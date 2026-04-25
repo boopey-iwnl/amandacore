@@ -16,14 +16,16 @@ import (
 func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	server := newWorldServer(fileStore)
 
-	mux.Handle("POST /v1/world/join-ticket", httpapi.RequireSession(fileStore, func(w http.ResponseWriter, r *http.Request, session *platform.Session) {
+	joinTicketHandler := httpapi.RequireSession(fileStore, func(w http.ResponseWriter, r *http.Request, session *platform.Session) {
 		var request joinTicketRequest
 		if err := httpapi.DecodeJSON(r, &request); err != nil {
 			httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
 			return
 		}
 
+		persistStartedAt := time.Now()
 		ticket, err := fileStore.IssueWorldJoinTicket(session.AccountID, session.ID, request.CharacterID, request.RealmID)
+		server.recordPersistenceDuration("world_join_ticket", persistStartedAt, err)
 		if err != nil {
 			httpapi.Error(w, http.StatusBadRequest, "join_ticket_failed", err.Error())
 			return
@@ -45,30 +47,47 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 		})
 
 		httpapi.WriteJSON(w, http.StatusCreated, ticket)
-	}))
+	})
+	mux.Handle("POST /v1/world/join-ticket", server.instrumentEndpoint("join_ticket", joinTicketHandler))
 
-	mux.HandleFunc("POST /v1/world/connect", server.handleConnect)
-	mux.HandleFunc("POST /v1/world/reconnect", server.handleReconnect)
-	mux.HandleFunc("POST /v1/world/move", server.handleMove)
-	mux.HandleFunc("POST /v1/world/disconnect", server.handleDisconnect)
-	mux.HandleFunc("POST /v1/world/target", server.handleTarget)
-	mux.HandleFunc("POST /v1/world/quest/accept", server.handleQuestAccept)
-	mux.HandleFunc("POST /v1/world/trainer/learn", server.handleTrainerLearn)
-	mux.HandleFunc("POST /v1/world/action-bar/assign", server.handleActionBarAssign)
-	mux.HandleFunc("POST /v1/world/action-bar/move", server.handleActionBarMove)
-	mux.HandleFunc("POST /v1/world/action-bar/clear", server.handleActionBarClear)
-	mux.HandleFunc("POST /v1/world/inventory/move", server.handleInventoryMove)
-	mux.HandleFunc("POST /v1/world/attack/auto", server.handleAutoAttack)
-	mux.HandleFunc("POST /v1/world/attack/ability", server.handleAbility)
-	mux.HandleFunc("GET /v1/world/state", server.handleState)
-	mux.HandleFunc("GET /v1/world/bootstrap", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /v1/world/connect", server.instrumentEndpointFunc("connect", server.handleConnect))
+	mux.HandleFunc("POST /v1/world/reconnect", server.instrumentEndpointFunc("reconnect", server.handleReconnect))
+	mux.HandleFunc("POST /v1/world/move", server.instrumentEndpointFunc("move", server.handleMove))
+	mux.HandleFunc("POST /v1/world/disconnect", server.instrumentEndpointFunc("disconnect", server.handleDisconnect))
+	mux.HandleFunc("POST /v1/world/target", server.instrumentEndpointFunc("target", server.handleTarget))
+	mux.HandleFunc("POST /v1/world/quest/accept", server.instrumentEndpointFunc("quest_accept", server.handleQuestAccept))
+	mux.HandleFunc("POST /v1/world/quest/track", server.instrumentEndpointFunc("quest_track", server.handleQuestTrack))
+	mux.HandleFunc("POST /v1/world/trainer/learn", server.instrumentEndpointFunc("trainer_learn", server.handleTrainerLearn))
+	mux.HandleFunc("POST /v1/world/profession/learn", server.instrumentEndpointFunc("profession_learn", server.handleProfessionLearn))
+	mux.HandleFunc("POST /v1/world/talent/select", server.instrumentEndpointFunc("talent_select", server.handleTalentSelect))
+	mux.HandleFunc("POST /v1/world/action-bar/assign", server.instrumentEndpointFunc("action_bar_assign", server.handleActionBarAssign))
+	mux.HandleFunc("POST /v1/world/action-bar/move", server.instrumentEndpointFunc("action_bar_move", server.handleActionBarMove))
+	mux.HandleFunc("POST /v1/world/action-bar/clear", server.instrumentEndpointFunc("action_bar_clear", server.handleActionBarClear))
+	mux.HandleFunc("POST /v1/world/inventory/move", server.instrumentEndpointFunc("inventory_move", server.handleInventoryMove))
+	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
+	mux.HandleFunc("POST /v1/world/vendor/buy", server.instrumentEndpointFunc("vendor_buy", server.handleVendorBuy))
+	mux.HandleFunc("POST /v1/world/vendor/sell", server.instrumentEndpointFunc("vendor_sell", server.handleVendorSell))
+	mux.HandleFunc("POST /v1/world/attack/auto", server.instrumentEndpointFunc("attack_auto", server.handleAutoAttack))
+	mux.HandleFunc("POST /v1/world/attack/ability", server.instrumentEndpointFunc("attack_ability", server.handleAbility))
+	mux.HandleFunc("GET /v1/world/social/state", server.instrumentEndpointFunc("social_state", server.handleSocialState))
+	mux.HandleFunc("POST /v1/world/chat/send", server.instrumentEndpointFunc("chat_send", server.handleChatSend))
+	mux.HandleFunc("POST /v1/world/friends/add", server.instrumentEndpointFunc("friends_add", server.handleFriendAdd))
+	mux.HandleFunc("POST /v1/world/friends/remove", server.instrumentEndpointFunc("friends_remove", server.handleFriendRemove))
+	mux.HandleFunc("POST /v1/world/party/invite", server.instrumentEndpointFunc("party_invite", server.handlePartyInvite))
+	mux.HandleFunc("POST /v1/world/party/accept", server.instrumentEndpointFunc("party_accept", server.handlePartyAccept))
+	mux.HandleFunc("POST /v1/world/party/decline", server.instrumentEndpointFunc("party_decline", server.handlePartyDecline))
+	mux.HandleFunc("POST /v1/world/party/leave", server.instrumentEndpointFunc("party_leave", server.handlePartyLeave))
+	mux.HandleFunc("POST /v1/world/party/disband", server.instrumentEndpointFunc("party_disband", server.handlePartyDisband))
+	mux.HandleFunc("GET /v1/world/state", server.instrumentEndpointFunc("state", server.handleState))
+	mux.HandleFunc("GET /v1/world/metrics", server.instrumentEndpointFunc("metrics", server.handleMetrics))
+	mux.HandleFunc("GET /v1/world/bootstrap", server.instrumentEndpointFunc("bootstrap", func(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, http.StatusOK, map[string]any{
 			"zoneId":   "sunset_frontier",
 			"cellId":   defaultZoneID,
 			"motd":     "Stonewake Vale is active. Muster at Hearthwatch Yard, train with Armsmaster Corin, and follow the westward road.",
 			"revision": "0.6.0-stonewake-starter-zone",
 		})
-	})
+	}))
 }
 
 func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +97,11 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	persistStartedAt := time.Now()
 	ticket, err := s.store.ConsumeWorldJoinTicket(request.TicketID)
+	s.recordPersistenceDuration("world_join_ticket_consume", persistStartedAt, err)
 	if err != nil {
+		s.metrics.recordSessionEvent("connect_ticket_failed")
 		httpapi.Error(w, http.StatusUnauthorized, "invalid_ticket", err.Error())
 		return
 	}
@@ -133,6 +155,8 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				"z":                 session.Z,
 				"resumeExisting":    true,
 			})
+			s.sendSystemMessageLocked("World session reconnected.", recipientSet(session.CharacterID))
+			s.metrics.recordSessionEvent("connect_resumed")
 			httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 			return
 		}
@@ -153,7 +177,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		LastSeenAt:  time.Now().Unix(),
 		Health:      playerMaxHealth,
 		MaxHealth:   playerMaxHealth,
-		Resource:    playerMaxResource,
+		Resource:    0,
 		MaxResource: playerMaxResource,
 		Alive:       true,
 	}
@@ -172,6 +196,8 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		"z":                 session.Z,
 		"resumeExisting":    false,
 	})
+	s.sendSystemMessageLocked("World session linked.", recipientSet(session.CharacterID))
+	s.metrics.recordSessionEvent("connect_created")
 	httpapi.WriteJSON(w, http.StatusCreated, s.buildResponse(session))
 }
 
@@ -192,6 +218,7 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 
 	session, ok := s.sessionsByToken[request.WorldSessionToken]
 	if !ok {
+		s.metrics.recordSessionEvent("reconnect_missing")
 		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
 		return
 	}
@@ -228,6 +255,8 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 		"health":            session.Health,
 		"resource":          session.Resource,
 	})
+	s.sendSystemMessageLocked("World session reconnected.", recipientSet(session.CharacterID))
+	s.metrics.recordSessionEvent("reconnect_succeeded")
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 }
 
@@ -261,7 +290,9 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
 
+	persistStartedAt := time.Now()
 	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
+	s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
 	if err != nil {
 		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
 		return
@@ -307,7 +338,9 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
 
+	persistStartedAt := time.Now()
 	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
+	s.recordPersistenceDuration("character_state_disconnect", persistStartedAt, err)
 	if err != nil {
 		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
 		return
@@ -324,6 +357,7 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		"z":                 character.PositionZ,
 	})
 
+	s.metrics.recordSessionEvent("disconnect_succeeded")
 	httpapi.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -379,6 +413,93 @@ func (s *worldServer) handleInventoryMove(w http.ResponseWriter, r *http.Request
 
 	if err := s.moveInventorySlotLocked(session, request.FromSlotIndex, request.ToSlotIndex); err != nil {
 		httpapi.Error(w, http.StatusBadRequest, "inventory_move_failed", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleInventoryEquip(w http.ResponseWriter, r *http.Request) {
+	var request inventoryEquipRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.equipInventorySlotLocked(session, request.SlotIndex); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "inventory_equip_failed", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleVendorBuy(w http.ResponseWriter, r *http.Request) {
+	var request vendorBuyRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.buyVendorItemLocked(session, request.VendorID, request.ItemID, request.StackCount); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "vendor_buy_failed", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleVendorSell(w http.ResponseWriter, r *http.Request) {
+	var request vendorSellRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.sellVendorItemLocked(session, request.VendorID, request.SlotIndex, request.StackCount); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "vendor_sell_failed", err.Error())
 		return
 	}
 
@@ -443,6 +564,54 @@ func (s *worldServer) handleQuestAccept(w http.ResponseWriter, r *http.Request) 
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 }
 
+func (s *worldServer) handleQuestTrack(w http.ResponseWriter, r *http.Request) {
+	var request questTrackRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	quest, found := s.quests[request.QuestID]
+	if !found {
+		httpapi.Error(w, http.StatusBadRequest, "quest_invalid", "Quest is not available.")
+		return
+	}
+	progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+	if request.Tracked && progress.State != questStateActive && progress.State != questStateCompleted {
+		httpapi.Error(w, http.StatusBadRequest, "quest_tracking_invalid", "Only active or ready-to-turn-in quests can be tracked.")
+		return
+	}
+
+	if request.Tracked {
+		s.trackQuestLocked(session, quest.ID)
+	} else {
+		s.untrackQuestLocked(session, quest.ID)
+	}
+
+	character, err := s.store.UpdateCharacterTrackedQuests(session.CharacterID, session.TrackedQuestIDs)
+	if err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "quest_tracking_save_failed", err.Error())
+		return
+	}
+	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(character.TrackedQuestIDs, session.QuestProgress)
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
 func (s *worldServer) handleAutoAttack(w http.ResponseWriter, r *http.Request) {
 	var request autoAttackRequest
 	if err := httpapi.DecodeJSON(r, &request); err != nil {
@@ -495,6 +664,64 @@ func (s *worldServer) handleTrainerLearn(w http.ResponseWriter, r *http.Request)
 
 	if err := s.learnTrainerAbilityLocked(session, request.TrainerID, request.AbilityID); err != nil {
 		httpapi.Error(w, http.StatusBadRequest, "trainer_learn_invalid", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleProfessionLearn(w http.ResponseWriter, r *http.Request) {
+	var request professionLearnRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.learnProfessionLocked(session, request.TrainerID, request.ProfessionID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "profession_learn_invalid", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleTalentSelect(w http.ResponseWriter, r *http.Request) {
+	var request talentSelectRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.selectTalentLocked(session, request.TalentID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "talent_select_invalid", err.Error())
 		return
 	}
 
@@ -614,6 +841,7 @@ func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
 
 func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 	s.ensureMobsLocked()
+	s.touchSessionLocked(session)
 
 	if session.QuestProgress == nil {
 		session.QuestProgress = map[string]platform.CharacterQuestProgress{}
@@ -622,6 +850,9 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 	entities := make([]sessionEntity, 0, len(s.sessionsByToken)+len(s.mobOrder)+len(s.friendlyNPCOrder))
 	for _, npcID := range s.friendlyNPCOrder {
 		npc := s.friendlyNPCs[npcID]
+		if npc.ZoneID != session.ZoneID {
+			continue
+		}
 		entities = append(entities, sessionEntity{
 			ID:          npc.ID,
 			DisplayName: npc.DisplayName,
@@ -640,7 +871,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 
 	for _, mobID := range s.mobOrder {
 		mob := s.mobs[mobID]
-		if mob == nil {
+		if mob == nil || mob.ZoneID != session.ZoneID {
 			continue
 		}
 
@@ -694,6 +925,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"maxHealth":      session.MaxHealth,
 		"resource":       session.Resource,
 		"maxResource":    session.MaxResource,
+		"resourceName":   "Grit",
 		"alive":          session.Alive,
 		"experience":     session.Experience,
 		"currencyCopper": session.CurrencyCopper,
@@ -702,12 +934,24 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 			SlotCount: platform.InventorySlotCount,
 			Slots:     platform.NormalizeInventorySlots(session.Inventory),
 		},
+		"equipment": equipmentResponse{
+			Slots: platform.NormalizeEquipmentSlots(session.Equipment),
+		},
+		"stats":                s.buildStatsResponse(session),
+		"talents":              s.buildTalentsResponse(session),
 		"learnedAbilityIds":    platform.NormalizeLearnedAbilityIDs(session.LearnedAbilityIDs),
 		"spellbook":            s.buildSpellbookResponse(session),
 		"actionBar":            s.buildActionBarResponse(session),
 		"trainer":              s.buildTrainerResponse(session),
-		"quest":                s.buildQuestResponse(session.QuestProgress),
+		"professions":          s.buildProfessionsResponse(session),
+		"professionTrainer":    s.buildProfessionTrainerResponse(session),
+		"vendor":               s.buildVendorResponse(session),
+		"quest":                s.buildQuestResponse(session),
 		"quests":               s.buildQuestListResponse(session),
+		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
+		"zoneMap":              s.buildZoneMapResponse(),
+		"navigationAreas":      s.buildNavigationAreasResponse(),
+		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"currentTargetId":      session.CurrentTargetID,
 		"autoAttackActive":     session.AutoAttackActive,
 		"globalCooldownEndsAt": session.GlobalCooldownEnds,
@@ -753,10 +997,10 @@ func clamp(value float64, minimum float64, maximum float64) float64 {
 }
 
 func resolveStarterZoneMovement(currentX float64, currentY float64, deltaX float64, deltaY float64) (float64, float64) {
-	candidateX := clamp(currentX+deltaX, 0.0, 100.0)
-	candidateY := clamp(currentY+deltaY, 0.0, 100.0)
+	candidateX := clamp(currentX+deltaX, 0.0, starterZoneMaxX)
+	candidateY := clamp(currentY+deltaY, 0.0, starterZoneMaxY)
 
-	if candidateX >= 18.0 && candidateX <= 22.0 && candidateY >= 6.0 && candidateY <= 11.0 {
+	if candidateX >= 72.0 && candidateX <= 80.0 && candidateY >= 28.0 && candidateY <= 46.0 {
 		return currentX, currentY
 	}
 

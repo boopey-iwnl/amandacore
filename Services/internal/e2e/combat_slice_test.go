@@ -197,7 +197,7 @@ func TestCombatSliceHardening(t *testing.T) {
 
 	t.Run("target switching between hostile mobs stays authoritative", func(t *testing.T) {
 		fixture := newCombatFixture(t)
-		state := fixture.moveToPosition(t, 18.0, 16.0)
+		state := fixture.moveToPosition(t, 89.0, 37.0)
 		firstMobID := stonewakeCombatMob1
 		secondMobID := stonewakeCombatMob2
 
@@ -214,7 +214,7 @@ func TestCombatSliceHardening(t *testing.T) {
 
 	t.Run("auto attack cleanly switches to the new target without continuing on the old target", func(t *testing.T) {
 		fixture := newCombatFixture(t)
-		state := fixture.moveToPosition(t, 18.0, 16.0)
+		state := fixture.moveToPosition(t, 89.0, 37.0)
 		state = fixture.targetMobByID(t, stonewakeCombatMob1)
 
 		postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/attack/auto", nil, map[string]any{
@@ -248,7 +248,7 @@ func TestCombatSliceHardening(t *testing.T) {
 
 	t.Run("steady strike stays bound to the currently selected target", func(t *testing.T) {
 		fixture := newCombatFixture(t)
-		state := fixture.moveToPosition(t, 18.0, 16.0)
+		state := fixture.moveToPosition(t, 88.0, 37.0)
 		state = fixture.targetMobByID(t, stonewakeCombatMob1)
 		firstMob := findHostileMobByID(t, state, stonewakeCombatMob1)
 		secondMob := findHostileMobByID(t, state, stonewakeCombatMob2)
@@ -310,7 +310,8 @@ func TestCombatSliceHardening(t *testing.T) {
 		}
 
 		mob = findHostileMobByID(t, state, stonewakeDeathMob)
-		if mob["aiState"].(string) == "aggro" || mob["aiState"].(string) == "chase" {
+		switch mob["aiState"].(string) {
+		case "alerted", "chasing", "attacking":
 			t.Fatalf("expected reconnect to return mob to a non-engaged state, got %v", mob["aiState"])
 		}
 	})

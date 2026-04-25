@@ -12,6 +12,7 @@ $startScript = Join-Path $PSScriptRoot "start-local.ps1"
 $stopScript = Join-Path $PSScriptRoot "stop-local.ps1"
 $buildClientScript = Join-Path $PSScriptRoot "build-playable-client.ps1"
 $processManifest = Join-Path $PSScriptRoot "local-processes.json"
+$versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
 $serviceLogsRoot = Join-Path $PSScriptRoot "logs"
 $userLogRoot = Join-Path $repoRoot "user\log"
 $gameLogPath = Join-Path $userLogRoot "Game.log"
@@ -128,6 +129,34 @@ function Get-StackSnapshot {
     }
 }
 
+function Get-VersionManifestSummary {
+    if (!(Test-Path $versionManifestPath)) {
+        return "Not present"
+    }
+
+    try {
+        $manifest = Get-Content -Path $versionManifestPath -Raw | ConvertFrom-Json
+        $buildId = [string]$manifest.buildId
+        $clientVersion = [string]$manifest.clientVersion
+        $protocolVersion = [string]$manifest.protocolVersion
+        if ([string]::IsNullOrWhiteSpace($buildId)) {
+            return "Invalid manifest"
+        }
+
+        $shortBuildId = if ($buildId.Length -gt 52) {
+            $buildId.Substring(0, 44) + "..." + $buildId.Substring($buildId.Length - 5)
+        }
+        else {
+            $buildId
+        }
+
+        return "$shortBuildId | client $clientVersion | protocol $protocolVersion"
+    }
+    catch {
+        return "Unreadable: $($_.Exception.Message)"
+    }
+}
+
 function Set-StatusMessage {
     param(
         [Parameter(Mandatory = $true)]
@@ -166,6 +195,7 @@ function Refresh-Status {
     }
 
     $manifestValueLabel.Text = if ($snapshot.ManifestPresent) { $processManifest } else { "Not present" }
+    $buildValueLabel.Text = Get-VersionManifestSummary
     $servicesValueLabel.Text = if ($snapshot.RunningServices.Count -gt 0) {
         $snapshot.RunningServices -join ", "
     }
@@ -179,6 +209,7 @@ function Refresh-Status {
         "User log folder: $userLogRoot",
         "Local state store: $stateStore",
         "Process manifest: $processManifest",
+        "Version manifest: $versionManifestPath",
         "Desktop shortcut: $desktopShortcut",
         "Launcher executable: $launcherExe",
         "O3DE client (windows): $o3deWindowsExe",
@@ -189,8 +220,8 @@ function Refresh-Status {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "amandacore Local Ops"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(760, 510)
-$form.MinimumSize = New-Object System.Drawing.Size(760, 510)
+$form.Size = New-Object System.Drawing.Size(760, 540)
+$form.MinimumSize = New-Object System.Drawing.Size(760, 540)
 $form.MaximizeBox = $false
 
 $titleLabel = New-Object System.Windows.Forms.Label
@@ -247,7 +278,7 @@ $form.Controls.Add($statusLabel)
 $statusGroup = New-Object System.Windows.Forms.GroupBox
 $statusGroup.Text = "Current Status"
 $statusGroup.Location = New-Object System.Drawing.Point(20, 180)
-$statusGroup.Size = New-Object System.Drawing.Size(696, 132)
+$statusGroup.Size = New-Object System.Drawing.Size(696, 158)
 $form.Controls.Add($statusGroup)
 
 function Add-StatusRow {
@@ -273,28 +304,29 @@ function Add-StatusRow {
 $stackValueLabel = Add-StatusRow -Label "Stack" -Y 26
 $launcherValueLabel = Add-StatusRow -Label "Launcher" -Y 50
 $gameValueLabel = Add-StatusRow -Label "Game Client" -Y 74
-$manifestValueLabel = Add-StatusRow -Label "Process Manifest" -Y 98
+$buildValueLabel = Add-StatusRow -Label "Build" -Y 98
+$manifestValueLabel = Add-StatusRow -Label "Process Manifest" -Y 122
 
 $servicesLabel = New-Object System.Windows.Forms.Label
 $servicesLabel.Text = "Running Services"
-$servicesLabel.Location = New-Object System.Drawing.Point(20, 326)
+$servicesLabel.Location = New-Object System.Drawing.Point(20, 352)
 $servicesLabel.Size = New-Object System.Drawing.Size(140, 22)
 $form.Controls.Add($servicesLabel)
 
 $servicesValueLabel = New-Object System.Windows.Forms.Label
-$servicesValueLabel.Location = New-Object System.Drawing.Point(162, 326)
+$servicesValueLabel.Location = New-Object System.Drawing.Point(162, 352)
 $servicesValueLabel.Size = New-Object System.Drawing.Size(554, 36)
 $servicesValueLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $form.Controls.Add($servicesValueLabel)
 
 $pathsLabel = New-Object System.Windows.Forms.Label
 $pathsLabel.Text = "Main Paths"
-$pathsLabel.Location = New-Object System.Drawing.Point(20, 364)
+$pathsLabel.Location = New-Object System.Drawing.Point(20, 390)
 $pathsLabel.Size = New-Object System.Drawing.Size(120, 22)
 $form.Controls.Add($pathsLabel)
 
 $pathBox = New-Object System.Windows.Forms.TextBox
-$pathBox.Location = New-Object System.Drawing.Point(20, 390)
+$pathBox.Location = New-Object System.Drawing.Point(20, 416)
 $pathBox.Size = New-Object System.Drawing.Size(696, 68)
 $pathBox.Multiline = $true
 $pathBox.ReadOnly = $true

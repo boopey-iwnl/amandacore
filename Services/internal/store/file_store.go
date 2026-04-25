@@ -27,6 +27,10 @@ var (
 	ErrSessionExpired      = errors.New("session has expired")
 	ErrCharacterNameExists = errors.New("character name already exists in this realm")
 	ErrJoinTicketConsumed  = errors.New("join ticket has already been consumed")
+	ErrFriendExists        = errors.New("friend entry already exists")
+	ErrFriendSelf          = errors.New("cannot add yourself as a friend")
+	ErrFriendMissing       = errors.New("friend entry does not exist")
+	ErrPartyMissing        = errors.New("party does not exist")
 )
 
 type state struct {
@@ -36,6 +40,8 @@ type state struct {
 	Sessions         map[string]platform.Session             `json:"sessions"`
 	WorldJoinTickets map[string]platform.WorldJoinTicket     `json:"worldJoinTickets"`
 	PasswordReset    map[string]platform.PasswordResetTicket `json:"passwordReset"`
+	Friends          map[string]platform.FriendRelationship  `json:"friends"`
+	Parties          map[string]platform.Party               `json:"parties"`
 	BuildManifest    platform.BuildManifest                  `json:"buildManifest"`
 }
 
@@ -47,6 +53,7 @@ type FileStore struct {
 }
 
 func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore, error) {
+	buildManifest := defaultBuildManifest(buildID, worldEndpoint)
 	fileStore := &FileStore{
 		path:     path,
 		fileLock: flock.New(path + ".lock"),
@@ -57,15 +64,9 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 			Sessions:         map[string]platform.Session{},
 			WorldJoinTickets: map[string]platform.WorldJoinTicket{},
 			PasswordReset:    map[string]platform.PasswordResetTicket{},
-			BuildManifest: platform.BuildManifest{
-				ID:                buildID,
-				Channel:           "development",
-				DisplayVersion:    buildID,
-				RequiredServices:  []string{"auth-service", "realm-service", "character-service", "world-service"},
-				LauncherNews:      "amandacore development environment",
-				AllowedForLogin:   true,
-				WorldEndpointHint: worldEndpoint,
-			},
+			Friends:          map[string]platform.FriendRelationship{},
+			Parties:          map[string]platform.Party{},
+			BuildManifest:    buildManifest,
 		},
 	}
 
@@ -74,7 +75,7 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 	}
 	defer fileStore.unlockState()
 
-	fileStore.ensureDefaultRealm(buildID, worldEndpoint)
+	fileStore.applyRuntimeBuildManifest(buildManifest, worldEndpoint)
 	return fileStore, fileStore.saveLocked()
 }
 
@@ -445,23 +446,27 @@ func (s *FileStore) CreateCharacter(accountID string, realmID string, displayNam
 	archetypeID, raceID, classID = platform.NormalizeCharacterIdentity(archetypeID, raceID, classID)
 
 	character := platform.Character{
-		ID:             randomID("char"),
-		AccountID:      accountID,
-		RealmID:        realmID,
-		DisplayName:    displayName,
-		RaceID:         raceID,
-		ClassID:        classID,
-		ArchetypeID:    archetypeID,
-		Level:          1,
-		Experience:     0,
-		CurrencyCopper: platform.StarterCurrencyCopper,
-		ZoneID:         platform.DefaultStarterZoneID,
-		PositionX:      platform.DefaultStarterSpawnX,
-		PositionY:      platform.DefaultStarterSpawnY,
-		PositionZ:      platform.DefaultStarterSpawnZ,
-		Inventory:      platform.DefaultStarterInventory(),
-		Quests:         map[string]platform.CharacterQuestProgress{},
-		LastSeenAt:     time.Now().Unix(),
+		ID:              randomID("char"),
+		AccountID:       accountID,
+		RealmID:         realmID,
+		DisplayName:     displayName,
+		RaceID:          raceID,
+		ClassID:         classID,
+		ArchetypeID:     archetypeID,
+		Level:           1,
+		Experience:      0,
+		CurrencyCopper:  platform.StarterCurrencyCopper,
+		ZoneID:          platform.DefaultStarterZoneID,
+		PositionX:       platform.DefaultStarterSpawnX,
+		PositionY:       platform.DefaultStarterSpawnY,
+		PositionZ:       platform.DefaultStarterSpawnZ,
+		Inventory:       platform.DefaultStarterInventory(),
+		Equipment:       platform.DefaultEquipmentSlots(),
+		Professions:     []platform.CharacterProfessionState{},
+		Talents:         map[string]int{},
+		Quests:          map[string]platform.CharacterQuestProgress{},
+		TrackedQuestIDs: []string{},
+		LastSeenAt:      time.Now().Unix(),
 	}
 
 	character = platform.NormalizeCharacter(character)
@@ -566,6 +571,192 @@ func (s *FileStore) GetCharacterByID(characterID string) (*platform.Character, e
 	return &copy, nil
 }
 
+func (s *FileStore) GetCharacterByName(realmID string, displayName string) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	normalizedName := normalize(displayName)
+	for _, character := range s.state.Characters {
+		if realmID != "" && character.RealmID != realmID {
+			continue
+		}
+		if normalize(character.DisplayName) != normalizedName {
+			continue
+		}
+
+		copy := normalizedCharacterCopy(character)
+		return &copy, nil
+	}
+
+	return nil, fmt.Errorf("character not found")
+}
+
+func (s *FileStore) AddFriend(ownerCharacterID string, friendCharacterID string) (platform.FriendRelationship, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.FriendRelationship{}, err
+	}
+	defer s.unlockState()
+
+	owner, ok := s.state.Characters[ownerCharacterID]
+	if !ok {
+		return platform.FriendRelationship{}, fmt.Errorf("owner character not found")
+	}
+	friend, ok := s.state.Characters[friendCharacterID]
+	if !ok {
+		return platform.FriendRelationship{}, fmt.Errorf("friend character not found")
+	}
+	if owner.ID == friend.ID {
+		return platform.FriendRelationship{}, ErrFriendSelf
+	}
+	if owner.RealmID != friend.RealmID {
+		return platform.FriendRelationship{}, fmt.Errorf("friend is not on this realm")
+	}
+
+	key := friendKey(owner.ID, friend.ID)
+	if _, exists := s.state.Friends[key]; exists {
+		return platform.FriendRelationship{}, ErrFriendExists
+	}
+
+	relationship := platform.FriendRelationship{
+		OwnerCharacterID:  owner.ID,
+		FriendCharacterID: friend.ID,
+		FriendDisplayName: friend.DisplayName,
+		CreatedAt:         time.Now().Unix(),
+	}
+	s.state.Friends[key] = relationship
+	return relationship, s.saveLocked()
+}
+
+func (s *FileStore) RemoveFriend(ownerCharacterID string, friendCharacterID string) error {
+	if err := s.lockState(true); err != nil {
+		return err
+	}
+	defer s.unlockState()
+
+	key := friendKey(ownerCharacterID, friendCharacterID)
+	if _, exists := s.state.Friends[key]; !exists {
+		return ErrFriendMissing
+	}
+
+	delete(s.state.Friends, key)
+	return s.saveLocked()
+}
+
+func (s *FileStore) ListFriends(ownerCharacterID string) ([]platform.FriendRelationship, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	results := make([]platform.FriendRelationship, 0)
+	for _, relationship := range s.state.Friends {
+		if relationship.OwnerCharacterID != ownerCharacterID {
+			continue
+		}
+		if friend, ok := s.state.Characters[relationship.FriendCharacterID]; ok {
+			relationship.FriendDisplayName = friend.DisplayName
+		}
+		results = append(results, relationship)
+	}
+	return results, nil
+}
+
+func (s *FileStore) CreateParty(leaderCharacterID string, memberCharacterIDs []string) (platform.Party, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.Party{}, err
+	}
+	defer s.unlockState()
+
+	if _, ok := s.state.Characters[leaderCharacterID]; !ok {
+		return platform.Party{}, fmt.Errorf("leader character not found")
+	}
+
+	members := normalizePartyMembers(leaderCharacterID, memberCharacterIDs)
+	now := time.Now().Unix()
+	party := platform.Party{
+		ID:                 randomID("party"),
+		LeaderCharacterID:  leaderCharacterID,
+		MemberCharacterIDs: members,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+	s.state.Parties[party.ID] = party
+	return party, s.saveLocked()
+}
+
+func (s *FileStore) SaveParty(party platform.Party) (platform.Party, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.Party{}, err
+	}
+	defer s.unlockState()
+
+	if party.ID == "" {
+		return platform.Party{}, ErrPartyMissing
+	}
+	if _, exists := s.state.Parties[party.ID]; !exists {
+		return platform.Party{}, ErrPartyMissing
+	}
+	party.MemberCharacterIDs = normalizePartyMembers(party.LeaderCharacterID, party.MemberCharacterIDs)
+	if len(party.MemberCharacterIDs) == 0 {
+		delete(s.state.Parties, party.ID)
+		return party, s.saveLocked()
+	}
+	if !containsString(party.MemberCharacterIDs, party.LeaderCharacterID) {
+		party.LeaderCharacterID = party.MemberCharacterIDs[0]
+	}
+	party.UpdatedAt = time.Now().Unix()
+	s.state.Parties[party.ID] = party
+	return party, s.saveLocked()
+}
+
+func (s *FileStore) DeleteParty(partyID string) error {
+	if err := s.lockState(true); err != nil {
+		return err
+	}
+	defer s.unlockState()
+
+	if _, exists := s.state.Parties[partyID]; !exists {
+		return ErrPartyMissing
+	}
+	delete(s.state.Parties, partyID)
+	return s.saveLocked()
+}
+
+func (s *FileStore) GetPartyByID(partyID string) (*platform.Party, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	party, ok := s.state.Parties[partyID]
+	if !ok {
+		return nil, ErrPartyMissing
+	}
+	copy := party
+	copy.MemberCharacterIDs = append([]string(nil), party.MemberCharacterIDs...)
+	return &copy, nil
+}
+
+func (s *FileStore) GetPartyForCharacter(characterID string) (*platform.Party, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	for _, party := range s.state.Parties {
+		if !containsString(party.MemberCharacterIDs, characterID) {
+			continue
+		}
+		copy := party
+		copy.MemberCharacterIDs = append([]string(nil), party.MemberCharacterIDs...)
+		return &copy, nil
+	}
+
+	return nil, ErrPartyMissing
+}
+
 func (s *FileStore) UpdateCharacterState(characterID string, zoneID string, x float64, y float64, z float64) (*platform.Character, error) {
 	if err := s.lockState(true); err != nil {
 		return nil, err
@@ -618,6 +809,123 @@ func (s *FileStore) UpdateCharacterProgression(
 	character.LearnedAbilityIDs = append([]string(nil), learnedAbilityIDs...)
 	character.ActionBarSlots = platform.NormalizeActionBarSlots(actionBarSlots, character.LearnedAbilityIDs)
 	character.Quests = cloneQuestProgressMap(quests)
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
+func (s *FileStore) UpdateCharacterTrackedQuests(characterID string, trackedQuestIDs []string) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	character.TrackedQuestIDs = cloneStringIDs(trackedQuestIDs)
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
+func (s *FileStore) UpdateCharacterEconomy(
+	characterID string,
+	currencyCopper int,
+	inventory []platform.CharacterInventorySlot,
+	equipment []platform.CharacterEquipmentSlot,
+) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	if currencyCopper < 0 {
+		currencyCopper = 0
+	}
+	character.CurrencyCopper = currencyCopper
+	character.Inventory = cloneInventorySlots(inventory)
+	character.Equipment = cloneEquipmentSlots(equipment)
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
+func (s *FileStore) UpdateCharacterProfessions(
+	characterID string,
+	currencyCopper int,
+	professions []platform.CharacterProfessionState,
+) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	if currencyCopper < 0 {
+		currencyCopper = 0
+	}
+	character.CurrencyCopper = currencyCopper
+	character.Professions = cloneProfessionStates(professions)
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
+func (s *FileStore) UpdateCharacterTalents(
+	characterID string,
+	talents map[string]int,
+) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	character.Talents = cloneTalentRanks(talents)
 	character = platform.NormalizeCharacter(character)
 	character.LastSeenAt = time.Now().Unix()
 	s.state.Characters[characterID] = character
@@ -720,6 +1028,12 @@ func (s *FileStore) load() error {
 	if loaded.PasswordReset != nil {
 		s.state.PasswordReset = loaded.PasswordReset
 	}
+	if loaded.Friends != nil {
+		s.state.Friends = loaded.Friends
+	}
+	if loaded.Parties != nil {
+		s.state.Parties = loaded.Parties
+	}
 	if loaded.BuildManifest.ID != "" {
 		s.state.BuildManifest = loaded.BuildManifest
 	}
@@ -763,6 +1077,12 @@ func (s *FileStore) reloadLocked() error {
 	}
 	if loaded.PasswordReset == nil {
 		loaded.PasswordReset = map[string]platform.PasswordResetTicket{}
+	}
+	if loaded.Friends == nil {
+		loaded.Friends = map[string]platform.FriendRelationship{}
+	}
+	if loaded.Parties == nil {
+		loaded.Parties = map[string]platform.Party{}
 	}
 	if loaded.BuildManifest.ID == "" {
 		loaded.BuildManifest = s.state.BuildManifest
@@ -821,20 +1141,65 @@ func (s *FileStore) saveLocked() error {
 	return os.Rename(tempPath, s.path)
 }
 
-func (s *FileStore) ensureDefaultRealm(buildID string, worldEndpoint string) {
-	if len(s.state.Realms) > 0 {
-		return
+func defaultBuildManifest(buildID string, worldEndpoint string) platform.BuildManifest {
+	clientVersion := envOrDefault("AMANDACORE_CLIENT_VERSION", buildID)
+	serverVersion := envOrDefault("AMANDACORE_SERVER_VERSION", buildID)
+	contentVersion := envOrDefault("AMANDACORE_CONTENT_VERSION", buildID)
+	protocolVersion := envOrDefault("AMANDACORE_PROTOCOL_VERSION", "local-dev-1")
+	apiVersion := envOrDefault("AMANDACORE_API_VERSION", "local-api-1")
+
+	return platform.BuildManifest{
+		ID:                         buildID,
+		Channel:                    envOrDefault("AMANDACORE_BUILD_CHANNEL", "development"),
+		DisplayVersion:             envOrDefault("AMANDACORE_DISPLAY_VERSION", buildID),
+		ClientVersion:              clientVersion,
+		ServerVersion:              serverVersion,
+		ContentVersion:             contentVersion,
+		ProtocolVersion:            protocolVersion,
+		APIVersion:                 apiVersion,
+		CompatibleClientVersions:   []string{clientVersion},
+		CompatibleServerVersions:   []string{serverVersion},
+		CompatibleProtocolVersions: []string{protocolVersion},
+		RequiredServices: []string{
+			"auth-service",
+			"account-service",
+			"realm-service",
+			"character-service",
+			"world-service",
+			"admin-service",
+		},
+		LauncherNews:      "amandacore development environment",
+		AllowedForLogin:   true,
+		WorldEndpointHint: worldEndpoint,
+		GeneratedAtUTC:    envOrDefault("AMANDACORE_BUILD_GENERATED_AT_UTC", time.Now().UTC().Format(time.RFC3339)),
+	}
+}
+
+func (s *FileStore) applyRuntimeBuildManifest(buildManifest platform.BuildManifest, worldEndpoint string) {
+	s.state.BuildManifest = buildManifest
+
+	realm, ok := s.state.Realms["sunset-frontier-dev"]
+	if !ok {
+		realm = platform.Realm{
+			ID:          "sunset-frontier-dev",
+			DisplayName: "Sunset Frontier Dev",
+			Region:      "local",
+		}
 	}
 
-	s.state.Realms["sunset-frontier-dev"] = platform.Realm{
-		ID:             "sunset-frontier-dev",
-		DisplayName:    "Sunset Frontier Dev",
-		Region:         "local",
-		Endpoint:       worldEndpoint,
-		SupportedBuild: buildID,
-		OnlinePlayers:  0,
-		Online:         true,
+	realm.Endpoint = worldEndpoint
+	realm.SupportedBuild = buildManifest.ID
+	realm.Online = true
+	s.state.Realms["sunset-frontier-dev"] = realm
+}
+
+func envOrDefault(key string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
 	}
+
+	return value
 }
 
 func hashPassword(password string) (string, error) {
@@ -880,6 +1245,43 @@ func normalize(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
+func friendKey(ownerCharacterID string, friendCharacterID string) string {
+	return ownerCharacterID + ":" + friendCharacterID
+}
+
+func normalizePartyMembers(leaderCharacterID string, memberCharacterIDs []string) []string {
+	seen := map[string]struct{}{}
+	members := make([]string, 0, len(memberCharacterIDs)+1)
+
+	if leaderCharacterID != "" {
+		seen[leaderCharacterID] = struct{}{}
+		members = append(members, leaderCharacterID)
+	}
+
+	for _, characterID := range memberCharacterIDs {
+		characterID = strings.TrimSpace(characterID)
+		if characterID == "" {
+			continue
+		}
+		if _, exists := seen[characterID]; exists {
+			continue
+		}
+		seen[characterID] = struct{}{}
+		members = append(members, characterID)
+	}
+
+	return members
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func containsRole(roles []platform.Role, target platform.Role) bool {
 	for _, role := range roles {
 		if role == target {
@@ -905,15 +1307,35 @@ func cloneInventorySlots(source []platform.CharacterInventorySlot) []platform.Ch
 	return platform.NormalizeInventorySlots(source)
 }
 
+func cloneEquipmentSlots(source []platform.CharacterEquipmentSlot) []platform.CharacterEquipmentSlot {
+	return platform.NormalizeEquipmentSlots(source)
+}
+
+func cloneProfessionStates(source []platform.CharacterProfessionState) []platform.CharacterProfessionState {
+	return platform.NormalizeProfessionStates(source)
+}
+
+func cloneTalentRanks(source map[string]int) map[string]int {
+	return platform.NormalizeTalentRanks(source)
+}
+
 func cloneActionBarSlots(source []platform.CharacterActionBarSlot, learnedAbilityIDs []string) []platform.CharacterActionBarSlot {
 	return platform.NormalizeActionBarSlots(source, learnedAbilityIDs)
+}
+
+func cloneStringIDs(source []string) []string {
+	return platform.NormalizeStringIDs(source)
 }
 
 func normalizedCharacterCopy(source platform.Character) platform.Character {
 	normalized := platform.NormalizeCharacter(source)
 	normalized.Inventory = cloneInventorySlots(normalized.Inventory)
+	normalized.Equipment = cloneEquipmentSlots(normalized.Equipment)
+	normalized.Professions = cloneProfessionStates(normalized.Professions)
+	normalized.Talents = cloneTalentRanks(normalized.Talents)
 	normalized.ActionBarSlots = cloneActionBarSlots(normalized.ActionBarSlots, normalized.LearnedAbilityIDs)
 	normalized.Quests = cloneQuestProgressMap(normalized.Quests)
+	normalized.TrackedQuestIDs = cloneStringIDs(normalized.TrackedQuestIDs)
 	return normalized
 }
 

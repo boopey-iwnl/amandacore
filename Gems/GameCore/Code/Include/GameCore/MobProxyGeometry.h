@@ -9,16 +9,16 @@ namespace GameCore
 {
     namespace MobProxyGeometry
     {
-        constexpr float BodyHeight = 1.3f;
-        constexpr float BodyRadius = 1.35f;
-        constexpr float HeadHeight = 2.65f;
-        constexpr float HeadRadius = 0.6f;
-        constexpr float BaseRingRadius = 1.75f;
-        constexpr float BaseRingSphereRadius = 0.15f;
+        constexpr float BodyHeight = 1.0f;
+        constexpr float BodyRadius = 0.78f;
+        constexpr float HeadHeight = 1.95f;
+        constexpr float HeadRadius = 0.34f;
+        constexpr float BaseRingRadius = 1.05f;
+        constexpr float BaseRingSphereRadius = 0.09f;
         constexpr int BaseRingSegments = 16;
-        constexpr float InstancePipHeight = 4.35f;
-        constexpr float InstancePipSpacing = 0.42f;
-        constexpr float InstancePipRadius = 0.22f;
+        constexpr float InstancePipHeight = 3.05f;
+        constexpr float InstancePipSpacing = 0.30f;
+        constexpr float InstancePipRadius = 0.13f;
         constexpr float TwoPi = 6.28318530717958647692f;
 
         inline int GetMobOrdinal(const AZStd::string& mobId)

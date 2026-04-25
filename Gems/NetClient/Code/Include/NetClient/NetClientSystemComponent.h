@@ -68,6 +68,14 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool TrackQuest(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& questId,
+            bool tracked,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool SetAutoAttack(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,

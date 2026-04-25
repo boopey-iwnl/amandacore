@@ -26,10 +26,10 @@ namespace NpcAi
     namespace
     {
         constexpr float PlayerTargetRange = 28.0f;
-        constexpr float CommandPointX = 8.0f;
-        constexpr float CommandPointY = 8.0f;
-        constexpr float EncounterAnchorX = 58.0f;
-        constexpr float EncounterAnchorY = 36.0f;
+        constexpr float CommandPointX = 13.0f;
+        constexpr float CommandPointY = 10.0f;
+        constexpr float EncounterAnchorX = 322.0f;
+        constexpr float EncounterAnchorY = 174.0f;
         constexpr float RingSphereRadius = 0.18f;
         constexpr int RingSegments = 18;
         constexpr int MarkerSteps = 5;
@@ -404,11 +404,15 @@ namespace NpcAi
                     ? AZ::Color(0.95f, 0.32f, 0.18f, 1.0f)
                     : AZ::Color(0.35f, 0.55f, 0.35f, 1.0f);
 
-                DrawPathNode(auxGeom, 16.0f, 14.0f, routeColor);
-                DrawPathNode(auxGeom, 28.0f, 18.0f, routeColor);
-                DrawPathNode(auxGeom, 42.0f, 25.0f, routeColor);
-                DrawPathNode(auxGeom, 58.0f, 36.0f, routeColor);
-                DrawPathNode(auxGeom, 72.0f, 48.0f, routeColor);
+                DrawPathNode(auxGeom, 22.0f, 14.0f, routeColor);
+                DrawPathNode(auxGeom, 52.0f, 26.0f, routeColor);
+                DrawPathNode(auxGeom, 84.0f, 36.0f, routeColor);
+                DrawPathNode(auxGeom, 134.0f, 64.0f, routeColor);
+                DrawPathNode(auxGeom, 184.0f, 96.0f, routeColor);
+                DrawPathNode(auxGeom, 232.0f, 118.0f, routeColor);
+                DrawPathNode(auxGeom, 322.0f, 174.0f, routeColor);
+                DrawPathNode(auxGeom, 420.0f, 224.0f, routeColor);
+                DrawPathNode(auxGeom, 438.0f, 246.0f, routeColor);
 
                 DrawRing(auxGeom, AZ::Vector3(EncounterAnchorX, EncounterAnchorY, 0.08f), 7.8f, encounterColor);
                 DrawMarkerColumn(auxGeom, AZ::Vector3(EncounterAnchorX, EncounterAnchorY, 0.12f), encounterColor);

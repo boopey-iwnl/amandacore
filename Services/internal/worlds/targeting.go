@@ -45,7 +45,7 @@ func (s *worldServer) setTargetLocked(session *worldSessionState, targetID strin
 		return fmt.Errorf("target is not available")
 	}
 
-	if !targetMob.Alive || !targetMob.Targetable || targetMob.AIState == "respawning" {
+	if !targetMob.Alive || !targetMob.Targetable || targetMob.AIState == mobAIStateRespawning {
 		observability.LogEvent("world-service", "world.target_rejected", map[string]any{
 			"worldSessionToken": session.Token,
 			"characterId":       session.CharacterID,

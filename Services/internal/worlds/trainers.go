@@ -31,8 +31,11 @@ var warriorTrainer = trainerDefinition{
 	Radius:      starterInteractRadius,
 	AbilityIDs: []string{
 		platform.DrivingBlowAbilityID,
-		platform.WarCryAbilityID,
+		platform.RallyingCallAbilityID,
 		platform.HamperingStrikeAbilityID,
+		platform.GuardedFormAbilityID,
+		platform.OverhandCutAbilityID,
+		platform.IronResolveAbilityID,
 	},
 }
 
@@ -49,7 +52,20 @@ func (s *worldServer) trainerInRangeLocked(session *worldSessionState, trainer t
 		return false
 	}
 
+	trainer = s.resolveTrainerLocationLocked(trainer)
 	return distance2D(session.X, session.Y, trainer.X, trainer.Y) <= trainer.Radius
+}
+
+func (s *worldServer) resolveTrainerLocationLocked(trainer trainerDefinition) trainerDefinition {
+	if npc, ok := s.friendlyNPCs[trainer.ID]; ok {
+		trainer.X = npc.X
+		trainer.Y = npc.Y
+		trainer.Z = npc.Z
+		if npc.Radius > 0 {
+			trainer.Radius = npc.Radius
+		}
+	}
+	return trainer
 }
 
 func (s *worldServer) buildTrainerResponse(session *worldSessionState) map[string]any {
@@ -57,7 +73,7 @@ func (s *worldServer) buildTrainerResponse(session *worldSessionState) map[strin
 		return map[string]any{}
 	}
 
-	trainer := warriorTrainer
+	trainer := s.resolveTrainerLocationLocked(warriorTrainer)
 	inRange := s.trainerInRangeLocked(session, trainer)
 	offers := make([]map[string]any, 0, len(trainer.AbilityIDs))
 	for _, abilityID := range trainer.AbilityIDs {
@@ -87,18 +103,24 @@ func (s *worldServer) buildTrainerResponse(session *worldSessionState) map[strin
 		}
 
 		offers = append(offers, map[string]any{
-			"abilityId":       ability.ID,
-			"displayName":     ability.DisplayName,
-			"description":     ability.Description,
-			"requiredLevel":   ability.RequiredLevel,
-			"costCopper":      ability.TrainerCostCopper,
-			"learned":         learned,
-			"canLearn":        canLearn,
-			"requirementText": requirementText,
-			"actionBarSlot":   ability.ActionBarSlot,
-			"actionBarHotkey": ability.ActionBarHotkey,
-			"actionBarLabel":  ability.ActionBarLabel,
-			"requiresTarget":  ability.RequiresTarget,
+			"abilityId":          ability.ID,
+			"displayName":        ability.DisplayName,
+			"description":        ability.Description,
+			"tooltipText":        abilityTooltip(ability),
+			"requiredLevel":      ability.RequiredLevel,
+			"costCopper":         ability.TrainerCostCopper,
+			"learned":            learned,
+			"canLearn":           canLearn,
+			"requirementText":    requirementText,
+			"actionBarSlot":      ability.ActionBarSlot,
+			"actionBarHotkey":    ability.ActionBarHotkey,
+			"actionBarLabel":     ability.ActionBarLabel,
+			"requiresTarget":     ability.RequiresTarget,
+			"resourceName":       "Grit",
+			"resourceCost":       ability.ResourceCost,
+			"resourceGeneration": ability.ResourceGeneration,
+			"cooldownMs":         ability.CooldownMs,
+			"rangeMeters":        ability.RangeMeters,
 		})
 	}
 
@@ -107,7 +129,7 @@ func (s *worldServer) buildTrainerResponse(session *worldSessionState) map[strin
 		"displayName":     trainer.DisplayName,
 		"classId":         trainer.ClassID,
 		"inRange":         inRange,
-		"interactionHint": "Right-click the blue-gold Warrior trainer NPC to train.",
+		"interactionHint": "Right-click the Warrior trainer NPC to train.",
 		"offers":          offers,
 	}
 }
@@ -121,6 +143,7 @@ func (s *worldServer) learnTrainerAbilityLocked(session *worldSessionState, trai
 	if !found {
 		return fmt.Errorf("trainer is not available")
 	}
+	trainer = s.resolveTrainerLocationLocked(trainer)
 	if session.ClassID != trainer.ClassID {
 		return fmt.Errorf("wrong class for this trainer")
 	}

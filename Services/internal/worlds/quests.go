@@ -80,9 +80,14 @@ func (s *worldServer) applyCharacterProgressionLocked(session *worldSessionState
 	session.ClassID = character.ClassID
 	session.CurrencyCopper = character.CurrencyCopper
 	session.Inventory = platform.NormalizeInventorySlots(character.Inventory)
+	session.Equipment = platform.NormalizeEquipmentSlots(character.Equipment)
+	session.Professions = platform.NormalizeProfessionStates(character.Professions)
+	session.Talents = platform.NormalizeTalentRanks(character.Talents)
 	session.LearnedAbilityIDs = platform.NormalizeLearnedAbilityIDs(character.LearnedAbilityIDs)
 	session.ActionBarSlots = platform.NormalizeActionBarSlots(character.ActionBarSlots, session.LearnedAbilityIDs)
 	session.QuestProgress = s.loadQuestProgressFromCharacter(character)
+	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(character.TrackedQuestIDs, session.QuestProgress)
+	s.applyDerivedStatsLocked(session)
 }
 
 func (s *worldServer) buildCharacterQuestMap(progressByQuest map[string]platform.CharacterQuestProgress) map[string]platform.CharacterQuestProgress {
@@ -98,6 +103,7 @@ func (s *worldServer) buildCharacterQuestMap(progressByQuest map[string]platform
 }
 
 func (s *worldServer) persistSessionProgressionLocked(session *worldSessionState) error {
+	persistStartedAt := time.Now()
 	character, err := s.store.UpdateCharacterProgression(
 		session.CharacterID,
 		session.Experience,
@@ -106,6 +112,7 @@ func (s *worldServer) persistSessionProgressionLocked(session *worldSessionState
 		session.LearnedAbilityIDs,
 		session.ActionBarSlots,
 		s.buildCharacterQuestMap(session.QuestProgress))
+	s.recordPersistenceDuration("character_progression", persistStartedAt, err)
 	if err != nil {
 		return err
 	}
@@ -114,9 +121,20 @@ func (s *worldServer) persistSessionProgressionLocked(session *worldSessionState
 	session.Level = character.Level
 	session.CurrencyCopper = character.CurrencyCopper
 	session.Inventory = platform.NormalizeInventorySlots(character.Inventory)
+	session.Equipment = platform.NormalizeEquipmentSlots(character.Equipment)
+	session.Professions = platform.NormalizeProfessionStates(character.Professions)
+	session.Talents = platform.NormalizeTalentRanks(character.Talents)
 	session.LearnedAbilityIDs = platform.NormalizeLearnedAbilityIDs(character.LearnedAbilityIDs)
 	session.ActionBarSlots = platform.NormalizeActionBarSlots(character.ActionBarSlots, session.LearnedAbilityIDs)
 	session.QuestProgress = s.loadQuestProgressFromCharacter(character)
+	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress)
+	s.applyDerivedStatsLocked(session)
+	persistStartedAt = time.Now()
+	_, err = s.store.UpdateCharacterTrackedQuests(session.CharacterID, session.TrackedQuestIDs)
+	s.recordPersistenceDuration("character_tracked_quests", persistStartedAt, err)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -141,6 +159,7 @@ func (s *worldServer) acceptQuestLocked(session *worldSessionState, questID stri
 		progress.AcceptedAt = now
 		progress.UpdatedAt = now
 		session.QuestProgress[quest.ID] = progress
+		s.trackQuestLocked(session, quest.ID)
 		observability.LogEvent("world-service", "world.quest_accepted", map[string]any{
 			"worldSessionToken": session.Token,
 			"accountId":         session.AccountID,
@@ -275,6 +294,10 @@ func addItemToInventory(inventory *[]platform.CharacterInventorySlot, item itemR
 		return nil
 	}
 
+	if definition, found := findItemDefinition(item.ItemID); found {
+		return addDefinedItemToInventory(inventory, definition, item.StackCount)
+	}
+
 	slots := platform.NormalizeInventorySlots(*inventory)
 	for index := range slots {
 		if slots[index].ItemID == item.ItemID {
@@ -359,6 +382,60 @@ func (s *worldServer) primaryQuestLocked(session *worldSessionState) questDefini
 	return s.quest
 }
 
+func (s *worldServer) normalizeTrackedQuestIDsLocked(source []string, progressByQuest map[string]platform.CharacterQuestProgress) []string {
+	normalized := platform.NormalizeStringIDs(source)
+	if len(normalized) == 0 {
+		return []string{}
+	}
+
+	result := make([]string, 0, len(normalized))
+	for _, questID := range normalized {
+		quest, found := s.quests[questID]
+		if !found {
+			continue
+		}
+		progress := s.normalizeQuestProgress(quest, progressByQuest[questID])
+		if progress.State == questStateNotStarted || progress.State == questStateRewardGranted {
+			continue
+		}
+		result = append(result, questID)
+		if len(result) >= 3 {
+			break
+		}
+	}
+	return result
+}
+
+func (s *worldServer) questTrackedLocked(session *worldSessionState, questID string) bool {
+	for _, trackedQuestID := range session.TrackedQuestIDs {
+		if trackedQuestID == questID {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *worldServer) trackQuestLocked(session *worldSessionState, questID string) {
+	if session == nil || questID == "" || s.questTrackedLocked(session, questID) {
+		return
+	}
+	session.TrackedQuestIDs = append(session.TrackedQuestIDs, questID)
+	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress)
+}
+
+func (s *worldServer) untrackQuestLocked(session *worldSessionState, questID string) {
+	if session == nil || questID == "" {
+		return
+	}
+	next := make([]string, 0, len(session.TrackedQuestIDs))
+	for _, trackedQuestID := range session.TrackedQuestIDs {
+		if trackedQuestID != questID {
+			next = append(next, trackedQuestID)
+		}
+	}
+	session.TrackedQuestIDs = next
+}
+
 func (s *worldServer) prerequisitesMetLocked(session *worldSessionState, quest questDefinition) bool {
 	for _, prerequisiteID := range quest.PrerequisiteIDs {
 		prereq, found := s.quests[prerequisiteID]
@@ -373,10 +450,10 @@ func (s *worldServer) prerequisitesMetLocked(session *worldSessionState, quest q
 	return true
 }
 
-func (s *worldServer) buildQuestResponse(progressByQuest map[string]platform.CharacterQuestProgress) map[string]any {
-	quest := s.primaryQuestLocked(&worldSessionState{QuestProgress: progressByQuest})
-	progress := s.normalizeQuestProgress(quest, progressByQuest[quest.ID])
-	return s.buildQuestSummary(quest, progress)
+func (s *worldServer) buildQuestResponse(session *worldSessionState) map[string]any {
+	quest := s.primaryQuestLocked(session)
+	progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+	return s.buildQuestSummary(quest, progress, s.questTrackedLocked(session, quest.ID))
 }
 
 func (s *worldServer) buildQuestListResponse(session *worldSessionState) []map[string]any {
@@ -387,15 +464,28 @@ func (s *worldServer) buildQuestListResponse(session *worldSessionState) []map[s
 		if progress.State == questStateNotStarted && !s.prerequisitesMetLocked(session, quest) {
 			continue
 		}
-		quests = append(quests, s.buildQuestSummary(quest, progress))
+		quests = append(quests, s.buildQuestSummary(quest, progress, s.questTrackedLocked(session, quest.ID)))
 	}
 	return quests
 }
 
-func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform.CharacterQuestProgress) map[string]any {
+func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform.CharacterQuestProgress, tracked bool) map[string]any {
+	objectiveArea := s.objectiveAreaForQuest(quest)
+	rewardItems := make([]itemRewardResponse, 0, len(quest.RewardItems))
+	for _, item := range quest.RewardItems {
+		rewardItems = append(rewardItems, itemRewardResponse{
+			ItemID:      item.ItemID,
+			DisplayName: item.DisplayName,
+			StackCount:  item.StackCount,
+		})
+	}
+
 	return map[string]any{
 		"id":                   quest.ID,
 		"title":                quest.Title,
+		"category":             "Stonewake Vale",
+		"statusBucket":         questStatusBucket(progress),
+		"tracked":              tracked,
 		"objectiveType":        quest.ObjectiveType,
 		"objectiveText":        quest.ObjectiveText,
 		"state":                progress.State,
@@ -407,7 +497,63 @@ func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform
 		"rewardXp":             quest.RewardXP,
 		"rewardCurrencyCopper": quest.RewardCopper,
 		"rewardCurrency":       breakdownCurrency(quest.RewardCopper),
+		"rewardItems":          rewardItems,
+		"objectiveArea":        objectiveArea,
 	}
+}
+
+func questStatusBucket(progress platform.CharacterQuestProgress) string {
+	switch progress.State {
+	case questStateNotStarted:
+		return "available"
+	case questStateActive:
+		return "active"
+	case questStateCompleted:
+		return "ready_to_turn_in"
+	case questStateRewardGranted:
+		return "completed"
+	default:
+		return "available"
+	}
+}
+
+func (s *worldServer) objectiveAreaForQuest(quest questDefinition) map[string]any {
+	if area, ok := s.findNavigationAreaForQuest(quest); ok {
+		return map[string]any{
+			"areaId":        area.ID,
+			"displayName":   area.DisplayName,
+			"kind":          area.Kind,
+			"centerX":       area.CenterX,
+			"centerY":       area.CenterY,
+			"radius":        area.Radius,
+			"routeHintText": area.RouteHintText,
+		}
+	}
+
+	if quest.MarkerX != 0 || quest.MarkerY != 0 {
+		return map[string]any{
+			"areaId":        quest.ID + "_marker",
+			"displayName":   quest.Title,
+			"kind":          "objective",
+			"centerX":       quest.MarkerX,
+			"centerY":       quest.MarkerY,
+			"radius":        starterInteractRadius,
+			"routeHintText": "Follow the road marker toward the objective.",
+		}
+	}
+
+	return map[string]any{}
+}
+
+func (s *worldServer) findNavigationAreaForQuest(quest questDefinition) (navigationAreaDefinition, bool) {
+	for _, area := range stonewakeNavigationAreas {
+		for _, questID := range area.QuestIDs {
+			if questID == quest.ID {
+				return area, true
+			}
+		}
+	}
+	return navigationAreaDefinition{}, false
 }
 
 func breakdownCurrency(totalCopper int) currencyBreakdown {

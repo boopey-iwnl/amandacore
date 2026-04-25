@@ -8,13 +8,14 @@ const (
 	RoleGameMaster    Role = "game_master"
 	RoleAdministrator Role = "administrator"
 
-	InventorySlotCount    = 16
-	ActionBarSlotCount    = 48
-	StarterCurrencyCopper = 125
-	DefaultStarterZoneID  = "stonewake_vale"
-	DefaultStarterSpawnX  = 8.0
-	DefaultStarterSpawnY  = 8.0
-	DefaultStarterSpawnZ  = 0.0
+	InventorySlotCount     = 16
+	ActionBarSlotCount     = 48
+	StarterCurrencyCopper  = 125
+	PrimaryProfessionLimit = 2
+	DefaultStarterZoneID   = "stonewake_vale"
+	DefaultStarterSpawnX   = 10.0
+	DefaultStarterSpawnY   = 10.0
+	DefaultStarterSpawnZ   = 0.0
 
 	DefaultRaceID             = "human"
 	DefaultClassID            = "warrior"
@@ -24,8 +25,32 @@ const (
 	SteadyStrikeAbilityID    = "steady_strike"
 	BraceAbilityID           = "brace"
 	DrivingBlowAbilityID     = "driving_blow"
-	WarCryAbilityID          = "war_cry"
+	RallyingCallAbilityID    = "rallying_call"
+	WarCryAbilityID          = RallyingCallAbilityID
 	HamperingStrikeAbilityID = "hampering_strike"
+	GuardedFormAbilityID     = "guarded_form"
+	OverhandCutAbilityID     = "overhand_cut"
+	IronResolveAbilityID     = "iron_resolve"
+
+	ProfessionOrekeepingID = "orekeeping"
+	ProfessionForgecraftID = "forgecraft"
+	ProfessionFieldAidID   = "field_aid"
+)
+
+var EquipmentSlots = []string{
+	EquipmentSlotMainHand,
+	EquipmentSlotChest,
+	EquipmentSlotHands,
+	EquipmentSlotLegs,
+	EquipmentSlotFeet,
+}
+
+const (
+	EquipmentSlotMainHand = "main_hand"
+	EquipmentSlotChest    = "chest"
+	EquipmentSlotHands    = "hands"
+	EquipmentSlotLegs     = "legs"
+	EquipmentSlotFeet     = "feet"
 )
 
 type CharacterInventorySlot struct {
@@ -35,9 +60,56 @@ type CharacterInventorySlot struct {
 	StackCount  int    `json:"stackCount"`
 }
 
+type CharacterEquipmentSlot struct {
+	Slot        string `json:"slot"`
+	ItemID      string `json:"itemId"`
+	DisplayName string `json:"displayName"`
+}
+
+type CharacterProfessionState struct {
+	ProfessionID   string   `json:"professionId"`
+	SkillValue     int      `json:"skillValue"`
+	RankID         string   `json:"rankId"`
+	KnownRecipeIDs []string `json:"knownRecipeIds"`
+	LearnedAt      int64    `json:"learnedAt"`
+	UpdatedAt      int64    `json:"updatedAt"`
+}
+
 type CharacterActionBarSlot struct {
 	SlotIndex int    `json:"slotIndex"`
 	AbilityID string `json:"abilityId"`
+}
+
+type CharacterTalentRank struct {
+	TalentID string `json:"talentId"`
+	Rank     int    `json:"rank"`
+}
+
+type ChatMessage struct {
+	MessageID         string `json:"messageId"`
+	Channel           string `json:"channel"`
+	SenderCharacterID string `json:"senderCharacterId"`
+	SenderDisplayName string `json:"senderDisplayName"`
+	TargetCharacterID string `json:"targetCharacterId,omitempty"`
+	PartyID           string `json:"partyId,omitempty"`
+	ZoneID            string `json:"zoneId,omitempty"`
+	MessageText       string `json:"messageText"`
+	Timestamp         int64  `json:"timestamp"`
+}
+
+type FriendRelationship struct {
+	OwnerCharacterID  string `json:"ownerCharacterId"`
+	FriendCharacterID string `json:"friendCharacterId"`
+	FriendDisplayName string `json:"friendDisplayName"`
+	CreatedAt         int64  `json:"createdAt"`
+}
+
+type Party struct {
+	ID                 string   `json:"partyId"`
+	LeaderCharacterID  string   `json:"leaderCharacterId"`
+	MemberCharacterIDs []string `json:"memberCharacterIds"`
+	CreatedAt          int64    `json:"createdAt"`
+	UpdatedAt          int64    `json:"updatedAt"`
 }
 
 type Account struct {
@@ -97,20 +169,33 @@ type Character struct {
 	PositionY         float64                           `json:"positionY"`
 	PositionZ         float64                           `json:"positionZ"`
 	Inventory         []CharacterInventorySlot          `json:"inventory"`
+	Equipment         []CharacterEquipmentSlot          `json:"equipment"`
+	Professions       []CharacterProfessionState        `json:"professions"`
 	LearnedAbilityIDs []string                          `json:"learnedAbilityIds"`
 	ActionBarSlots    []CharacterActionBarSlot          `json:"actionBarSlots"`
+	Talents           map[string]int                    `json:"talents"`
 	Quests            map[string]CharacterQuestProgress `json:"quests"`
+	TrackedQuestIDs   []string                          `json:"trackedQuestIds"`
 	LastSeenAt        int64                             `json:"lastSeenAt"`
 }
 
 type BuildManifest struct {
-	ID                string   `json:"id"`
-	Channel           string   `json:"channel"`
-	DisplayVersion    string   `json:"displayVersion"`
-	RequiredServices  []string `json:"requiredServices"`
-	LauncherNews      string   `json:"launcherNews"`
-	AllowedForLogin   bool     `json:"allowedForLogin"`
-	WorldEndpointHint string   `json:"worldEndpointHint"`
+	ID                         string   `json:"id"`
+	Channel                    string   `json:"channel"`
+	DisplayVersion             string   `json:"displayVersion"`
+	ClientVersion              string   `json:"clientVersion"`
+	ServerVersion              string   `json:"serverVersion"`
+	ContentVersion             string   `json:"contentVersion"`
+	ProtocolVersion            string   `json:"protocolVersion"`
+	APIVersion                 string   `json:"apiVersion"`
+	CompatibleClientVersions   []string `json:"compatibleClientVersions"`
+	CompatibleServerVersions   []string `json:"compatibleServerVersions"`
+	CompatibleProtocolVersions []string `json:"compatibleProtocolVersions"`
+	RequiredServices           []string `json:"requiredServices"`
+	LauncherNews               string   `json:"launcherNews"`
+	AllowedForLogin            bool     `json:"allowedForLogin"`
+	WorldEndpointHint          string   `json:"worldEndpointHint"`
+	GeneratedAtUTC             string   `json:"generatedAtUtc"`
 }
 
 type WorldJoinTicket struct {
@@ -146,6 +231,14 @@ func DefaultStarterInventory() []CharacterInventorySlot {
 	return slots
 }
 
+func DefaultEquipmentSlots() []CharacterEquipmentSlot {
+	slots := make([]CharacterEquipmentSlot, len(EquipmentSlots))
+	for index, slot := range EquipmentSlots {
+		slots[index].Slot = slot
+	}
+	return slots
+}
+
 func NormalizeCharacterIdentity(archetypeID string, raceID string, classID string) (string, string, string) {
 	normalizedArchetypeID := archetypeID
 	if normalizedArchetypeID == "" {
@@ -176,8 +269,11 @@ func NormalizeCharacter(character Character) Character {
 		character.RaceID,
 		character.ClassID)
 	character.Inventory = NormalizeInventorySlots(character.Inventory)
+	character.Equipment = NormalizeEquipmentSlots(character.Equipment)
+	character.Professions = NormalizeProfessionStates(character.Professions)
 	character.LearnedAbilityIDs = NormalizeLearnedAbilityIDs(character.LearnedAbilityIDs)
 	character.ActionBarSlots = NormalizeActionBarSlots(character.ActionBarSlots, character.LearnedAbilityIDs)
+	character.Talents = NormalizeTalentRanks(character.Talents)
 	if computedLevel := LevelForExperience(character.Experience); character.Level < computedLevel {
 		character.Level = computedLevel
 	}
@@ -187,6 +283,7 @@ func NormalizeCharacter(character Character) Character {
 	if character.Quests == nil {
 		character.Quests = map[string]CharacterQuestProgress{}
 	}
+	character.TrackedQuestIDs = NormalizeStringIDs(character.TrackedQuestIDs)
 	hasStarterQuestProgress := false
 	for questID := range character.Quests {
 		if len(questID) >= 3 && questID[:3] == "sv_" {
@@ -209,15 +306,47 @@ func NormalizeCharacter(character Character) Character {
 	return character
 }
 
+func NormalizeStringIDs(source []string) []string {
+	if len(source) == 0 {
+		return []string{}
+	}
+
+	seen := map[string]struct{}{}
+	normalized := make([]string, 0, len(source))
+	for _, id := range source {
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		normalized = append(normalized, id)
+	}
+	return normalized
+}
+
 func LevelForExperience(experience int) int {
 	switch {
-	case experience >= 1200:
+	case experience >= 4900:
+		return 12
+	case experience >= 4000:
+		return 11
+	case experience >= 3200:
+		return 10
+	case experience >= 2500:
+		return 9
+	case experience >= 1900:
+		return 8
+	case experience >= 1400:
+		return 7
+	case experience >= 1000:
 		return 6
-	case experience >= 850:
+	case experience >= 700:
 		return 5
-	case experience >= 550:
+	case experience >= 450:
 		return 4
-	case experience >= 300:
+	case experience >= 250:
 		return 3
 	case experience >= 100:
 		return 2
@@ -265,6 +394,17 @@ func NormalizeLearnedAbilityIDs(source []string) []string {
 	return normalized
 }
 
+func NormalizeTalentRanks(source map[string]int) map[string]int {
+	normalized := map[string]int{}
+	for talentID, rank := range source {
+		if talentID == "" || rank <= 0 {
+			continue
+		}
+		normalized[talentID] = rank
+	}
+	return normalized
+}
+
 func DefaultActionBarSlots(learnedAbilityIDs []string) []CharacterActionBarSlot {
 	slots := make([]CharacterActionBarSlot, ActionBarSlotCount)
 	for slotIndex := range slots {
@@ -289,6 +429,85 @@ func DefaultActionBarSlots(learnedAbilityIDs []string) []CharacterActionBarSlot 
 	}
 
 	return slots
+}
+
+func NormalizeEquipmentSlots(source []CharacterEquipmentSlot) []CharacterEquipmentSlot {
+	slots := DefaultEquipmentSlots()
+	slotIndexByName := map[string]int{}
+	for index, slot := range slots {
+		slotIndexByName[slot.Slot] = index
+	}
+
+	for _, sourceSlot := range source {
+		index, ok := slotIndexByName[sourceSlot.Slot]
+		if !ok {
+			continue
+		}
+
+		normalizedSlot := CharacterEquipmentSlot{
+			Slot:        sourceSlot.Slot,
+			ItemID:      sourceSlot.ItemID,
+			DisplayName: sourceSlot.DisplayName,
+		}
+		if normalizedSlot.ItemID == "" {
+			normalizedSlot.DisplayName = ""
+		}
+		slots[index] = normalizedSlot
+	}
+
+	return slots
+}
+
+func NormalizeProfessionStates(source []CharacterProfessionState) []CharacterProfessionState {
+	if len(source) == 0 {
+		return []CharacterProfessionState{}
+	}
+
+	seenProfessions := map[string]struct{}{}
+	normalized := make([]CharacterProfessionState, 0, len(source))
+	for _, profession := range source {
+		if profession.ProfessionID == "" {
+			continue
+		}
+		if _, exists := seenProfessions[profession.ProfessionID]; exists {
+			continue
+		}
+		seenProfessions[profession.ProfessionID] = struct{}{}
+
+		if profession.SkillValue < 0 {
+			profession.SkillValue = 0
+		}
+		if profession.RankID == "" {
+			profession.RankID = "novice"
+		}
+		profession.KnownRecipeIDs = NormalizeKnownRecipeIDs(profession.KnownRecipeIDs)
+		normalized = append(normalized, profession)
+	}
+
+	if len(normalized) == 0 {
+		return []CharacterProfessionState{}
+	}
+	return normalized
+}
+
+func NormalizeKnownRecipeIDs(source []string) []string {
+	if len(source) == 0 {
+		return []string{}
+	}
+
+	seenRecipes := map[string]struct{}{}
+	normalized := make([]string, 0, len(source))
+	for _, recipeID := range source {
+		if recipeID == "" {
+			continue
+		}
+		if _, exists := seenRecipes[recipeID]; exists {
+			continue
+		}
+		seenRecipes[recipeID] = struct{}{}
+		normalized = append(normalized, recipeID)
+	}
+	return normalized
 }
 
 func NormalizeActionBarSlots(source []CharacterActionBarSlot, learnedAbilityIDs []string) []CharacterActionBarSlot {

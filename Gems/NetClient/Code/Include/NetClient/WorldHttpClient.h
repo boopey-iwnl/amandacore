@@ -40,11 +40,21 @@ namespace NetClient
     {
         AZStd::string m_id;
         AZStd::string m_title;
+        AZStd::string m_category;
+        AZStd::string m_statusBucket;
         AZStd::string m_objectiveType;
         AZStd::string m_objectiveText;
         AZStd::string m_state;
         AZStd::string m_giverNpcId;
         AZStd::string m_turnInNpcId;
+        AZStd::string m_objectiveAreaId;
+        AZStd::string m_objectiveAreaName;
+        AZStd::string m_objectiveAreaKind;
+        AZStd::string m_routeHintText;
+        bool m_tracked = false;
+        double m_objectiveX = 0.0;
+        double m_objectiveY = 0.0;
+        double m_objectiveRadius = 0.0;
         int m_currentCount = 0;
         int m_targetCount = 0;
         int m_rewardXp = 0;
@@ -52,6 +62,68 @@ namespace NetClient
         int m_rewardCurrencySilver = 0;
         int m_rewardCurrencyGold = 0;
         int m_rewardCurrencyCopper = 0;
+    };
+
+    struct MapPointState
+    {
+        double m_x = 0.0;
+        double m_y = 0.0;
+    };
+
+    struct MapRoadState
+    {
+        AZStd::string m_id;
+        AZStd::string m_displayName;
+        AZStd::vector<MapPointState> m_points;
+    };
+
+    struct MapLandmarkState
+    {
+        AZStd::string m_id;
+        AZStd::string m_displayName;
+        AZStd::string m_kind;
+        double m_x = 0.0;
+        double m_y = 0.0;
+    };
+
+    struct ZoneMapState
+    {
+        AZStd::string m_zoneId;
+        AZStd::string m_displayName;
+        double m_minX = 0.0;
+        double m_minY = 0.0;
+        double m_maxX = 0.0;
+        double m_maxY = 0.0;
+        AZStd::vector<MapRoadState> m_roads;
+        AZStd::vector<MapLandmarkState> m_landmarks;
+    };
+
+    struct NavigationAreaState
+    {
+        AZStd::string m_areaId;
+        AZStd::string m_displayName;
+        AZStd::string m_kind;
+        AZStd::string m_routeHintText;
+        AZStd::string m_targetMobType;
+        AZStd::string m_targetEntityId;
+        double m_centerX = 0.0;
+        double m_centerY = 0.0;
+        double m_radius = 0.0;
+        AZStd::vector<AZStd::string> m_questIds;
+    };
+
+    struct MapMarkerState
+    {
+        AZStd::string m_id;
+        AZStd::string m_displayName;
+        AZStd::string m_kind;
+        AZStd::string m_questId;
+        AZStd::string m_entityId;
+        AZStd::string m_areaId;
+        AZStd::string m_routeHintText;
+        double m_x = 0.0;
+        double m_y = 0.0;
+        double m_radius = 0.0;
     };
 
     struct CurrencyState
@@ -141,6 +213,11 @@ namespace NetClient
         TrainerState m_trainer;
         bool m_alive = false;
         QuestState m_quest;
+        AZStd::vector<QuestState> m_quests;
+        AZStd::vector<AZStd::string> m_trackedQuestIds;
+        ZoneMapState m_zoneMap;
+        AZStd::vector<NavigationAreaState> m_navigationAreas;
+        AZStd::vector<MapMarkerState> m_mapMarkers;
         AZStd::string m_currentTargetId;
         bool m_autoAttackActive = false;
         AZ::s64 m_globalCooldownEndsAt = 0;
@@ -220,6 +297,14 @@ namespace NetClient
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
             const AZStd::string& questId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool TrackQuest(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& questId,
+            bool tracked,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 

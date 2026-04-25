@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Drawing;
 using System.Text;
 using AmandaCore.Launcher.Api;
 using AmandaCore.Launcher.Models;
@@ -15,6 +16,8 @@ internal sealed class LauncherForm : Form
     private readonly LauncherConfig _config = LauncherConfig.Load();
 
     private LauncherSession? _session = LauncherSession.Load();
+    private LocalVersionManifest? _localManifest;
+    private BuildManifest? _serverManifest;
     private readonly TextBox _usernameTextBox = new() { Width = 180 };
     private readonly TextBox _passwordTextBox = new() { Width = 180, UseSystemPasswordChar = true };
     private readonly Button _registerButton = new() { Text = "Register", Width = 100 };
@@ -29,9 +32,13 @@ internal sealed class LauncherForm : Form
     private readonly Button _joinWorldButton = new() { Text = "Join World", Width = 120 };
     private readonly TextBox _logTextBox = new() { Multiline = true, Width = 560, Height = 160, ScrollBars = ScrollBars.Vertical, ReadOnly = true };
     private readonly Label _statusLabel = new() { AutoSize = true, Text = "Status: Ready" };
+    private readonly Label _buildInfoLabel = new() { AutoSize = true, MaximumSize = new Size(560, 0), Text = "Build: local manifest not loaded" };
 
     public LauncherForm()
     {
+        _localManifest = LocalVersionManifest.LoadFromRepoRoot(_config.Resolution.RepoRoot);
+        _buildInfoLabel.Text = BuildInfoText(null);
+
         Text = "amandacore Launcher";
         Width = 620;
         Height = 620;
@@ -46,6 +53,7 @@ internal sealed class LauncherForm : Form
             Padding = new Padding(12)
         };
 
+        root.Controls.Add(_buildInfoLabel);
         root.Controls.Add(BuildCredentialsRow());
         root.Controls.Add(BuildRealmRow());
         root.Controls.Add(BuildCharacterRow());
@@ -62,6 +70,7 @@ internal sealed class LauncherForm : Form
         _loadCharactersButton.Click += async (_, _) => await ExecuteAsync(LoadCharactersAsync);
         _createCharacterButton.Click += async (_, _) => await ExecuteAsync(CreateCharacterAsync);
         _joinWorldButton.Click += async (_, _) => await ExecuteAsync(JoinWorldAsync);
+        Shown += async (_, _) => await ExecuteAsync(RefreshServerBuildInfoAsync);
 
         if (_session != null)
         {
@@ -117,6 +126,10 @@ internal sealed class LauncherForm : Form
     private async Task LoginAsync(CancellationToken cancellationToken)
     {
         var manifest = await _apiClient.GetBuildManifestAsync(_config, cancellationToken);
+        _serverManifest = manifest;
+        _buildInfoLabel.Text = BuildInfoText(manifest);
+        LogServerBuildManifest(manifest);
+        LogCompatibilityWarnings(manifest);
         if (!manifest.AllowedForLogin)
         {
             throw new InvalidOperationException($"Build {manifest.DisplayVersion} is not allowed for login.");
@@ -133,6 +146,24 @@ internal sealed class LauncherForm : Form
 
         _statusLabel.Text = $"Status: Logged in as {_usernameTextBox.Text.Trim()}";
         Log($"Login succeeded for account {auth.AccountId}. Build: {manifest.DisplayVersion}");
+    }
+
+    private async Task RefreshServerBuildInfoAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var manifest = await _apiClient.GetBuildManifestAsync(_config, cancellationToken);
+            _serverManifest = manifest;
+            _buildInfoLabel.Text = BuildInfoText(manifest);
+            LogServerBuildManifest(manifest);
+            LogCompatibilityWarnings(manifest);
+        }
+        catch (Exception exception)
+        {
+            _serverManifest = null;
+            _buildInfoLabel.Text = BuildInfoText(null);
+            Log($"Server status unavailable: {exception.Message}");
+        }
     }
 
     private void Logout()
@@ -152,6 +183,7 @@ internal sealed class LauncherForm : Form
         foreach (var realm in realms.Realms)
         {
             _realmComboBox.Items.Add(realm);
+            Log($"Realm {realm.DisplayName}: online={realm.Online}, supportedBuild={ValueOrUnknown(realm.SupportedBuild)}, endpoint={ValueOrUnknown(realm.Endpoint)}");
         }
 
         _realmComboBox.DisplayMember = nameof(RealmDescriptor.DisplayName);
@@ -284,6 +316,87 @@ internal sealed class LauncherForm : Form
     private void Log(string message)
     {
         _logTextBox.AppendText($"[{DateTime.Now:T}] {message}{Environment.NewLine}");
+    }
+
+    private string BuildInfoText(BuildManifest? serverManifest)
+    {
+        var localBuild = _localManifest?.BuildId ?? "missing";
+        var localClient = _localManifest?.ClientVersion ?? "unknown";
+        var localProtocol = _localManifest?.ProtocolVersion ?? "unknown";
+        var serverBuild = serverManifest?.Id ?? "unavailable";
+        var serverProtocol = serverManifest?.ProtocolVersion ?? "unknown";
+
+        return $"Build: local {ShortBuild(localBuild)} | server {ShortBuild(serverBuild)} | client {localClient} | protocol {localProtocol}/{serverProtocol}";
+    }
+
+    private void LogServerBuildManifest(BuildManifest manifest)
+    {
+        Log(
+            "Server manifest: " +
+            $"build={ValueOrUnknown(manifest.Id)}, " +
+            $"display={ValueOrUnknown(manifest.DisplayVersion)}, " +
+            $"channel={ValueOrUnknown(manifest.Channel)}, " +
+            $"client={ValueOrUnknown(manifest.ClientVersion)}, " +
+            $"server={ValueOrUnknown(manifest.ServerVersion)}, " +
+            $"content={ValueOrUnknown(manifest.ContentVersion)}, " +
+            $"protocol={ValueOrUnknown(manifest.ProtocolVersion)}, " +
+            $"api={ValueOrUnknown(manifest.ApiVersion)}");
+    }
+
+    private void LogCompatibilityWarnings(BuildManifest manifest)
+    {
+        if (_localManifest is null)
+        {
+            Log("Warning: local version manifest was not found. Compatibility is warning-only for this milestone.");
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.Id) &&
+            !string.Equals(_localManifest.BuildId, manifest.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            Log($"Warning: local build {_localManifest.BuildId} differs from server build {manifest.Id}. Join is still allowed in this milestone.");
+        }
+
+        if (!AllowedByManifest(manifest.CompatibleClientVersions, _localManifest.ClientVersion, manifest.ClientVersion))
+        {
+            Log($"Warning: local client version {_localManifest.ClientVersion} is not listed as compatible with server manifest client version {ValueOrUnknown(manifest.ClientVersion)}.");
+        }
+
+        if (!AllowedByManifest(manifest.CompatibleProtocolVersions, _localManifest.ProtocolVersion, manifest.ProtocolVersion))
+        {
+            Log($"Warning: local protocol version {_localManifest.ProtocolVersion} is not listed as compatible with server protocol version {ValueOrUnknown(manifest.ProtocolVersion)}.");
+        }
+    }
+
+    private static bool AllowedByManifest(IReadOnlyCollection<string> allowedValues, string localValue, string exactValue)
+    {
+        if (string.IsNullOrWhiteSpace(localValue))
+        {
+            return true;
+        }
+
+        if (allowedValues.Count > 0)
+        {
+            return allowedValues.Any(value => string.Equals(value, localValue, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return string.IsNullOrWhiteSpace(exactValue) ||
+            string.Equals(localValue, exactValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ShortBuild(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "unknown";
+        }
+
+        return value.Length <= 36 ? value : $"{value[..28]}...{value[^5..]}";
+    }
+
+    private static string ValueOrUnknown(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "unknown" : value;
     }
 
     private void LogClientExecutableResolution()

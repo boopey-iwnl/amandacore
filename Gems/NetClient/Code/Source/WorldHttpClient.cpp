@@ -243,6 +243,53 @@ namespace NetClient
             return true;
         }
 
+        bool ReadDouble(const rapidjson::Value& object, const char* name, double& outValue)
+        {
+            if (!object.HasMember(name) || !object[name].IsNumber())
+            {
+                return false;
+            }
+
+            outValue = object[name].GetDouble();
+            return true;
+        }
+
+        void ParseQuestState(const rapidjson::Value& quest, QuestState& outQuest)
+        {
+            ReadString(quest, "id", outQuest.m_id);
+            ReadString(quest, "title", outQuest.m_title);
+            ReadString(quest, "category", outQuest.m_category);
+            ReadString(quest, "statusBucket", outQuest.m_statusBucket);
+            ReadString(quest, "objectiveType", outQuest.m_objectiveType);
+            ReadString(quest, "objectiveText", outQuest.m_objectiveText);
+            ReadString(quest, "state", outQuest.m_state);
+            ReadString(quest, "giverNpcId", outQuest.m_giverNpcId);
+            ReadString(quest, "turnInNpcId", outQuest.m_turnInNpcId);
+            ReadBool(quest, "tracked", outQuest.m_tracked);
+            ReadInt(quest, "currentCount", outQuest.m_currentCount);
+            ReadInt(quest, "targetCount", outQuest.m_targetCount);
+            ReadInt(quest, "rewardXp", outQuest.m_rewardXp);
+            ReadInt(quest, "rewardCurrencyCopper", outQuest.m_rewardCurrencyTotalCopper);
+            if (quest.HasMember("rewardCurrency") && quest["rewardCurrency"].IsObject())
+            {
+                const rapidjson::Value& rewardCurrency = quest["rewardCurrency"];
+                ReadInt(rewardCurrency, "gold", outQuest.m_rewardCurrencyGold);
+                ReadInt(rewardCurrency, "silver", outQuest.m_rewardCurrencySilver);
+                ReadInt(rewardCurrency, "copper", outQuest.m_rewardCurrencyCopper);
+            }
+            if (quest.HasMember("objectiveArea") && quest["objectiveArea"].IsObject())
+            {
+                const rapidjson::Value& objectiveArea = quest["objectiveArea"];
+                ReadString(objectiveArea, "areaId", outQuest.m_objectiveAreaId);
+                ReadString(objectiveArea, "displayName", outQuest.m_objectiveAreaName);
+                ReadString(objectiveArea, "kind", outQuest.m_objectiveAreaKind);
+                ReadString(objectiveArea, "routeHintText", outQuest.m_routeHintText);
+                ReadDouble(objectiveArea, "centerX", outQuest.m_objectiveX);
+                ReadDouble(objectiveArea, "centerY", outQuest.m_objectiveY);
+                ReadDouble(objectiveArea, "radius", outQuest.m_objectiveRadius);
+            }
+        }
+
         bool ParseWorldSessionJson(const AZStd::string& payload, WorldSessionResponse& outResponse, AZStd::string& outError)
         {
             outResponse = WorldSessionResponse{};
@@ -426,24 +473,147 @@ namespace NetClient
             ReadString(document, "castingAbilityId", outResponse.m_castingAbilityId);
             if (document.HasMember("quest") && document["quest"].IsObject())
             {
-                const rapidjson::Value& quest = document["quest"];
-                ReadString(quest, "id", outResponse.m_quest.m_id);
-                ReadString(quest, "title", outResponse.m_quest.m_title);
-                ReadString(quest, "objectiveType", outResponse.m_quest.m_objectiveType);
-                ReadString(quest, "objectiveText", outResponse.m_quest.m_objectiveText);
-                ReadString(quest, "state", outResponse.m_quest.m_state);
-                ReadString(quest, "giverNpcId", outResponse.m_quest.m_giverNpcId);
-                ReadString(quest, "turnInNpcId", outResponse.m_quest.m_turnInNpcId);
-                ReadInt(quest, "currentCount", outResponse.m_quest.m_currentCount);
-                ReadInt(quest, "targetCount", outResponse.m_quest.m_targetCount);
-                ReadInt(quest, "rewardXp", outResponse.m_quest.m_rewardXp);
-                ReadInt(quest, "rewardCurrencyCopper", outResponse.m_quest.m_rewardCurrencyTotalCopper);
-                if (quest.HasMember("rewardCurrency") && quest["rewardCurrency"].IsObject())
+                ParseQuestState(document["quest"], outResponse.m_quest);
+            }
+            outResponse.m_quests.clear();
+            if (document.HasMember("quests") && document["quests"].IsArray())
+            {
+                for (const rapidjson::Value& questValue : document["quests"].GetArray())
                 {
-                    const rapidjson::Value& rewardCurrency = quest["rewardCurrency"];
-                    ReadInt(rewardCurrency, "gold", outResponse.m_quest.m_rewardCurrencyGold);
-                    ReadInt(rewardCurrency, "silver", outResponse.m_quest.m_rewardCurrencySilver);
-                    ReadInt(rewardCurrency, "copper", outResponse.m_quest.m_rewardCurrencyCopper);
+                    if (!questValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    QuestState quest;
+                    ParseQuestState(questValue, quest);
+                    outResponse.m_quests.push_back(AZStd::move(quest));
+                }
+            }
+            outResponse.m_trackedQuestIds.clear();
+            if (document.HasMember("trackedQuestIds") && document["trackedQuestIds"].IsArray())
+            {
+                for (const rapidjson::Value& trackedQuestValue : document["trackedQuestIds"].GetArray())
+                {
+                    if (trackedQuestValue.IsString())
+                    {
+                        outResponse.m_trackedQuestIds.push_back(trackedQuestValue.GetString());
+                    }
+                }
+            }
+            outResponse.m_zoneMap = ZoneMapState{};
+            if (document.HasMember("zoneMap") && document["zoneMap"].IsObject())
+            {
+                const rapidjson::Value& zoneMap = document["zoneMap"];
+                ReadString(zoneMap, "zoneId", outResponse.m_zoneMap.m_zoneId);
+                ReadString(zoneMap, "displayName", outResponse.m_zoneMap.m_displayName);
+                if (zoneMap.HasMember("bounds") && zoneMap["bounds"].IsObject())
+                {
+                    const rapidjson::Value& bounds = zoneMap["bounds"];
+                    ReadDouble(bounds, "minX", outResponse.m_zoneMap.m_minX);
+                    ReadDouble(bounds, "minY", outResponse.m_zoneMap.m_minY);
+                    ReadDouble(bounds, "maxX", outResponse.m_zoneMap.m_maxX);
+                    ReadDouble(bounds, "maxY", outResponse.m_zoneMap.m_maxY);
+                }
+                if (zoneMap.HasMember("roads") && zoneMap["roads"].IsArray())
+                {
+                    for (const rapidjson::Value& roadValue : zoneMap["roads"].GetArray())
+                    {
+                        if (!roadValue.IsObject())
+                        {
+                            continue;
+                        }
+                        MapRoadState road;
+                        ReadString(roadValue, "id", road.m_id);
+                        ReadString(roadValue, "displayName", road.m_displayName);
+                        if (roadValue.HasMember("points") && roadValue["points"].IsArray())
+                        {
+                            for (const rapidjson::Value& pointValue : roadValue["points"].GetArray())
+                            {
+                                if (!pointValue.IsObject())
+                                {
+                                    continue;
+                                }
+                                MapPointState point;
+                                ReadDouble(pointValue, "x", point.m_x);
+                                ReadDouble(pointValue, "y", point.m_y);
+                                road.m_points.push_back(point);
+                            }
+                        }
+                        outResponse.m_zoneMap.m_roads.push_back(AZStd::move(road));
+                    }
+                }
+                if (zoneMap.HasMember("landmarks") && zoneMap["landmarks"].IsArray())
+                {
+                    for (const rapidjson::Value& landmarkValue : zoneMap["landmarks"].GetArray())
+                    {
+                        if (!landmarkValue.IsObject())
+                        {
+                            continue;
+                        }
+                        MapLandmarkState landmark;
+                        ReadString(landmarkValue, "id", landmark.m_id);
+                        ReadString(landmarkValue, "displayName", landmark.m_displayName);
+                        ReadString(landmarkValue, "kind", landmark.m_kind);
+                        ReadDouble(landmarkValue, "x", landmark.m_x);
+                        ReadDouble(landmarkValue, "y", landmark.m_y);
+                        outResponse.m_zoneMap.m_landmarks.push_back(AZStd::move(landmark));
+                    }
+                }
+            }
+            outResponse.m_navigationAreas.clear();
+            if (document.HasMember("navigationAreas") && document["navigationAreas"].IsArray())
+            {
+                for (const rapidjson::Value& areaValue : document["navigationAreas"].GetArray())
+                {
+                    if (!areaValue.IsObject())
+                    {
+                        continue;
+                    }
+                    NavigationAreaState area;
+                    ReadString(areaValue, "areaId", area.m_areaId);
+                    ReadString(areaValue, "displayName", area.m_displayName);
+                    ReadString(areaValue, "kind", area.m_kind);
+                    ReadString(areaValue, "routeHintText", area.m_routeHintText);
+                    ReadString(areaValue, "targetMobType", area.m_targetMobType);
+                    ReadString(areaValue, "targetEntityId", area.m_targetEntityId);
+                    ReadDouble(areaValue, "centerX", area.m_centerX);
+                    ReadDouble(areaValue, "centerY", area.m_centerY);
+                    ReadDouble(areaValue, "radius", area.m_radius);
+                    if (areaValue.HasMember("questIds") && areaValue["questIds"].IsArray())
+                    {
+                        for (const rapidjson::Value& questIdValue : areaValue["questIds"].GetArray())
+                        {
+                            if (questIdValue.IsString())
+                            {
+                                area.m_questIds.push_back(questIdValue.GetString());
+                            }
+                        }
+                    }
+                    outResponse.m_navigationAreas.push_back(AZStd::move(area));
+                }
+            }
+            outResponse.m_mapMarkers.clear();
+            if (document.HasMember("mapMarkers") && document["mapMarkers"].IsArray())
+            {
+                for (const rapidjson::Value& markerValue : document["mapMarkers"].GetArray())
+                {
+                    if (!markerValue.IsObject())
+                    {
+                        continue;
+                    }
+                    MapMarkerState marker;
+                    ReadString(markerValue, "id", marker.m_id);
+                    ReadString(markerValue, "displayName", marker.m_displayName);
+                    ReadString(markerValue, "kind", marker.m_kind);
+                    ReadString(markerValue, "questId", marker.m_questId);
+                    ReadString(markerValue, "entityId", marker.m_entityId);
+                    ReadString(markerValue, "areaId", marker.m_areaId);
+                    ReadString(markerValue, "routeHintText", marker.m_routeHintText);
+                    ReadDouble(markerValue, "x", marker.m_x);
+                    ReadDouble(markerValue, "y", marker.m_y);
+                    ReadDouble(markerValue, "radius", marker.m_radius);
+                    outResponse.m_mapMarkers.push_back(AZStd::move(marker));
                 }
             }
             outResponse.m_entities.clear();
@@ -722,6 +892,35 @@ namespace NetClient
             worldSessionToken.c_str(),
             questId.c_str());
         if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/quest/accept", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool TrackQuestRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        bool tracked,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"questId\":\"%s\",\"tracked\":%s}",
+            worldSessionToken.c_str(),
+            questId.c_str(),
+            tracked ? "true" : "false");
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/quest/track", requestBody, responseBody, statusCode, outError))
         {
             return false;
         }

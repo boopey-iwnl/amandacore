@@ -55,6 +55,7 @@ Services/.cache/
 Services/pkg/
 Infra/dev/platform-state.json
 Infra/dev/local-processes.json
+Infra/dev/version-manifest.json
 Infra/dev/logs/
 
 imgui.ini

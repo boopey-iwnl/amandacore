@@ -28,11 +28,12 @@ namespace UiClient
 {
     namespace
     {
-        constexpr float CommandPointX = 8.0f;
-        constexpr float CommandPointY = 8.0f;
+        constexpr float CommandPointX = 13.0f;
+        constexpr float CommandPointY = 10.0f;
         constexpr float CommandPointRadius = 5.0f;
-        constexpr float EncounterAnchorX = 58.0f;
-        constexpr float EncounterAnchorY = 36.0f;
+        constexpr float EncounterAnchorX = 232.0f;
+        constexpr float EncounterAnchorY = 118.0f;
+        constexpr float FriendlyNameplateDrawDistance = 36.0f;
         constexpr float MeleeRange = 5.5f;
         constexpr float SpellRange = 24.0f;
         constexpr size_t MaxEventLogEntries = 9;
@@ -717,7 +718,7 @@ namespace UiClient
             drawList->AddCircle(center, radius * 0.55f, ColorU32(58, 87, 90, 180), 40, 1.0f);
             drawList->AddText(ImVec2(center.x - 6.0f, center.y - radius - 14.0f), ColorU32(224, 214, 189), "N");
 
-            const float mapScale = radius / 36.0f;
+            const float mapScale = radius / 140.0f;
             auto plotWorldPoint = [&](float worldX, float worldY, ImU32 color, float pointRadius)
             {
                 const float deltaX = (worldX - playerX) * mapScale;
@@ -756,7 +757,7 @@ namespace UiClient
                 ImVec2(center.x - 7.0f, center.y + 8.0f),
                 ImVec2(center.x + 7.0f, center.y + 8.0f),
                 ColorU32(226, 240, 243));
-            ImGui::TextUnformatted("Markers: quest giver, trainer, choke, hostiles");
+            ImGui::TextUnformatted("Markers: quest giver, trainer, route, hostiles");
         }
 
         void DrawFriendlyNpcNameplates(
@@ -768,6 +769,17 @@ namespace UiClient
             for (const auto& entity : worldState.m_session.m_entities)
             {
                 if (!entity.m_alive || !entity.m_targetable || !IsFriendlyNpc(entity))
+                {
+                    continue;
+                }
+
+                const float distanceToPlayer = Distance2D(
+                    static_cast<float>(worldState.m_session.m_position.m_x),
+                    static_cast<float>(worldState.m_session.m_position.m_y),
+                    static_cast<float>(entity.m_x),
+                    static_cast<float>(entity.m_y));
+                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
+                if (!isSelected && distanceToPlayer > FriendlyNameplateDrawDistance)
                 {
                     continue;
                 }
@@ -786,7 +798,6 @@ namespace UiClient
                 }
 
                 const bool isTrainer = IsTrainerNpc(entity);
-                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
                 const AZStd::string label = AZStd::string::format(
                     "%s  %s",
                     isTrainer ? "Trainer" : "Quest",
@@ -813,13 +824,23 @@ namespace UiClient
             float distanceToCommandPoint,
             float distanceToEncounter)
         {
+            const NetClient::QuestState* trackerQuest = &worldState.m_session.m_quest;
+            for (const auto& quest : worldState.m_session.m_quests)
+            {
+                if (quest.m_tracked)
+                {
+                    trackerQuest = &quest;
+                    break;
+                }
+            }
+
             ImGui::TextUnformatted("Stonewake Orders");
             ImGui::Separator();
-            ImGui::TextUnformatted(worldState.m_session.m_quest.m_title.c_str());
+            ImGui::TextUnformatted(trackerQuest->m_title.c_str());
 
-            if (worldState.m_session.m_quest.m_state == "not_started")
+            if (trackerQuest->m_state == "not_started")
             {
-                ImGui::TextWrapped("%s", worldState.m_session.m_quest.m_objectiveText.c_str());
+                ImGui::TextWrapped("%s", trackerQuest->m_objectiveText.c_str());
                 ImGui::Spacing();
                 if (nearCommandPoint)
                 {
@@ -832,40 +853,44 @@ namespace UiClient
                     ImGui::PopStyleColor();
                 }
             }
-            else if (worldState.m_session.m_quest.m_state == "active")
+            else if (trackerQuest->m_state == "active")
             {
                 ImGui::Text(
                     "%s: %d / %d",
-                    worldState.m_session.m_quest.m_objectiveText.c_str(),
-                    worldState.m_session.m_quest.m_currentCount,
-                    worldState.m_session.m_quest.m_targetCount);
-                ImGui::TextWrapped("Follow the Stonewake route markers. Next landmark distance %.1fm.", distanceToEncounter);
+                    trackerQuest->m_objectiveText.c_str(),
+                    trackerQuest->m_currentCount,
+                    trackerQuest->m_targetCount);
+                ImGui::TextWrapped(
+                    "%s",
+                    trackerQuest->m_routeHintText.empty()
+                        ? AZStd::string::format("Follow the Stonewake route markers. Next landmark distance %.1fm.", distanceToEncounter).c_str()
+                        : trackerQuest->m_routeHintText.c_str());
                 ImGui::Text(
                     "Reward: %d XP and %dg %ds %dc",
-                    worldState.m_session.m_quest.m_rewardXp,
-                    worldState.m_session.m_quest.m_rewardCurrencyGold,
-                    worldState.m_session.m_quest.m_rewardCurrencySilver,
-                    worldState.m_session.m_quest.m_rewardCurrencyCopper);
+                    trackerQuest->m_rewardXp,
+                    trackerQuest->m_rewardCurrencyGold,
+                    trackerQuest->m_rewardCurrencySilver,
+                    trackerQuest->m_rewardCurrencyCopper);
             }
-            else if (worldState.m_session.m_quest.m_state == "completed")
+            else if (trackerQuest->m_state == "completed")
             {
                 ImGui::TextWrapped("Objective complete. Return to the listed turn-in NPC and right-click to claim the reward.");
                 ImGui::Text(
                     "Reward: %d XP and %dg %ds %dc",
-                    worldState.m_session.m_quest.m_rewardXp,
-                    worldState.m_session.m_quest.m_rewardCurrencyGold,
-                    worldState.m_session.m_quest.m_rewardCurrencySilver,
-                    worldState.m_session.m_quest.m_rewardCurrencyCopper);
+                    trackerQuest->m_rewardXp,
+                    trackerQuest->m_rewardCurrencyGold,
+                    trackerQuest->m_rewardCurrencySilver,
+                    trackerQuest->m_rewardCurrencyCopper);
             }
-            else if (worldState.m_session.m_quest.m_state == "reward_granted")
+            else if (trackerQuest->m_state == "reward_granted")
             {
                 ImGui::TextWrapped("Completed and persisted.");
                 ImGui::Text(
                     "Rewards: +%d XP  |  +%dg %ds %dc",
-                    worldState.m_session.m_quest.m_rewardXp,
-                    worldState.m_session.m_quest.m_rewardCurrencyGold,
-                    worldState.m_session.m_quest.m_rewardCurrencySilver,
-                    worldState.m_session.m_quest.m_rewardCurrencyCopper);
+                    trackerQuest->m_rewardXp,
+                    trackerQuest->m_rewardCurrencyGold,
+                    trackerQuest->m_rewardCurrencySilver,
+                    trackerQuest->m_rewardCurrencyCopper);
                 ImGui::TextUnformatted("Reconnects and restarts preserve this state.");
             }
 
@@ -1702,23 +1727,89 @@ namespace UiClient
                 worldState.m_session.m_position.m_z);
         }
 
-        void DrawQuestLogWindow(const GameCore::ClientWorldState& worldState)
+        const char* QuestBucketLabel(const AZStd::string& statusBucket)
         {
-            ImGui::TextUnformatted(worldState.m_session.m_quest.m_title.c_str());
+            if (statusBucket == "active")
+            {
+                return "Active";
+            }
+            if (statusBucket == "ready_to_turn_in")
+            {
+                return "Ready to Turn In";
+            }
+            if (statusBucket == "completed")
+            {
+                return "Completed";
+            }
+            return "Available";
+        }
+
+        void DrawQuestLogWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            AZStd::vector<NetClient::QuestState> fallbackQuests;
+            const AZStd::vector<NetClient::QuestState>* quests = &worldState.m_session.m_quests;
+            if (quests->empty() && !worldState.m_session.m_quest.m_id.empty())
+            {
+                fallbackQuests.push_back(worldState.m_session.m_quest);
+                quests = &fallbackQuests;
+            }
+
+            ImGui::TextUnformatted("Stonewake Vale");
             ImGui::Separator();
-            ImGui::TextWrapped("%s", worldState.m_session.m_quest.m_objectiveText.c_str());
-            ImGui::Spacing();
-            ImGui::Text("State: %s", worldState.m_session.m_quest.m_state.c_str());
-            ImGui::Text(
-                "Progress: %d / %d",
-                worldState.m_session.m_quest.m_currentCount,
-                worldState.m_session.m_quest.m_targetCount);
-            ImGui::Text(
-                "Reward: %d XP and %dg %ds %dc",
-                worldState.m_session.m_quest.m_rewardXp,
-                worldState.m_session.m_quest.m_rewardCurrencyGold,
-                worldState.m_session.m_quest.m_rewardCurrencySilver,
-                worldState.m_session.m_quest.m_rewardCurrencyCopper);
+            ImGui::BeginChild("##quest_log_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            const char* buckets[] = {"active", "ready_to_turn_in", "available", "completed"};
+            for (const char* bucket : buckets)
+            {
+                bool wroteHeader = false;
+                for (const auto& quest : *quests)
+                {
+                    if (quest.m_id.empty() || quest.m_statusBucket != bucket)
+                    {
+                        continue;
+                    }
+                    if (!wroteHeader)
+                    {
+                        ImGui::TextUnformatted(QuestBucketLabel(bucket));
+                        ImGui::Separator();
+                        wroteHeader = true;
+                    }
+
+                    ImGui::PushID(quest.m_id.c_str());
+                    ImGui::TextUnformatted(quest.m_title.c_str());
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s", quest.m_category.empty() ? "Stonewake Vale" : quest.m_category.c_str());
+                    ImGui::TextWrapped("%s", quest.m_objectiveText.c_str());
+                    ImGui::Text(
+                        "Progress: %d / %d  |  Reward: %d XP and %dg %ds %dc",
+                        quest.m_currentCount,
+                        quest.m_targetCount,
+                        quest.m_rewardXp,
+                        quest.m_rewardCurrencyGold,
+                        quest.m_rewardCurrencySilver,
+                        quest.m_rewardCurrencyCopper);
+                    if (!quest.m_objectiveAreaName.empty())
+                    {
+                        ImGui::TextWrapped("Area: %s. %s", quest.m_objectiveAreaName.c_str(), quest.m_routeHintText.c_str());
+                    }
+                    const bool trackable = quest.m_statusBucket == "active" || quest.m_statusBucket == "ready_to_turn_in";
+                    if (trackable && gameCore)
+                    {
+                        const char* buttonLabel = quest.m_tracked ? "Untrack" : "Track";
+                        if (ImGui::Button(buttonLabel, ImVec2(96.0f, 0.0f)))
+                        {
+                            gameCore->TrackQuest(quest.m_id, !quest.m_tracked);
+                        }
+                    }
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
+                if (wroteHeader)
+                {
+                    ImGui::Spacing();
+                }
+            }
+            ImGui::EndChild();
         }
 
         void DrawMicroMenuBar(
@@ -2447,7 +2538,7 @@ namespace UiClient
         if (!m_loggedPlayableZoneReady &&
             gameCore->GetCameraState().m_ready &&
             worldState.m_session.m_alive &&
-            visibleHostileCount == 3)
+            visibleHostileCount >= 3)
         {
             AZ_Printf("amandacore", "client.playable_zone_ready visible=true mobs=3 hud=true grounded=true");
             m_loggedPlayableZoneReady = true;
@@ -2668,7 +2759,7 @@ namespace UiClient
 
         if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize))
         {
-            DrawQuestLogWindow(worldState);
+            DrawQuestLogWindow(gameCore, worldState);
         }
         if (m_questLogOpen)
         {

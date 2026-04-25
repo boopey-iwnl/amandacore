@@ -369,6 +369,34 @@ namespace GameCore
         return true;
     }
 
+    bool GameCoreSystemComponent::TrackQuest(const AZStd::string& questId, bool tracked)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->TrackQuest(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                questId,
+                tracked,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "TrackQuest failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), tracked ? "quest_track" : "quest_untrack");
+        return true;
+    }
+
     bool GameCoreSystemComponent::SetAutoAttack(bool enabled)
     {
         if (!m_worldState.m_worldConnected)

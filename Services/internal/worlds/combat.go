@@ -60,7 +60,7 @@ func (s *worldServer) resetSessionCombatStateLocked(session *worldSessionState, 
 func (s *worldServer) reviveSessionLocked(session *worldSessionState) {
 	session.Alive = true
 	session.Health = session.MaxHealth
-	session.Resource = session.MaxResource
+	session.Resource = 0
 }
 
 func (s *worldServer) findMobByIDLocked(mobID string) *mobState {
@@ -86,6 +86,37 @@ func (s *worldServer) hostileMobsLocked() []*mobState {
 	return mobs
 }
 
+func (s *worldServer) setMobAIStateLocked(mob *mobState, nextState string, reason string) {
+	if mob == nil || nextState == "" {
+		return
+	}
+
+	previousState := mob.AIState
+	if previousState == "" {
+		previousState = mobAIStateIdle
+	}
+	if previousState == nextState {
+		mob.AIState = nextState
+		return
+	}
+
+	mob.AIState = nextState
+	observability.LogEvent("world-service", "world.ai_state_changed", map[string]any{
+		"mobId":             mob.ID,
+		"from":              previousState,
+		"to":                nextState,
+		"reason":            reason,
+		"targetCharacterId": mob.CurrentTargetCharacter,
+		"zoneId":            mob.ZoneID,
+		"x":                 mob.X,
+		"y":                 mob.Y,
+		"z":                 mob.Z,
+		"homeX":             mob.SpawnX,
+		"homeY":             mob.SpawnY,
+		"homeZ":             mob.SpawnZ,
+	})
+}
+
 func (s *worldServer) clearMobAggroForCharacterLocked(characterID string) {
 	for _, mob := range s.hostileMobsLocked() {
 		if mob.CurrentTargetCharacter != characterID {
@@ -93,8 +124,8 @@ func (s *worldServer) clearMobAggroForCharacterLocked(characterID string) {
 		}
 
 		mob.CurrentTargetCharacter = ""
-		if mob.Alive && mob.AIState != "leash_return" {
-			mob.AIState = "idle"
+		if mob.Alive && mob.AIState != mobAIStateEvading && mob.AIState != mobAIStateReturning {
+			s.setMobAIStateLocked(mob, mobAIStateIdle, "target_cleared")
 		}
 	}
 }
@@ -155,7 +186,14 @@ func (s *worldServer) activateAbilityLocked(session *worldSessionState, abilityI
 }
 
 func (s *worldServer) advanceWorldLocked(now time.Time) error {
+	tickStartedAt := time.Now()
+	defer func() {
+		s.metrics.recordTick(time.Since(tickStartedAt))
+		s.maybeLogMetricsSnapshotLocked(now)
+	}()
+
 	s.ensureMobsLocked()
+	s.cleanupStaleSessionsLocked(now)
 	if s.lastUpdatedAt.IsZero() {
 		s.lastUpdatedAt = now
 		return nil
@@ -200,7 +238,8 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 		}
 		if nowMs-session.LastAutoAttackAtMs >= playerAutoAttackCadenceMs {
 			session.LastAutoAttackAtMs = nowMs
-			if err := s.applyDamageToMobLocked(session, targetMob, playerAutoAttackDamage, "auto_attack"); err != nil {
+			session.Resource = minFloat(session.MaxResource, session.Resource+playerAutoAttackGrit)
+			if err := s.applyDamageToMobLocked(session, targetMob, s.autoAttackDamage(session), "auto_attack"); err != nil {
 				return err
 			}
 		}
@@ -219,9 +258,9 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 
 	if !mob.Alive {
 		if mob.RespawnAtMs != 0 && nowMs >= mob.RespawnAtMs {
+			s.setMobAIStateLocked(mob, mobAIStateRespawning, "respawn_timer_elapsed")
 			mob.Alive = true
 			mob.Targetable = true
-			mob.AIState = "idle"
 			mob.Health = mob.MaxHealth
 			mob.X = mob.SpawnX
 			mob.Y = mob.SpawnY
@@ -229,6 +268,7 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 			mob.CurrentTargetCharacter = ""
 			mob.LastAttackAtMs = 0
 			mob.RespawnAtMs = 0
+			s.setMobAIStateLocked(mob, mobAIStateIdle, "respawn_complete")
 			observability.LogEvent("world-service", "world.mob_respawned", map[string]any{
 				"mobId":  mob.ID,
 				"zoneId": mob.ZoneID,
@@ -242,34 +282,37 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 
 	targetSession := s.resolveMobTargetLocked(mob)
 	if targetSession == nil {
-		if mob.AIState == "leash_return" {
+		if mob.AIState == mobAIStateEvading {
+			s.setMobAIStateLocked(mob, mobAIStateReturning, "evade_complete")
+		}
+		if mob.AIState == mobAIStateReturning {
 			s.moveMobTowardsLocked(mob, mob.SpawnX, mob.SpawnY, deltaSeconds)
 			if distance2D(mob.X, mob.Y, mob.SpawnX, mob.SpawnY) <= 0.25 {
 				mob.X = mob.SpawnX
 				mob.Y = mob.SpawnY
 				mob.Health = mob.MaxHealth
 				mob.Targetable = true
-				mob.AIState = "idle"
+				s.setMobAIStateLocked(mob, mobAIStateIdle, "return_complete")
 			}
 		} else {
-			mob.AIState = "idle"
+			s.setMobAIStateLocked(mob, mobAIStateIdle, "target_missing")
 		}
 		return
 	}
 
 	if distance2D(targetSession.X, targetSession.Y, mob.SpawnX, mob.SpawnY) > mob.LeashRadius {
-		s.enterLeashReturnLocked(mob)
+		s.enterEvadeLocked(mob, "leash_exceeded")
 		return
 	}
 
 	distanceToTarget := distance2D(mob.X, mob.Y, targetSession.X, targetSession.Y)
 	if distanceToTarget > mob.AttackRange {
-		mob.AIState = "chase"
+		s.setMobAIStateLocked(mob, mobAIStateChasing, "target_out_of_attack_range")
 		s.moveMobTowardsLocked(mob, targetSession.X, targetSession.Y, deltaSeconds)
 		return
 	}
 
-	mob.AIState = "aggro"
+	s.setMobAIStateLocked(mob, mobAIStateAttacking, "target_in_attack_range")
 	if nowMs-mob.LastAttackAtMs < mob.AttackCadenceMs {
 		return
 	}
@@ -279,11 +322,13 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 		return
 	}
 
-	targetSession.Health = maxFloat(0.0, targetSession.Health-mob.AttackDamage)
+	damage := mob.AttackDamage * (1.0 - armorReduction(calculatePlayerStats(targetSession.Level, targetSession.Equipment, targetSession.Talents).Armor, mob.Level))
+	damage = maxFloat(1.0, damage)
+	targetSession.Health = maxFloat(0.0, targetSession.Health-damage)
 	observability.LogEvent("world-service", "world.damage_applied", map[string]any{
 		"source":            mob.ID,
 		"targetCharacterId": targetSession.CharacterID,
-		"amount":            mob.AttackDamage,
+		"amount":            damage,
 		"remainingHealth":   targetSession.Health,
 	})
 
@@ -291,8 +336,13 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 		targetSession.Alive = false
 		s.resetSessionCombatStateLocked(targetSession, "player_dead")
 		mob.CurrentTargetCharacter = ""
-		mob.AIState = "idle"
+		s.setMobAIStateLocked(mob, mobAIStateIdle, "target_dead")
 	}
+}
+
+func (s *worldServer) autoAttackDamage(session *worldSessionState) float64 {
+	stats := calculatePlayerStats(session.Level, session.Equipment, session.Talents)
+	return maxFloat(1.0, playerAutoAttackDamage+(stats.AttackPower*0.35))
 }
 
 func (s *worldServer) resolveMobTargetLocked(mob *mobState) *worldSessionState {
@@ -323,12 +373,13 @@ func (s *worldServer) resolveMobTargetLocked(mob *mobState) *worldSessionState {
 
 	if closest != nil {
 		mob.CurrentTargetCharacter = closest.CharacterID
-		if mob.AIState == "idle" {
+		if mob.AIState == mobAIStateIdle || mob.AIState == mobAIStatePatrolling {
 			observability.LogEvent("world-service", "world.mob_aggroed", map[string]any{
 				"mobId":       mob.ID,
 				"characterId": closest.CharacterID,
 				"distance":    closestDistance,
 			})
+			s.setMobAIStateLocked(mob, mobAIStateAlerted, "target_acquired")
 		}
 	}
 
@@ -358,12 +409,13 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 	}
 
 	mob.CurrentTargetCharacter = session.CharacterID
-	if mob.AIState == "idle" {
+	if mob.AIState == mobAIStateIdle || mob.AIState == mobAIStatePatrolling {
 		observability.LogEvent("world-service", "world.mob_aggroed", map[string]any{
 			"mobId":       mob.ID,
 			"characterId": session.CharacterID,
 			"reason":      source,
 		})
+		s.setMobAIStateLocked(mob, mobAIStateAlerted, "damage_taken")
 	}
 
 	mob.Health = maxFloat(0.0, mob.Health-amount)
@@ -381,7 +433,7 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 
 	mob.Alive = false
 	mob.Targetable = false
-	mob.AIState = "dead"
+	s.setMobAIStateLocked(mob, mobAIStateDead, "killed")
 	mob.RespawnAtMs = nowMillis() + mob.RespawnDelayMs
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "target_dead")
@@ -396,13 +448,13 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 	return nil
 }
 
-func (s *worldServer) enterLeashReturnLocked(mob *mobState) {
+func (s *worldServer) enterEvadeLocked(mob *mobState, reason string) {
 	if mob == nil {
 		return
 	}
 
-	mob.AIState = "leash_return"
 	mob.Targetable = false
+	s.setMobAIStateLocked(mob, mobAIStateEvading, reason)
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "leash_reset")
 }

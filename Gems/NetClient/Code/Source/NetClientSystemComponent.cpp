@@ -50,6 +50,14 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool TrackQuestRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        bool tracked,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool SetAutoAttackRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -213,6 +221,17 @@ namespace NetClient
         AZStd::string& outError)
     {
         return AcceptQuestRequest(worldEndpoint, worldSessionToken, questId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::TrackQuest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        bool tracked,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return TrackQuestRequest(worldEndpoint, worldSessionToken, questId, tracked, outResponse, outError);
     }
 
     bool NetClientSystemComponent::SetAutoAttack(
