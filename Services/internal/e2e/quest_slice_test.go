@@ -20,6 +20,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 
 	state := fixture.getWorldState(t)
 	assertQuestSummaryState(t, state, "sv_first_muster", "not_started", 0, 1, 0, 125)
+	assertNavigationMetadata(t, state, "sv_first_muster")
 	assertStarterInventory(t, state)
 
 	state = fixture.moveToPosition(t, 26.0, 24.0)
@@ -31,7 +32,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	assertQuestSummaryState(t, state, "sv_first_muster", "not_started", 0, 1, 0, 125)
 	assertStarterInventory(t, state)
 
-	state = fixture.moveToPosition(t, 8.0, 8.0)
+	state = fixture.moveToPosition(t, 13.0, 10.0)
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/target", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 		"targetId":          "npc_commander_elian_rook",
@@ -41,6 +42,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 		"questId":           "sv_first_muster",
 	}, http.StatusOK, &state)
 	assertQuestSummaryState(t, state, "sv_first_muster", "active", 0, 1, 0, 125)
+	assertQuestTracked(t, state, "sv_first_muster", true)
 	assertStarterInventory(t, state)
 
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
@@ -51,7 +53,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	assertQuestSummaryState(t, state, "sv_first_muster", "active", 0, 1, 0, 125)
 	assertStarterInventory(t, state)
 
-	state = fixture.moveToPosition(t, 12.0, 8.0)
+	state = fixture.moveToPosition(t, 34.0, 18.0)
 	state = fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
@@ -68,6 +70,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_01")
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_02")
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_03")
+	state = fixture.moveToPosition(t, 34.0, 18.0)
 	state = fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
@@ -75,17 +78,34 @@ func TestQuestSlicePersistence(t *testing.T) {
 	}, http.StatusOK, &state)
 	assertQuestSummaryState(t, state, "sv_yard_drills", "reward_granted", 3, 3, 80, 135)
 
-	state = fixture.moveToPosition(t, 8.0, 8.0)
+	state = fixture.moveToPosition(t, 13.0, 10.0)
 	state = fixture.targetFriendlyByID(t, "npc_commander_elian_rook")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 		"questId":           milestoneQuestID,
 	}, http.StatusOK, &state)
 	assertQuestSummaryState(t, state, milestoneQuestID, "active", 0, 6, 80, 135)
+	assertQuestTracked(t, state, milestoneQuestID, true)
+	assertNavigationMetadata(t, state, milestoneQuestID)
+
+	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/track", nil, map[string]any{
+		"worldSessionToken": fixture.worldSessionToken,
+		"questId":           milestoneQuestID,
+		"tracked":           false,
+	}, http.StatusOK, &state)
+	assertQuestTracked(t, state, milestoneQuestID, false)
+
+	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/track", nil, map[string]any{
+		"worldSessionToken": fixture.worldSessionToken,
+		"questId":           milestoneQuestID,
+		"tracked":           true,
+	}, http.StatusOK, &state)
+	assertQuestTracked(t, state, milestoneQuestID, true)
 
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_01")
 	state = fixture.getWorldState(t)
 	assertQuestSummaryState(t, state, milestoneQuestID, "active", 1, 6, 80, 135)
+	assertQuestTracked(t, state, milestoneQuestID, true)
 	assertStarterInventory(t, state)
 	time.Sleep(1200 * time.Millisecond)
 	state = fixture.getWorldState(t)
@@ -99,6 +119,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 		"worldSessionToken": fixture.worldSessionToken,
 	}, http.StatusOK, &state)
 	assertQuestSummaryState(t, state, milestoneQuestID, "active", 1, 6, 80, 135)
+	assertQuestTracked(t, state, milestoneQuestID, true)
 	assertStarterInventory(t, state)
 
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_02")
@@ -106,7 +127,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_04")
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_01")
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_02")
-	state = fixture.moveToPosition(t, 8.0, 8.0)
+	state = fixture.moveToPosition(t, 13.0, 10.0)
 	state = fixture.targetFriendlyByID(t, "npc_commander_elian_rook")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
@@ -248,6 +269,73 @@ func assertQuestSummaryState(t *testing.T, state map[string]any, questID string,
 	}
 	if int(currency["copper"].(float64)) != expectedCurrencyCopper%100 {
 		t.Fatalf("expected copper %d, got %v", expectedCurrencyCopper%100, currency["copper"])
+	}
+}
+
+func assertQuestTracked(t *testing.T, state map[string]any, questID string, expectedTracked bool) {
+	t.Helper()
+
+	quest := findQuestSummary(t, state, questID)
+	tracked, ok := quest["tracked"].(bool)
+	if !ok {
+		t.Fatalf("quest %s missing tracked flag: %#v", questID, quest)
+	}
+	if tracked != expectedTracked {
+		t.Fatalf("expected quest %s tracked=%v, got %v", questID, expectedTracked, tracked)
+	}
+
+	trackedIDs, ok := state["trackedQuestIds"].([]any)
+	if !ok {
+		t.Fatalf("state response missing trackedQuestIds payload: %#v", state["trackedQuestIds"])
+	}
+	found := false
+	for _, trackedValue := range trackedIDs {
+		if trackedValue == questID {
+			found = true
+			break
+		}
+	}
+	if found != expectedTracked {
+		t.Fatalf("expected trackedQuestIds membership for %s to be %v, got %v in %#v", questID, expectedTracked, found, trackedIDs)
+	}
+}
+
+func assertNavigationMetadata(t *testing.T, state map[string]any, questID string) {
+	t.Helper()
+
+	zoneMap, ok := state["zoneMap"].(map[string]any)
+	if !ok {
+		t.Fatalf("state response missing zoneMap payload: %#v", state["zoneMap"])
+	}
+	if zoneMap["zoneId"].(string) != "stonewake_vale" {
+		t.Fatalf("expected Stonewake zone map, got %#v", zoneMap)
+	}
+	roads, ok := zoneMap["roads"].([]any)
+	if !ok || len(roads) == 0 {
+		t.Fatalf("expected zone map roads, got %#v", zoneMap["roads"])
+	}
+	landmarks, ok := zoneMap["landmarks"].([]any)
+	if !ok || len(landmarks) == 0 {
+		t.Fatalf("expected zone map landmarks, got %#v", zoneMap["landmarks"])
+	}
+
+	areas, ok := state["navigationAreas"].([]any)
+	if !ok || len(areas) == 0 {
+		t.Fatalf("state response missing navigation areas: %#v", state["navigationAreas"])
+	}
+
+	quest := findQuestSummary(t, state, questID)
+	objectiveArea, ok := quest["objectiveArea"].(map[string]any)
+	if !ok || objectiveArea["areaId"] == "" {
+		t.Fatalf("quest %s missing objective area metadata: %#v", questID, quest["objectiveArea"])
+	}
+	if objectiveArea["routeHintText"] == "" {
+		t.Fatalf("quest %s missing route hint text: %#v", questID, objectiveArea)
+	}
+
+	markers, ok := state["mapMarkers"].([]any)
+	if !ok || len(markers) == 0 {
+		t.Fatalf("state response missing map markers: %#v", state["mapMarkers"])
 	}
 }
 

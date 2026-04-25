@@ -28,11 +28,12 @@ namespace UiClient
 {
     namespace
     {
-        constexpr float CommandPointX = 8.0f;
-        constexpr float CommandPointY = 8.0f;
+        constexpr float CommandPointX = 13.0f;
+        constexpr float CommandPointY = 10.0f;
         constexpr float CommandPointRadius = 5.0f;
-        constexpr float EncounterAnchorX = 58.0f;
-        constexpr float EncounterAnchorY = 36.0f;
+        constexpr float EncounterAnchorX = 232.0f;
+        constexpr float EncounterAnchorY = 118.0f;
+        constexpr float FriendlyNameplateDrawDistance = 36.0f;
         constexpr float MeleeRange = 5.5f;
         constexpr float SpellRange = 24.0f;
         constexpr size_t MaxEventLogEntries = 9;
@@ -258,12 +259,62 @@ namespace UiClient
         AZStd::string GetMobDisplayLabel(const NetClient::VisibleEntity& entity)
         {
             const AZStd::string suffix = GetMobDebugSuffix(entity.m_id);
+            const bool isElite = entity.m_elite || entity.m_classification == "elite";
+            const AZStd::string baseLabel = isElite
+                ? AZStd::string::format("%s (Elite)", entity.m_displayName.c_str())
+                : entity.m_displayName;
             if (suffix.empty())
             {
-                return entity.m_displayName;
+                return baseLabel;
             }
 
-            return AZStd::string::format("%s %s", entity.m_displayName.c_str(), suffix.c_str());
+            return AZStd::string::format("%s %s", baseLabel.c_str(), suffix.c_str());
+        }
+
+        AZStd::string GetQuestDisplayTitle(const NetClient::QuestState& quest)
+        {
+            if (!quest.m_groupRecommended)
+            {
+                return quest.m_title;
+            }
+            if (quest.m_recommendedPlayers > 0)
+            {
+                return AZStd::string::format("[Group %d] %s", quest.m_recommendedPlayers, quest.m_title.c_str());
+            }
+            return AZStd::string::format("[Group] %s", quest.m_title.c_str());
+        }
+
+        AZStd::string PartyCreditStatusLabel(const NetClient::PartyMemberState& member)
+        {
+            if (member.m_groupCreditStatus == "you")
+            {
+                return "you";
+            }
+            if (member.m_groupCreditStatus == "eligible")
+            {
+                return "shared credit ready";
+            }
+            if (member.m_groupCreditStatus == "out_of_range")
+            {
+                return "too far for shared credit";
+            }
+            if (member.m_groupCreditStatus == "wrong_zone")
+            {
+                return "wrong zone";
+            }
+            if (member.m_groupCreditStatus == "not_on_group_quest")
+            {
+                return "not on tracked group quest";
+            }
+            if (member.m_groupCreditStatus == "no_group_quest")
+            {
+                return "no active group quest";
+            }
+            if (member.m_groupCreditStatus == "offline")
+            {
+                return "offline";
+            }
+            return member.m_groupCreditStatus.empty() ? AZStd::string("unknown") : member.m_groupCreditStatus;
         }
 
         AZStd::string FormatCurrency(const NetClient::CurrencyState& currency)
@@ -347,6 +398,18 @@ namespace UiClient
                 }
             }
             return false;
+        }
+
+        AZStd::string EntityServiceId(const NetClient::VisibleEntity& entity, const char* serviceType)
+        {
+            for (const auto& service : entity.m_services)
+            {
+                if (service.m_type == serviceType)
+                {
+                    return service.m_serviceId;
+                }
+            }
+            return {};
         }
 
         bool IsTrainerNpc(const NetClient::VisibleEntity& entity)
@@ -491,6 +554,76 @@ namespace UiClient
                 totalCopper / 10000,
             };
             return FormatCurrency(currency);
+        }
+
+        AZStd::string FormatAbilityFacts(
+            const AZStd::string& resourceName,
+            double resourceCost,
+            double resourceGeneration,
+            AZ::s64 cooldownMs,
+            double rangeMeters)
+        {
+            AZStd::string facts;
+            const AZStd::string resolvedResourceName = resourceName.empty() ? "Grit" : resourceName;
+            if (resourceCost > 0.0)
+            {
+                facts += AZStd::string::format("Cost %.0f %s", resourceCost, resolvedResourceName.c_str());
+            }
+            if (resourceGeneration > 0.0)
+            {
+                if (!facts.empty())
+                {
+                    facts += "  |  ";
+                }
+                facts += AZStd::string::format("Generates %.0f %s", resourceGeneration, resolvedResourceName.c_str());
+            }
+            if (cooldownMs > 0)
+            {
+                if (!facts.empty())
+                {
+                    facts += "  |  ";
+                }
+                facts += AZStd::string::format("Cooldown %.1fs", static_cast<double>(cooldownMs) / 1000.0);
+            }
+            if (rangeMeters > 0.0)
+            {
+                if (!facts.empty())
+                {
+                    facts += "  |  ";
+                }
+                facts += AZStd::string::format("Range %.1fm", rangeMeters);
+            }
+            return facts;
+        }
+
+        AZStd::string FormatAbilityFacts(const NetClient::SpellbookEntryState& entry)
+        {
+            return FormatAbilityFacts(
+                entry.m_resourceName,
+                entry.m_resourceCost,
+                entry.m_resourceGeneration,
+                entry.m_cooldownMs,
+                entry.m_rangeMeters);
+        }
+
+        AZStd::string FormatAbilityFacts(const NetClient::ActionBarSlotState& slot)
+        {
+            return FormatAbilityFacts(
+                slot.m_resourceName,
+                slot.m_resourceCost,
+                slot.m_resourceGeneration,
+                slot.m_cooldownMs,
+                slot.m_rangeMeters);
+        }
+
+        AZStd::string FormatAbilityFacts(const NetClient::TrainerOfferState& offer)
+        {
+            return FormatAbilityFacts(
+                offer.m_resourceName,
+                offer.m_resourceCost,
+                offer.m_resourceGeneration,
+                offer.m_cooldownMs,
+                offer.m_rangeMeters);
         }
 
         void SuppressStockImGuiWindow(const char* windowName)
@@ -641,7 +774,12 @@ namespace UiClient
             ImGui::Text("%s  |  Level %d", worldState.m_session.m_displayName.c_str(), worldState.m_session.m_level);
             ImGui::TextUnformatted(nearCommandPoint ? "Near friendly NPC services" : "Stonewake Vale patrol");
             DrawMeter("Vitality", static_cast<float>(worldState.m_session.m_health), static_cast<float>(worldState.m_session.m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
-            DrawMeter("Focus", static_cast<float>(worldState.m_session.m_resource), static_cast<float>(worldState.m_session.m_maxResource), ColorU32(54, 117, 181), ImVec2(160.0f, 16.0f));
+            DrawMeter(
+                worldState.m_session.m_resourceName.empty() ? "Grit" : worldState.m_session.m_resourceName.c_str(),
+                static_cast<float>(worldState.m_session.m_resource),
+                static_cast<float>(worldState.m_session.m_maxResource),
+                ColorU32(54, 117, 181),
+                ImVec2(160.0f, 16.0f));
             ImGui::Text("Friendly NPCs %.1fm", distanceToCommandPoint);
         }
 
@@ -652,15 +790,13 @@ namespace UiClient
             float playerX,
             float playerY)
         {
-            (void)gameCore;
-            (void)worldState;
             const ImVec2 origin = ImGui::GetCursorScreenPos();
             if (!targetEntity)
             {
                 DrawPortraitBadge("?", ImVec2(origin.x + 34.0f, origin.y + 42.0f), ColorU32(72, 74, 78));
                 ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y + 10.0f));
                 ImGui::TextUnformatted("No target selected");
-                ImGui::TextUnformatted("Left-click NPCs or hostiles");
+                ImGui::TextUnformatted("Left-click NPCs, players, or hostiles");
                 ImGui::TextUnformatted("Tab cycles hostile targets");
                 return;
             }
@@ -689,11 +825,49 @@ namespace UiClient
                 return;
             }
 
+            if (targetEntity->m_kind == "player")
+            {
+                DrawPortraitBadge("P", ImVec2(origin.x + 34.0f, origin.y + 42.0f), targetEntity->m_duelOpponent ? ColorU32(181, 70, 62) : ColorU32(68, 103, 159));
+                ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
+                ImGui::TextUnformatted(targetEntity->m_displayName.c_str());
+                ImGui::Text("%s  |  %s", targetEntity->m_duelOpponent ? "Duel opponent" : "Player", targetEntity->m_alive ? "available" : "down");
+                DrawMeter("Vitality", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
+                ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
+                if (worldState.m_session.m_pvp.m_safeZone.m_noDuel)
+                {
+                    ImGui::TextUnformatted("Safe zone: duels unavailable");
+                    return;
+                }
+                if (!worldState.m_session.m_pvp.m_duelId.empty())
+                {
+                    if (worldState.m_session.m_pvp.m_duelState == "active" && targetEntity->m_duelOpponent)
+                    {
+                        if (ImGui::Button("Surrender", ImVec2(104.0f, 24.0f)) && gameCore)
+                        {
+                            gameCore->SurrenderDuel(worldState.m_session.m_pvp.m_duelId);
+                        }
+                    }
+                    else if (worldState.m_session.m_pvp.m_outgoingDuel)
+                    {
+                        if (ImGui::Button("Cancel Duel", ImVec2(112.0f, 24.0f)) && gameCore)
+                        {
+                            gameCore->CancelDuel(worldState.m_session.m_pvp.m_duelId);
+                        }
+                    }
+                    return;
+                }
+                if (ImGui::Button("Request Duel", ImVec2(116.0f, 24.0f)) && gameCore)
+                {
+                    gameCore->RequestDuel(targetEntity->m_id, {});
+                }
+                return;
+            }
+
             const AZStd::string targetLabel = GetMobDisplayLabel(*targetEntity);
             DrawPortraitBadge("!", ImVec2(origin.x + 34.0f, origin.y + 42.0f), ColorU32(146, 72, 44));
             ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
             ImGui::TextUnformatted(targetLabel.c_str());
-            ImGui::Text("%s  |  %s", "Hostile", targetEntity->m_alive ? "engageable" : "down");
+            ImGui::Text("%s  |  %s  |  %s", "Hostile", targetEntity->m_elite ? "elite" : "normal", targetEntity->m_alive ? "engageable" : "down");
             DrawMeter("Integrity", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(198, 93, 34), ImVec2(160.0f, 18.0f));
             ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
             ImGui::Text("Behavior: %s", targetEntity->m_aiState.empty() ? "idle" : targetEntity->m_aiState.c_str());
@@ -717,7 +891,7 @@ namespace UiClient
             drawList->AddCircle(center, radius * 0.55f, ColorU32(58, 87, 90, 180), 40, 1.0f);
             drawList->AddText(ImVec2(center.x - 6.0f, center.y - radius - 14.0f), ColorU32(224, 214, 189), "N");
 
-            const float mapScale = radius / 36.0f;
+            const float mapScale = radius / 140.0f;
             auto plotWorldPoint = [&](float worldX, float worldY, ImU32 color, float pointRadius)
             {
                 const float deltaX = (worldX - playerX) * mapScale;
@@ -731,6 +905,37 @@ namespace UiClient
                 }
             };
 
+            for (const auto& marker : worldState.m_session.m_mapMarkers)
+            {
+                ImU32 color = ColorU32(226, 183, 74);
+                float pointRadius = 4.0f;
+                if (marker.m_kind == "quest_turn_in")
+                {
+                    color = ColorU32(76, 218, 141);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "quest_available")
+                {
+                    color = ColorU32(214, 194, 84);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "tracked_objective" || marker.m_kind == "quest_objective")
+                {
+                    color = ColorU32(228, 111, 54);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "trainer")
+                {
+                    color = ColorU32(88, 165, 235);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "vendor")
+                {
+                    color = ColorU32(183, 135, 223);
+                    pointRadius = 5.0f;
+                }
+                plotWorldPoint(static_cast<float>(marker.m_x), static_cast<float>(marker.m_y), color, pointRadius);
+            }
             plotWorldPoint(EncounterAnchorX, EncounterAnchorY, ColorU32(228, 111, 54), 5.0f);
             for (const auto& entity : worldState.m_session.m_entities)
             {
@@ -756,7 +961,110 @@ namespace UiClient
                 ImVec2(center.x - 7.0f, center.y + 8.0f),
                 ImVec2(center.x + 7.0f, center.y + 8.0f),
                 ColorU32(226, 240, 243));
-            ImGui::TextUnformatted("Markers: quest giver, trainer, choke, hostiles");
+            ImGui::TextUnformatted("Markers: quest giver, trainer, route, hostiles");
+        }
+
+        ImU32 MapMarkerColor(const AZStd::string& kind)
+        {
+            if (kind == "quest_turn_in")
+            {
+                return ColorU32(76, 218, 141);
+            }
+            if (kind == "quest_available")
+            {
+                return ColorU32(214, 194, 84);
+            }
+            if (kind == "tracked_objective" || kind == "quest_objective")
+            {
+                return ColorU32(228, 111, 54);
+            }
+            if (kind == "trainer")
+            {
+                return ColorU32(88, 165, 235);
+            }
+            if (kind == "vendor")
+            {
+                return ColorU32(183, 135, 223);
+            }
+            return ColorU32(210, 210, 198);
+        }
+
+        void DrawZoneMapWindow(
+            const GameCore::ClientWorldState& worldState,
+            float playerX,
+            float playerY)
+        {
+            const auto& zoneMap = worldState.m_session.m_zoneMap;
+            ImGui::Text("%s", zoneMap.m_displayName.empty() ? "Stonewake Vale" : zoneMap.m_displayName.c_str());
+            ImGui::TextUnformatted("Authored navigation blockout");
+
+            const ImVec2 canvasSize(590.0f, 360.0f);
+            const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
+            ImGui::InvisibleButton("##stonewake_zone_map_canvas", canvasSize);
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
+            drawList->AddRectFilled(canvasMin, canvasMax, ColorU32(18, 25, 29, 245), 6.0f);
+            drawList->AddRect(canvasMin, canvasMax, ColorU32(126, 132, 117), 6.0f, 0, 1.5f);
+
+            const double minX = zoneMap.m_minX;
+            const double minY = zoneMap.m_minY;
+            const double width = (zoneMap.m_maxX - zoneMap.m_minX) > 1.0 ? (zoneMap.m_maxX - zoneMap.m_minX) : 1.0;
+            const double height = (zoneMap.m_maxY - zoneMap.m_minY) > 1.0 ? (zoneMap.m_maxY - zoneMap.m_minY) : 1.0;
+            auto mapToScreen = [&](double x, double y) -> ImVec2
+            {
+                const float normalizedX = static_cast<float>((x - minX) / width);
+                const float normalizedY = static_cast<float>((y - minY) / height);
+                return ImVec2(
+                    canvasMin.x + 18.0f + (normalizedX * (canvasSize.x - 36.0f)),
+                    canvasMax.y - 18.0f - (normalizedY * (canvasSize.y - 36.0f)));
+            };
+
+            for (const auto& road : zoneMap.m_roads)
+            {
+                for (size_t pointIndex = 1; pointIndex < road.m_points.size(); ++pointIndex)
+                {
+                    const ImVec2 previous = mapToScreen(road.m_points[pointIndex - 1].m_x, road.m_points[pointIndex - 1].m_y);
+                    const ImVec2 current = mapToScreen(road.m_points[pointIndex].m_x, road.m_points[pointIndex].m_y);
+                    drawList->AddLine(previous, current, ColorU32(136, 112, 70), 4.0f);
+                    drawList->AddLine(previous, current, ColorU32(196, 169, 103), 1.5f);
+                }
+            }
+
+            for (const auto& area : worldState.m_session.m_navigationAreas)
+            {
+                const ImVec2 center = mapToScreen(area.m_centerX, area.m_centerY);
+                const float radius = static_cast<float>((area.m_radius / width) * (canvasSize.x - 36.0f));
+                const ImU32 areaColor = area.m_kind == "hostile_objective" ? ColorU32(135, 74, 52, 65) : ColorU32(72, 121, 112, 55);
+                drawList->AddCircleFilled(center, AZ::GetClamp(radius, 8.0f, 42.0f), areaColor, 32);
+                drawList->AddCircle(center, AZ::GetClamp(radius, 8.0f, 42.0f), ColorU32(178, 166, 124, 130), 32, 1.0f);
+            }
+
+            for (const auto& landmark : zoneMap.m_landmarks)
+            {
+                const ImVec2 point = mapToScreen(landmark.m_x, landmark.m_y);
+                drawList->AddCircleFilled(point, 3.5f, ColorU32(199, 211, 194), 16);
+                drawList->AddText(ImVec2(point.x + 5.0f, point.y - 7.0f), ColorU32(223, 219, 199), landmark.m_displayName.c_str());
+            }
+
+            for (const auto& marker : worldState.m_session.m_mapMarkers)
+            {
+                const ImVec2 point = mapToScreen(marker.m_x, marker.m_y);
+                drawList->AddCircleFilled(point, 6.0f, MapMarkerColor(marker.m_kind), 20);
+                drawList->AddCircle(point, 7.5f, ColorU32(21, 25, 27), 20, 1.5f);
+                if (!marker.m_displayName.empty())
+                {
+                    drawList->AddText(ImVec2(point.x + 8.0f, point.y - 8.0f), ColorU32(240, 232, 206), marker.m_displayName.c_str());
+                }
+            }
+
+            const ImVec2 playerPoint = mapToScreen(playerX, playerY);
+            drawList->AddTriangleFilled(
+                ImVec2(playerPoint.x, playerPoint.y - 9.0f),
+                ImVec2(playerPoint.x - 7.0f, playerPoint.y + 7.0f),
+                ImVec2(playerPoint.x + 7.0f, playerPoint.y + 7.0f),
+                ColorU32(226, 240, 243));
+
+            ImGui::TextUnformatted("Legend: gold available, green turn-in, rust objective, blue trainer, violet vendor");
         }
 
         void DrawFriendlyNpcNameplates(
@@ -768,6 +1076,17 @@ namespace UiClient
             for (const auto& entity : worldState.m_session.m_entities)
             {
                 if (!entity.m_alive || !entity.m_targetable || !IsFriendlyNpc(entity))
+                {
+                    continue;
+                }
+
+                const float distanceToPlayer = Distance2D(
+                    static_cast<float>(worldState.m_session.m_position.m_x),
+                    static_cast<float>(worldState.m_session.m_position.m_y),
+                    static_cast<float>(entity.m_x),
+                    static_cast<float>(entity.m_y));
+                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
+                if (!isSelected && distanceToPlayer > FriendlyNameplateDrawDistance)
                 {
                     continue;
                 }
@@ -786,7 +1105,6 @@ namespace UiClient
                 }
 
                 const bool isTrainer = IsTrainerNpc(entity);
-                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
                 const AZStd::string label = AZStd::string::format(
                     "%s  %s",
                     isTrainer ? "Trainer" : "Quest",
@@ -813,13 +1131,45 @@ namespace UiClient
             float distanceToCommandPoint,
             float distanceToEncounter)
         {
+            const NetClient::QuestState* trackerQuest = &worldState.m_session.m_quest;
+            for (const auto& quest : worldState.m_session.m_quests)
+            {
+                if (quest.m_tracked)
+                {
+                    trackerQuest = &quest;
+                    break;
+                }
+            }
+
             ImGui::TextUnformatted("Stonewake Orders");
             ImGui::Separator();
-            ImGui::TextUnformatted(worldState.m_session.m_quest.m_title.c_str());
-
-            if (worldState.m_session.m_quest.m_state == "not_started")
+            const AZStd::string trackerTitle = GetQuestDisplayTitle(*trackerQuest);
+            ImGui::TextUnformatted(trackerTitle.c_str());
+            if (trackerQuest->m_groupRecommended)
             {
-                ImGui::TextWrapped("%s", worldState.m_session.m_quest.m_objectiveText.c_str());
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.93f, 0.70f, 0.33f, 1.0f));
+                if (trackerQuest->m_recommendedPlayers > 0)
+                {
+                    ImGui::Text("Recommended group: %d players", trackerQuest->m_recommendedPlayers);
+                }
+                else
+                {
+                    ImGui::TextUnformatted("Recommended group");
+                }
+                ImGui::PopStyleColor();
+                if (!trackerQuest->m_partyStatusText.empty())
+                {
+                    ImGui::TextWrapped(
+                        "%s Nearby: %d, eligible: %d.",
+                        trackerQuest->m_partyStatusText.c_str(),
+                        trackerQuest->m_partyNearbyCount,
+                        trackerQuest->m_partyEligibleCount);
+                }
+            }
+
+            if (trackerQuest->m_state == "not_started")
+            {
+                ImGui::TextWrapped("%s", trackerQuest->m_objectiveText.c_str());
                 ImGui::Spacing();
                 if (nearCommandPoint)
                 {
@@ -832,40 +1182,43 @@ namespace UiClient
                     ImGui::PopStyleColor();
                 }
             }
-            else if (worldState.m_session.m_quest.m_state == "active")
+            else if (trackerQuest->m_state == "active")
             {
                 ImGui::Text(
                     "%s: %d / %d",
-                    worldState.m_session.m_quest.m_objectiveText.c_str(),
-                    worldState.m_session.m_quest.m_currentCount,
-                    worldState.m_session.m_quest.m_targetCount);
-                ImGui::TextWrapped("Follow the Stonewake route markers. Next landmark distance %.1fm.", distanceToEncounter);
+                    trackerQuest->m_objectiveText.c_str(),
+                    trackerQuest->m_currentCount,
+                    trackerQuest->m_targetCount);
+                const AZStd::string routeHint = trackerQuest->m_routeHintText.empty()
+                    ? AZStd::string::format("Follow the Stonewake route markers. Next landmark distance %.1fm.", distanceToEncounter)
+                    : trackerQuest->m_routeHintText;
+                ImGui::TextWrapped("%s", routeHint.c_str());
                 ImGui::Text(
                     "Reward: %d XP and %dg %ds %dc",
-                    worldState.m_session.m_quest.m_rewardXp,
-                    worldState.m_session.m_quest.m_rewardCurrencyGold,
-                    worldState.m_session.m_quest.m_rewardCurrencySilver,
-                    worldState.m_session.m_quest.m_rewardCurrencyCopper);
+                    trackerQuest->m_rewardXp,
+                    trackerQuest->m_rewardCurrencyGold,
+                    trackerQuest->m_rewardCurrencySilver,
+                    trackerQuest->m_rewardCurrencyCopper);
             }
-            else if (worldState.m_session.m_quest.m_state == "completed")
+            else if (trackerQuest->m_state == "completed")
             {
                 ImGui::TextWrapped("Objective complete. Return to the listed turn-in NPC and right-click to claim the reward.");
                 ImGui::Text(
                     "Reward: %d XP and %dg %ds %dc",
-                    worldState.m_session.m_quest.m_rewardXp,
-                    worldState.m_session.m_quest.m_rewardCurrencyGold,
-                    worldState.m_session.m_quest.m_rewardCurrencySilver,
-                    worldState.m_session.m_quest.m_rewardCurrencyCopper);
+                    trackerQuest->m_rewardXp,
+                    trackerQuest->m_rewardCurrencyGold,
+                    trackerQuest->m_rewardCurrencySilver,
+                    trackerQuest->m_rewardCurrencyCopper);
             }
-            else if (worldState.m_session.m_quest.m_state == "reward_granted")
+            else if (trackerQuest->m_state == "reward_granted")
             {
                 ImGui::TextWrapped("Completed and persisted.");
                 ImGui::Text(
                     "Rewards: +%d XP  |  +%dg %ds %dc",
-                    worldState.m_session.m_quest.m_rewardXp,
-                    worldState.m_session.m_quest.m_rewardCurrencyGold,
-                    worldState.m_session.m_quest.m_rewardCurrencySilver,
-                    worldState.m_session.m_quest.m_rewardCurrencyCopper);
+                    trackerQuest->m_rewardXp,
+                    trackerQuest->m_rewardCurrencyGold,
+                    trackerQuest->m_rewardCurrencySilver,
+                    trackerQuest->m_rewardCurrencyCopper);
                 ImGui::TextUnformatted("Reconnects and restarts preserve this state.");
             }
 
@@ -959,7 +1312,29 @@ namespace UiClient
                 ImGui::PushID(slotIndex);
                 const NetClient::ActionBarSlotState* slotState = FindActionBarSlot(worldState.m_session, slotIndex);
                 const bool hasAbility = slotState && slotState->m_learned && !slotState->m_abilityId.empty();
-                const bool clickable = hasAbility && (!slotState->m_requiresTarget || hasHostileTarget);
+                const AZ::s64 nowMs = NowMs();
+                AZ::s64 abilityCooldownRemainingMs = 0;
+                if (slotState)
+                {
+                    abilityCooldownRemainingMs = slotState->m_cooldownRemainingMs;
+                    if (slotState->m_cooldownEndsAt > nowMs)
+                    {
+                        abilityCooldownRemainingMs = AZ::GetMax(abilityCooldownRemainingMs, slotState->m_cooldownEndsAt - nowMs);
+                    }
+                }
+                const AZ::s64 gcdRemainingMs =
+                    slotState && slotState->m_triggersGlobalCooldown && worldState.m_session.m_globalCooldownEndsAt > nowMs
+                    ? worldState.m_session.m_globalCooldownEndsAt - nowMs
+                    : 0;
+                const AZ::s64 blockedRemainingMs = AZ::GetMax(abilityCooldownRemainingMs, gcdRemainingMs);
+                const bool blockedByCooldown = blockedRemainingMs > 0;
+                const bool blockedByResource = hasAbility &&
+                    slotState->m_resourceCost > 0.0 &&
+                    worldState.m_session.m_resource + 0.01 < slotState->m_resourceCost;
+                const bool clickable = hasAbility &&
+                    (!slotState->m_requiresTarget || hasHostileTarget) &&
+                    !blockedByCooldown &&
+                    !blockedByResource;
                 if (editMode)
                 {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.20f, 0.10f, 1.0f));
@@ -991,6 +1366,31 @@ namespace UiClient
                 if (!keyLabel.empty() && keyLabel != "Unbound")
                 {
                     drawList->AddText(ImVec2(slotMin.x + 6.0f, slotMin.y + 4.0f), ColorU32(235, 211, 154), keyLabel.c_str());
+                }
+                if (hasAbility && blockedByCooldown)
+                {
+                    const float cooldownRatio = slotState->m_cooldownMs > 0
+                        ? Clamp01(static_cast<float>(blockedRemainingMs) / static_cast<float>(slotState->m_cooldownMs))
+                        : 1.0f;
+                    const float overlayHeight = slotSize.y * cooldownRatio;
+                    drawList->AddRectFilled(
+                        ImVec2(slotMin.x, slotMax.y - overlayHeight),
+                        slotMax,
+                        ColorU32(8, 11, 15, 185),
+                        8.0f);
+                    const AZStd::string cooldownText = AZStd::string::format("%.1f", static_cast<double>(blockedRemainingMs) / 1000.0);
+                    const ImVec2 cooldownTextSize = ImGui::CalcTextSize(cooldownText.c_str());
+                    drawList->AddText(
+                        ImVec2(
+                            slotMin.x + ((slotSize.x - cooldownTextSize.x) * 0.5f),
+                            slotMin.y + ((slotSize.y - cooldownTextSize.y) * 0.5f)),
+                        ColorU32(246, 236, 204),
+                        cooldownText.c_str());
+                }
+                else if (hasAbility && blockedByResource)
+                {
+                    drawList->AddRectFilled(slotMin, slotMax, ColorU32(15, 18, 24, 150), 8.0f);
+                    drawList->AddText(ImVec2(slotMin.x + 34.0f, slotMax.y - 18.0f), ColorU32(112, 154, 214), "G");
                 }
 
                 if (!editMode && pressed && clickable)
@@ -1099,14 +1499,35 @@ namespace UiClient
 
                 if (slotState && !slotState->m_displayName.empty() && ImGui::IsItemHovered())
                 {
+                    AZStd::string tooltip = slotState->m_displayName;
+                    const AZStd::string facts = FormatAbilityFacts(*slotState);
+                    if (!facts.empty())
+                    {
+                        tooltip += "\n";
+                        tooltip += facts;
+                    }
+                    if (!slotState->m_tooltipText.empty())
+                    {
+                        tooltip += "\n";
+                        tooltip += slotState->m_tooltipText;
+                    }
+                    if (blockedByCooldown)
+                    {
+                        tooltip += AZStd::string::format("\nReady in %.1fs.", static_cast<double>(blockedRemainingMs) / 1000.0);
+                    }
+                    if (blockedByResource)
+                    {
+                        tooltip += "\nNot enough Grit.";
+                    }
                     if (editMode)
                     {
-                        ImGui::SetTooltip("%s\nSHIFT-click to arm move, drag to move, or SHIFT-right-click to clear.", slotState->m_displayName.c_str());
+                        tooltip += "\nSHIFT-click to arm move, drag to move, or SHIFT-right-click to clear.";
                     }
                     else
                     {
-                        ImGui::SetTooltip("%s\nBars are locked. Hold SHIFT to move or clear abilities.", slotState->m_displayName.c_str());
+                        tooltip += "\nBars are locked. Hold SHIFT to move or clear abilities.";
                     }
+                    ImGui::SetTooltip("%s", tooltip.c_str());
                 }
                 else if (editMode && ImGui::IsItemHovered())
                 {
@@ -1265,6 +1686,15 @@ namespace UiClient
                 }
                 ImGui::PopStyleColor();
                 ImGui::TextWrapped("%s", entry.m_description.c_str());
+                const AZStd::string learnedFacts = FormatAbilityFacts(entry);
+                if (!learnedFacts.empty())
+                {
+                    ImGui::TextWrapped("%s", learnedFacts.c_str());
+                }
+                if (!entry.m_tooltipText.empty())
+                {
+                    ImGui::TextDisabled("%s", entry.m_tooltipText.c_str());
+                }
                 ImGui::TextDisabled("Known  |  level %d", entry.m_requiredLevel);
                 ImGui::EndGroup();
                 if (editMode && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
@@ -1306,6 +1736,15 @@ namespace UiClient
                 ImGui::Text("%s", entry.m_displayName.c_str());
                 ImGui::PopStyleColor();
                 ImGui::TextWrapped("%s", entry.m_description.c_str());
+                const AZStd::string previewFacts = FormatAbilityFacts(entry);
+                if (!previewFacts.empty())
+                {
+                    ImGui::TextWrapped("%s", previewFacts.c_str());
+                }
+                if (!entry.m_tooltipText.empty())
+                {
+                    ImGui::TextDisabled("%s", entry.m_tooltipText.c_str());
+                }
                 ImGui::TextWrapped("%s", entry.m_requirementText.c_str());
                 ImGui::EndGroup();
                 ImGui::Separator();
@@ -1343,6 +1782,15 @@ namespace UiClient
                 ImGui::PushID(offer.m_abilityId.c_str());
                 ImGui::Text("%s", offer.m_displayName.c_str());
                 ImGui::TextWrapped("%s", offer.m_description.c_str());
+                const AZStd::string offerFacts = FormatAbilityFacts(offer);
+                if (!offerFacts.empty())
+                {
+                    ImGui::TextWrapped("%s", offerFacts.c_str());
+                }
+                if (!offer.m_tooltipText.empty())
+                {
+                    ImGui::TextDisabled("%s", offer.m_tooltipText.c_str());
+                }
                 ImGui::Text("Cost: %s  |  Level %d", FormatTrainerCost(offer.m_costCopper).c_str(), offer.m_requiredLevel);
 
                 if (offer.m_learned)
@@ -1541,6 +1989,335 @@ namespace UiClient
             }
         }
 
+        AZStd::string FormatCopperAmount(int totalCopper)
+        {
+            const NetClient::CurrencyState currency{
+                totalCopper,
+                totalCopper % 100,
+                (totalCopper % 10000) / 100,
+                totalCopper / 10000,
+            };
+            return FormatCurrency(currency);
+        }
+
+        AZStd::string FormatAuctionRemaining(AZ::s64 remainingSeconds)
+        {
+            if (remainingSeconds <= 0)
+            {
+                return "expired";
+            }
+            const AZ::s64 hours = remainingSeconds / 3600;
+            AZ::s64 minutes = (remainingSeconds % 3600) / 60;
+            if (hours > 0)
+            {
+                return AZStd::string::format("%lldh %lldm", static_cast<long long>(hours), static_cast<long long>(minutes));
+            }
+            if (minutes < 1)
+            {
+                minutes = 1;
+            }
+            return AZStd::string::format("%lldm", static_cast<long long>(minutes));
+        }
+
+        const NetClient::InventorySlotState* FindInventorySlot(
+            const NetClient::InventoryState& inventory,
+            int slotIndex)
+        {
+            for (const auto& slot : inventory.m_slots)
+            {
+                if (slot.m_slotIndex == slotIndex)
+                {
+                    return &slot;
+                }
+            }
+            return nullptr;
+        }
+
+        const NetClient::AuctionSellSlotState* FindAuctionSellSlot(
+            const NetClient::AuctionStateResponse& auctionState,
+            int slotIndex)
+        {
+            for (const auto& slot : auctionState.m_sellSlots)
+            {
+                if (slot.m_slotIndex == slotIndex)
+                {
+                    return &slot;
+                }
+            }
+            return nullptr;
+        }
+
+        void DrawAuctionListingRow(
+            GameCore::IGameCoreRequests* gameCore,
+            const NetClient::AuctionListingState& listing,
+            int rowIndex,
+            bool canBuy,
+            int& pendingBuyoutIndex)
+        {
+            ImGui::PushID(listing.m_auctionId.c_str());
+            ImGui::Text("%s x%d", listing.m_itemDisplayName.c_str(), listing.m_stackCount);
+            ImGui::TextDisabled("%s / %s", listing.m_itemType.c_str(), listing.m_itemSubtype.c_str());
+            ImGui::SameLine(210.0f);
+            ImGui::Text("%s", listing.m_sellerDisplayName.c_str());
+            ImGui::SameLine(360.0f);
+            ImGui::Text("%s", FormatCopperAmount(listing.m_buyoutCopper).c_str());
+            ImGui::SameLine(490.0f);
+            ImGui::Text("%s", FormatAuctionRemaining(listing.m_timeRemainingSeconds).c_str());
+            if (canBuy)
+            {
+                ImGui::SameLine(590.0f);
+                if (ImGui::Button("Buyout", ImVec2(78.0f, 0.0f)))
+                {
+                    pendingBuyoutIndex = rowIndex;
+                    ImGui::OpenPopup("Confirm Buyout");
+                }
+            }
+            else if (listing.m_state == "active")
+            {
+                ImGui::SameLine(590.0f);
+                if (ImGui::Button("Cancel", ImVec2(78.0f, 0.0f)) && gameCore)
+                {
+                    gameCore->CancelAuction(listing.m_auctionId);
+                }
+            }
+            ImGui::Separator();
+            ImGui::PopID();
+        }
+
+        void DrawAuctionWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            char* searchBuffer,
+            size_t searchBufferLength,
+            char* buyoutBuffer,
+            size_t buyoutBufferLength,
+            int& selectedSellSlot,
+            int& stackCount,
+            int& pendingBuyoutIndex)
+        {
+            const char* itemTypes[] = {"", "weapon", "armor", "consumable", "material", "junk"};
+            static int selectedItemType = 0;
+            static int selectedSort = 0;
+            const char* sortLabels[] = {"price asc", "price desc"};
+            const char* sortValues[] = {"buyout_asc", "buyout_desc"};
+            static int selectedDuration = 1;
+            const char* durationLabels[] = {"30 min", "12 hours", "24 hours"};
+            const AZ::s64 durationSeconds[] = {30 * 60, 12 * 60 * 60, 24 * 60 * 60};
+
+            ImGui::Text("Highmere Market");
+            ImGui::SameLine();
+            ImGui::TextDisabled("Purse %s", FormatCurrency(worldState.m_session.m_currency).c_str());
+            if (!worldState.m_errorMessage.empty())
+            {
+                ImGui::TextColored(ImVec4(0.95f, 0.34f, 0.28f, 1.0f), "Status");
+                ImGui::SameLine();
+                ImGui::TextWrapped("%s", worldState.m_errorMessage.c_str());
+            }
+            ImGui::Separator();
+
+            if (ImGui::BeginTabBar("##auction_tabs"))
+            {
+                if (ImGui::BeginTabItem("Browse"))
+                {
+                    ImGui::SetNextItemWidth(220.0f);
+                    ImGui::InputText("Search", searchBuffer, searchBufferLength);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(130.0f);
+                    ImGui::Combo("Type", &selectedItemType, itemTypes, AZ_ARRAY_SIZE(itemTypes));
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::Combo("Sort", &selectedSort, sortLabels, AZ_ARRAY_SIZE(sortLabels));
+                    ImGui::SameLine();
+                    if (ImGui::Button("Refresh", ImVec2(82.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->BrowseAuctions(searchBuffer, itemTypes[selectedItemType], sortValues[selectedSort]);
+                    }
+
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Item");
+                    ImGui::SameLine(210.0f);
+                    ImGui::TextDisabled("Seller");
+                    ImGui::SameLine(360.0f);
+                    ImGui::TextDisabled("Buyout");
+                    ImGui::SameLine(490.0f);
+                    ImGui::TextDisabled("Time");
+                    ImGui::Separator();
+                    ImGui::BeginChild("##auction_listing_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (int index = 0; index < static_cast<int>(worldState.m_auction.m_listings.size()); ++index)
+                    {
+                        DrawAuctionListingRow(gameCore, worldState.m_auction.m_listings[index], index, true, pendingBuyoutIndex);
+                    }
+                    ImGui::EndChild();
+
+                    if (ImGui::BeginPopupModal("Confirm Buyout", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                    {
+                        if (pendingBuyoutIndex >= 0 &&
+                            pendingBuyoutIndex < static_cast<int>(worldState.m_auction.m_listings.size()))
+                        {
+                            const auto& listing = worldState.m_auction.m_listings[pendingBuyoutIndex];
+                            ImGui::TextWrapped(
+                                "Buy %s x%d for %s?",
+                                listing.m_itemDisplayName.c_str(),
+                                listing.m_stackCount,
+                                FormatCopperAmount(listing.m_buyoutCopper).c_str());
+                            if (ImGui::Button("Confirm", ImVec2(96.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->BuyoutAuction(listing.m_auctionId);
+                                pendingBuyoutIndex = -1;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                        }
+                        if (ImGui::Button("Cancel", ImVec2(96.0f, 0.0f)))
+                        {
+                            pendingBuyoutIndex = -1;
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Sell"))
+                {
+                    ImGui::TextUnformatted("Select an inventory slot or drag an item here.");
+                    ImGui::Button("Drop Item", ImVec2(140.0f, 34.0f));
+                    if (ImGui::BeginDragDropTarget())
+                    {
+                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(InventorySlotPayloadType))
+                        {
+                            const auto* drag = static_cast<const InventorySlotDragPayload*>(payload->Data);
+                            if (drag && drag->m_sourceSlotIndex >= 0)
+                            {
+                                selectedSellSlot = drag->m_sourceSlotIndex;
+                            }
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+                    ImGui::SameLine();
+                    if (selectedSellSlot >= 0)
+                    {
+                        const auto* selectedSlot = FindInventorySlot(worldState.m_session.m_inventory, selectedSellSlot);
+                        const auto* sellSlot = FindAuctionSellSlot(worldState.m_auction, selectedSellSlot);
+                        ImGui::Text(
+                            "Slot %02d: %s x%d",
+                            selectedSellSlot + 1,
+                            selectedSlot ? selectedSlot->m_displayName.c_str() : "empty",
+                            selectedSlot ? selectedSlot->m_stackCount : 0);
+                        if (sellSlot && !sellSlot->m_tradeable)
+                        {
+                            ImGui::SameLine();
+                            ImGui::TextColored(
+                                ImVec4(0.95f, 0.34f, 0.28f, 1.0f),
+                                "%s",
+                                sellSlot->m_blockedReason.empty() ? "not tradeable" : sellSlot->m_blockedReason.c_str());
+                        }
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted("No item selected");
+                    }
+
+                    ImGui::BeginChild("##auction_sell_inventory", ImVec2(250.0f, 220.0f), true);
+                    for (const auto& slot : worldState.m_session.m_inventory.m_slots)
+                    {
+                        if (slot.m_itemId.empty() || slot.m_stackCount <= 0)
+                        {
+                            continue;
+                        }
+                        const auto* sellSlot = FindAuctionSellSlot(worldState.m_auction, slot.m_slotIndex);
+                        ImGui::PushID(slot.m_slotIndex);
+                        const bool selected = selectedSellSlot == slot.m_slotIndex;
+                        const bool disabled = sellSlot && !sellSlot->m_tradeable;
+                        const AZStd::string label = disabled
+                            ? AZStd::string::format("%02d  %s x%d (blocked)", slot.m_slotIndex + 1, slot.m_displayName.c_str(), slot.m_stackCount)
+                            : AZStd::string::format("%02d  %s x%d", slot.m_slotIndex + 1, slot.m_displayName.c_str(), slot.m_stackCount);
+                        if (ImGui::Selectable(label.c_str(), selected) && !disabled)
+                        {
+                            selectedSellSlot = slot.m_slotIndex;
+                            if (stackCount < 1)
+                            {
+                                stackCount = 1;
+                            }
+                            if (stackCount > slot.m_stackCount)
+                            {
+                                stackCount = slot.m_stackCount;
+                            }
+                        }
+                        if (disabled)
+                        {
+                            if (ImGui::IsItemHovered())
+                            {
+                                ImGui::SetTooltip("%s", sellSlot->m_blockedReason.empty() ? "This item cannot be auctioned." : sellSlot->m_blockedReason.c_str());
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+                    ImGui::EndChild();
+                    ImGui::SameLine();
+                    ImGui::BeginGroup();
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::InputInt("Stack", &stackCount);
+                    if (stackCount < 1)
+                    {
+                        stackCount = 1;
+                    }
+                    ImGui::SetNextItemWidth(150.0f);
+                    ImGui::InputText("Buyout copper", buyoutBuffer, buyoutBufferLength, ImGuiInputTextFlags_CharsDecimal);
+                    ImGui::SetNextItemWidth(150.0f);
+                    ImGui::Combo("Duration", &selectedDuration, durationLabels, AZ_ARRAY_SIZE(durationLabels));
+                    const auto* sellSlot = FindAuctionSellSlot(worldState.m_auction, selectedSellSlot);
+                    if (sellSlot)
+                    {
+                        const int clampedStack = stackCount > 0
+                            ? (stackCount < sellSlot->m_stackCount ? stackCount : sellSlot->m_stackCount)
+                            : 1;
+                        int previewDeposit = sellSlot->m_sellPriceCopper * clampedStack / 20;
+                        if (previewDeposit <= 0)
+                        {
+                            previewDeposit = 1;
+                        }
+                        ImGui::TextDisabled("Deposit %s", FormatCopperAmount(previewDeposit).c_str());
+                        if (!sellSlot->m_tradeable)
+                        {
+                            ImGui::TextColored(
+                                ImVec4(0.95f, 0.34f, 0.28f, 1.0f),
+                                "%s",
+                                sellSlot->m_blockedReason.empty() ? "This item cannot be auctioned." : sellSlot->m_blockedReason.c_str());
+                        }
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Deposit appears after selecting an item.");
+                    }
+                    if (ImGui::Button("Create Listing", ImVec2(150.0f, 0.0f)) && gameCore)
+                    {
+                        const int buyoutCopper = atoi(buyoutBuffer);
+                        if (gameCore->ListAuctionItem(selectedSellSlot, stackCount, buyoutCopper, durationSeconds[selectedDuration]))
+                        {
+                            selectedSellSlot = -1;
+                            stackCount = 1;
+                            buyoutBuffer[0] = '\0';
+                        }
+                    }
+                    ImGui::EndGroup();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("My Auctions"))
+                {
+                    ImGui::BeginChild("##auction_mine_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (int index = 0; index < static_cast<int>(worldState.m_auction.m_myAuctions.size()); ++index)
+                    {
+                        DrawAuctionListingRow(gameCore, worldState.m_auction.m_myAuctions[index], index, false, pendingBuyoutIndex);
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+        }
+
         bool DrawKeyBindingRow(
             const char* label,
             const char* actionId,
@@ -1582,6 +2359,7 @@ namespace UiClient
             AZStd::string& bagBinding,
             AZStd::string& characterBinding,
             AZStd::string& questLogBinding,
+            AZStd::string& mapBinding,
             AZStd::string& settingsBinding,
             AZStd::string& interactBinding,
             AZStd::string& targetHostileBinding,
@@ -1613,6 +2391,7 @@ namespace UiClient
                         changed |= DrawKeyBindingRow("Bag", "bag", bagBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Character", "character", characterBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Quest Log", "questLog", questLogBinding, pendingKeybindActionId);
+                        changed |= DrawKeyBindingRow("Map", "map", mapBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Settings/Menu", "settings", settingsBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Interact", "interact", interactBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Target Hostile", "targetHostile", targetHostileBinding, pendingKeybindActionId);
@@ -1695,6 +2474,13 @@ namespace UiClient
             ImGui::Text("Class: Warrior");
             ImGui::Text("Level: %d", worldState.m_session.m_level);
             ImGui::Text("Currency: %s", FormatCurrency(worldState.m_session.m_currency).c_str());
+            ImGui::Separator();
+            ImGui::Text("Strength: %d", worldState.m_session.m_stats.m_strength);
+            ImGui::Text("Stamina: %d", worldState.m_session.m_stats.m_stamina);
+            ImGui::Text("Armor: %d", worldState.m_session.m_stats.m_armor);
+            ImGui::Text("Attack Power: %.1f", worldState.m_session.m_stats.m_attackPower);
+            ImGui::Text("Armor Reduction: %.1f%%", worldState.m_session.m_stats.m_armorReductionPct * 100.0);
+            ImGui::Separator();
             ImGui::Text(
                 "Position: %.1f, %.1f, %.1f",
                 worldState.m_session.m_position.m_x,
@@ -1702,31 +2488,630 @@ namespace UiClient
                 worldState.m_session.m_position.m_z);
         }
 
-        void DrawQuestLogWindow(const GameCore::ClientWorldState& worldState)
+        void DrawTalentWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
         {
-            ImGui::TextUnformatted(worldState.m_session.m_quest.m_title.c_str());
+            const auto& talents = worldState.m_session.m_talents;
+            ImGui::Text("Warrior Talents  |  Points %d / %d", talents.m_pointsAvailable, talents.m_pointsGranted);
             ImGui::Separator();
-            ImGui::TextWrapped("%s", worldState.m_session.m_quest.m_objectiveText.c_str());
-            ImGui::Spacing();
-            ImGui::Text("State: %s", worldState.m_session.m_quest.m_state.c_str());
-            ImGui::Text(
-                "Progress: %d / %d",
-                worldState.m_session.m_quest.m_currentCount,
-                worldState.m_session.m_quest.m_targetCount);
-            ImGui::Text(
-                "Reward: %d XP and %dg %ds %dc",
-                worldState.m_session.m_quest.m_rewardXp,
-                worldState.m_session.m_quest.m_rewardCurrencyGold,
-                worldState.m_session.m_quest.m_rewardCurrencySilver,
-                worldState.m_session.m_quest.m_rewardCurrencyCopper);
+            if (!talents.m_unlocked)
+            {
+                ImGui::Text("Unlocks at level %d", talents.m_unlockLevel);
+                return;
+            }
+
+            ImGui::BeginChild(
+                "##talent_scroll",
+                ImVec2(0.0f, 0.0f),
+                false,
+                ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            for (const auto& category : talents.m_categories)
+            {
+                bool wroteCategory = false;
+                for (const auto& talent : talents.m_talents)
+                {
+                    if (talent.m_category != category)
+                    {
+                        continue;
+                    }
+                    if (!wroteCategory)
+                    {
+                        ImGui::TextUnformatted(category.c_str());
+                        ImGui::Separator();
+                        wroteCategory = true;
+                    }
+
+                    ImGui::PushID(talent.m_id.c_str());
+                    ImGui::Text("%s  %d/%d", talent.m_displayName.c_str(), talent.m_rank, talent.m_maxRank);
+                    ImGui::TextWrapped("%s", talent.m_description.c_str());
+                    if (!talent.m_requirementText.empty())
+                    {
+                        ImGui::TextDisabled("%s", talent.m_requirementText.c_str());
+                    }
+                    if (talent.m_canSelect)
+                    {
+                        if (ImGui::Button("Select", ImVec2(92.0f, 0.0f)) && gameCore)
+                        {
+                            gameCore->SelectTalent(talent.m_id);
+                        }
+                    }
+                    else if (talent.m_rank >= talent.m_maxRank)
+                    {
+                        ImGui::TextDisabled("Max rank");
+                    }
+                    else if (talents.m_pointsAvailable <= 0)
+                    {
+                        ImGui::TextDisabled("No points available");
+                    }
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
+                if (wroteCategory)
+                {
+                    ImGui::Spacing();
+                }
+            }
+            ImGui::EndChild();
+        }
+
+        const char* QuestBucketLabel(const AZStd::string& statusBucket)
+        {
+            if (statusBucket == "active")
+            {
+                return "Active";
+            }
+            if (statusBucket == "ready_to_turn_in")
+            {
+                return "Ready to Turn In";
+            }
+            if (statusBucket == "completed")
+            {
+                return "Completed";
+            }
+            return "Available";
+        }
+
+        void DrawQuestLogWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            AZStd::vector<NetClient::QuestState> fallbackQuests;
+            const AZStd::vector<NetClient::QuestState>* quests = &worldState.m_session.m_quests;
+            if (quests->empty() && !worldState.m_session.m_quest.m_id.empty())
+            {
+                fallbackQuests.push_back(worldState.m_session.m_quest);
+                quests = &fallbackQuests;
+            }
+
+            ImGui::TextUnformatted("Stonewake Vale");
+            ImGui::Separator();
+            ImGui::BeginChild("##quest_log_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            const char* buckets[] = {"active", "ready_to_turn_in", "available", "completed"};
+            for (const char* bucket : buckets)
+            {
+                bool wroteHeader = false;
+                for (const auto& quest : *quests)
+                {
+                    if (quest.m_id.empty() || quest.m_statusBucket != bucket)
+                    {
+                        continue;
+                    }
+                    if (!wroteHeader)
+                    {
+                        ImGui::TextUnformatted(QuestBucketLabel(bucket));
+                        ImGui::Separator();
+                        wroteHeader = true;
+                    }
+
+                    ImGui::PushID(quest.m_id.c_str());
+                    const AZStd::string questTitle = GetQuestDisplayTitle(quest);
+                    ImGui::TextUnformatted(questTitle.c_str());
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s", quest.m_category.empty() ? "Stonewake Vale" : quest.m_category.c_str());
+                    if (quest.m_groupRecommended)
+                    {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("Recommended Group");
+                    }
+                    if (!quest.m_partyStatusText.empty())
+                    {
+                        ImGui::TextWrapped(
+                            "Party credit: %s Nearby %d, eligible %d.",
+                            quest.m_partyStatusText.c_str(),
+                            quest.m_partyNearbyCount,
+                            quest.m_partyEligibleCount);
+                    }
+                    ImGui::TextWrapped("%s", quest.m_objectiveText.c_str());
+                    ImGui::Text(
+                        "Progress: %d / %d  |  Reward: %d XP and %dg %ds %dc",
+                        quest.m_currentCount,
+                        quest.m_targetCount,
+                        quest.m_rewardXp,
+                        quest.m_rewardCurrencyGold,
+                        quest.m_rewardCurrencySilver,
+                        quest.m_rewardCurrencyCopper);
+                    if (!quest.m_objectiveAreaName.empty())
+                    {
+                        ImGui::TextWrapped("Area: %s. %s", quest.m_objectiveAreaName.c_str(), quest.m_routeHintText.c_str());
+                    }
+                    const bool trackable = quest.m_statusBucket == "active" || quest.m_statusBucket == "ready_to_turn_in";
+                    if (trackable && gameCore)
+                    {
+                        const char* buttonLabel = quest.m_tracked ? "Untrack" : "Track";
+                        if (ImGui::Button(buttonLabel, ImVec2(96.0f, 0.0f)))
+                        {
+                            gameCore->TrackQuest(quest.m_id, !quest.m_tracked);
+                        }
+                    }
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
+                if (wroteHeader)
+                {
+                    ImGui::Spacing();
+                }
+            }
+            ImGui::EndChild();
+        }
+
+        ImVec4 ChatChannelColor(const AZStd::string& channel)
+        {
+            if (channel == "system")
+            {
+                return ImVec4(0.95f, 0.75f, 0.42f, 1.0f);
+            }
+            if (channel == "whisper")
+            {
+                return ImVec4(0.86f, 0.48f, 0.92f, 1.0f);
+            }
+            if (channel == "party")
+            {
+                return ImVec4(0.42f, 0.68f, 1.0f, 1.0f);
+            }
+            if (channel == "guild")
+            {
+                return ImVec4(0.38f, 0.86f, 0.48f, 1.0f);
+            }
+            return ImVec4(0.92f, 0.92f, 0.86f, 1.0f);
+        }
+
+        const char* ChatChannelLabel(const AZStd::string& channel)
+        {
+            if (channel == "system")
+            {
+                return "System";
+            }
+            if (channel == "whisper")
+            {
+                return "Whisper";
+            }
+            if (channel == "party")
+            {
+                return "Party";
+            }
+            if (channel == "guild")
+            {
+                return "Guild";
+            }
+            return "Say";
+        }
+
+        bool DrawChatWindow(
+            const GameCore::ClientWorldState& worldState,
+            AZStd::string& selectedChannel,
+            char* inputBuffer,
+            size_t inputBufferSize,
+            char* whisperTargetBuffer,
+            size_t whisperTargetBufferSize,
+            AZStd::string& outSubmittedInput)
+        {
+            ImGui::BeginChild("##chat_scrollback", ImVec2(0.0f, 158.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            for (const auto& message : worldState.m_social.m_chatMessages)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ChatChannelColor(message.m_channel));
+                ImGui::Text("[%s]", ChatChannelLabel(message.m_channel));
+                ImGui::PopStyleColor();
+                ImGui::SameLine();
+                if (message.m_channel == "system")
+                {
+                    ImGui::TextWrapped("%s", message.m_messageText.c_str());
+                }
+                else
+                {
+                    ImGui::TextWrapped("%s: %s", message.m_senderDisplayName.c_str(), message.m_messageText.c_str());
+                }
+            }
+            if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f)
+            {
+                ImGui::SetScrollHereY(1.0f);
+            }
+            ImGui::EndChild();
+
+            if (ImGui::Button("Say", ImVec2(58.0f, 24.0f)))
+            {
+                selectedChannel = "say";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Whisper", ImVec2(82.0f, 24.0f)))
+            {
+                selectedChannel = "whisper";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Party", ImVec2(66.0f, 24.0f)))
+            {
+                selectedChannel = "party";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Guild", ImVec2(66.0f, 24.0f)))
+            {
+                selectedChannel = "guild";
+            }
+            ImGui::SameLine();
+            ImGui::Text("Channel: %s", ChatChannelLabel(selectedChannel));
+
+            if (selectedChannel == "whisper")
+            {
+                ImGui::SetNextItemWidth(138.0f);
+                ImGui::InputText("Target", whisperTargetBuffer, whisperTargetBufferSize);
+                ImGui::SameLine();
+            }
+
+            ImGui::SetNextItemWidth(-1.0f);
+            const bool submitted = ImGui::InputText(
+                "##chat_input",
+                inputBuffer,
+                inputBufferSize,
+                ImGuiInputTextFlags_EnterReturnsTrue);
+            if (submitted)
+            {
+                outSubmittedInput = inputBuffer;
+                inputBuffer[0] = '\0';
+            }
+            return submitted;
+        }
+
+        void DrawPartyFrames(const GameCore::ClientWorldState& worldState)
+        {
+            if (!worldState.m_social.m_hasParty)
+            {
+                ImGui::TextUnformatted("No party");
+                return;
+            }
+
+            for (const auto& member : worldState.m_social.m_party.m_members)
+            {
+                ImGui::Separator();
+                ImGui::Text(
+                    "%s%s  |  Level %d %s",
+                    member.m_leader ? "* " : "",
+                    member.m_displayName.c_str(),
+                    member.m_level,
+                    member.m_classId.c_str());
+                ImGui::Text("%s  |  %s", member.m_zoneId.c_str(), member.m_online ? "online" : "offline");
+                if (member.m_online)
+                {
+                    DrawMeter("Health", static_cast<float>(member.m_health), static_cast<float>(member.m_maxHealth), ColorU32(173, 52, 44), ImVec2(204.0f, 14.0f));
+                    DrawMeter("Grit", static_cast<float>(member.m_resource), static_cast<float>(member.m_maxResource), ColorU32(54, 117, 181), ImVec2(204.0f, 14.0f));
+                    const AZStd::string creditStatus = PartyCreditStatusLabel(member);
+                    if (member.m_sameZone && member.m_distanceToPlayer > 0.0)
+                    {
+                        ImGui::Text(
+                            "%s  |  %.0fm",
+                            creditStatus.c_str(),
+                            member.m_distanceToPlayer);
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted(creditStatus.c_str());
+                    }
+                }
+            }
+        }
+
+        void DrawPartyInvitePrompt(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            if (!gameCore || worldState.m_social.m_partyInvites.empty())
+            {
+                return;
+            }
+
+            const auto& invite = worldState.m_social.m_partyInvites.front();
+            ImGui::Text("%s invited you to a party.", invite.m_inviterDisplayName.c_str());
+            if (ImGui::Button("Accept", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->AcceptPartyInvite(invite.m_inviteId);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Decline", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->DeclinePartyInvite(invite.m_inviteId);
+            }
+        }
+
+        void DrawDuelPrompt(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            if (!gameCore)
+            {
+                return;
+            }
+
+            const auto& pvp = worldState.m_session.m_pvp;
+            if (pvp.m_incomingDuel)
+            {
+                ImGui::Text("%s challenged you to a duel.", pvp.m_opponentDisplayName.c_str());
+                if (ImGui::Button("Accept", ImVec2(104.0f, 28.0f)))
+                {
+                    gameCore->AcceptDuel(pvp.m_duelId);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Decline", ImVec2(104.0f, 28.0f)))
+                {
+                    gameCore->DeclineDuel(pvp.m_duelId);
+                }
+                return;
+            }
+
+            if (pvp.m_duelState == "countdown")
+            {
+                AZ::s64 remainingMs = pvp.m_countdownEndsAt - NowMs();
+                if (remainingMs < 0)
+                {
+                    remainingMs = 0;
+                }
+                ImGui::Text("Duel starts in %.1fs", static_cast<double>(remainingMs) / 1000.0);
+                ImGui::Text("%s", pvp.m_opponentDisplayName.c_str());
+                if (ImGui::Button("Cancel", ImVec2(104.0f, 28.0f)))
+                {
+                    gameCore->CancelDuel(pvp.m_duelId);
+                }
+                return;
+            }
+
+            if (pvp.m_duelState == "active")
+            {
+                ImGui::Text("Dueling %s", pvp.m_opponentDisplayName.c_str());
+                ImGui::Text("Wins %d  Losses %d  Honor %d", pvp.m_stats.m_duelsWon, pvp.m_stats.m_duelsLost, pvp.m_stats.m_honorPoints);
+                if (ImGui::Button("Surrender", ImVec2(112.0f, 28.0f)))
+                {
+                    gameCore->SurrenderDuel(pvp.m_duelId);
+                }
+                return;
+            }
+
+            if (!pvp.m_lastResult.m_duelId.empty())
+            {
+                ImGui::Text(
+                    "Last duel: %s vs %s",
+                    pvp.m_lastResult.m_result.c_str(),
+                    pvp.m_lastResult.m_opponentDisplayName.c_str());
+                ImGui::Text("Wins %d  Losses %d  Honor %d", pvp.m_stats.m_duelsWon, pvp.m_stats.m_duelsLost, pvp.m_stats.m_honorPoints);
+            }
+        }
+
+        bool HasGuildPermission(const NetClient::GuildState& guild, const char* permission)
+        {
+            return AZStd::find(
+                guild.m_currentPermissions.begin(),
+                guild.m_currentPermissions.end(),
+                AZStd::string(permission)) != guild.m_currentPermissions.end();
+        }
+
+        void DrawGuildInvitePrompt(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            if (!gameCore || worldState.m_social.m_guildInvites.empty())
+            {
+                return;
+            }
+
+            const auto& invite = worldState.m_social.m_guildInvites.front();
+            ImGui::Text("%s invited you to join %s.", invite.m_inviterDisplayName.c_str(), invite.m_guildName.c_str());
+            if (ImGui::Button("Accept", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->AcceptGuildInvite(invite.m_inviteId);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Decline", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->DeclineGuildInvite(invite.m_inviteId);
+            }
+        }
+
+        void DrawSocialWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            char* nameBuffer,
+            size_t nameBufferSize,
+            char* guildNameBuffer,
+            size_t guildNameBufferSize,
+            char* guildMotdBuffer,
+            size_t guildMotdBufferSize)
+        {
+            if (ImGui::BeginTabBar("##social_tabs"))
+            {
+                if (ImGui::BeginTabItem("Friends"))
+                {
+                    ImGui::SetNextItemWidth(210.0f);
+                    ImGui::InputText("Name", nameBuffer, nameBufferSize);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Add", ImVec2(62.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->AddFriend(nameBuffer);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove", ImVec2(86.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->RemoveFriend(nameBuffer);
+                    }
+
+                    ImGui::Separator();
+                    ImGui::BeginChild("##friends_list", ImVec2(0.0f, 280.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (const auto& friendState : worldState.m_social.m_friends)
+                    {
+                        ImGui::Text(
+                            "%s  |  L%d %s  |  %s",
+                            friendState.m_displayName.c_str(),
+                            friendState.m_level,
+                            friendState.m_classId.c_str(),
+                            friendState.m_online ? "online" : "offline");
+                        if (friendState.m_online)
+                        {
+                            ImGui::SameLine();
+                            ImGui::Text(" | %s", friendState.m_zoneId.c_str());
+                            ImGui::SameLine();
+                            ImGui::PushID(friendState.m_characterId.c_str());
+                            if (ImGui::Button("Invite", ImVec2(72.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->InviteParty(friendState.m_displayName, friendState.m_characterId);
+                            }
+                            ImGui::PopID();
+                        }
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Party"))
+                {
+                    ImGui::SetNextItemWidth(210.0f);
+                    ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->InviteParty(nameBuffer, {});
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->LeaveParty();
+                    }
+                    ImGui::Separator();
+                    DrawPartyFrames(worldState);
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Guild"))
+                {
+                    if (!worldState.m_social.m_hasGuild)
+                    {
+                        ImGui::SetNextItemWidth(250.0f);
+                        ImGui::InputText("Guild Name", guildNameBuffer, guildNameBufferSize);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Create", ImVec2(86.0f, 0.0f)) && gameCore)
+                        {
+                            gameCore->CreateGuild(guildNameBuffer);
+                        }
+                        ImGui::Separator();
+                        ImGui::TextUnformatted("No guild");
+                    }
+                    else
+                    {
+                        const auto& guild = worldState.m_social.m_guild;
+                        ImGui::Text("%s  |  %s", guild.m_guildName.c_str(), guild.m_currentRankId.c_str());
+                        if (!guild.m_messageOfTheDay.empty())
+                        {
+                            ImGui::TextWrapped("MOTD: %s", guild.m_messageOfTheDay.c_str());
+                        }
+                        if (guildMotdBuffer[0] == '\0' && !guild.m_messageOfTheDay.empty())
+                        {
+                            strncpy_s(guildMotdBuffer, guildMotdBufferSize, guild.m_messageOfTheDay.c_str(), _TRUNCATE);
+                        }
+
+                        if (HasGuildPermission(guild, "invite_member"))
+                        {
+                            ImGui::SetNextItemWidth(190.0f);
+                            ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->InviteGuild(nameBuffer);
+                            }
+                        }
+                        if (HasGuildPermission(guild, "edit_motd"))
+                        {
+                            ImGui::SetNextItemWidth(286.0f);
+                            ImGui::InputText("Message", guildMotdBuffer, guildMotdBufferSize);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Set", ImVec2(58.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->SetGuildMessageOfTheDay(guildMotdBuffer);
+                            }
+                        }
+
+                        if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                        {
+                            gameCore->LeaveGuild();
+                        }
+                        if (HasGuildPermission(guild, "disband_guild"))
+                        {
+                            ImGui::SameLine();
+                            if (ImGui::Button("Disband", ImVec2(92.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->DisbandGuild();
+                            }
+                        }
+
+                        ImGui::Separator();
+                        ImGui::BeginChild("##guild_roster", ImVec2(0.0f, 250.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                        for (const auto& member : guild.m_members)
+                        {
+                            ImGui::PushID(member.m_characterId.c_str());
+                            ImGui::Text(
+                                "%s  |  %s  |  L%d %s  |  %s",
+                                member.m_displayName.c_str(),
+                                member.m_rankName.c_str(),
+                                member.m_level,
+                                member.m_classId.c_str(),
+                                member.m_online ? "online" : "offline");
+                            if (!member.m_currentZoneId.empty())
+                            {
+                                ImGui::SameLine();
+                                ImGui::Text(" | %s", member.m_currentZoneId.c_str());
+                            }
+                            if (member.m_characterId != worldState.m_session.m_characterId)
+                            {
+                                if (HasGuildPermission(guild, "promote_member"))
+                                {
+                                    if (ImGui::Button("Promote", ImVec2(82.0f, 0.0f)) && gameCore)
+                                    {
+                                        gameCore->PromoteGuildMember(member.m_displayName);
+                                    }
+                                    ImGui::SameLine();
+                                }
+                                if (HasGuildPermission(guild, "demote_member"))
+                                {
+                                    if (ImGui::Button("Demote", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    {
+                                        gameCore->DemoteGuildMember(member.m_displayName);
+                                    }
+                                    ImGui::SameLine();
+                                }
+                                if (HasGuildPermission(guild, "remove_member"))
+                                {
+                                    if (ImGui::Button("Remove", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    {
+                                        gameCore->RemoveGuildMember(member.m_displayName);
+                                    }
+                                }
+                            }
+                            ImGui::Separator();
+                            ImGui::PopID();
+                        }
+                        ImGui::EndChild();
+                    }
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
         }
 
         void DrawMicroMenuBar(
             bool& characterSheetOpen,
+            bool& talentsOpen,
             bool& questLogOpen,
+            bool& mapOpen,
             bool& spellbookOpen,
             bool& bagOpen,
-            bool& settingsOpen)
+            bool& settingsOpen,
+            bool& socialOpen)
         {
             struct MenuButtonState
             {
@@ -1736,9 +3121,12 @@ namespace UiClient
 
             MenuButtonState buttons[] = {
                 {"Character", &characterSheetOpen},
+                {"Talents", &talentsOpen},
                 {"Quest Log", &questLogOpen},
+                {"Map", &mapOpen},
                 {"Spellbook", &spellbookOpen},
                 {"Bag", &bagOpen},
+                {"Social", &socialOpen},
                 {"Settings", &settingsOpen},
             };
 
@@ -1807,6 +3195,7 @@ namespace UiClient
         m_questToastExpiresAt = 0;
         m_lastHandledInteractionSequence = 0;
         m_questGossipOpen = false;
+        m_auctionOpen = false;
         m_lastNearCommandPoint = false;
         m_lastWorldConnected = false;
         m_loggedActionBarVisible = false;
@@ -1815,6 +3204,11 @@ namespace UiClient
         m_pendingActionAssignmentAbilityId.clear();
         m_pendingActionMoveSlot = -1;
         m_pendingInventoryMoveSlot = -1;
+        m_pendingAuctionSellSlot = -1;
+        m_pendingAuctionBuyoutIndex = -1;
+        m_auctionStackCount = 1;
+        m_auctionSearchBuffer[0] = '\0';
+        m_auctionBuyoutBuffer[0] = '\0';
         LoadDefaultKeybindings();
         LoadUiSettings();
     }
@@ -1849,6 +3243,7 @@ namespace UiClient
         m_bagBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericB.GetName();
         m_characterBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericC.GetName();
         m_questLogBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericL.GetName();
+        m_mapBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericM.GetName();
         m_settingsBinding = AzFramework::InputDeviceKeyboard::Key::Escape.GetName();
         m_interactBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericE.GetName();
         m_targetHostileBinding = AzFramework::InputDeviceKeyboard::Key::EditTab.GetName();
@@ -1896,6 +3291,7 @@ namespace UiClient
             readString("bind.bag", m_bagBinding);
             readString("bind.character", m_characterBinding);
             readString("bind.questLog", m_questLogBinding);
+            readString("bind.map", m_mapBinding);
             readString("bind.settings", m_settingsBinding);
             readString("bind.interact", m_interactBinding);
             readString("bind.targetHostile", m_targetHostileBinding);
@@ -1933,6 +3329,7 @@ namespace UiClient
         fprintf(settingsFile, "bind.bag=%s\n", m_bagBinding.c_str());
         fprintf(settingsFile, "bind.character=%s\n", m_characterBinding.c_str());
         fprintf(settingsFile, "bind.questLog=%s\n", m_questLogBinding.c_str());
+        fprintf(settingsFile, "bind.map=%s\n", m_mapBinding.c_str());
         fprintf(settingsFile, "bind.settings=%s\n", m_settingsBinding.c_str());
         fprintf(settingsFile, "bind.interact=%s\n", m_interactBinding.c_str());
         fprintf(settingsFile, "bind.targetHostile=%s\n", m_targetHostileBinding.c_str());
@@ -1958,6 +3355,7 @@ namespace UiClient
         clearConflicts(m_bagBinding);
         clearConflicts(m_characterBinding);
         clearConflicts(m_questLogBinding);
+        clearConflicts(m_mapBinding);
         clearConflicts(m_settingsBinding);
         clearConflicts(m_interactBinding);
         clearConflicts(m_targetHostileBinding);
@@ -1986,6 +3384,10 @@ namespace UiClient
         else if (actionId == "questLog")
         {
             m_questLogBinding = keyName;
+        }
+        else if (actionId == "map")
+        {
+            m_mapBinding = keyName;
         }
         else if (actionId == "settings")
         {
@@ -2105,6 +3507,11 @@ namespace UiClient
             m_questLogOpen = !m_questLogOpen;
             return true;
         }
+        if (keyName == m_mapBinding)
+        {
+            m_mapOpen = !m_mapOpen;
+            return true;
+        }
         if (keyName == m_settingsBinding)
         {
             m_settingsOpen = !m_settingsOpen;
@@ -2184,10 +3591,67 @@ namespace UiClient
             return false;
         }
 
+        if (EntityHasService(entity, "dungeon_entrance"))
+        {
+            const AZStd::string dungeonId = EntityServiceId(entity, "dungeon_entrance");
+            if (dungeonId.empty())
+            {
+                AddHudEvent("Dungeon entrance is unavailable");
+                return false;
+            }
+            if (gameCore->EnterDungeon(dungeonId))
+            {
+                m_questGossipOpen = false;
+                m_trainerOpen = false;
+                m_auctionOpen = false;
+                AddHudEvent(AZStd::string::format("Entering %s", entity.m_displayName.c_str()));
+                return true;
+            }
+            const auto& latestState = gameCore->GetClientWorldState();
+            AddHudEvent(latestState.m_errorMessage.empty() ? "Unable to enter dungeon" : latestState.m_errorMessage);
+            return false;
+        }
+
+        if (EntityHasService(entity, "dungeon_exit"))
+        {
+            if (gameCore->ExitDungeon())
+            {
+                m_questGossipOpen = false;
+                m_trainerOpen = false;
+                m_auctionOpen = false;
+                AddHudEvent("Leaving dungeon");
+                return true;
+            }
+            const auto& latestState = gameCore->GetClientWorldState();
+            AddHudEvent(latestState.m_errorMessage.empty() ? "Unable to leave dungeon" : latestState.m_errorMessage);
+            return false;
+        }
+
+        if (EntityHasService(entity, "auction"))
+        {
+            if (gameCore->BrowseAuctions(m_auctionSearchBuffer, {}, "buyout_asc"))
+            {
+                m_auctionOpen = true;
+                m_questGossipOpen = false;
+                m_trainerOpen = false;
+                AZ_Printf(
+                    "amandacore",
+                    "client.auction_visible open=true source=%s targetId=%s",
+                    source,
+                    entity.m_id.c_str());
+                AddHudEvent(AZStd::string::format("Viewing %s", entity.m_displayName.c_str()));
+                return true;
+            }
+            const auto& latestState = gameCore->GetClientWorldState();
+            AddHudEvent(latestState.m_errorMessage.empty() ? "Unable to open market" : latestState.m_errorMessage);
+            return false;
+        }
+
         if (ShouldOpenQuestForEntity(worldState, entity))
         {
             m_questGossipOpen = true;
             m_trainerOpen = false;
+            m_auctionOpen = false;
             AZ_Printf(
                 "amandacore",
                 "client.quest_gossip_visible open=true source=%s targetId=%s",
@@ -2201,6 +3665,7 @@ namespace UiClient
         {
             m_trainerOpen = true;
             m_questGossipOpen = false;
+            m_auctionOpen = false;
             AZ_Printf(
                 "amandacore",
                 "client.trainer_visible open=true source=%s targetId=%s",
@@ -2214,6 +3679,7 @@ namespace UiClient
         {
             m_questGossipOpen = true;
             m_trainerOpen = false;
+            m_auctionOpen = false;
             AZ_Printf(
                 "amandacore",
                 "client.quest_gossip_visible open=true source=%s targetId=%s",
@@ -2224,6 +3690,115 @@ namespace UiClient
         }
 
         AddHudEvent(AZStd::string::format("%s has nothing new right now", entity.m_displayName.c_str()));
+        return false;
+    }
+
+    bool UiClientSystemComponent::SubmitChatInput(GameCore::IGameCoreRequests* gameCore, const AZStd::string& input)
+    {
+        if (!gameCore)
+        {
+            return false;
+        }
+
+        auto trim = [](const AZStd::string& value) -> AZStd::string
+        {
+            const size_t start = value.find_first_not_of(" \t\r\n");
+            if (start == AZStd::string::npos)
+            {
+                return {};
+            }
+            const size_t end = value.find_last_not_of(" \t\r\n");
+            return value.substr(start, end - start + 1);
+        };
+
+        AZStd::string text = trim(input);
+        if (text.empty())
+        {
+            return false;
+        }
+
+        auto splitFirst = [&trim](const AZStd::string& value) -> AZStd::pair<AZStd::string, AZStd::string>
+        {
+            const size_t space = value.find(' ');
+            if (space == AZStd::string::npos)
+            {
+                return {trim(value), {}};
+            }
+            return {trim(value.substr(0, space)), trim(value.substr(space + 1))};
+        };
+
+        if (text[0] != '/')
+        {
+            const AZStd::string target = m_chatChannel == "whisper" ? AZStd::string(m_chatWhisperTargetBuffer) : AZStd::string();
+            return gameCore->SubmitChatMessage(m_chatChannel, target, text);
+        }
+
+        const auto commandAndRest = splitFirst(text.substr(1));
+        const AZStd::string command = commandAndRest.first;
+        const AZStd::string rest = commandAndRest.second;
+        if (command == "say" || command == "s")
+        {
+            return gameCore->SubmitChatMessage("say", {}, rest);
+        }
+        if (command == "party" || command == "p")
+        {
+            return gameCore->SubmitChatMessage("party", {}, rest);
+        }
+        if (command == "guild" || command == "g")
+        {
+            return gameCore->SubmitChatMessage("guild", {}, rest);
+        }
+        if (command == "whisper" || command == "w")
+        {
+            const auto targetAndMessage = splitFirst(rest);
+            return gameCore->SubmitChatMessage("whisper", targetAndMessage.first, targetAndMessage.second);
+        }
+        if (command == "friend")
+        {
+            const auto actionAndName = splitFirst(rest);
+            if (actionAndName.first == "add")
+            {
+                return gameCore->AddFriend(actionAndName.second);
+            }
+            if (actionAndName.first == "remove")
+            {
+                return gameCore->RemoveFriend(actionAndName.second);
+            }
+        }
+        if (command == "invite")
+        {
+            return gameCore->InviteParty(rest, {});
+        }
+        if (command == "leave")
+        {
+            return gameCore->LeaveParty();
+        }
+        if (command == "gcreate")
+        {
+            return gameCore->CreateGuild(rest);
+        }
+        if (command == "ginvite")
+        {
+            return gameCore->InviteGuild(rest);
+        }
+        if (command == "gleave")
+        {
+            return gameCore->LeaveGuild();
+        }
+        if (command == "gkick")
+        {
+            return gameCore->RemoveGuildMember(rest);
+        }
+        if (command == "gpromote")
+        {
+            return gameCore->PromoteGuildMember(rest);
+        }
+        if (command == "gdemote")
+        {
+            return gameCore->DemoteGuildMember(rest);
+        }
+
+        AddHudEvent(AZStd::string::format("Unknown command: /%s", command.c_str()));
         return false;
     }
 
@@ -2310,6 +3885,7 @@ namespace UiClient
         if (!worldState.m_worldConnected)
         {
             m_trainerOpen = false;
+            m_talentsOpen = false;
             if (BeginHudPanel(
                     "##world_connect_panel",
                     "World Link",
@@ -2447,7 +4023,7 @@ namespace UiClient
         if (!m_loggedPlayableZoneReady &&
             gameCore->GetCameraState().m_ready &&
             worldState.m_session.m_alive &&
-            visibleHostileCount == 3)
+            visibleHostileCount >= 3)
         {
             AZ_Printf("amandacore", "client.playable_zone_ready visible=true mobs=3 hud=true grounded=true");
             m_loggedPlayableZoneReady = true;
@@ -2465,8 +4041,10 @@ namespace UiClient
         const ImVec2 actionBarPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
-        const ImVec2 microMenuSize(198.0f, 206.0f);
+        const ImVec2 microMenuSize(198.0f, 270.0f);
         const ImVec2 microMenuPos(actionBarPos.x + actionBarSize.x + 8.0f, actionBarPos.y);
+        const ImVec2 minimapSize(250.0f, 260.0f);
+        const ImVec2 minimapPos(displaySize.x > 1180.0f ? displaySize.x - 640.0f : 548.0f, 18.0f);
         const ImVec2 spellbookSize(680.0f, 560.0f);
         const ImVec2 spellbookPos(displaySize.x - spellbookSize.x - 18.0f, displaySize.y - spellbookSize.y - 188.0f);
         const ImVec2 trainerSize(460.0f, 440.0f);
@@ -2475,15 +4053,34 @@ namespace UiClient
         const ImVec2 inventoryPos(18.0f, utilityPos.y - inventorySize.y - 18.0f);
         const ImVec2 settingsSize(680.0f, 520.0f);
         const ImVec2 settingsPos((displaySize.x - settingsSize.x) * 0.5f, (displaySize.y - settingsSize.y) * 0.5f);
-        const ImVec2 characterSize(360.0f, 220.0f);
+        const ImVec2 characterSize(360.0f, 310.0f);
         const ImVec2 characterPos(280.0f, displaySize.y - characterSize.y - 210.0f);
+        const ImVec2 talentsSize(440.0f, 430.0f);
+        const ImVec2 talentsPos(
+            AZ::GetMin(characterPos.x + characterSize.x + 18.0f, displaySize.x - talentsSize.x - 18.0f),
+            displaySize.y - talentsSize.y - 210.0f);
         const ImVec2 questLogSize(400.0f, 280.0f);
         const ImVec2 questLogPos(280.0f, displaySize.y - questLogSize.y - 180.0f);
+        const ImVec2 mapSize(640.0f, 470.0f);
+        const ImVec2 mapPos((displaySize.x - mapSize.x) * 0.5f, (displaySize.y - mapSize.y) * 0.5f);
         const ImVec2 upperActionBarSize(744.0f, 92.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 4.0f);
         const ImVec2 rightActionBarSize(86.0f, 740.0f);
         const ImVec2 rightActionBarOnePos(displaySize.x - rightActionBarSize.x - 18.0f, 370.0f);
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 3.0f, 370.0f);
+        const ImVec2 partyFramesSize(250.0f, 250.0f);
+        const ImVec2 partyFramesPos(18.0f, 158.0f);
+        const ImVec2 chatSize(460.0f, 250.0f);
+        const ImVec2 chatPos(18.0f, AZ::GetMax(158.0f, utilityPos.y - chatSize.y - 18.0f));
+        const ImVec2 socialSize(430.0f, 430.0f);
+        const ImVec2 socialPos(displaySize.x - socialSize.x - 18.0f, displaySize.y - socialSize.y - 188.0f);
+        const ImVec2 auctionSize(720.0f, 520.0f);
+        const ImVec2 auctionPos((displaySize.x - auctionSize.x) * 0.5f, (displaySize.y - auctionSize.y) * 0.5f);
+        const ImVec2 invitePromptSize(360.0f, 92.0f);
+        const ImVec2 invitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 170.0f);
+        const ImVec2 guildInvitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 270.0f);
+        const ImVec2 duelPromptSize(380.0f, 108.0f);
+        const ImVec2 duelPromptPos((displaySize.x - duelPromptSize.x) * 0.5f, 370.0f);
 
         if (m_trainerOpen &&
             (worldState.m_session.m_trainer.m_id.empty() ||
@@ -2495,6 +4092,10 @@ namespace UiClient
         if (m_questGossipOpen && (!targetEntity || !IsQuestGiverNpc(*targetEntity)))
         {
             m_questGossipOpen = false;
+        }
+        if (m_auctionOpen && (!targetEntity || !EntityHasService(*targetEntity, "auction")))
+        {
+            m_auctionOpen = false;
         }
 
         if (BeginHudPanel("##player_frame", "Player", playerFramePos, playerFrameSize))
@@ -2509,6 +4110,63 @@ namespace UiClient
         }
         ImGui::End();
 
+        if (worldState.m_social.m_hasParty && BeginHudPanel("##party_frames", "Party", partyFramesPos, partyFramesSize))
+        {
+            DrawPartyFrames(worldState);
+        }
+        if (worldState.m_social.m_hasParty)
+        {
+            ImGui::End();
+        }
+
+        if (BeginHudPanel("##chat_window", "Chat", chatPos, chatSize))
+        {
+            AZStd::string submittedInput;
+            if (DrawChatWindow(
+                    worldState,
+                    m_chatChannel,
+                    m_chatInputBuffer,
+                    AZ_ARRAY_SIZE(m_chatInputBuffer),
+                    m_chatWhisperTargetBuffer,
+                    AZ_ARRAY_SIZE(m_chatWhisperTargetBuffer),
+                    submittedInput))
+            {
+                SubmitChatInput(gameCore, submittedInput);
+            }
+        }
+        ImGui::End();
+
+        if (!worldState.m_social.m_partyInvites.empty() && BeginHudPanel("##party_invite_prompt", "Party Invite", invitePromptPos, invitePromptSize))
+        {
+            DrawPartyInvitePrompt(gameCore, worldState);
+        }
+        if (!worldState.m_social.m_partyInvites.empty())
+        {
+            ImGui::End();
+        }
+
+        if (!worldState.m_social.m_guildInvites.empty() && BeginHudPanel("##guild_invite_prompt", "Guild Invite", guildInvitePromptPos, invitePromptSize))
+        {
+            DrawGuildInvitePrompt(gameCore, worldState);
+        }
+        if (!worldState.m_social.m_guildInvites.empty())
+        {
+            ImGui::End();
+        }
+
+        const bool duelPanelVisible = worldState.m_session.m_pvp.m_incomingDuel ||
+            worldState.m_session.m_pvp.m_duelState == "countdown" ||
+            worldState.m_session.m_pvp.m_duelState == "active" ||
+            !worldState.m_session.m_pvp.m_lastResult.m_duelId.empty();
+        if (duelPanelVisible && BeginHudPanel("##duel_prompt", "Duel", duelPromptPos, duelPromptSize))
+        {
+            DrawDuelPrompt(gameCore, worldState);
+        }
+        if (duelPanelVisible)
+        {
+            ImGui::End();
+        }
+
         if (BeginHudPanel("##utility_footer", "Inventory", utilityPos, utilitySize))
         {
             DrawUtilityFooter(worldState, m_bagOpen);
@@ -2518,6 +4176,12 @@ namespace UiClient
         if (BeginHudPanel("##quest_tracker", "Objectives", trackerPos, trackerSize))
         {
             DrawQuestTracker(worldState, nearCommandPoint, distanceToCommandPoint, distanceToEncounter);
+        }
+        ImGui::End();
+
+        if (BeginHudPanel("##stonewake_minimap", "Navigator", minimapPos, minimapSize))
+        {
+            DrawMinimap(worldState, playerX, playerY);
         }
         ImGui::End();
 
@@ -2552,10 +4216,13 @@ namespace UiClient
         {
             DrawMicroMenuBar(
                 m_characterSheetOpen,
+                m_talentsOpen,
                 m_questLogOpen,
+                m_mapOpen,
                 m_spellbookOpen,
                 m_bagOpen,
-                m_settingsOpen);
+                m_settingsOpen,
+                m_socialOpen);
         }
         ImGui::End();
 
@@ -2622,6 +4289,23 @@ namespace UiClient
             ImGui::End();
         }
 
+        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize))
+        {
+            DrawSocialWindow(
+                gameCore,
+                worldState,
+                m_socialNameBuffer,
+                AZ_ARRAY_SIZE(m_socialNameBuffer),
+                m_guildNameBuffer,
+                AZ_ARRAY_SIZE(m_guildNameBuffer),
+                m_guildMotdBuffer,
+                AZ_ARRAY_SIZE(m_guildMotdBuffer));
+        }
+        if (m_socialOpen)
+        {
+            ImGui::End();
+        }
+
         if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize))
         {
             if (DrawSettingsWindow(
@@ -2634,6 +4318,7 @@ namespace UiClient
                     m_bagBinding,
                     m_characterBinding,
                     m_questLogBinding,
+                    m_mapBinding,
                     m_settingsBinding,
                     m_interactBinding,
                     m_targetHostileBinding,
@@ -2666,11 +4351,47 @@ namespace UiClient
             ImGui::End();
         }
 
+        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize))
+        {
+            DrawTalentWindow(gameCore, worldState);
+        }
+        if (m_talentsOpen)
+        {
+            ImGui::End();
+        }
+
         if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize))
         {
-            DrawQuestLogWindow(worldState);
+            DrawQuestLogWindow(gameCore, worldState);
         }
         if (m_questLogOpen)
+        {
+            ImGui::End();
+        }
+
+        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize))
+        {
+            DrawZoneMapWindow(worldState, playerX, playerY);
+        }
+        if (m_mapOpen)
+        {
+            ImGui::End();
+        }
+
+        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize))
+        {
+            DrawAuctionWindow(
+                gameCore,
+                worldState,
+                m_auctionSearchBuffer,
+                AZ_ARRAY_SIZE(m_auctionSearchBuffer),
+                m_auctionBuyoutBuffer,
+                AZ_ARRAY_SIZE(m_auctionBuyoutBuffer),
+                m_pendingAuctionSellSlot,
+                m_auctionStackCount,
+                m_pendingAuctionBuyoutIndex);
+        }
+        if (m_auctionOpen)
         {
             ImGui::End();
         }

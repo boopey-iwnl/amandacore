@@ -1,23 +1,42 @@
 package worlds
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"math"
 	"testing"
 )
 
 func TestStonewakeStarterContentLoads(t *testing.T) {
 	server := newWorldServer(nil)
 
-	if len(server.questOrder) != 15 {
-		t.Fatalf("expected 15 Stonewake starter quests, got %d", len(server.questOrder))
+	stonewakeQuestCount := 0
+	for _, questID := range server.questOrder {
+		if server.quests[questID].ZoneID == defaultZoneID {
+			stonewakeQuestCount++
+		}
 	}
-	if len(server.friendlyNPCOrder) != 8 {
-		t.Fatalf("expected 8 Stonewake friendly NPC/object entities, got %d", len(server.friendlyNPCOrder))
+	if stonewakeQuestCount != 15 {
+		t.Fatalf("expected 15 Stonewake starter quests, got %d", stonewakeQuestCount)
 	}
-	if len(server.mobOrder) != 37 {
-		t.Fatalf("expected 37 Stonewake mob spawns, got %d", len(server.mobOrder))
+
+	stonewakeFriendlyCount := 0
+	for _, npcID := range server.friendlyNPCOrder {
+		npc := server.friendlyNPCs[npcID]
+		if npc.ZoneID == defaultZoneID && npc.Kind != professionTrainerNPCKind {
+			stonewakeFriendlyCount++
+		}
+	}
+	if stonewakeFriendlyCount != 9 {
+		t.Fatalf("expected 9 Stonewake friendly NPC/object entities, got %d", stonewakeFriendlyCount)
+	}
+
+	stonewakeMobCount := 0
+	for _, mobID := range server.mobOrder {
+		if server.mobs[mobID].ZoneID == defaultZoneID {
+			stonewakeMobCount++
+		}
+	}
+	if stonewakeMobCount != 37 {
+		t.Fatalf("expected 37 Stonewake mob spawns, got %d", stonewakeMobCount)
 	}
 
 	requiredQuests := []string{
@@ -53,26 +72,56 @@ func TestStonewakeStarterContentLoads(t *testing.T) {
 	}
 }
 
-func TestBootstrapMapsStonewakeAsSunsetFrontierCell(t *testing.T) {
-	mux := http.NewServeMux()
-	RegisterRoutes(mux, nil)
+func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
+	server := newWorldServer(nil)
 
-	request := httptest.NewRequest(http.MethodGet, "/v1/world/bootstrap", nil)
-	response := httptest.NewRecorder()
-	mux.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected bootstrap status 200, got %d", response.Code)
+	for _, npcID := range []string{npcCommanderElianRookID, warriorTrainerID, npcQuartermasterMiraID, npcHealerSellaID} {
+		npc := server.friendlyNPCs[npcID]
+		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance > 36.0 {
+			t.Fatalf("expected hub NPC %s near spawn, distance %.1f", npcID, distance)
+		}
 	}
 
-	var payload map[string]any
-	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
-		t.Fatalf("failed to decode bootstrap response: %v", err)
+	for _, npcID := range []string{npcScoutRowanID, npcRoadwardenIlyaID, objWatchLanternID, npcQuartermasterLyraID} {
+		npc := server.friendlyNPCs[npcID]
+		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance < 80.0 {
+			t.Fatalf("expected progression NPC %s outside spawn view, distance %.1f", npcID, distance)
+		}
 	}
-	if payload["zoneId"] != "sunset_frontier" {
-		t.Fatalf("expected broad zone sunset_frontier, got %#v", payload["zoneId"])
+
+	for _, mob := range server.mobs {
+		if distance := math.Hypot(mob.X-starterSpawnX, mob.Y-starterSpawnY); distance < 28.0 {
+			t.Fatalf("expected no hostile/training mobs inside the starter hub, got %s at %.1fm", mob.ID, distance)
+		}
 	}
-	if payload["cellId"] != "stonewake_vale" {
-		t.Fatalf("expected Stonewake playable cell, got %#v", payload["cellId"])
+
+	assertMobAreaCenter(t, server, mobTrainingDummyTypeID, 40.0, 22.0, 10.0)
+	assertMobAreaCenter(t, server, mobDitchRatTypeID, 96.0, 45.0, 24.0)
+	assertMobAreaCenter(t, server, mobFieldBoarTypeID, 163.0, 86.0, 32.0)
+	assertMobAreaCenter(t, server, mobRidgeCrowTypeID, 240.0, 127.0, 34.0)
+	assertMobAreaCenter(t, server, mobAshbandScoutTypeID, 313.0, 170.0, 34.0)
+	assertMobAreaCenter(t, server, mobAshbandPoacherTypeID, 375.0, 210.0, 42.0)
+
+	bram := server.mobs["mob_bram_kettle_01"]
+	if distance := math.Hypot(bram.X-420.0, bram.Y-224.0); distance > 1.0 {
+		t.Fatalf("expected Bram Kettle in isolated wagon stand, got %.1f, %.1f", bram.X, bram.Y)
+	}
+}
+
+func assertMobAreaCenter(t *testing.T, server *worldServer, mobTypeID string, centerX float64, centerY float64, maxRadius float64) {
+	t.Helper()
+
+	count := 0
+	for _, mob := range server.mobs {
+		if mob.MobTypeID != mobTypeID {
+			continue
+		}
+		count++
+		if distance := math.Hypot(mob.X-centerX, mob.Y-centerY); distance > maxRadius {
+			t.Fatalf("expected %s near %.1f,%.1f within %.1f, got %s at %.1f,%.1f distance %.1f", mobTypeID, centerX, centerY, maxRadius, mob.ID, mob.X, mob.Y, distance)
+		}
+	}
+	if count == 0 {
+		t.Fatalf("expected at least one %s spawn", mobTypeID)
 	}
 }

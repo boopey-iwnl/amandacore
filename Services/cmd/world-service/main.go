@@ -22,7 +22,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	worlds.RegisterRoutes(mux, fileStore)
+	worlds.RegisterRoutesWithAdmin(mux, fileStore, cfg.AdminToolsEnabled)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})

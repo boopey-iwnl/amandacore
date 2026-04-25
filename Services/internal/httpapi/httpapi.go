@@ -78,6 +78,23 @@ func RequireRole(store *store.FileStore, required platform.Role, next func(http.
 	})
 }
 
+func RequirePermission(store *store.FileStore, required platform.Permission, next func(http.ResponseWriter, *http.Request, *platform.Session, *platform.Account)) http.HandlerFunc {
+	return RequireSession(store, func(w http.ResponseWriter, r *http.Request, session *platform.Session) {
+		account, err := store.GetAccountByID(session.AccountID)
+		if err != nil {
+			Error(w, http.StatusUnauthorized, "invalid_account", err.Error())
+			return
+		}
+
+		if !platform.HasPermission(account.Roles, required) {
+			Error(w, http.StatusForbidden, "missing_permission", "The current session does not have the required permission.")
+			return
+		}
+
+		next(w, r, session, account)
+	})
+}
+
 func WithCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

@@ -10,22 +10,44 @@ import (
 )
 
 const (
-	playerMaxHealth           = 100.0
+	playerMaxHealth           = 88.0
 	playerMaxResource         = 100.0
-	playerResourceRegenPerSec = 12.0
+	playerResourceRegenPerSec = 0.0
 	playerTargetRange         = 28.0
 	playerAutoAttackRange     = 5.5
-	playerAutoAttackDamage    = 10.0
+	playerAutoAttackDamage    = 8.0
+	playerAutoAttackGrit      = 12.0
 	playerAutoAttackCadenceMs = int64(1800)
 	playerGlobalCooldownMs    = int64(1500)
 
-	hostileMobKind     = "hostile_mob"
-	trainerNPCKind     = "trainer_npc"
-	questGiverNPCKind  = "quest_giver_npc"
-	worldObjectNPCKind = "quest_object"
+	hostileMobKind           = "hostile_mob"
+	gatheringNodeKind        = "gathering_node"
+	trainerNPCKind           = "trainer_npc"
+	professionTrainerNPCKind = "profession_trainer_npc"
+	questGiverNPCKind        = "quest_giver_npc"
+	worldObjectNPCKind       = "quest_object"
+	dungeonEntranceKind      = "dungeon_entrance"
+	dungeonExitKind          = "dungeon_exit"
+	housingEntranceKind      = "housing_entrance"
+	housingExitKind          = "housing_exit"
+	housingStorageKind       = "housing_storage"
+	housingDecorationKind    = "housing_decoration"
+
+	mobAIStateIdle       = "idle"
+	mobAIStatePatrolling = "patrolling"
+	mobAIStateAlerted    = "alerted"
+	mobAIStateChasing    = "chasing"
+	mobAIStateAttacking  = "attacking"
+	mobAIStateEvading    = "evading"
+	mobAIStateReturning  = "returning"
+	mobAIStateDead       = "dead"
+	mobAIStateRespawning = "respawning"
 
 	defaultZoneID       = "stonewake_vale"
-	nextZoneID          = "west_approach"
+	secondZoneID        = "brindlebrook_roadlands"
+	dungeonZoneID       = "dun_tallowdeep_sluice"
+	housingZoneID       = "house_personal_room"
+	nextZoneID          = secondZoneID
 	worldTickMaxSeconds = 0.25
 
 	questStateNotStarted    = "not_started"
@@ -40,12 +62,18 @@ const (
 	objectiveExplore = "explore"
 	objectiveUse     = "use_location"
 
-	starterQuestID         = "sv_first_muster"
+	starterQuestID        = "sv_first_muster"
 	legacyEmberQuestID    = "defeat_ember_hounds_01"
-	starterSpawnX         = 8.0
-	starterSpawnY         = 8.0
+	starterSpawnX         = 10.0
+	starterSpawnY         = 10.0
 	starterSpawnZ         = 0.0
 	starterInteractRadius = 5.0
+	starterZoneMaxX       = 480.0
+	starterZoneMaxY       = 300.0
+	secondZoneEntryX      = 34.0
+	secondZoneEntryY      = 148.0
+	secondZoneMaxX        = 720.0
+	secondZoneMaxY        = 420.0
 )
 
 type joinTicketRequest struct {
@@ -65,10 +93,105 @@ type disconnectRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 }
 
+type bindSetRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	BindLocationID    string `json:"bindLocationId"`
+}
+
+type recallUseRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type travelDiscoverRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TravelPointID     string `json:"travelPointId"`
+}
+
+type travelRouteRequest struct {
+	WorldSessionToken  string `json:"worldSessionToken"`
+	SourcePointID      string `json:"sourcePointId"`
+	DestinationPointID string `json:"destinationPointId"`
+}
+
+type mountUnlockRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	MountID           string `json:"mountId"`
+}
+
+type mountSelectRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	MountID           string `json:"mountId"`
+}
+
+type mountSummonRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	MountID           string `json:"mountId,omitempty"`
+}
+
+type mountDismissRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
 type moveRequest struct {
 	WorldSessionToken string  `json:"worldSessionToken"`
 	DeltaX            float64 `json:"deltaX"`
 	DeltaY            float64 `json:"deltaY"`
+}
+
+type dungeonEnterRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	DungeonID         string `json:"dungeonId"`
+}
+
+type dungeonExitRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type dungeonResetRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	DungeonID         string `json:"dungeonId"`
+}
+
+type housingEnterRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type housingLeaveRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type housingStorageDepositRequest struct {
+	WorldSessionToken  string `json:"worldSessionToken"`
+	InventorySlotIndex int    `json:"inventorySlotIndex"`
+	StorageSlotIndex   *int   `json:"storageSlotIndex,omitempty"`
+	StackCount         int    `json:"stackCount"`
+}
+
+type housingStorageWithdrawRequest struct {
+	WorldSessionToken  string `json:"worldSessionToken"`
+	StorageSlotIndex   int    `json:"storageSlotIndex"`
+	InventorySlotIndex *int   `json:"inventorySlotIndex,omitempty"`
+	StackCount         int    `json:"stackCount"`
+}
+
+type housingStorageMoveRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	FromSlotIndex     int    `json:"fromSlotIndex"`
+	ToSlotIndex       int    `json:"toSlotIndex"`
+}
+
+type decorationPlaceRequest struct {
+	WorldSessionToken string  `json:"worldSessionToken"`
+	DecorationID      string  `json:"decorationId"`
+	X                 float64 `json:"x"`
+	Y                 float64 `json:"y"`
+	Z                 float64 `json:"z"`
+	RotationYaw       float64 `json:"rotationYaw"`
+}
+
+type decorationRemoveRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	PlacementID       string `json:"placementId"`
 }
 
 type targetRequest struct {
@@ -86,10 +209,42 @@ type abilityRequest struct {
 	AbilityID         string `json:"abilityId"`
 }
 
+type duelRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TargetCharacterID string `json:"targetCharacterId"`
+	TargetName        string `json:"targetName"`
+}
+
+type duelActionRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	DuelID            string `json:"duelId"`
+}
+
 type trainerLearnRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	TrainerID         string `json:"trainerId"`
 	AbilityID         string `json:"abilityId"`
+}
+
+type talentSelectRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TalentID          string `json:"talentId"`
+}
+
+type professionLearnRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TrainerID         string `json:"trainerId"`
+	ProfessionID      string `json:"professionId"`
+}
+
+type gatherRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	NodeID            string `json:"nodeId"`
+}
+
+type craftRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	RecipeID          string `json:"recipeId"`
 }
 
 type actionBarAssignRequest struct {
@@ -115,9 +270,43 @@ type inventoryMoveRequest struct {
 	ToSlotIndex       int    `json:"toSlotIndex"`
 }
 
+type inventoryEquipRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	SlotIndex         int    `json:"slotIndex"`
+}
+
+type vendorBuyRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	VendorID          string `json:"vendorId"`
+	ItemID            string `json:"itemId"`
+	StackCount        int    `json:"stackCount"`
+}
+
+type vendorSellRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	VendorID          string `json:"vendorId"`
+	SlotIndex         int    `json:"slotIndex"`
+	StackCount        int    `json:"stackCount"`
+}
+
 type questAcceptRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	QuestID           string `json:"questId"`
+}
+
+type questTrackRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	QuestID           string `json:"questId"`
+	Tracked           bool   `json:"tracked"`
+}
+
+type titleSelectRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TitleID           string `json:"titleId"`
+}
+
+type titleClearRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
 }
 
 type npcService struct {
@@ -127,19 +316,29 @@ type npcService struct {
 }
 
 type sessionEntity struct {
-	ID          string       `json:"id"`
-	DisplayName string       `json:"displayName"`
-	Kind        string       `json:"kind"`
-	MobTypeID   string       `json:"mobTypeId,omitempty"`
-	X           float64      `json:"x"`
-	Y           float64      `json:"y"`
-	Z           float64      `json:"z"`
-	Health      float64      `json:"health"`
-	MaxHealth   float64      `json:"maxHealth"`
-	Alive       bool         `json:"alive"`
-	Targetable  bool         `json:"targetable"`
-	AIState     string       `json:"aiState,omitempty"`
-	Services    []npcService `json:"npcServices,omitempty"`
+	ID               string       `json:"id"`
+	DisplayName      string       `json:"displayName"`
+	Kind             string       `json:"kind"`
+	MobTypeID        string       `json:"mobTypeId,omitempty"`
+	Classification   string       `json:"classification,omitempty"`
+	Elite            bool         `json:"elite,omitempty"`
+	GatherNodeTypeID string       `json:"gatherNodeTypeId,omitempty"`
+	ProfessionID     string       `json:"professionId,omitempty"`
+	RequiredSkill    int          `json:"requiredSkill,omitempty"`
+	Ready            bool         `json:"ready,omitempty"`
+	ReadyAt          int64        `json:"readyAt,omitempty"`
+	InteractionLabel string       `json:"interactionLabel,omitempty"`
+	X                float64      `json:"x"`
+	Y                float64      `json:"y"`
+	Z                float64      `json:"z"`
+	Health           float64      `json:"health"`
+	MaxHealth        float64      `json:"maxHealth"`
+	Alive            bool         `json:"alive"`
+	Targetable       bool         `json:"targetable"`
+	AIState          string       `json:"aiState,omitempty"`
+	PvPState         string       `json:"pvpState,omitempty"`
+	DuelOpponent     bool         `json:"duelOpponent,omitempty"`
+	Services         []npcService `json:"npcServices,omitempty"`
 }
 
 type itemRewardDefinition struct {
@@ -148,29 +347,84 @@ type itemRewardDefinition struct {
 	StackCount  int
 }
 
+type itemRewardResponse struct {
+	ItemID      string `json:"itemId"`
+	DisplayName string `json:"displayName"`
+	StackCount  int    `json:"stackCount"`
+}
+
 type questDefinition struct {
-	ID              string
-	Title           string
-	ObjectiveType   string
-	ObjectiveText   string
-	GiverNPCID      string
-	TurnInNPCID     string
-	TargetEntityID  string
-	TargetMobType   string
-	TargetItemID    string
-	TargetItemName  string
-	TargetCount     int
-	RewardXP        int
-	RewardCopper    int
-	RewardItems     []itemRewardDefinition
-	PrerequisiteIDs []string
-	LevelBand       string
-	MarkerX         float64
-	MarkerY         float64
+	ID                 string
+	ZoneID             string
+	Title              string
+	ObjectiveType      string
+	ObjectiveText      string
+	GiverNPCID         string
+	TurnInNPCID        string
+	TargetEntityID     string
+	TargetMobType      string
+	TargetItemID       string
+	TargetItemName     string
+	TargetCount        int
+	RewardXP           int
+	RewardCopper       int
+	RewardItems        []itemRewardDefinition
+	PrerequisiteIDs    []string
+	LevelBand          string
+	MarkerX            float64
+	MarkerY            float64
+	PartyShareable     bool
+	GroupRecommended   bool
+	RecommendedPlayers int
+	PartyCreditRadius  float64
+}
+
+type navigationAreaDefinition struct {
+	ID             string
+	DisplayName    string
+	Kind           string
+	CenterX        float64
+	CenterY        float64
+	Radius         float64
+	RouteHintText  string
+	QuestIDs       []string
+	TargetMobType  string
+	TargetEntityID string
+}
+
+type mapRoadDefinition struct {
+	ID          string
+	DisplayName string
+	Points      []mapPointDefinition
+}
+
+type mapPointDefinition struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type mapLandmarkDefinition struct {
+	ID          string
+	DisplayName string
+	Kind        string
+	X           float64
+	Y           float64
+}
+
+type zoneMapDefinition struct {
+	ZoneID      string
+	DisplayName string
+	MinX        float64
+	MinY        float64
+	MaxX        float64
+	MaxY        float64
+	Roads       []mapRoadDefinition
+	Landmarks   []mapLandmarkDefinition
 }
 
 type friendlyNPCDefinition struct {
 	ID          string
+	ZoneID      string
 	DisplayName string
 	Kind        string
 	X           float64
@@ -179,6 +433,34 @@ type friendlyNPCDefinition struct {
 	AIState     string
 	Radius      float64
 	Services    []npcService
+}
+
+type gatheringLootDefinition struct {
+	ItemID     string
+	MinCount   int
+	MaxCount   int
+	Guaranteed bool
+}
+
+type gatheringNodeDefinition struct {
+	ID                   string
+	NodeTypeID           string
+	DisplayName          string
+	ZoneID               string
+	X                    float64
+	Y                    float64
+	Z                    float64
+	Radius               float64
+	RequiredProfessionID string
+	RequiredSkill        int
+	Loot                 []gatheringLootDefinition
+	RespawnDelayMs       int64
+	InteractionLabel     string
+}
+
+type gatheringNodeState struct {
+	Definition gatheringNodeDefinition
+	ReadyAtMs  int64
 }
 
 type currencyBreakdown struct {
@@ -192,6 +474,55 @@ type inventoryResponse struct {
 	Slots     []platform.CharacterInventorySlot `json:"slots"`
 }
 
+type equipmentResponse struct {
+	Slots []platform.CharacterEquipmentSlot `json:"slots"`
+}
+
+type statBlockResponse struct {
+	Strength          int     `json:"strength"`
+	Stamina           int     `json:"stamina"`
+	Armor             int     `json:"armor"`
+	AttackPower       float64 `json:"attackPower"`
+	ArmorReductionPct float64 `json:"armorReductionPct"`
+}
+
+type zoneBoundsDefinition struct {
+	MinX float64 `json:"minX"`
+	MinY float64 `json:"minY"`
+	MaxX float64 `json:"maxX"`
+	MaxY float64 `json:"maxY"`
+}
+
+type zonePointDefinition struct {
+	ID          string  `json:"id"`
+	DisplayName string  `json:"displayName"`
+	Type        string  `json:"type"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+}
+
+type zoneRoadDefinition struct {
+	ID          string                `json:"id"`
+	DisplayName string                `json:"displayName"`
+	Points      []zonePointDefinition `json:"points"`
+}
+
+type zoneDefinition struct {
+	ID          string                `json:"id"`
+	DisplayName string                `json:"displayName"`
+	LevelBand   string                `json:"levelBand"`
+	Bounds      zoneBoundsDefinition  `json:"bounds"`
+	Roads       []zoneRoadDefinition  `json:"roads"`
+	Landmarks   []zonePointDefinition `json:"landmarks"`
+	Transitions []zonePointDefinition `json:"transitions"`
+}
+
+type achievementNotification struct {
+	AchievementID string `json:"achievementId"`
+	DisplayName   string `json:"displayName"`
+	CompletedAt   int64  `json:"completedAt"`
+}
+
 type worldSessionState struct {
 	Token              string
 	AccountID          string
@@ -201,6 +532,13 @@ type worldSessionState struct {
 	Level              int
 	RealmID            string
 	ZoneID             string
+	InstanceID         string
+	HousingSpaceID     string
+	HousingInstanceID  string
+	ReturnZoneID       string
+	ReturnX            float64
+	ReturnY            float64
+	ReturnZ            float64
 	X                  float64
 	Y                  float64
 	Z                  float64
@@ -218,16 +556,29 @@ type worldSessionState struct {
 	CastEndsAtMs       int64
 	CastingAbilityID   string
 	CastingTargetID    string
+	AbilityCooldowns   map[string]int64
 	Experience         int
 	CurrencyCopper     int
 	Inventory          []platform.CharacterInventorySlot
+	Equipment          []platform.CharacterEquipmentSlot
+	Professions        []platform.CharacterProfessionState
+	Talents            map[string]int
 	LearnedAbilityIDs  []string
 	ActionBarSlots     []platform.CharacterActionBarSlot
 	QuestProgress      map[string]platform.CharacterQuestProgress
+	TrackedQuestIDs    []string
+	PvPStats           platform.CharacterPvPStats
+	LastDuelResult     *duelResultState
+	AccountProgress    platform.AccountProgressState
+	BindPoint          platform.CharacterBindPoint
+	TravelState        platform.CharacterTravelState
+	MountState         platform.CharacterMountState
+	CurrentlyTraveling bool
 }
 
 type mobState struct {
 	ID                     string
+	InstanceID             string
 	MobTypeID              string
 	DisplayName            string
 	Kind                   string
@@ -248,6 +599,8 @@ type mobState struct {
 	MoveSpeedPerSec        float64
 	LeashRadius            float64
 	RespawnDelayMs         int64
+	Classification         string
+	Elite                  bool
 	Alive                  bool
 	Targetable             bool
 	AIState                string
@@ -257,55 +610,143 @@ type mobState struct {
 }
 
 type mobSpawnDefinition struct {
+	ID              string
+	ZoneID          string
+	MobTypeID       string
+	DisplayName     string
+	Level           int
+	X               float64
+	Y               float64
+	Z               float64
+	MaxHealth       float64
+	AggroRadius     float64
+	AttackRange     float64
+	AttackDamage    float64
+	AttackCadenceMs int64
+	MoveSpeedPerSec float64
+	LeashRadius     float64
+	RespawnDelayMs  int64
+	Classification  string
+	Elite           bool
+}
+
+type worldPosition struct {
+	ZoneID string
+	X      float64
+	Y      float64
+	Z      float64
+}
+
+type dungeonDefinition struct {
 	ID               string
-	MobTypeID        string
 	DisplayName      string
-	Level            int
-	X                float64
-	Y                float64
-	Z                float64
-	MaxHealth        float64
-	AggroRadius      float64
-	AttackRange      float64
-	AttackDamage     float64
-	AttackCadenceMs  int64
-	MoveSpeedPerSec  float64
-	LeashRadius      float64
-	RespawnDelayMs   int64
+	LevelBand        string
+	InstanceZoneID   string
+	EntranceZoneID   string
+	EntranceEntityID string
+	ExitEntityID     string
+	StartPositions   []worldPosition
+	ExitPosition     worldPosition
+	ReturnPosition   worldPosition
+	MobSpawns        []mobSpawnDefinition
+	BossMobTypeID    string
+	QuestID          string
+	EmptyExpiryMs    int64
+	HardExpiryMs     int64
+}
+
+type dungeonObjectiveState struct {
+	BossDefeated bool  `json:"bossDefeated"`
+	UpdatedAtMs  int64 `json:"updatedAt"`
+}
+
+type dungeonInstanceState struct {
+	InstanceID         string
+	DungeonID          string
+	PartyID            string
+	ZoneID             string
+	CreatedAtMs        int64
+	ExpiresAtMs        int64
+	State              string
+	MemberCharacterIDs []string
+	PlayersInside      map[string]bool
+	ReturnPositions    map[string]worldPosition
+	Mobs               map[string]*mobState
+	MobOrder           []string
+	Objective          dungeonObjectiveState
+	BossRewardGranted  map[string]bool
+	LastPlayerLeftAtMs int64
 }
 
 type worldServer struct {
-	store              *store.FileStore
-	mutex              sync.Mutex
-	sessionsByToken    map[string]*worldSessionState
-	sessionTokenByChar map[string]string
-	mobs               map[string]*mobState
-	mobOrder           []string
-	quests             map[string]questDefinition
-	questOrder         []string
-	quest              questDefinition
-	friendlyNPCs       map[string]friendlyNPCDefinition
-	friendlyNPCOrder   []string
-	lastUpdatedAt      time.Time
+	store                  *store.FileStore
+	metrics                *worldMetrics
+	mutex                  sync.Mutex
+	sessionsByToken        map[string]*worldSessionState
+	sessionTokenByChar     map[string]string
+	mobs                   map[string]*mobState
+	mobOrder               []string
+	duels                  map[string]*duelState
+	duelByCharacter        map[string]string
+	duelCounter            int64
+	dungeonInstances       map[string]*dungeonInstanceState
+	instanceByParty        map[string]string
+	instanceCounter        int64
+	housingInstanceCounter int64
+	quests                 map[string]questDefinition
+	questOrder             []string
+	quest                  questDefinition
+	friendlyNPCs           map[string]friendlyNPCDefinition
+	friendlyNPCOrder       []string
+	gatheringNodes         map[string]*gatheringNodeState
+	gatheringNodeOrder     []string
+	zones                  map[string]zoneDefinition
+	chatMessages           []chatEnvelope
+	chatSequence           int64
+	partyInvites           map[string]partyInviteState
+	partyInviteCounter     int64
+	lastUpdatedAt          time.Time
 }
 
 func newWorldServer(fileStore *store.FileStore) *worldServer {
 	server := &worldServer{
 		store:              fileStore,
+		metrics:            newWorldMetrics(),
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
+		duels:              map[string]*duelState{},
+		duelByCharacter:    map[string]string{},
+		dungeonInstances:   map[string]*dungeonInstanceState{},
+		instanceByParty:    map[string]string{},
 		quests:             map[string]questDefinition{},
 		friendlyNPCs:       map[string]friendlyNPCDefinition{},
+		gatheringNodes:     map[string]*gatheringNodeState{},
+		zones:              map[string]zoneDefinition{},
+		partyInvites:       map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
 	server.ensureMobsLocked()
+	server.ensureGatheringNodesLocked()
 	return server
 }
 
 func (s *worldServer) loadStarterContentLocked() {
-	s.questOrder = make([]string, 0, len(stonewakeQuestDefinitions))
-	for _, quest := range stonewakeQuestDefinitions {
+	allZones := append([]zoneDefinition{}, zoneDefinitions...)
+	allZones = append(allZones, dungeonZoneDefinitions...)
+	allZones = append(allZones, housingZoneDefinitions...)
+	for _, zone := range allZones {
+		s.zones[zone.ID] = zone
+	}
+
+	allQuests := append([]questDefinition{}, stonewakeQuestDefinitions...)
+	allQuests = append(allQuests, brindlebrookQuestDefinitions...)
+	allQuests = append(allQuests, dungeonQuestDefinitions...)
+	s.questOrder = make([]string, 0, len(allQuests))
+	for _, quest := range allQuests {
+		if quest.ZoneID == "" {
+			quest.ZoneID = defaultZoneID
+		}
 		if quest.TargetCount <= 0 {
 			quest.TargetCount = 1
 		}
@@ -316,8 +757,15 @@ func (s *worldServer) loadStarterContentLocked() {
 		s.quest = quest
 	}
 
-	s.friendlyNPCOrder = make([]string, 0, len(stonewakeFriendlyNPCs))
-	for _, npc := range stonewakeFriendlyNPCs {
+	allFriendlyNPCs := append([]friendlyNPCDefinition{}, stonewakeFriendlyNPCs...)
+	allFriendlyNPCs = append(allFriendlyNPCs, brindlebrookFriendlyNPCs...)
+	allFriendlyNPCs = append(allFriendlyNPCs, dungeonFriendlyNPCs...)
+	allFriendlyNPCs = append(allFriendlyNPCs, housingFriendlyNPCs...)
+	s.friendlyNPCOrder = make([]string, 0, len(allFriendlyNPCs))
+	for _, npc := range allFriendlyNPCs {
+		if npc.ZoneID == "" {
+			npc.ZoneID = defaultZoneID
+		}
 		if npc.Radius <= 0 {
 			npc.Radius = starterInteractRadius
 		}
@@ -331,15 +779,22 @@ func (s *worldServer) ensureMobsLocked() {
 		return
 	}
 
-	s.mobOrder = make([]string, 0, len(stonewakeMobSpawns))
-	for _, spawn := range stonewakeMobSpawns {
+	allMobSpawns := append([]mobSpawnDefinition{}, stonewakeMobSpawns...)
+	allMobSpawns = append(allMobSpawns, brindlebrookMobSpawns...)
+	s.mobOrder = make([]string, 0, len(allMobSpawns))
+	for _, spawn := range allMobSpawns {
+		zoneID := spawn.ZoneID
+		if zoneID == "" {
+			zoneID = defaultZoneID
+		}
 		s.mobOrder = append(s.mobOrder, spawn.ID)
 		s.mobs[spawn.ID] = &mobState{
 			ID:              spawn.ID,
+			InstanceID:      "",
 			MobTypeID:       spawn.MobTypeID,
 			DisplayName:     spawn.DisplayName,
 			Kind:            hostileMobKind,
-			ZoneID:          defaultZoneID,
+			ZoneID:          zoneID,
 			Level:           spawn.Level,
 			X:               spawn.X,
 			Y:               spawn.Y,
@@ -356,10 +811,34 @@ func (s *worldServer) ensureMobsLocked() {
 			MoveSpeedPerSec: spawn.MoveSpeedPerSec,
 			LeashRadius:     spawn.LeashRadius,
 			RespawnDelayMs:  spawn.RespawnDelayMs,
+			Classification:  spawn.Classification,
+			Elite:           spawn.Elite,
 			Alive:           true,
 			Targetable:      true,
-			AIState:         "idle",
+			AIState:         mobAIStateIdle,
 		}
+	}
+}
+
+func (s *worldServer) ensureGatheringNodesLocked() {
+	if len(s.gatheringNodes) != 0 {
+		return
+	}
+
+	allGatheringNodes := append([]gatheringNodeDefinition{}, stonewakeGatheringNodeDefinitions...)
+	s.gatheringNodeOrder = make([]string, 0, len(allGatheringNodes))
+	for _, node := range allGatheringNodes {
+		if node.ZoneID == "" {
+			node.ZoneID = defaultZoneID
+		}
+		if node.Radius <= 0 {
+			node.Radius = starterInteractRadius
+		}
+		if node.RespawnDelayMs <= 0 {
+			node.RespawnDelayMs = 1000
+		}
+		s.gatheringNodeOrder = append(s.gatheringNodeOrder, node.ID)
+		s.gatheringNodes[node.ID] = &gatheringNodeState{Definition: node}
 	}
 }
 

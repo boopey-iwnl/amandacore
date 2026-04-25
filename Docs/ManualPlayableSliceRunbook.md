@@ -28,6 +28,7 @@ The GUI wraps the existing local scripts instead of replacing them:
 - User log folder: `C:\Users\forwo\OneDrive\Desktop\Code Project\user\log`
 - Process manifest: `C:\Users\forwo\OneDrive\Desktop\Code Project\Infra\dev\local-processes.json`
 - Local persisted state: `C:\Users\forwo\AppData\Local\amandacore\platform-state.json`
+- Load-test output: `C:\Users\forwo\OneDrive\Desktop\Code Project\Infra\dev\load-tests`
 
 ## Human Test Flow
 
@@ -99,6 +100,18 @@ The GUI wraps the existing local scripts instead of replacing them:
 5. Click `Open Launcher`, log back in, and `Join World`.
 6. Confirm completed quest state and rewards persisted across the full restart.
 7. Confirm no duplicate reward was granted after re-entry.
+
+### 8. Run a short simulated multi-client soak
+
+1. Keep the local stack running.
+2. Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\Users\forwo\OneDrive\Desktop\Code Project\Infra\dev\run-load-test.ps1" -Clients 2 -Scenario mixed -DurationMinutes 5
+```
+
+3. Inspect the generated `summary.md`, `summary.json`, and `events.jsonl` under `C:\Users\forwo\OneDrive\Desktop\Code Project\Infra\dev\load-tests`.
+4. Confirm the world service stayed running and the summary shows endpoint timings, error counts, session counts, and desync count.
 
 ## Expected In-Client Acceptance
 

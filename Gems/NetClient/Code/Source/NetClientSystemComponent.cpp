@@ -36,6 +36,83 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool SocialStateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& afterMessageId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool SendChatRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& channel,
+        const AZStd::string& targetName,
+        const AZStd::string& messageText,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool FriendRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& name,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool InvitePartyRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        const AZStd::string& targetCharacterId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool PartyInviteActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool PartyActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool GuildCreateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& guildName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool GuildNameActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool GuildInviteActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool GuildMOTDRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& messageOfTheDay,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
     bool SetTargetRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -47,6 +124,27 @@ namespace NetClient
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
         const AZStd::string& questId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool EnterDungeonRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& dungeonId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool ExitDungeonRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool TrackQuestRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        bool tracked,
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
@@ -64,11 +162,34 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool RequestDuelRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetCharacterId,
+        const AZStd::string& targetName,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool DuelActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& duelId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool LearnTrainerAbilityRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
         const AZStd::string& trainerId,
         const AZStd::string& abilityId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool SelectTalentRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& talentId,
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
@@ -101,6 +222,33 @@ namespace NetClient
         int fromSlotIndex,
         int toSlotIndex,
         WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool AuctionStateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& search,
+        const AZStd::string& itemType,
+        const AZStd::string& sort,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool ListAuctionItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        int stackCount,
+        int buyoutCopper,
+        AZ::s64 durationSeconds,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool AuctionIdActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& auctionId,
+        AuctionStateResponse& outResponse,
         AZStd::string& outError);
 
     bool ReconnectRequest(
@@ -195,6 +343,195 @@ namespace NetClient
         return StateRequest(worldEndpoint, worldSessionToken, outResponse, outError);
     }
 
+    bool NetClientSystemComponent::SocialState(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& afterMessageId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SocialStateRequest(worldEndpoint, worldSessionToken, afterMessageId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::SendChat(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& channel,
+        const AZStd::string& targetName,
+        const AZStd::string& messageText,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SendChatRequest(worldEndpoint, worldSessionToken, channel, targetName, messageText, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::AddFriend(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& name,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return FriendRequest(worldEndpoint, L"/v1/world/friends/add", worldSessionToken, name, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::RemoveFriend(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& name,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return FriendRequest(worldEndpoint, L"/v1/world/friends/remove", worldSessionToken, name, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::InviteParty(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        const AZStd::string& targetCharacterId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return InvitePartyRequest(worldEndpoint, worldSessionToken, targetName, targetCharacterId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::AcceptPartyInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyInviteActionRequest(worldEndpoint, L"/v1/world/party/accept", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DeclinePartyInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyInviteActionRequest(worldEndpoint, L"/v1/world/party/decline", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::LeaveParty(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/party/leave", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DisbandParty(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/party/disband", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::CreateGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& guildName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildCreateRequest(worldEndpoint, worldSessionToken, guildName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::InviteGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/invite", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::AcceptGuildInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildInviteActionRequest(worldEndpoint, L"/v1/world/guild/accept", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DeclineGuildInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildInviteActionRequest(worldEndpoint, L"/v1/world/guild/decline", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::LeaveGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/guild/leave", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DisbandGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/guild/disband", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::PromoteGuildMember(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/promote", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DemoteGuildMember(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/demote", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::RemoveGuildMember(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/remove", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::SetGuildMessageOfTheDay(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& messageOfTheDay,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildMOTDRequest(worldEndpoint, worldSessionToken, messageOfTheDay, outResponse, outError);
+    }
+
     bool NetClientSystemComponent::SetTarget(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -213,6 +550,36 @@ namespace NetClient
         AZStd::string& outError)
     {
         return AcceptQuestRequest(worldEndpoint, worldSessionToken, questId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::EnterDungeon(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& dungeonId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return EnterDungeonRequest(worldEndpoint, worldSessionToken, dungeonId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::ExitDungeon(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return ExitDungeonRequest(worldEndpoint, worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::TrackQuest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        bool tracked,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return TrackQuestRequest(worldEndpoint, worldSessionToken, questId, tracked, outResponse, outError);
     }
 
     bool NetClientSystemComponent::SetAutoAttack(
@@ -235,6 +602,57 @@ namespace NetClient
         return ActivateAbilityRequest(worldEndpoint, worldSessionToken, abilityId, outResponse, outError);
     }
 
+    bool NetClientSystemComponent::RequestDuel(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetCharacterId,
+        const AZStd::string& targetName,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return RequestDuelRequest(worldEndpoint, worldSessionToken, targetCharacterId, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::AcceptDuel(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& duelId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return DuelActionRequest(worldEndpoint, L"/v1/world/duel/accept", worldSessionToken, duelId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DeclineDuel(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& duelId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return DuelActionRequest(worldEndpoint, L"/v1/world/duel/decline", worldSessionToken, duelId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::CancelDuel(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& duelId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return DuelActionRequest(worldEndpoint, L"/v1/world/duel/cancel", worldSessionToken, duelId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::SurrenderDuel(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& duelId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return DuelActionRequest(worldEndpoint, L"/v1/world/duel/surrender", worldSessionToken, duelId, outResponse, outError);
+    }
+
     bool NetClientSystemComponent::LearnTrainerAbility(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -250,6 +668,16 @@ namespace NetClient
             abilityId,
             outResponse,
             outError);
+    }
+
+    bool NetClientSystemComponent::SelectTalent(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& talentId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SelectTalentRequest(worldEndpoint, worldSessionToken, talentId, outResponse, outError);
     }
 
     bool NetClientSystemComponent::AssignActionBarSlot(
@@ -303,6 +731,71 @@ namespace NetClient
             worldSessionToken,
             fromSlotIndex,
             toSlotIndex,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::BrowseAuctions(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& search,
+        const AZStd::string& itemType,
+        const AZStd::string& sort,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return AuctionStateRequest(worldEndpoint, worldSessionToken, search, itemType, sort, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::ListAuctionItem(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        int stackCount,
+        int buyoutCopper,
+        AZ::s64 durationSeconds,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return ListAuctionItemRequest(
+            worldEndpoint,
+            worldSessionToken,
+            slotIndex,
+            stackCount,
+            buyoutCopper,
+            durationSeconds,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::BuyoutAuction(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& auctionId,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return AuctionIdActionRequest(
+            worldEndpoint,
+            L"/v1/world/auction/buyout",
+            worldSessionToken,
+            auctionId,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::CancelAuction(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& auctionId,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return AuctionIdActionRequest(
+            worldEndpoint,
+            L"/v1/world/auction/cancel",
+            worldSessionToken,
+            auctionId,
             outResponse,
             outError);
     }
