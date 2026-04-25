@@ -3012,8 +3012,7 @@ namespace UiClient
                         }
                         if (guildMotdBuffer[0] == '\0' && !guild.m_messageOfTheDay.empty())
                         {
-                            std::strncpy(guildMotdBuffer, guild.m_messageOfTheDay.c_str(), guildMotdBufferSize - 1);
-                            guildMotdBuffer[guildMotdBufferSize - 1] = '\0';
+                            strncpy_s(guildMotdBuffer, guildMotdBufferSize, guild.m_messageOfTheDay.c_str(), _TRUNCATE);
                         }
 
                         if (HasGuildPermission(guild, "invite_member"))
