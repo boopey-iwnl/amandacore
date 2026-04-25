@@ -1,0 +1,14 @@
+{
+  "quests": [
+    {
+      "quest_id": "dawnwake_first_steps",
+      "display_name": "First Steps on Dawnwake",
+      "provider_id": "dawnwake_landing_pathfinder",
+      "objective_graph": [
+        { "objective_id": "reach_amberglass_road_placeholder", "kind": "ReachLocationPlaceholder", "zone_id": "dawnwake_landing", "target": "landing_to_amberglass_road" }
+      ],
+      "rewards": [],
+      "tags": ["starter", "placeholder"]
+    }
+  ]
+}

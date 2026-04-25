@@ -1,0 +1,5 @@
+{
+  "auras": [
+    { "aura_id": "dawnwake_city_resting_placeholder", "display_name": "City Resting Placeholder", "kind": "city_service_placeholder", "tags": ["placeholder", "kingsfall_harbor"] }
+  ]
+}
