@@ -465,7 +465,6 @@ type worldSessionState struct {
 	QuestProgress      map[string]platform.CharacterQuestProgress
 	TrackedQuestIDs    []string
 	PvPStats           platform.CharacterPvPStats
-	LastDuelResult     *duelResultState
 }
 
 type mobState struct {
@@ -578,9 +577,6 @@ type worldServer struct {
 	sessionTokenByChar map[string]string
 	mobs               map[string]*mobState
 	mobOrder           []string
-	duels              map[string]*duelState
-	duelByCharacter    map[string]string
-	duelCounter        int64
 	dungeonInstances   map[string]*dungeonInstanceState
 	instanceByParty    map[string]string
 	instanceCounter    int64
@@ -606,8 +602,6 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
-		duels:              map[string]*duelState{},
-		duelByCharacter:    map[string]string{},
 		dungeonInstances:   map[string]*dungeonInstanceState{},
 		instanceByParty:    map[string]string{},
 		quests:             map[string]questDefinition{},

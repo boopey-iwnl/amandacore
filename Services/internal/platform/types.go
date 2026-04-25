@@ -28,6 +28,8 @@ const (
 	PermissionManageSupport    Permission = "manage_support"
 
 	InventorySlotCount     = 16
+	HousingStorageSlotCount = 24
+	HousingDecorationLimit  = 8
 	ActionBarSlotCount     = 48
 	StarterCurrencyCopper  = 125
 	PrimaryProfessionLimit = 2
@@ -77,6 +79,46 @@ type CharacterInventorySlot struct {
 	ItemID      string `json:"itemId"`
 	DisplayName string `json:"displayName"`
 	StackCount  int    `json:"stackCount"`
+}
+
+type HousingEntitlement struct {
+	CharacterID    string `json:"characterId"`
+	HousingSpaceID string `json:"housingSpaceId"`
+	TemplateID     string `json:"templateId"`
+	Unlocked       bool   `json:"unlocked"`
+	CreatedAt      int64  `json:"createdAt"`
+}
+
+type HousingSpace struct {
+	HousingSpaceID  string  `json:"housingSpaceId"`
+	OwnerCharacterID string  `json:"ownerCharacterId"`
+	OwnerAccountID   string  `json:"ownerAccountId"`
+	TemplateID       string  `json:"templateId"`
+	CreatedAt        int64   `json:"createdAt"`
+	LastVisitedAt    int64   `json:"lastVisitedAt"`
+	ReturnZoneID     string  `json:"returnZoneId"`
+	ReturnX          float64 `json:"returnX"`
+	ReturnY          float64 `json:"returnY"`
+	ReturnZ          float64 `json:"returnZ"`
+}
+
+type HousingStorageSlot struct {
+	SlotIndex   int    `json:"slotIndex"`
+	ItemID      string `json:"itemId"`
+	DisplayName string `json:"displayName"`
+	StackCount  int    `json:"stackCount"`
+}
+
+type DecorationPlacement struct {
+	PlacementID    string  `json:"placementId"`
+	HousingSpaceID string  `json:"housingSpaceId"`
+	DecorationID   string  `json:"decorationId"`
+	DisplayName    string  `json:"displayName"`
+	X              float64 `json:"x"`
+	Y              float64 `json:"y"`
+	Z              float64 `json:"z"`
+	RotationYaw    float64 `json:"rotationYaw"`
+	CreatedAt      int64   `json:"createdAt"`
 }
 
 type CharacterEquipmentSlot struct {
@@ -185,6 +227,81 @@ type GuildInvite struct {
 	TargetCharacterID  string `json:"targetCharacterId"`
 	CreatedAt          int64  `json:"createdAt"`
 	ExpiresAt          int64  `json:"expiresAt"`
+}
+
+const (
+	AuctionStateActive   = "active"
+	AuctionStateSold     = "sold"
+	AuctionStateCanceled = "canceled"
+	AuctionStateExpired  = "expired"
+)
+
+type AuctionListing struct {
+	AuctionID                string `json:"auctionId"`
+	RealmID                  string `json:"realmId"`
+	SellerCharacterID        string `json:"sellerCharacterId"`
+	SellerDisplayName        string `json:"sellerDisplayName"`
+	BuyerCharacterID         string `json:"buyerCharacterId,omitempty"`
+	ItemID                   string `json:"itemId"`
+	ItemDisplayName          string `json:"itemDisplayName"`
+	ItemQuality              string `json:"itemQuality"`
+	ItemType                 string `json:"itemType"`
+	ItemSubtype              string `json:"itemSubtype"`
+	ItemStackable            bool   `json:"itemStackable"`
+	ItemMaxStack             int    `json:"itemMaxStack"`
+	StackCount               int    `json:"stackCount"`
+	BuyoutCopper             int    `json:"buyoutCopper"`
+	BidCopper                int    `json:"bidCopper,omitempty"`
+	CurrentBidCopper         int    `json:"currentBidCopper,omitempty"`
+	CurrentBidderCharacterID string `json:"currentBidderCharacterId,omitempty"`
+	DepositCopper            int    `json:"depositCopper"`
+	CutCopper                int    `json:"cutCopper"`
+	CutPercent               int    `json:"cutPercent"`
+	CreatedAt                int64  `json:"createdAt"`
+	ExpiresAt                int64  `json:"expiresAt"`
+	SoldAt                   int64  `json:"soldAt,omitempty"`
+	CanceledAt               int64  `json:"canceledAt,omitempty"`
+	State                    string `json:"state"`
+	SourceInventorySlot      int    `json:"sourceInventorySlot"`
+	Version                  int    `json:"version"`
+	ItemDeliveredMailID      string `json:"itemDeliveredMailId,omitempty"`
+	ProceedsDeliveredMailID  string `json:"proceedsDeliveredMailId,omitempty"`
+	ReturnDeliveredMailID    string `json:"returnDeliveredMailId,omitempty"`
+}
+
+type MailItemAttachment struct {
+	ItemID      string `json:"itemId"`
+	DisplayName string `json:"displayName"`
+	StackCount  int    `json:"stackCount"`
+}
+
+type MailEnvelope struct {
+	MailID               string               `json:"mailId"`
+	AuctionID            string               `json:"auctionId,omitempty"`
+	SenderCharacterID    string               `json:"senderCharacterId,omitempty"`
+	SenderDisplayName    string               `json:"senderDisplayName"`
+	RecipientCharacterID string               `json:"recipientCharacterId"`
+	Subject              string               `json:"subject"`
+	Body                 string               `json:"body"`
+	ItemAttachments      []MailItemAttachment `json:"itemAttachments"`
+	CurrencyCopper       int                  `json:"currencyCopper"`
+	CreatedAt            int64                `json:"createdAt"`
+	DeliveredAt          int64                `json:"deliveredAt,omitempty"`
+}
+
+type EconomyAuditEvent struct {
+	EventID           string `json:"eventId"`
+	EventType         string `json:"eventType"`
+	AuctionID         string `json:"auctionId,omitempty"`
+	SellerCharacterID string `json:"sellerCharacterId,omitempty"`
+	BuyerCharacterID  string `json:"buyerCharacterId,omitempty"`
+	ItemID            string `json:"itemId,omitempty"`
+	StackCount        int    `json:"stackCount,omitempty"`
+	BuyoutCopper      int    `json:"buyoutCopper,omitempty"`
+	DepositCopper     int    `json:"depositCopper,omitempty"`
+	CutCopper         int    `json:"cutCopper,omitempty"`
+	Reason            string `json:"reason,omitempty"`
+	CreatedAt         int64  `json:"createdAt"`
 }
 
 type Account struct {
@@ -882,4 +999,65 @@ func NormalizeInventorySlots(source []CharacterInventorySlot) []CharacterInvento
 	}
 
 	return slots
+}
+
+func NormalizeHousingStorageSlots(source []HousingStorageSlot) []HousingStorageSlot {
+	slots := make([]HousingStorageSlot, HousingStorageSlotCount)
+	for slotIndex := range slots {
+		slots[slotIndex].SlotIndex = slotIndex
+	}
+
+	nextEmptySlot := 0
+	for _, slot := range source {
+		if slot.StackCount < 0 {
+			slot.StackCount = 0
+		}
+
+		targetIndex := slot.SlotIndex
+		if targetIndex < 0 || targetIndex >= HousingStorageSlotCount {
+			for nextEmptySlot < HousingStorageSlotCount && slots[nextEmptySlot].ItemID != "" {
+				nextEmptySlot++
+			}
+			if nextEmptySlot >= HousingStorageSlotCount {
+				continue
+			}
+			targetIndex = nextEmptySlot
+		}
+
+		normalizedSlot := HousingStorageSlot{
+			SlotIndex:   targetIndex,
+			ItemID:      slot.ItemID,
+			DisplayName: slot.DisplayName,
+			StackCount:  slot.StackCount,
+		}
+		if normalizedSlot.StackCount <= 0 {
+			normalizedSlot.ItemID = ""
+			normalizedSlot.DisplayName = ""
+			normalizedSlot.StackCount = 0
+		}
+		slots[targetIndex] = normalizedSlot
+	}
+
+	return slots
+}
+
+func NormalizeDecorationPlacements(source []DecorationPlacement) []DecorationPlacement {
+	if len(source) == 0 {
+		return []DecorationPlacement{}
+	}
+
+	seen := map[string]struct{}{}
+	placements := make([]DecorationPlacement, 0, len(source))
+	for _, placement := range source {
+		if placement.PlacementID == "" || placement.HousingSpaceID == "" || placement.DecorationID == "" {
+			continue
+		}
+		if _, exists := seen[placement.PlacementID]; exists {
+			continue
+		}
+		seen[placement.PlacementID] = struct{}{}
+		placements = append(placements, placement)
+	}
+
+	return placements
 }

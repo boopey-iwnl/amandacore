@@ -48,9 +48,15 @@ type state struct {
 	Parties          map[string]platform.Party               `json:"parties"`
 	Guilds           map[string]platform.Guild               `json:"guilds"`
 	GuildInvites     map[string]platform.GuildInvite         `json:"guildInvites"`
+	Auctions         map[string]platform.AuctionListing      `json:"auctions"`
+	Mail             map[string]platform.MailEnvelope        `json:"mail"`
 	AuditEvents      map[string]platform.AuditEvent          `json:"auditEvents"`
 	SupportTickets   map[string]platform.SupportTicket       `json:"supportTickets"`
 	Mutes            map[string]platform.MuteRecord          `json:"mutes"`
+	HousingEntitlements map[string]platform.HousingEntitlement `json:"housingEntitlements"`
+	HousingSpaces       map[string]platform.HousingSpace       `json:"housingSpaces"`
+	HousingStorage      map[string][]platform.HousingStorageSlot `json:"housingStorage"`
+	HousingDecorations  map[string][]platform.DecorationPlacement `json:"housingDecorations"`
 	BuildManifest    platform.BuildManifest                  `json:"buildManifest"`
 }
 
@@ -77,9 +83,15 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 			Parties:          map[string]platform.Party{},
 			Guilds:           map[string]platform.Guild{},
 			GuildInvites:     map[string]platform.GuildInvite{},
+			Auctions:         map[string]platform.AuctionListing{},
+			Mail:             map[string]platform.MailEnvelope{},
 			AuditEvents:      map[string]platform.AuditEvent{},
 			SupportTickets:   map[string]platform.SupportTicket{},
 			Mutes:            map[string]platform.MuteRecord{},
+			HousingEntitlements: map[string]platform.HousingEntitlement{},
+			HousingSpaces:       map[string]platform.HousingSpace{},
+			HousingStorage:      map[string][]platform.HousingStorageSlot{},
+			HousingDecorations:  map[string][]platform.DecorationPlacement{},
 			BuildManifest:    buildManifest,
 		},
 	}
@@ -186,7 +198,8 @@ func (s *FileStore) Authenticate(username string, password string) (platform.Acc
 			continue
 		}
 
-		if account.Banned {
+		now := time.Now().Unix()
+		if account.Banned || account.SuspendedUntil > now {
 			return platform.Account{}, ErrAccountBanned
 		}
 
@@ -218,6 +231,12 @@ func (s *FileStore) CreateSession(accountID string) (platform.Session, error) {
 	}
 
 	s.state.Sessions[session.ID] = session
+	if account, ok := s.state.Accounts[accountID]; ok {
+		account.LastLoginAt = session.CreatedAt
+		account.LastSessionID = session.ID
+		account.UpdatedAt = session.CreatedAt
+		s.state.Accounts[accountID] = account
+	}
 	return session, s.saveLocked()
 }
 
@@ -264,6 +283,12 @@ func (s *FileStore) ValidateAccessToken(token string) (*platform.Session, error)
 
 		if session.AccessExpiresAt < now {
 			return nil, ErrSessionExpired
+		}
+
+		if account, ok := s.state.Accounts[session.AccountID]; ok {
+			if account.Banned || account.SuspendedUntil > now {
+				return nil, ErrAccountBanned
+			}
 		}
 
 		copy := session
@@ -1304,6 +1329,15 @@ func (s *FileStore) load() error {
 	if loaded.GuildInvites != nil {
 		s.state.GuildInvites = loaded.GuildInvites
 	}
+	if loaded.AuditEvents != nil {
+		s.state.AuditEvents = loaded.AuditEvents
+	}
+	if loaded.SupportTickets != nil {
+		s.state.SupportTickets = loaded.SupportTickets
+	}
+	if loaded.Mutes != nil {
+		s.state.Mutes = loaded.Mutes
+	}
 	if loaded.BuildManifest.ID != "" {
 		s.state.BuildManifest = loaded.BuildManifest
 	}
@@ -1359,6 +1393,15 @@ func (s *FileStore) reloadLocked() error {
 	}
 	if loaded.GuildInvites == nil {
 		loaded.GuildInvites = map[string]platform.GuildInvite{}
+	}
+	if loaded.AuditEvents == nil {
+		loaded.AuditEvents = map[string]platform.AuditEvent{}
+	}
+	if loaded.SupportTickets == nil {
+		loaded.SupportTickets = map[string]platform.SupportTicket{}
+	}
+	if loaded.Mutes == nil {
+		loaded.Mutes = map[string]platform.MuteRecord{}
 	}
 	if loaded.BuildManifest.ID == "" {
 		loaded.BuildManifest = s.state.BuildManifest
