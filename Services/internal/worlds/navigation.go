@@ -85,6 +85,29 @@ func (s *worldServer) buildNavigationAreasResponse(session *worldSessionState) [
 }
 
 func (s *worldServer) buildMapMarkersResponse(session *worldSessionState) []map[string]any {
+	if session != nil && session.ZoneID == dungeonZoneID {
+		return []map[string]any{
+			{
+				"id":          "dungeon_exit_" + npcTallowdeepExitID,
+				"displayName": "Exit Winch",
+				"kind":        "dungeon_exit",
+				"entityId":    npcTallowdeepExitID,
+				"x":           166.0,
+				"y":           34.0,
+			},
+			{
+				"id":            "dungeon_boss_tallowdeep",
+				"displayName":   "Sluice Warden Platform",
+				"kind":          "tracked_objective",
+				"questId":       dungeonQuestTallowdeepID,
+				"areaId":        "tds_boss_platform",
+				"x":             148.0,
+				"y":             34.0,
+				"radius":        18.0,
+				"routeHintText": "Push through the lower sluice and defeat the warden.",
+			},
+		}
+	}
 	markers := make([]map[string]any, 0, len(s.friendlyNPCOrder)+len(stonewakeNavigationAreas))
 
 	for _, npcID := range s.friendlyNPCOrder {
@@ -194,4 +217,37 @@ func (s *worldServer) markerKindForNPCLocked(session *worldSessionState, npc fri
 		return "vendor", ""
 	}
 	return "service", ""
+}
+
+func buildZoneMapPayload(zoneMap zoneMapDefinition) map[string]any {
+	roads := make([]map[string]any, 0, len(zoneMap.Roads))
+	for _, road := range zoneMap.Roads {
+		roads = append(roads, map[string]any{
+			"id":          road.ID,
+			"displayName": road.DisplayName,
+			"points":      road.Points,
+		})
+	}
+	landmarks := make([]map[string]any, 0, len(zoneMap.Landmarks))
+	for _, landmark := range zoneMap.Landmarks {
+		landmarks = append(landmarks, map[string]any{
+			"id":          landmark.ID,
+			"displayName": landmark.DisplayName,
+			"kind":        landmark.Kind,
+			"x":           landmark.X,
+			"y":           landmark.Y,
+		})
+	}
+	return map[string]any{
+		"zoneId":      zoneMap.ZoneID,
+		"displayName": zoneMap.DisplayName,
+		"bounds": map[string]float64{
+			"minX": zoneMap.MinX,
+			"minY": zoneMap.MinY,
+			"maxX": zoneMap.MaxX,
+			"maxY": zoneMap.MaxY,
+		},
+		"roads":     roads,
+		"landmarks": landmarks,
+	}
 }
