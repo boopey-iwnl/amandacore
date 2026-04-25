@@ -1,6 +1,11 @@
 package worlds
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func TestStonewakeStarterContentLoads(t *testing.T) {
 	server := newWorldServer(nil)
@@ -45,5 +50,29 @@ func TestStonewakeStarterContentLoads(t *testing.T) {
 	}
 	if finalQuest.RewardXP != 100 || finalQuest.RewardCopper != 60 {
 		t.Fatalf("unexpected final quest rewards: %#v", finalQuest)
+	}
+}
+
+func TestBootstrapMapsStonewakeAsSunsetFrontierCell(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, nil)
+
+	request := httptest.NewRequest(http.MethodGet, "/v1/world/bootstrap", nil)
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected bootstrap status 200, got %d", response.Code)
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed to decode bootstrap response: %v", err)
+	}
+	if payload["zoneId"] != "sunset_frontier" {
+		t.Fatalf("expected broad zone sunset_frontier, got %#v", payload["zoneId"])
+	}
+	if payload["cellId"] != "stonewake_vale" {
+		t.Fatalf("expected Stonewake playable cell, got %#v", payload["cellId"])
 	}
 }
