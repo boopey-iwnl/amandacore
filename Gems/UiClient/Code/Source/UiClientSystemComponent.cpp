@@ -2241,6 +2241,10 @@ namespace UiClient
             {
                 return ImVec4(0.42f, 0.68f, 1.0f, 1.0f);
             }
+            if (channel == "guild")
+            {
+                return ImVec4(0.38f, 0.86f, 0.48f, 1.0f);
+            }
             return ImVec4(0.92f, 0.92f, 0.86f, 1.0f);
         }
 
@@ -2257,6 +2261,10 @@ namespace UiClient
             if (channel == "party")
             {
                 return "Party";
+            }
+            if (channel == "guild")
+            {
+                return "Guild";
             }
             return "Say";
         }
@@ -2305,6 +2313,11 @@ namespace UiClient
             if (ImGui::Button("Party", ImVec2(66.0f, 24.0f)))
             {
                 selectedChannel = "party";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Guild", ImVec2(66.0f, 24.0f)))
+            {
+                selectedChannel = "guild";
             }
             ImGui::SameLine();
             ImGui::Text("Channel: %s", ChatChannelLabel(selectedChannel));
