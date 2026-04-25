@@ -2389,11 +2389,43 @@ namespace UiClient
             }
         }
 
+        bool HasGuildPermission(const NetClient::GuildState& guild, const char* permission)
+        {
+            return AZStd::find(
+                guild.m_currentPermissions.begin(),
+                guild.m_currentPermissions.end(),
+                AZStd::string(permission)) != guild.m_currentPermissions.end();
+        }
+
+        void DrawGuildInvitePrompt(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            if (!gameCore || worldState.m_social.m_guildInvites.empty())
+            {
+                return;
+            }
+
+            const auto& invite = worldState.m_social.m_guildInvites.front();
+            ImGui::Text("%s invited you to join %s.", invite.m_inviterDisplayName.c_str(), invite.m_guildName.c_str());
+            if (ImGui::Button("Accept", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->AcceptGuildInvite(invite.m_inviteId);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Decline", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->DeclineGuildInvite(invite.m_inviteId);
+            }
+        }
+
         void DrawSocialWindow(
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
             char* nameBuffer,
-            size_t nameBufferSize)
+            size_t nameBufferSize,
+            char* guildNameBuffer,
+            size_t guildNameBufferSize,
+            char* guildMotdBuffer,
+            size_t guildMotdBufferSize)
         {
             if (ImGui::BeginTabBar("##social_tabs"))
             {
@@ -2455,6 +2487,119 @@ namespace UiClient
                     }
                     ImGui::Separator();
                     DrawPartyFrames(worldState);
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Guild"))
+                {
+                    if (!worldState.m_social.m_hasGuild)
+                    {
+                        ImGui::SetNextItemWidth(250.0f);
+                        ImGui::InputText("Guild Name", guildNameBuffer, guildNameBufferSize);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Create", ImVec2(86.0f, 0.0f)) && gameCore)
+                        {
+                            gameCore->CreateGuild(guildNameBuffer);
+                        }
+                        ImGui::Separator();
+                        ImGui::TextUnformatted("No guild");
+                    }
+                    else
+                    {
+                        const auto& guild = worldState.m_social.m_guild;
+                        ImGui::Text("%s  |  %s", guild.m_guildName.c_str(), guild.m_currentRankId.c_str());
+                        if (!guild.m_messageOfTheDay.empty())
+                        {
+                            ImGui::TextWrapped("MOTD: %s", guild.m_messageOfTheDay.c_str());
+                        }
+                        if (guildMotdBuffer[0] == '\0' && !guild.m_messageOfTheDay.empty())
+                        {
+                            std::strncpy(guildMotdBuffer, guild.m_messageOfTheDay.c_str(), guildMotdBufferSize - 1);
+                            guildMotdBuffer[guildMotdBufferSize - 1] = '\0';
+                        }
+
+                        if (HasGuildPermission(guild, "invite_member"))
+                        {
+                            ImGui::SetNextItemWidth(190.0f);
+                            ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->InviteGuild(nameBuffer);
+                            }
+                        }
+                        if (HasGuildPermission(guild, "edit_motd"))
+                        {
+                            ImGui::SetNextItemWidth(286.0f);
+                            ImGui::InputText("Message", guildMotdBuffer, guildMotdBufferSize);
+                            ImGui::SameLine();
+                            if (ImGui::Button("Set", ImVec2(58.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->SetGuildMessageOfTheDay(guildMotdBuffer);
+                            }
+                        }
+
+                        if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                        {
+                            gameCore->LeaveGuild();
+                        }
+                        if (HasGuildPermission(guild, "disband_guild"))
+                        {
+                            ImGui::SameLine();
+                            if (ImGui::Button("Disband", ImVec2(92.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->DisbandGuild();
+                            }
+                        }
+
+                        ImGui::Separator();
+                        ImGui::BeginChild("##guild_roster", ImVec2(0.0f, 250.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                        for (const auto& member : guild.m_members)
+                        {
+                            ImGui::PushID(member.m_characterId.c_str());
+                            ImGui::Text(
+                                "%s  |  %s  |  L%d %s  |  %s",
+                                member.m_displayName.c_str(),
+                                member.m_rankName.c_str(),
+                                member.m_level,
+                                member.m_classId.c_str(),
+                                member.m_online ? "online" : "offline");
+                            if (!member.m_currentZoneId.empty())
+                            {
+                                ImGui::SameLine();
+                                ImGui::Text(" | %s", member.m_currentZoneId.c_str());
+                            }
+                            if (member.m_characterId != worldState.m_session.m_characterId)
+                            {
+                                if (HasGuildPermission(guild, "promote_member"))
+                                {
+                                    if (ImGui::Button("Promote", ImVec2(82.0f, 0.0f)) && gameCore)
+                                    {
+                                        gameCore->PromoteGuildMember(member.m_displayName);
+                                    }
+                                    ImGui::SameLine();
+                                }
+                                if (HasGuildPermission(guild, "demote_member"))
+                                {
+                                    if (ImGui::Button("Demote", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    {
+                                        gameCore->DemoteGuildMember(member.m_displayName);
+                                    }
+                                    ImGui::SameLine();
+                                }
+                                if (HasGuildPermission(guild, "remove_member"))
+                                {
+                                    if (ImGui::Button("Remove", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    {
+                                        gameCore->RemoveGuildMember(member.m_displayName);
+                                    }
+                                }
+                            }
+                            ImGui::Separator();
+                            ImGui::PopID();
+                        }
+                        ImGui::EndChild();
+                    }
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
@@ -3525,7 +3670,15 @@ namespace UiClient
 
         if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize))
         {
-            DrawSocialWindow(gameCore, worldState, m_socialNameBuffer, AZ_ARRAY_SIZE(m_socialNameBuffer));
+            DrawSocialWindow(
+                gameCore,
+                worldState,
+                m_socialNameBuffer,
+                AZ_ARRAY_SIZE(m_socialNameBuffer),
+                m_guildNameBuffer,
+                AZ_ARRAY_SIZE(m_guildNameBuffer),
+                m_guildMotdBuffer,
+                AZ_ARRAY_SIZE(m_guildMotdBuffer));
         }
         if (m_socialOpen)
         {
