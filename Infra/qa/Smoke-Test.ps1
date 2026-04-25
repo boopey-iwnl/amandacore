@@ -143,6 +143,45 @@ function Test-BinaryFileContainsAscii {
     Add-Result -Name $Name -Passed $found -Detail $(if ($found) { $Path } else { "$Needle was not found in $Path" })
 }
 
+function Test-PackagedO3deBootstrapOffline {
+    param([string]$PackageRoot)
+
+    $cacheRoot = Join-Path $PackageRoot "Cache\pc"
+    $bootstrapFiles = @(Get-ChildItem -Path $cacheRoot -Filter "bootstrap*.setreg" -File -ErrorAction SilentlyContinue)
+    if ($bootstrapFiles.Count -eq 0) {
+        Add-Result -Name "package O3DE bootstrap files exist" -Passed $false -Detail $cacheRoot
+        return
+    }
+
+    Add-Result -Name "package O3DE bootstrap files exist" -Passed $true -Detail (($bootstrapFiles | ForEach-Object { $_.Name }) -join "; ")
+
+    $violations = @()
+    foreach ($file in $bootstrapFiles) {
+        $content = Get-Content -Path $file.FullName -Raw
+        if (
+            $content -match '"connect_to_remote"\s*:\s*1' -or
+            $content -match '"wait_for_connect"\s*:\s*1' -or
+            $content -match '"connect_ap_timeout"\s*:\s*[1-9]\d*' -or
+            $content -match '"launch_ap_timeout"\s*:\s*[1-9]\d*' -or
+            $content -match '"wait_ap_ready_timeout"\s*:\s*[1-9]\d*'
+        ) {
+            $violations += $file.Name
+        }
+    }
+
+    Add-Result -Name "package O3DE bootstrap uses packaged cache" -Passed ($violations.Count -eq 0) -Detail $(if ($violations.Count -eq 0) { $cacheRoot } else { ($violations -join "; ") })
+
+    $bomFiles = @()
+    foreach ($file in $bootstrapFiles) {
+        $prefix = @(Get-Content -Path $file.FullName -Encoding Byte -TotalCount 3)
+        if ($prefix.Count -eq 3 -and $prefix[0] -eq 0xEF -and $prefix[1] -eq 0xBB -and $prefix[2] -eq 0xBF) {
+            $bomFiles += $file.Name
+        }
+    }
+
+    Add-Result -Name "package O3DE bootstrap has no UTF8 BOM" -Passed ($bomFiles.Count -eq 0) -Detail $(if ($bomFiles.Count -eq 0) { $cacheRoot } else { ($bomFiles -join "; ") })
+}
+
 function Stop-PackageRuntimeProcess {
     param(
         [System.Diagnostics.Process]$Process,
@@ -186,16 +225,24 @@ function Invoke-PackageO3deLevelSmoke {
     $gameLog = Join-Path $userRoot "log\Game.log"
     $startTime = Get-Date
     $process = $null
-    $failurePattern = "(?i)(Requested level not found|Startup level asset is not registered|Bootstrap zone mapping did not match|missing AssetCatalog|AssetCatalog.*missing|project path not found)"
+    $failurePattern = "(?i)(Requested level not found|Startup level asset is not registered|Bootstrap zone mapping did not match|missing AssetCatalog|AssetCatalog.*missing|project path not found|Unable to find product asset|Failed to load RPI system asset|Could not compile asset)"
     $failureMatch = ""
     $levelReady = $false
+    $assetCatalogPath = Join-Path $PackageRoot "Cache\pc\assetcatalog.xml"
+    $assetCatalogHashBefore = ""
+    if (Test-Path $assetCatalogPath) {
+        $assetCatalogHashBefore = (Get-FileHash -Path $assetCatalogPath -Algorithm SHA256).Hash
+    }
 
     try {
         $escapedPackageRoot = $PackageRoot.Replace('"', '\"')
+        $cacheRoot = (Join-Path $PackageRoot "Cache").Replace('"', '\"')
+        $userRootArg = (Join-Path $PackageRoot "user").Replace('"', '\"')
+        $logRootArg = (Join-Path $PackageRoot "user\log").Replace('"', '\"')
         $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
         $startInfo.FileName = $gameLauncherPath
         $startInfo.WorkingDirectory = $PackageRoot
-        $startInfo.Arguments = "--project-path `"$escapedPackageRoot`""
+        $startInfo.Arguments = "--project-path `"$escapedPackageRoot`" --project-cache-path `"$cacheRoot`" --project-user-path `"$userRootArg`" --project-log-path `"$logRootArg`""
         $startInfo.UseShellExecute = $false
         $startInfo.CreateNoWindow = $true
         $process = [System.Diagnostics.Process]::Start($startInfo)
@@ -239,6 +286,26 @@ function Invoke-PackageO3deLevelSmoke {
     }
     else {
         "Game.log was not created at $gameLog"
+    }
+
+    $assetCatalogHashAfter = ""
+    $assetCatalogHasLevel = $false
+    if (Test-Path $assetCatalogPath) {
+        $assetCatalogHashAfter = (Get-FileHash -Path $assetCatalogPath -Algorithm SHA256).Hash
+        $assetCatalogHasLevel = [bool](Select-String -Path $assetCatalogPath -SimpleMatch -Pattern "levels/testzone01/testzone01.spawnable" -Quiet -ErrorAction SilentlyContinue)
+    }
+
+    $assetCatalogPreserved = (
+        -not [string]::IsNullOrWhiteSpace($assetCatalogHashBefore) -and
+        $assetCatalogHashBefore -eq $assetCatalogHashAfter -and
+        $assetCatalogHasLevel
+    )
+    Add-Result -Name "package O3DE asset catalog preserved during runtime smoke" -Passed $assetCatalogPreserved -Detail $(if ($assetCatalogPreserved) { $assetCatalogHashAfter } else { "before=$assetCatalogHashBefore after=$assetCatalogHashAfter hasTestzone=$assetCatalogHasLevel" })
+
+    $assetProcessorLog = Join-Path $userRoot "log\AP_GUI.log"
+    $assetProcessorRan = (Test-Path $assetProcessorLog) -and ((Get-Item $assetProcessorLog).Length -gt 0)
+    if ($assetProcessorRan) {
+        Add-Result -Name "package O3DE AssetProcessor background log" -Passed $false -Severity "warning" -Detail $assetProcessorLog
     }
 
     Add-Result -Name "package O3DE runtime level smoke" -Passed ($levelReady -and [string]::IsNullOrWhiteSpace($failureMatch)) -Detail $detail
@@ -326,6 +393,7 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
     Test-TextFileDoesNotMatch -Name "package manifest has no local absolute paths" -Path (Join-Path $PackageRoot "Infra\dev\version-manifest.json") -Pattern "[A-Za-z]:\\" -FailureDetail "version-manifest.json contains a local absolute Windows path."
     Test-PathRequired -Name "package testzone01 spawnable" -Path (Join-Path $PackageRoot "Cache\pc\levels\testzone01\testzone01.spawnable")
     Test-BinaryFileContainsAscii -Name "package asset catalog references testzone01" -Path (Join-Path $PackageRoot "Cache\pc\assetcatalog.xml") -Needle "levels/testzone01/testzone01.spawnable"
+    Test-PackagedO3deBootstrapOffline -PackageRoot $PackageRoot
     Test-PackageDoesNotContain -Name "package excludes local/secrets/build junk" -PackageRoot $PackageRoot -RelativePatterns @(
         '(^|/)\.git(/|$)',
         '(^|/)\.secrets(/|$)',

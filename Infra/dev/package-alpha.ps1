@@ -198,6 +198,33 @@ function Assert-PackageSafety {
     }
 }
 
+function Set-PackagedO3deBootstrapOffline {
+    param([string]$PackageRoot)
+
+    $cacheRoot = Join-Path $PackageRoot "Cache\pc"
+    if (-not (Test-Path $cacheRoot)) {
+        return @()
+    }
+
+    $updated = @()
+    Get-ChildItem -Path $cacheRoot -Filter "bootstrap*.setreg" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $content = Get-Content -Path $_.FullName -Raw
+        $newContent = $content
+        $newContent = [regex]::Replace($newContent, '"connect_to_remote"\s*:\s*1', '"connect_to_remote":0')
+        $newContent = [regex]::Replace($newContent, '"wait_for_connect"\s*:\s*1', '"wait_for_connect":0')
+        $newContent = [regex]::Replace($newContent, '"connect_ap_timeout"\s*:\s*\d+', '"connect_ap_timeout":0')
+        $newContent = [regex]::Replace($newContent, '"launch_ap_timeout"\s*:\s*\d+', '"launch_ap_timeout":0')
+        $newContent = [regex]::Replace($newContent, '"wait_ap_ready_timeout"\s*:\s*\d+', '"wait_ap_ready_timeout":0')
+
+        if ($newContent -ne $content) {
+            Set-Content -Path $_.FullName -Value $newContent -Encoding ASCII -NoNewline
+            $updated += (Get-PackageRelativePath -Root $PackageRoot -Path $_.FullName)
+        }
+    }
+
+    return $updated
+}
+
 if (-not $SkipBuild) {
     & $buildScript
 }
@@ -269,6 +296,8 @@ foreach ($runtimePath in $runtimePaths) {
     }
 }
 
+$packagedBootstrapFiles = Set-PackagedO3deBootstrapOffline -PackageRoot $script:stagingRoot
+
 $packageManifest = [ordered]@{
     schemaVersion = 1
     packageName = $PackageName
@@ -283,6 +312,7 @@ $packageManifest = [ordered]@{
     releaseFilesCopied = $releaseFilesCopied
     sourceFilesCopied = 0
     runtimePaths = $runtimeSummary
+    packagedBootstrapFiles = $packagedBootstrapFiles
     excludedAreas = @(
         ".git",
         ".secrets",

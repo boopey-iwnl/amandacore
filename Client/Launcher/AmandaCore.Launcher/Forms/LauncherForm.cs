@@ -257,8 +257,7 @@ internal sealed class LauncherForm : Form
 
                 if (ShouldPassProjectPath())
                 {
-                    startInfo.ArgumentList.Add("--project-path");
-                    startInfo.ArgumentList.Add(_config.Resolution.RepoRoot);
+                    AddO3deRuntimeArguments(startInfo);
                 }
 
                 startInfo.ArgumentList.Add("--join-ticket");
@@ -341,6 +340,25 @@ internal sealed class LauncherForm : Form
 
         var fileName = Path.GetFileName(_config.ClientExecutablePath);
         return fileName.Contains("GameLauncher", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void AddO3deRuntimeArguments(ProcessStartInfo startInfo)
+    {
+        var packageRoot = _config.Resolution.RepoRoot;
+        startInfo.ArgumentList.Add("--project-path");
+        startInfo.ArgumentList.Add(packageRoot);
+
+        var cacheRoot = Path.Combine(packageRoot, "Cache");
+        if (Directory.Exists(cacheRoot))
+        {
+            startInfo.ArgumentList.Add("--project-cache-path");
+            startInfo.ArgumentList.Add(cacheRoot);
+        }
+
+        startInfo.ArgumentList.Add("--project-user-path");
+        startInfo.ArgumentList.Add(Path.Combine(packageRoot, "user"));
+        startInfo.ArgumentList.Add("--project-log-path");
+        startInfo.ArgumentList.Add(Path.Combine(packageRoot, "user", "log"));
     }
 
     private void ToggleButtons(bool enabled)
@@ -487,6 +505,19 @@ internal sealed class LauncherForm : Form
         {
             builder.Append("--project-path ");
             builder.Append(_config.Resolution.RepoRoot);
+            builder.Append(' ');
+            var cacheRoot = Path.Combine(_config.Resolution.RepoRoot, "Cache");
+            if (Directory.Exists(cacheRoot))
+            {
+                builder.Append("--project-cache-path ");
+                builder.Append(cacheRoot);
+                builder.Append(' ');
+            }
+
+            builder.Append("--project-user-path ");
+            builder.Append(Path.Combine(_config.Resolution.RepoRoot, "user"));
+            builder.Append(" --project-log-path ");
+            builder.Append(Path.Combine(_config.Resolution.RepoRoot, "user", "log"));
             builder.Append(' ');
         }
 
