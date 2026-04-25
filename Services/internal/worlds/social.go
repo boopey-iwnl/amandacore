@@ -20,12 +20,16 @@ const (
 	chatChannelSay     = "say"
 	chatChannelWhisper = "whisper"
 	chatChannelParty   = "party"
+	chatChannelGuild   = "guild"
 
 	maxChatMessageLength = 256
 	chatRingLimit        = 200
 	sayChatRadius        = 40.0
 	partyInviteTTL       = 60 * time.Second
+	guildInviteTTL       = 120 * time.Second
 	partySizeLimit       = 5
+	guildNameMinLength   = 3
+	guildNameMaxLength   = 32
 )
 
 type chatEnvelope struct {
@@ -70,11 +74,38 @@ type partyActionRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 }
 
+type guildCreateRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	GuildName         string `json:"guildName"`
+}
+
+type guildInviteRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TargetName        string `json:"targetName"`
+}
+
+type guildInviteActionRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	InviteID          string `json:"inviteId"`
+}
+
+type guildMemberActionRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TargetName        string `json:"targetName"`
+}
+
+type guildMOTDRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	MessageOfTheDay   string `json:"messageOfTheDay"`
+}
+
 type socialStateResponse struct {
 	ChatMessages []platform.ChatMessage `json:"chatMessages"`
 	Friends      []friendResponse       `json:"friends"`
 	Party        *partyResponse         `json:"party"`
 	PartyInvites []partyInviteResponse  `json:"partyInvites"`
+	Guild        *guildResponse         `json:"guild"`
+	GuildInvites []guildInviteResponse  `json:"guildInvites"`
 }
 
 type friendResponse struct {
@@ -110,6 +141,42 @@ type partyMemberResponse struct {
 type partyInviteResponse struct {
 	InviteID           string `json:"inviteId"`
 	PartyID            string `json:"partyId"`
+	InviterCharacterID string `json:"inviterCharacterId"`
+	InviterDisplayName string `json:"inviterDisplayName"`
+	ExpiresAt          int64  `json:"expiresAt"`
+}
+
+type guildResponse struct {
+	GuildID              string                `json:"guildId"`
+	GuildName            string                `json:"guildName"`
+	LeaderCharacterID    string                `json:"leaderCharacterId"`
+	MessageOfTheDay      string                `json:"messageOfTheDay"`
+	CurrentRankID        string                `json:"currentRankId"`
+	CurrentPermissions   []string              `json:"currentPermissions"`
+	Ranks                []platform.GuildRank  `json:"ranks"`
+	Members              []guildMemberResponse `json:"members"`
+	CreatedAt            int64                 `json:"createdAt"`
+	CreatedByCharacterID string                `json:"createdByCharacterId"`
+}
+
+type guildMemberResponse struct {
+	CharacterID   string `json:"characterId"`
+	DisplayName   string `json:"displayName"`
+	RaceID        string `json:"raceId"`
+	ClassID       string `json:"classId"`
+	Level         int    `json:"level"`
+	RankID        string `json:"rankId"`
+	RankName      string `json:"rankName"`
+	JoinedAt      int64  `json:"joinedAt"`
+	LastOnlineAt  int64  `json:"lastOnlineAt"`
+	Online        bool   `json:"online"`
+	CurrentZoneID string `json:"currentZoneId"`
+}
+
+type guildInviteResponse struct {
+	InviteID           string `json:"inviteId"`
+	GuildID            string `json:"guildId"`
+	GuildName          string `json:"guildName"`
 	InviterCharacterID string `json:"inviterCharacterId"`
 	InviterDisplayName string `json:"inviterDisplayName"`
 	ExpiresAt          int64  `json:"expiresAt"`
@@ -517,22 +584,6 @@ func (s *worldServer) sendChatMessageLocked(session *worldSessionState, request 
 			MessageText:       messageText,
 		}, recipientSet(party.MemberCharacterIDs...))
 		return nil
-	case chatChannelGuild:
-		if s.store == nil {
-			return fmt.Errorf("social persistence is unavailable")
-		}
-		guild, err := s.store.GetGuildForCharacter(session.CharacterID)
-		if err != nil {
-			return fmt.Errorf("you are not in a guild")
-		}
-		s.appendChatMessageLocked(platform.ChatMessage{
-			Channel:           channel,
-			SenderCharacterID: session.CharacterID,
-			SenderDisplayName: session.DisplayName,
-			GuildID:           guild.ID,
-			MessageText:       messageText,
-		}, s.onlineGuildRecipientSetLocked(*guild))
-		return nil
 	default:
 		return fmt.Errorf("unsupported chat channel")
 	}
@@ -579,16 +630,11 @@ func (s *worldServer) sendSystemMessageLocked(messageText string, recipients map
 }
 
 func (s *worldServer) buildSocialStateLocked(session *worldSessionState, afterMessageID string) socialStateResponse {
-	if s.store != nil {
-		_ = s.store.CleanupExpiredGuildInvites(time.Now().Unix())
-	}
 	return socialStateResponse{
 		ChatMessages: s.visibleChatMessagesLocked(session.CharacterID, afterMessageID),
 		Friends:      s.buildFriendResponsesLocked(session),
 		Party:        s.buildPartyResponseLocked(session.CharacterID),
 		PartyInvites: s.buildPartyInviteResponsesLocked(session.CharacterID),
-		Guild:        s.buildGuildResponseLocked(session.CharacterID),
-		GuildInvites: s.buildGuildInviteResponsesLocked(session.CharacterID),
 	}
 }
 

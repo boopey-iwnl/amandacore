@@ -1070,8 +1070,8 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"quest":                s.buildQuestResponse(session),
 		"quests":               s.buildQuestListResponse(session),
 		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
-		"zoneMap":              s.buildZoneMapResponse(session.ZoneID),
-		"navigationAreas":      s.buildNavigationAreasResponse(),
+		"zoneMap":              s.buildZoneMapResponse(session),
+		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"instance":             s.buildDungeonInstanceResponse(session),
 		"currentTargetId":      session.CurrentTargetID,
@@ -1118,12 +1118,21 @@ func clamp(value float64, minimum float64, maximum float64) float64 {
 	return value
 }
 
-func resolveStarterZoneMovement(currentX float64, currentY float64, deltaX float64, deltaY float64) (float64, float64) {
-	candidateX := clamp(currentX+deltaX, 0.0, starterZoneMaxX)
-	candidateY := clamp(currentY+deltaY, 0.0, starterZoneMaxY)
+func (s *worldServer) resolveMovementLocked(session *worldSessionState, deltaX float64, deltaY float64) (float64, float64) {
+	maxX := starterZoneMaxX
+	maxY := starterZoneMaxY
+	if session != nil {
+		if zone, ok := s.zones[session.ZoneID]; ok {
+			maxX = zone.Bounds.MaxX
+			maxY = zone.Bounds.MaxY
+		}
+	}
+	candidateX := clamp(session.X+deltaX, 0.0, maxX)
+	candidateY := clamp(session.Y+deltaY, 0.0, maxY)
 
-	if candidateX >= 72.0 && candidateX <= 80.0 && candidateY >= 28.0 && candidateY <= 46.0 {
-		return currentX, currentY
+	if session != nil && session.ZoneID == defaultZoneID &&
+		candidateX >= 72.0 && candidateX <= 80.0 && candidateY >= 28.0 && candidateY <= 46.0 {
+		return session.X, session.Y
 	}
 
 	return candidateX, candidateY

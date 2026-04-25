@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"amandacore/services/internal/httpapi"
 	"amandacore/services/internal/platform"
-	"amandacore/services/internal/shared/httpapi"
 )
 
 func validateGuildName(name string) (string, error) {
@@ -121,14 +121,14 @@ func (s *worldServer) acceptGuildInviteLocked(session *worldSessionState, invite
 
 	now := time.Now().Unix()
 	guild.Members = append(guild.Members, platform.GuildMember{
-		CharacterID:   character.ID,
-		DisplayName:   character.DisplayName,
-		RaceID:        character.RaceID,
-		ClassID:       character.ClassID,
-		Level:         character.Level,
-		RankID:        platform.GuildRankRecruit,
-		JoinedAt:      now,
-		LastOnlineAt:  now,
+		CharacterID:  character.ID,
+		DisplayName:  character.DisplayName,
+		RaceID:       character.RaceID,
+		ClassID:      character.ClassID,
+		Level:        character.Level,
+		RankID:       platform.GuildRankRecruit,
+		JoinedAt:     now,
+		LastOnlineAt: now,
 	})
 	saved, err := s.store.SaveGuild(*guild)
 	if err != nil {
