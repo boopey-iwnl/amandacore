@@ -20,16 +20,12 @@ const (
 	chatChannelSay     = "say"
 	chatChannelWhisper = "whisper"
 	chatChannelParty   = "party"
-	chatChannelGuild   = "guild"
 
 	maxChatMessageLength = 256
 	chatRingLimit        = 200
 	sayChatRadius        = 40.0
 	partyInviteTTL       = 60 * time.Second
-	guildInviteTTL       = 120 * time.Second
 	partySizeLimit       = 5
-	guildNameMinLength   = 3
-	guildNameMaxLength   = 32
 )
 
 type chatEnvelope struct {
@@ -74,38 +70,11 @@ type partyActionRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 }
 
-type guildCreateRequest struct {
-	WorldSessionToken string `json:"worldSessionToken"`
-	GuildName         string `json:"guildName"`
-}
-
-type guildInviteRequest struct {
-	WorldSessionToken string `json:"worldSessionToken"`
-	TargetName        string `json:"targetName"`
-}
-
-type guildInviteActionRequest struct {
-	WorldSessionToken string `json:"worldSessionToken"`
-	InviteID          string `json:"inviteId"`
-}
-
-type guildMemberActionRequest struct {
-	WorldSessionToken string `json:"worldSessionToken"`
-	TargetName        string `json:"targetName"`
-}
-
-type guildMOTDRequest struct {
-	WorldSessionToken string `json:"worldSessionToken"`
-	MessageOfTheDay   string `json:"messageOfTheDay"`
-}
-
 type socialStateResponse struct {
 	ChatMessages []platform.ChatMessage `json:"chatMessages"`
 	Friends      []friendResponse       `json:"friends"`
 	Party        *partyResponse         `json:"party"`
 	PartyInvites []partyInviteResponse  `json:"partyInvites"`
-	Guild        *guildResponse         `json:"guild"`
-	GuildInvites []guildInviteResponse  `json:"guildInvites"`
 }
 
 type friendResponse struct {
@@ -141,42 +110,6 @@ type partyMemberResponse struct {
 type partyInviteResponse struct {
 	InviteID           string `json:"inviteId"`
 	PartyID            string `json:"partyId"`
-	InviterCharacterID string `json:"inviterCharacterId"`
-	InviterDisplayName string `json:"inviterDisplayName"`
-	ExpiresAt          int64  `json:"expiresAt"`
-}
-
-type guildResponse struct {
-	GuildID              string                `json:"guildId"`
-	GuildName            string                `json:"guildName"`
-	LeaderCharacterID    string                `json:"leaderCharacterId"`
-	MessageOfTheDay      string                `json:"messageOfTheDay"`
-	CurrentRankID        string                `json:"currentRankId"`
-	CurrentPermissions   []string              `json:"currentPermissions"`
-	Ranks                []platform.GuildRank  `json:"ranks"`
-	Members              []guildMemberResponse `json:"members"`
-	CreatedAt            int64                 `json:"createdAt"`
-	CreatedByCharacterID string                `json:"createdByCharacterId"`
-}
-
-type guildMemberResponse struct {
-	CharacterID   string `json:"characterId"`
-	DisplayName   string `json:"displayName"`
-	RaceID        string `json:"raceId"`
-	ClassID       string `json:"classId"`
-	Level         int    `json:"level"`
-	RankID        string `json:"rankId"`
-	RankName      string `json:"rankName"`
-	JoinedAt      int64  `json:"joinedAt"`
-	LastOnlineAt  int64  `json:"lastOnlineAt"`
-	Online        bool   `json:"online"`
-	CurrentZoneID string `json:"currentZoneId"`
-}
-
-type guildInviteResponse struct {
-	InviteID           string `json:"inviteId"`
-	GuildID            string `json:"guildId"`
-	GuildName          string `json:"guildName"`
 	InviterCharacterID string `json:"inviterCharacterId"`
 	InviterDisplayName string `json:"inviterDisplayName"`
 	ExpiresAt          int64  `json:"expiresAt"`
@@ -1149,142 +1082,6 @@ func recipientSet(characterIDs ...string) map[string]struct{} {
 		recipients[characterID] = struct{}{}
 	}
 	return recipients
-}
-
-func guildRecipientSet(guild platform.Guild) map[string]struct{} {
-	recipients := map[string]struct{}{}
-	for _, member := range guild.Members {
-		if strings.TrimSpace(member.CharacterID) == "" {
-			continue
-		}
-		recipients[member.CharacterID] = struct{}{}
-	}
-	return recipients
-}
-
-func (s *worldServer) onlineGuildRecipientSetLocked(guild platform.Guild) map[string]struct{} {
-	recipients := map[string]struct{}{}
-	for _, member := range guild.Members {
-		if s.findConnectedSessionByCharacterLocked(member.CharacterID) == nil {
-			continue
-		}
-		recipients[member.CharacterID] = struct{}{}
-	}
-	return recipients
-}
-
-func validateGuildName(name string) (string, error) {
-	trimmed := strings.Join(strings.Fields(strings.TrimSpace(name)), " ")
-	if len(trimmed) < guildNameMinLength {
-		return "", fmt.Errorf("guild name must be at least %d characters", guildNameMinLength)
-	}
-	if len(trimmed) > guildNameMaxLength {
-		return "", fmt.Errorf("guild name cannot exceed %d characters", guildNameMaxLength)
-	}
-	for _, r := range trimmed {
-		if r < 32 || r == 127 {
-			return "", fmt.Errorf("guild name contains unsupported characters")
-		}
-	}
-	return trimmed, nil
-}
-
-func guildMemberByID(guild platform.Guild, characterID string) (platform.GuildMember, bool) {
-	for _, member := range guild.Members {
-		if member.CharacterID == characterID {
-			return member, true
-		}
-	}
-	return platform.GuildMember{}, false
-}
-
-func guildRankByID(guild platform.Guild, rankID string) platform.GuildRank {
-	for _, rank := range guild.Ranks {
-		if rank.RankID == rankID {
-			return rank
-		}
-	}
-	for _, rank := range platform.DefaultGuildRanks() {
-		if rank.RankID == rankID {
-			return rank
-		}
-	}
-	return platform.DefaultGuildRanks()[len(platform.DefaultGuildRanks())-1]
-}
-
-func guildMemberHasPermission(guild platform.Guild, characterID string, permission string) bool {
-	member, ok := guildMemberByID(guild, characterID)
-	if !ok {
-		return false
-	}
-	rank := guildRankByID(guild, member.RankID)
-	for _, allowed := range rank.Permissions {
-		if allowed == permission {
-			return true
-		}
-	}
-	return false
-}
-
-func guildCanActOnMember(guild platform.Guild, actorCharacterID string, targetCharacterID string) bool {
-	actor, ok := guildMemberByID(guild, actorCharacterID)
-	if !ok {
-		return false
-	}
-	target, ok := guildMemberByID(guild, targetCharacterID)
-	if !ok {
-		return false
-	}
-	if target.RankID == platform.GuildRankLeader {
-		return false
-	}
-	return guildRankByID(guild, actor.RankID).Priority < guildRankByID(guild, target.RankID).Priority
-}
-
-func guildCanAssignRank(guild platform.Guild, actorCharacterID string, rankID string) bool {
-	actor, ok := guildMemberByID(guild, actorCharacterID)
-	if !ok {
-		return false
-	}
-	if rankID == platform.GuildRankLeader {
-		return false
-	}
-	return guildRankByID(guild, actor.RankID).Priority < guildRankByID(guild, rankID).Priority
-}
-
-func nextGuildRank(guild platform.Guild, currentRankID string, promote bool) (platform.GuildRank, bool) {
-	current := guildRankByID(guild, currentRankID)
-	ranks := append([]platform.GuildRank(nil), guild.Ranks...)
-	sort.Slice(ranks, func(left int, right int) bool {
-		return ranks[left].Priority < ranks[right].Priority
-	})
-	for index, rank := range ranks {
-		if rank.RankID != current.RankID {
-			continue
-		}
-		if promote {
-			if index <= 0 {
-				return platform.GuildRank{}, false
-			}
-			return ranks[index-1], true
-		}
-		if index >= len(ranks)-1 {
-			return platform.GuildRank{}, false
-		}
-		return ranks[index+1], true
-	}
-	return platform.GuildRank{}, false
-}
-
-func removeGuildMember(members []platform.GuildMember, characterID string) []platform.GuildMember {
-	remaining := make([]platform.GuildMember, 0, len(members))
-	for _, member := range members {
-		if member.CharacterID == characterID {
-			continue
-		}
-		remaining = append(remaining, member)
-	}
-	return remaining
 }
 
 func chatMessageSequence(messageID string) int64 {

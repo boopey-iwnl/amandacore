@@ -309,6 +309,7 @@ namespace NetClient
         AZStd::string m_senderDisplayName;
         AZStd::string m_targetCharacterId;
         AZStd::string m_partyId;
+        AZStd::string m_guildId;
         AZStd::string m_zoneId;
         AZStd::string m_messageText;
         AZ::s64 m_timestamp = 0;
@@ -356,6 +357,53 @@ namespace NetClient
         AZ::s64 m_expiresAt = 0;
     };
 
+    struct GuildRankState
+    {
+        AZStd::string m_rankId;
+        AZStd::string m_displayName;
+        int m_priority = 0;
+        AZStd::vector<AZStd::string> m_permissions;
+    };
+
+    struct GuildMemberState
+    {
+        AZStd::string m_characterId;
+        AZStd::string m_displayName;
+        AZStd::string m_raceId;
+        AZStd::string m_classId;
+        int m_level = 0;
+        AZStd::string m_rankId;
+        AZStd::string m_rankName;
+        AZ::s64 m_joinedAt = 0;
+        AZ::s64 m_lastOnlineAt = 0;
+        bool m_online = false;
+        AZStd::string m_currentZoneId;
+    };
+
+    struct GuildState
+    {
+        AZStd::string m_guildId;
+        AZStd::string m_guildName;
+        AZStd::string m_leaderCharacterId;
+        AZStd::string m_messageOfTheDay;
+        AZStd::string m_currentRankId;
+        AZStd::vector<AZStd::string> m_currentPermissions;
+        AZStd::vector<GuildRankState> m_ranks;
+        AZStd::vector<GuildMemberState> m_members;
+        AZ::s64 m_createdAt = 0;
+        AZStd::string m_createdByCharacterId;
+    };
+
+    struct GuildInviteState
+    {
+        AZStd::string m_inviteId;
+        AZStd::string m_guildId;
+        AZStd::string m_guildName;
+        AZStd::string m_inviterCharacterId;
+        AZStd::string m_inviterDisplayName;
+        AZ::s64 m_expiresAt = 0;
+    };
+
     struct SocialStateResponse
     {
         AZStd::vector<ChatMessageState> m_chatMessages;
@@ -363,6 +411,9 @@ namespace NetClient
         bool m_hasParty = false;
         PartyState m_party;
         AZStd::vector<PartyInviteState> m_partyInvites;
+        bool m_hasGuild = false;
+        GuildState m_guild;
+        AZStd::vector<GuildInviteState> m_guildInvites;
     };
 
     class IWorldHttpClient
@@ -478,6 +529,74 @@ namespace NetClient
         virtual bool DisbandParty(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool CreateGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& guildName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool InviteGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool AcceptGuildInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool DeclineGuildInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool LeaveGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool DisbandGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool PromoteGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool DemoteGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool RemoveGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool SetGuildMessageOfTheDay(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& messageOfTheDay,
             SocialStateResponse& outResponse,
             AZStd::string& outError) = 0;
 

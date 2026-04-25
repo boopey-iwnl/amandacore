@@ -66,58 +66,108 @@ var dungeonDefinitions = map[string]dungeonDefinition{
 	},
 }
 
-var dungeonFriendlyNPCs = []friendlyNPCDefinition{
-	{
-		ID:          npcTallowdeepEntranceID,
-		ZoneID:      secondZoneID,
-		DisplayName: "Tallowdeep Sluice Gate",
-		Kind:        dungeonEntranceKind,
-		X:           590.0,
-		Y:           342.0,
-		Z:           0.0,
-		AIState:     "dungeon_entrance",
-		Radius:      starterInteractRadius,
-		Services: []npcService{
-			{Type: "dungeon_entrance", ServiceID: dungeonTallowdeepSluiceID, Label: "Enter Tallowdeep Sluice"},
-		},
-	},
-	{
-		ID:          npcTallowdeepExitID,
-		ZoneID:      dungeonZoneID,
-		DisplayName: "Exit Winch",
-		Kind:        dungeonExitKind,
-		X:           166.0,
-		Y:           34.0,
-		Z:           0.0,
-		AIState:     "dungeon_exit",
-		Radius:      starterInteractRadius,
-		Services: []npcService{
-			{Type: "dungeon_exit", ServiceID: dungeonTallowdeepSluiceID, Label: "Leave Dungeon"},
-		},
-	},
-}
+var (
+	dungeonQuestDefinitions []questDefinition
+	dungeonFriendlyNPCs     []friendlyNPCDefinition
+)
 
-var dungeonQuestDefinitions = []questDefinition{
-	{
-		ID:            dungeonQuestTallowdeepID,
-		ZoneID:        secondZoneID,
-		Title:         "First Descent into Tallowdeep",
-		ObjectiveType: objectiveKill,
-		ObjectiveText: "Enter Tallowdeep Sluice and defeat Vell Ordrin, Sluice Warden. Group recommended.",
-		GiverNPCID:    npcBBStonesetterBarnID,
-		TurnInNPCID:   npcBBStonesetterBarnID,
-		TargetMobType: mobTDSVellOrdrinTypeID,
-		TargetCount:   1,
-		RewardXP:      650,
-		RewardCopper:  160,
+func init() {
+	dungeonFriendlyNPCs = []friendlyNPCDefinition{
+		{
+			ID:          npcTallowdeepEntranceID,
+			ZoneID:      secondZoneID,
+			DisplayName: "Tallowdeep Sluice Gate",
+			Kind:        dungeonEntranceKind,
+			X:           590.0,
+			Y:           342.0,
+			Z:           0.0,
+			AIState:     "dungeon_entrance",
+			Radius:      starterInteractRadius,
+			Services: []npcService{
+				{Type: "dungeon_entrance", ServiceID: dungeonTallowdeepSluiceID, Label: "Enter Tallowdeep Sluice"},
+			},
+		},
+		{
+			ID:          npcTallowdeepExitID,
+			ZoneID:      dungeonZoneID,
+			DisplayName: "Exit Winch",
+			Kind:        dungeonExitKind,
+			X:           166.0,
+			Y:           34.0,
+			Z:           0.0,
+			AIState:     "dungeon_exit",
+			Radius:      starterInteractRadius,
+			Services: []npcService{
+				{Type: "dungeon_exit", ServiceID: dungeonTallowdeepSluiceID, Label: "Leave Dungeon"},
+			},
+		},
+	}
+
+	dungeonQuestDefinitions = []questDefinition{
+		{
+			ID:            dungeonQuestTallowdeepID,
+			ZoneID:        secondZoneID,
+			Title:         "First Descent into Tallowdeep",
+			ObjectiveType: objectiveKill,
+			ObjectiveText: "Enter Tallowdeep Sluice and defeat Vell Ordrin, Sluice Warden. Group recommended.",
+			GiverNPCID:    npcBBStonesetterBarnID,
+			TurnInNPCID:   npcBBStonesetterBarnID,
+			TargetMobType: mobTDSVellOrdrinTypeID,
+			TargetCount:   1,
+			RewardXP:      650,
+			RewardCopper:  160,
 		RewardItems: []itemRewardDefinition{
 			{ItemID: itemTDSSluiceguardHandwrapsID, DisplayName: "Sluiceguard Handwraps", StackCount: 1},
 		},
 		PrerequisiteIDs: []string{"bb_teeth_in_shallows"},
-		LevelBand:       "8-12 Dungeon - Group Recommended",
-		MarkerX:         590.0,
-		MarkerY:         342.0,
+		LevelBand:          "8-12 Dungeon",
+		MarkerX:            590.0,
+		MarkerY:            342.0,
+		PartyShareable:     true,
+		GroupRecommended:   true,
+		RecommendedPlayers: 3,
+		PartyCreditRadius:  80.0,
 	},
+}
+}
+
+var tallowdeepZoneMap = zoneMapDefinition{
+	ZoneID:      dungeonZoneID,
+	DisplayName: "Tallowdeep Sluice",
+	MinX:        0,
+	MinY:        0,
+	MaxX:        180,
+	MaxY:        70,
+	Roads: []mapRoadDefinition{
+		{
+			ID:          "tds_main_sluice",
+			DisplayName: "Sluice Route",
+			Points: []mapPointDefinition{
+				{X: 12, Y: 12},
+				{X: 42, Y: 16},
+				{X: 78, Y: 18},
+				{X: 112, Y: 30},
+				{X: 148, Y: 34},
+				{X: 166, Y: 34},
+			},
+		},
+	},
+	Landmarks: []mapLandmarkDefinition{
+		{ID: "tds_entry_shelf", DisplayName: "Entry Shelf", Kind: "start", X: 12, Y: 12},
+		{ID: "tds_first_pack", DisplayName: "Guard Shelf", Kind: "trash", X: 42, Y: 16},
+		{ID: "tds_sluice_tunnel", DisplayName: "Sluice Tunnel", Kind: "trash", X: 78, Y: 18},
+		{ID: "tds_pressure_room", DisplayName: "Pressure Room", Kind: "trash", X: 112, Y: 30},
+		{ID: "tds_boss_platform", DisplayName: "Sluice Warden Platform", Kind: "boss", X: 148, Y: 34},
+		{ID: "tds_exit_winch", DisplayName: "Exit Winch", Kind: "exit", X: 166, Y: 34},
+	},
+}
+
+var tallowdeepNavigationAreas = []navigationAreaDefinition{
+	{ID: "tds_entry_shelf", DisplayName: "Entry Shelf", Kind: "start", CenterX: 12, CenterY: 12, Radius: 10, RouteHintText: "Regroup on the entry shelf before pulling the first guard pair.", QuestIDs: []string{dungeonQuestTallowdeepID}},
+	{ID: "tds_guard_shelf", DisplayName: "Guard Shelf", Kind: "trash", CenterX: 42, CenterY: 16, Radius: 12, RouteHintText: "Clear the first guard pair and continue along the sluice route.", QuestIDs: []string{dungeonQuestTallowdeepID}, TargetMobType: mobTDSSluiceGuardTypeID},
+	{ID: "tds_pressure_room", DisplayName: "Pressure Room", Kind: "trash", CenterX: 112, CenterY: 30, Radius: 16, RouteHintText: "Clear the pressure room before engaging the warden.", QuestIDs: []string{dungeonQuestTallowdeepID}, TargetMobType: mobTDSPressureHandTypeID},
+	{ID: "tds_boss_platform", DisplayName: "Sluice Warden Platform", Kind: "boss", CenterX: 148, CenterY: 34, Radius: 18, RouteHintText: "Defeat Vell Ordrin, Sluice Warden.", QuestIDs: []string{dungeonQuestTallowdeepID}, TargetMobType: mobTDSVellOrdrinTypeID},
+	{ID: "tds_exit_winch", DisplayName: "Exit Winch", Kind: "exit", CenterX: 166, CenterY: 34, Radius: 8, RouteHintText: "Use the exit winch to return to the quarry.", TargetEntityID: npcTallowdeepExitID},
 }
 
 func (s *worldServer) handleDungeonEnter(w http.ResponseWriter, r *http.Request) {
@@ -545,6 +595,23 @@ func containsString(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func (s *worldServer) hostileMobsForSessionLocked(session *worldSessionState) []*mobState {
+	if session == nil || session.InstanceID == "" {
+		return s.hostileMobsLocked()
+	}
+	instance := s.dungeonInstances[session.InstanceID]
+	if instance == nil {
+		return nil
+	}
+	mobs := make([]*mobState, 0, len(instance.MobOrder))
+	for _, mobID := range instance.MobOrder {
+		if mob := instance.Mobs[mobID]; mob != nil {
+			mobs = append(mobs, mob)
+		}
+	}
+	return mobs
 }
 
 func (s *worldServer) recoverExpiredDungeonSessionLocked(session *worldSessionState) {

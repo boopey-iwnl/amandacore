@@ -599,6 +599,9 @@ func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform
 }
 
 func (s *worldServer) questCategory(quest questDefinition) string {
+	if quest.ID == dungeonQuestTallowdeepID {
+		return "Dungeon - Group Recommended"
+	}
 	if zone, ok := s.zones[quest.ZoneID]; ok && zone.DisplayName != "" {
 		return zone.DisplayName
 	}
@@ -649,7 +652,11 @@ func (s *worldServer) objectiveAreaForQuest(quest questDefinition) map[string]an
 }
 
 func (s *worldServer) findNavigationAreaForQuest(quest questDefinition) (navigationAreaDefinition, bool) {
-	for _, area := range stonewakeNavigationAreas {
+	source := stonewakeNavigationAreas
+	if quest.ID == dungeonQuestTallowdeepID {
+		source = tallowdeepNavigationAreas
+	}
+	for _, area := range source {
 		for _, questID := range area.QuestIDs {
 			if questID == quest.ID {
 				return area, true
