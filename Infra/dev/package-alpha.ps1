@@ -89,7 +89,7 @@ function Test-ExcludedPackagePath {
     $fileName = [System.IO.Path]::GetFileName($path)
 
     if ($path -match '(^|/)(\.git|\.secrets|\.vs|logs|user)(/|$)') { return $true }
-    if ($path -match '(^|/)(Cache|cache)(/|$)' -and $path -notmatch '^Cache/pc/') { return $true }
+    if ($path -match '(^|/)(Cache|cache)(/|$)' -and $path -notmatch '^Cache($|/pc($|/))') { return $true }
     if ($path -match '^Client/Portal/') { return $true }
     if ($path -match '^Infra/dev/(local-processes\.json|platform-state\.json|logs/)') { return $true }
     if ($path -match '^dist/') { return $true }
