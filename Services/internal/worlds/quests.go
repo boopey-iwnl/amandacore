@@ -653,9 +653,6 @@ func (s *worldServer) objectiveAreaForQuest(quest questDefinition) map[string]an
 
 func (s *worldServer) findNavigationAreaForQuest(quest questDefinition) (navigationAreaDefinition, bool) {
 	source := stonewakeNavigationAreas
-	if quest.ID == dungeonQuestTallowdeepID {
-		source = tallowdeepNavigationAreas
-	}
 	for _, area := range source {
 		for _, questID := range area.QuestIDs {
 			if questID == quest.ID {
