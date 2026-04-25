@@ -43,8 +43,9 @@ func TestClassProgressionMilestoneSlice(t *testing.T) {
 			"abilityId":         platform.DrivingBlowAbilityID,
 		}, http.StatusOK, &state)
 
-		state = fixture.moveNearMob(t, stonewakeCombatMob1)
-		state = fixture.targetMobByID(t, stonewakeCombatMob1)
+		const resourceTestMobID = "mob_field_boar_01"
+		state = fixture.moveNearMob(t, resourceTestMobID)
+		state = fixture.targetMobByID(t, resourceTestMobID)
 
 		postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/attack/ability", nil, map[string]any{
 			"worldSessionToken": fixture.worldSessionToken,
