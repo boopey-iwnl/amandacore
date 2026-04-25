@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
 )
@@ -784,6 +785,7 @@ type KillCreditLedger struct {
 type worldServer struct {
 	store                  *store.FileStore
 	metrics                *worldMetrics
+	runtime                *WorldRuntime
 	mutex                  sync.Mutex
 	sessionsByToken        map[string]*worldSessionState
 	sessionTokenByChar     map[string]string
@@ -821,6 +823,7 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 	server := &worldServer{
 		store:              fileStore,
 		metrics:            newWorldMetrics(),
+		runtime:            NewWorldRuntime(WorldRuntimeConfig{}),
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
@@ -852,6 +855,10 @@ func (s *worldServer) loadStarterContentLocked() {
 	allZones = append(allZones, housingZoneDefinitions...)
 	for _, zone := range allZones {
 		s.zones[zone.ID] = zone
+		observability.LogEvent("world-service", observability.EventWorldZoneLoaded, map[string]any{
+			"zoneId":      zone.ID,
+			"displayName": zone.DisplayName,
+		})
 	}
 
 	allQuests := append([]questDefinition{}, stonewakeQuestDefinitions...)

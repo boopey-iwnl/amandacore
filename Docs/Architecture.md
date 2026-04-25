@@ -71,6 +71,22 @@ The data model is deliberately wider than the first slice so future work can sca
 - Client performs prediction and interpolation but always accepts authoritative corrections.
 - Domain message and snapshot shapes are defined in `AmandaCoreShared/Messages.h` so alternate transports or backends can adapt without rewriting gameplay code.
 
+## Clean-room MMO architecture foundation
+
+AmandaCore now keeps a formal clean-room reference policy in `Docs/CleanRoomReferencePolicy.md`. TrinityCore and AzerothCore are read-only architectural reference corpora only; AmandaCore implementation, schemas, protocols, content manifests, IDs, admin vocabulary, and observability names must remain original.
+
+The backend foundation adds AmandaCore-native scaffolding for:
+
+- canonical internal server commands and domain events in `Services/internal/simcore`
+- a lightweight fixed-step `WorldRuntime` with deterministic command queue processing
+- neutral `ZoneRuntime`, `InstanceRuntime`, `EntityRegistry`, `SpawnPoint`, and `RuntimeEntity` concepts
+- structured observability event constants for ticks, command queue activity, zones, entities, combat, admin actions, and persistence snapshots
+- admin actor/action/audit decision types for RBAC-oriented operations
+- a lightweight migration runner convention for local file-store and future database state
+- original content package manifest skeletons in `Services/internal/contentpkg`
+
+This foundation is intentionally not a gameplay-heavy rewrite. NPC spawn loops, hostile AI, combat resolution, ability/effect execution, kill credit, loot, quest objective tracking, zone package loading, and Dawnwake Isles zone skeletons from authored maps should build on these boundaries in future milestones.
+
 ## Milestone one slice
 
 - One outdoor zone with two streamable cells and one micro-instance hook.

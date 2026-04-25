@@ -295,6 +295,7 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 		s.maybeLogMetricsSnapshotLocked(now)
 	}()
 
+	s.runRuntimeTickLocked(now)
 	s.ensureMobsLocked()
 	s.cleanupStaleSessionsLocked(now)
 	s.cleanupExpiredLootContainersLocked(now)
