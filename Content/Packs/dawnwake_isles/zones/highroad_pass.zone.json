@@ -1,0 +1,17 @@
+{
+  "zone_id": "highroad_pass",
+  "display_name": "Highroad Pass",
+  "bounds": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 140, "max_y": 130, "max_z": 45},
+  "entry_points": [
+    {"entry_id": "default", "position": {"x": 24, "y": 60, "z": 0}},
+    {"entry_id": "from_kingsfall_harbor", "position": {"x": 14, "y": 64, "z": 0}},
+    {"entry_id": "from_amberglass_fields", "position": {"x": 126, "y": 96, "z": 0}},
+    {"entry_id": "from_mistwood_reach", "position": {"x": 96, "y": 16, "z": 0}}
+  ],
+  "transition_gates": [
+    {"transition_id": "highroad_to_harbor", "to_zone_id": "kingsfall_harbor", "entry_id_on_arrival": "from_highroad_pass"},
+    {"transition_id": "highroad_to_amberglass", "to_zone_id": "amberglass_fields", "entry_id_on_arrival": "from_highroad_pass"},
+    {"transition_id": "highroad_to_mistwood", "to_zone_id": "mistwood_reach", "entry_id_on_arrival": "from_highroad_pass"}
+  ],
+  "runtime": {"max_sessions": 100, "max_entities": 220}
+}

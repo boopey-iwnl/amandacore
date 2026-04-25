@@ -57,3 +57,13 @@ The local stack waits for each service to report healthy before returning contro
 - retain position state
 
 Milestone `0.1` hardening details, commands, and pass/fail behavior are documented in `Docs/Milestone01-AccountToWorld.md`.
+
+## Local load simulation
+
+Run the in-process multi-zone load harness from `Services`:
+
+```powershell
+go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizone-pressure --content ../Content/Packs/dawnwake_isles/package.json --seed 42
+```
+
+Scale tiers, scenarios, reports, and sharding behavior are documented in `Docs/LoadTesting.md` and `Docs/MultiZoneSharding.md`.
