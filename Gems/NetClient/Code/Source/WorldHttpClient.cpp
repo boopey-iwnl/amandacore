@@ -862,6 +862,7 @@ namespace NetClient
                     ReadString(messageValue, "senderDisplayName", message.m_senderDisplayName);
                     ReadString(messageValue, "targetCharacterId", message.m_targetCharacterId);
                     ReadString(messageValue, "partyId", message.m_partyId);
+                    ReadString(messageValue, "guildId", message.m_guildId);
                     ReadString(messageValue, "zoneId", message.m_zoneId);
                     ReadString(messageValue, "messageText", message.m_messageText);
                     ReadInt64(messageValue, "timestamp", message.m_timestamp);
@@ -938,6 +939,97 @@ namespace NetClient
                     ReadString(inviteValue, "inviterDisplayName", invite.m_inviterDisplayName);
                     ReadInt64(inviteValue, "expiresAt", invite.m_expiresAt);
                     outResponse.m_partyInvites.push_back(AZStd::move(invite));
+                }
+            }
+
+            if (document.HasMember("guild") && document["guild"].IsObject())
+            {
+                outResponse.m_hasGuild = true;
+                const rapidjson::Value& guildValue = document["guild"];
+                ReadString(guildValue, "guildId", outResponse.m_guild.m_guildId);
+                ReadString(guildValue, "guildName", outResponse.m_guild.m_guildName);
+                ReadString(guildValue, "leaderCharacterId", outResponse.m_guild.m_leaderCharacterId);
+                ReadString(guildValue, "messageOfTheDay", outResponse.m_guild.m_messageOfTheDay);
+                ReadString(guildValue, "currentRankId", outResponse.m_guild.m_currentRankId);
+                ReadInt64(guildValue, "createdAt", outResponse.m_guild.m_createdAt);
+                ReadString(guildValue, "createdByCharacterId", outResponse.m_guild.m_createdByCharacterId);
+                if (guildValue.HasMember("currentPermissions") && guildValue["currentPermissions"].IsArray())
+                {
+                    for (const rapidjson::Value& permissionValue : guildValue["currentPermissions"].GetArray())
+                    {
+                        if (permissionValue.IsString())
+                        {
+                            outResponse.m_guild.m_currentPermissions.push_back(permissionValue.GetString());
+                        }
+                    }
+                }
+                if (guildValue.HasMember("ranks") && guildValue["ranks"].IsArray())
+                {
+                    for (const rapidjson::Value& rankValue : guildValue["ranks"].GetArray())
+                    {
+                        if (!rankValue.IsObject())
+                        {
+                            continue;
+                        }
+                        GuildRankState rank;
+                        ReadString(rankValue, "rankId", rank.m_rankId);
+                        ReadString(rankValue, "displayName", rank.m_displayName);
+                        ReadInt(rankValue, "priority", rank.m_priority);
+                        if (rankValue.HasMember("permissions") && rankValue["permissions"].IsArray())
+                        {
+                            for (const rapidjson::Value& permissionValue : rankValue["permissions"].GetArray())
+                            {
+                                if (permissionValue.IsString())
+                                {
+                                    rank.m_permissions.push_back(permissionValue.GetString());
+                                }
+                            }
+                        }
+                        outResponse.m_guild.m_ranks.push_back(AZStd::move(rank));
+                    }
+                }
+                if (guildValue.HasMember("members") && guildValue["members"].IsArray())
+                {
+                    for (const rapidjson::Value& memberValue : guildValue["members"].GetArray())
+                    {
+                        if (!memberValue.IsObject())
+                        {
+                            continue;
+                        }
+                        GuildMemberState member;
+                        ReadString(memberValue, "characterId", member.m_characterId);
+                        ReadString(memberValue, "displayName", member.m_displayName);
+                        ReadString(memberValue, "raceId", member.m_raceId);
+                        ReadString(memberValue, "classId", member.m_classId);
+                        ReadInt(memberValue, "level", member.m_level);
+                        ReadString(memberValue, "rankId", member.m_rankId);
+                        ReadString(memberValue, "rankName", member.m_rankName);
+                        ReadInt64(memberValue, "joinedAt", member.m_joinedAt);
+                        ReadInt64(memberValue, "lastOnlineAt", member.m_lastOnlineAt);
+                        ReadBool(memberValue, "online", member.m_online);
+                        ReadString(memberValue, "currentZoneId", member.m_currentZoneId);
+                        outResponse.m_guild.m_members.push_back(AZStd::move(member));
+                    }
+                }
+            }
+
+            if (document.HasMember("guildInvites") && document["guildInvites"].IsArray())
+            {
+                for (const rapidjson::Value& inviteValue : document["guildInvites"].GetArray())
+                {
+                    if (!inviteValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    GuildInviteState invite;
+                    ReadString(inviteValue, "inviteId", invite.m_inviteId);
+                    ReadString(inviteValue, "guildId", invite.m_guildId);
+                    ReadString(inviteValue, "guildName", invite.m_guildName);
+                    ReadString(inviteValue, "inviterCharacterId", invite.m_inviterCharacterId);
+                    ReadString(inviteValue, "inviterDisplayName", invite.m_inviterDisplayName);
+                    ReadInt64(inviteValue, "expiresAt", invite.m_expiresAt);
+                    outResponse.m_guildInvites.push_back(AZStd::move(invite));
                 }
             }
 
