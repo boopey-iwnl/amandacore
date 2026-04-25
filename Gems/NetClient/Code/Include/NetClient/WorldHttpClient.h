@@ -614,6 +614,19 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 
+        virtual bool EnterDungeon(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& dungeonId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool ExitDungeon(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
         virtual bool TrackQuest(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,

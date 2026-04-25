@@ -117,7 +117,6 @@ func init() {
 			RewardItems: []itemRewardDefinition{
 				{ItemID: itemTDSSluiceguardHandwrapsID, DisplayName: "Sluiceguard Handwraps", StackCount: 1},
 			},
-			PrerequisiteIDs:    []string{"bb_teeth_in_shallows"},
 			LevelBand:          "8-12 Dungeon",
 			MarkerX:            590.0,
 			MarkerY:            342.0,
@@ -539,21 +538,11 @@ func (s *worldServer) applyDungeonKillCreditLocked(session *worldSessionState, m
 	instance.Objective.BossDefeated = true
 	instance.Objective.UpdatedAtMs = nowMillis()
 	instance.State = dungeonStateCompleted
-	var firstErr error
-	for _, memberID := range instance.MemberCharacterIDs {
-		if !instance.PlayersInside[memberID] {
-			continue
-		}
-		memberSession := s.findConnectedSessionByCharacterLocked(memberID)
-		if memberSession == nil || memberSession.InstanceID != instance.InstanceID {
-			continue
-		}
-		if err := s.applyQuestKillCreditLocked(memberSession, mob); err != nil && firstErr == nil {
-			firstErr = err
-		}
+	if err := s.applyQuestKillCreditLocked(session, mob); err != nil {
+		return err
 	}
 	s.sendSystemMessageLocked("Dungeon objective complete: Vell Ordrin defeated.", recipientSet(instance.MemberCharacterIDs...))
-	return firstErr
+	return nil
 }
 
 func (s *worldServer) buildDungeonInstanceResponse(session *worldSessionState) map[string]any {

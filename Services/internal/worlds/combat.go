@@ -75,6 +75,13 @@ func (s *worldServer) findMobForSessionLocked(session *worldSessionState, mobID 
 	if session == nil || mobID == "" {
 		return nil
 	}
+	if session.InstanceID != "" {
+		instance := s.dungeonInstances[session.InstanceID]
+		if instance == nil {
+			return nil
+		}
+		return instance.Mobs[mobID]
+	}
 	mob := s.findMobByIDLocked(mobID)
 	if mob != nil && mob.InstanceID == "" {
 		return mob
@@ -98,10 +105,34 @@ func (s *worldServer) hostileMobsLocked() []*mobState {
 }
 
 func (s *worldServer) allHostileMobsLocked() []*mobState {
-	return s.hostileMobsLocked()
+	mobs := s.hostileMobsLocked()
+	for _, instance := range s.dungeonInstances {
+		if instance == nil {
+			continue
+		}
+		for _, mobID := range instance.MobOrder {
+			if mob := instance.Mobs[mobID]; mob != nil {
+				mobs = append(mobs, mob)
+			}
+		}
+	}
+	return mobs
 }
 
 func (s *worldServer) hostileMobsForSessionLocked(session *worldSessionState) []*mobState {
+	if session != nil && session.InstanceID != "" {
+		instance := s.dungeonInstances[session.InstanceID]
+		if instance == nil {
+			return nil
+		}
+		mobs := make([]*mobState, 0, len(instance.MobOrder))
+		for _, mobID := range instance.MobOrder {
+			if mob := instance.Mobs[mobID]; mob != nil {
+				mobs = append(mobs, mob)
+			}
+		}
+		return mobs
+	}
 	return s.hostileMobsLocked()
 }
 
@@ -460,7 +491,11 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 	}
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "target_dead")
-	if err := s.applyQuestKillCreditLocked(session, mob); err != nil {
+	if mob.InstanceID != "" {
+		if err := s.applyDungeonKillCreditLocked(session, mob); err != nil {
+			return err
+		}
+	} else if err := s.applyQuestKillCreditLocked(session, mob); err != nil {
 		return err
 	}
 	observability.LogEvent("world-service", "world.mob_died", map[string]any{

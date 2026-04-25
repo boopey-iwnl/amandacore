@@ -200,6 +200,19 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool EnterDungeon(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& dungeonId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool ExitDungeon(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool TrackQuest(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
