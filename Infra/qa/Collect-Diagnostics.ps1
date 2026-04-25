@@ -38,8 +38,8 @@ function ConvertTo-RedactedText {
     $redacted = [System.Text.RegularExpressions.Regex]::Replace($redacted, '(?i)\b(ticket|sess|world|reset)_[a-f0-9]{16,}\b', '<redacted-id>')
 
     $pathReplacements = @(
-        @{ Value = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile); Replacement = "%USERPROFILE%" },
-        @{ Value = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData); Replacement = "%LOCALAPPDATA%" }
+        @{ Value = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData); Replacement = "%LOCALAPPDATA%" },
+        @{ Value = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile); Replacement = "%USERPROFILE%" }
     )
     foreach ($pathReplacement in $pathReplacements) {
         $pathValue = $pathReplacement.Value
@@ -71,6 +71,11 @@ POSTGRES_PASSWORD=postgres_secret
 world_1234567890abcdef1234567890abcdef
 '@
 
+    $userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+    $localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    $sample += "`r`nrepoRoot=$userProfile\OneDrive\Desktop\Code Project"
+    $sample += "`r`nstatePath=$localAppData\amandacore\platform-state.json"
+
     $redacted = ConvertTo-RedactedText $sample
     $forbidden = @(
         "abcdef012345",
@@ -80,7 +85,9 @@ world_1234567890abcdef1234567890abcdef
         "argon_hash",
         "secret_value",
         "postgres_secret",
-        "world_1234567890abcdef1234567890abcdef"
+        "world_1234567890abcdef1234567890abcdef",
+        $userProfile,
+        $localAppData
     )
 
     foreach ($value in $forbidden) {

@@ -296,8 +296,8 @@ func TestCombatSliceHardening(t *testing.T) {
 		if state["health"].(float64) != state["maxHealth"].(float64) {
 			t.Fatalf("expected reconnect revive to restore full health, got %.1f", state["health"].(float64))
 		}
-		if state["resource"].(float64) != state["maxResource"].(float64) {
-			t.Fatalf("expected reconnect revive to restore full resource, got %.1f", state["resource"].(float64))
+		if state["resource"].(float64) != 0 {
+			t.Fatalf("expected reconnect revive to reset Grit, got %.1f", state["resource"].(float64))
 		}
 		if state["currentTargetId"].(string) != "" {
 			t.Fatalf("expected reconnect to clear target, got %v", state["currentTargetId"])

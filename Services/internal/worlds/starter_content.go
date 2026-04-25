@@ -24,6 +24,7 @@ const (
 	itemTornClothID         = "torn_cloth"
 	itemLinenWrapID         = "linen_wrap"
 	itemMilitiaTokenID      = "militia_token"
+	itemValeIronChipID      = "vale_iron_chip"
 )
 
 var stonewakeFriendlyNPCs = []friendlyNPCDefinition{
@@ -195,6 +196,57 @@ var stonewakeNavigationAreas = []navigationAreaDefinition{
 	{ID: "poacher_line", DisplayName: "Poacher Line", Kind: "objective", CenterX: 378, CenterY: 213, Radius: 44, RouteHintText: "Push along the road beyond the old mill toward the poacher line.", QuestIDs: []string{"sv_break_poacher_line"}, TargetMobType: mobAshbandPoacherTypeID},
 	{ID: "broken_wagon_stand", DisplayName: "Broken Wagon Stand", Kind: "objective", CenterX: 420, CenterY: 224, Radius: 22, RouteHintText: "Follow the road to the isolated broken wagon before the westward gate.", QuestIDs: []string{"sv_bram_kettles_stand"}, TargetMobType: mobBramKettleTypeID},
 	{ID: "westward_gate", DisplayName: "Westward Gate", Kind: "handoff", CenterX: 438, CenterY: 246, Radius: 24, RouteHintText: "Continue to the westward gate and report to Quartermaster Lyra.", QuestIDs: []string{"sv_westward_orders"}, TargetEntityID: npcQuartermasterLyraID},
+}
+
+var stonewakeGatheringNodeDefinitions = []gatheringNodeDefinition{
+	{
+		ID:                   "node_vale_iron_01",
+		NodeTypeID:           "stonewake_surface_ore",
+		DisplayName:          "Exposed Vale Iron",
+		X:                    26.0,
+		Y:                    29.0,
+		Z:                    0.0,
+		Radius:               4.0,
+		RequiredProfessionID: platform.ProfessionOrekeepingID,
+		RequiredSkill:        1,
+		Loot: []gatheringLootDefinition{
+			{ItemID: itemValeIronChipID, MinCount: 2, MaxCount: 2, Guaranteed: true},
+		},
+		RespawnDelayMs:   500,
+		InteractionLabel: "Gather ore chips",
+	},
+	{
+		ID:                   "node_vale_iron_02",
+		NodeTypeID:           "stonewake_surface_ore",
+		DisplayName:          "Ditchwall Iron Flecks",
+		X:                    91.0,
+		Y:                    42.0,
+		Z:                    0.0,
+		Radius:               4.0,
+		RequiredProfessionID: platform.ProfessionOrekeepingID,
+		RequiredSkill:        1,
+		Loot: []gatheringLootDefinition{
+			{ItemID: itemValeIronChipID, MinCount: 1, MaxCount: 2, Guaranteed: true},
+		},
+		RespawnDelayMs:   500,
+		InteractionLabel: "Gather ore chips",
+	},
+	{
+		ID:                   "node_vale_iron_03",
+		NodeTypeID:           "stonewake_surface_ore",
+		DisplayName:          "Ridge Iron Nubs",
+		X:                    232.0,
+		Y:                    124.0,
+		Z:                    0.0,
+		Radius:               4.0,
+		RequiredProfessionID: platform.ProfessionOrekeepingID,
+		RequiredSkill:        1,
+		Loot: []gatheringLootDefinition{
+			{ItemID: itemValeIronChipID, MinCount: 2, MaxCount: 3, Guaranteed: true},
+		},
+		RespawnDelayMs:   500,
+		InteractionLabel: "Gather ore chips",
+	},
 }
 
 var stonewakeQuestDefinitions = []questDefinition{

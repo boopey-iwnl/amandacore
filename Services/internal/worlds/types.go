@@ -21,6 +21,7 @@ const (
 	playerGlobalCooldownMs    = int64(1500)
 
 	hostileMobKind           = "hostile_mob"
+	gatheringNodeKind        = "gathering_node"
 	trainerNPCKind           = "trainer_npc"
 	professionTrainerNPCKind = "profession_trainer_npc"
 	questGiverNPCKind        = "quest_giver_npc"
@@ -122,6 +123,11 @@ type professionLearnRequest struct {
 	ProfessionID      string `json:"professionId"`
 }
 
+type gatherRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	NodeID            string `json:"nodeId"`
+}
+
 type actionBarAssignRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	SlotIndex         int    `json:"slotIndex"`
@@ -182,19 +188,25 @@ type npcService struct {
 }
 
 type sessionEntity struct {
-	ID          string       `json:"id"`
-	DisplayName string       `json:"displayName"`
-	Kind        string       `json:"kind"`
-	MobTypeID   string       `json:"mobTypeId,omitempty"`
-	X           float64      `json:"x"`
-	Y           float64      `json:"y"`
-	Z           float64      `json:"z"`
-	Health      float64      `json:"health"`
-	MaxHealth   float64      `json:"maxHealth"`
-	Alive       bool         `json:"alive"`
-	Targetable  bool         `json:"targetable"`
-	AIState     string       `json:"aiState,omitempty"`
-	Services    []npcService `json:"npcServices,omitempty"`
+	ID               string       `json:"id"`
+	DisplayName      string       `json:"displayName"`
+	Kind             string       `json:"kind"`
+	MobTypeID        string       `json:"mobTypeId,omitempty"`
+	GatherNodeTypeID string       `json:"gatherNodeTypeId,omitempty"`
+	ProfessionID     string       `json:"professionId,omitempty"`
+	RequiredSkill    int          `json:"requiredSkill,omitempty"`
+	Ready            bool         `json:"ready,omitempty"`
+	ReadyAt          int64        `json:"readyAt,omitempty"`
+	InteractionLabel string       `json:"interactionLabel,omitempty"`
+	X                float64      `json:"x"`
+	Y                float64      `json:"y"`
+	Z                float64      `json:"z"`
+	Health           float64      `json:"health"`
+	MaxHealth        float64      `json:"maxHealth"`
+	Alive            bool         `json:"alive"`
+	Targetable       bool         `json:"targetable"`
+	AIState          string       `json:"aiState,omitempty"`
+	Services         []npcService `json:"npcServices,omitempty"`
 }
 
 type itemRewardDefinition struct {
@@ -285,6 +297,34 @@ type friendlyNPCDefinition struct {
 	AIState     string
 	Radius      float64
 	Services    []npcService
+}
+
+type gatheringLootDefinition struct {
+	ItemID     string
+	MinCount   int
+	MaxCount   int
+	Guaranteed bool
+}
+
+type gatheringNodeDefinition struct {
+	ID                   string
+	NodeTypeID           string
+	DisplayName          string
+	ZoneID               string
+	X                    float64
+	Y                    float64
+	Z                    float64
+	Radius               float64
+	RequiredProfessionID string
+	RequiredSkill        int
+	Loot                 []gatheringLootDefinition
+	RespawnDelayMs       int64
+	InteractionLabel     string
+}
+
+type gatheringNodeState struct {
+	Definition gatheringNodeDefinition
+	ReadyAtMs  int64
 }
 
 type currencyBreakdown struct {
@@ -442,6 +482,8 @@ type worldServer struct {
 	quest              questDefinition
 	friendlyNPCs       map[string]friendlyNPCDefinition
 	friendlyNPCOrder   []string
+	gatheringNodes     map[string]*gatheringNodeState
+	gatheringNodeOrder []string
 	zones              map[string]zoneDefinition
 	chatMessages       []chatEnvelope
 	chatSequence       int64
@@ -459,11 +501,13 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		mobs:               map[string]*mobState{},
 		quests:             map[string]questDefinition{},
 		friendlyNPCs:       map[string]friendlyNPCDefinition{},
+		gatheringNodes:     map[string]*gatheringNodeState{},
 		zones:              map[string]zoneDefinition{},
 		partyInvites:       map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
 	server.ensureMobsLocked()
+	server.ensureGatheringNodesLocked()
 	return server
 }
 
@@ -544,6 +588,28 @@ func (s *worldServer) ensureMobsLocked() {
 			Targetable:      true,
 			AIState:         mobAIStateIdle,
 		}
+	}
+}
+
+func (s *worldServer) ensureGatheringNodesLocked() {
+	if len(s.gatheringNodes) != 0 {
+		return
+	}
+
+	allGatheringNodes := append([]gatheringNodeDefinition{}, stonewakeGatheringNodeDefinitions...)
+	s.gatheringNodeOrder = make([]string, 0, len(allGatheringNodes))
+	for _, node := range allGatheringNodes {
+		if node.ZoneID == "" {
+			node.ZoneID = defaultZoneID
+		}
+		if node.Radius <= 0 {
+			node.Radius = starterInteractRadius
+		}
+		if node.RespawnDelayMs <= 0 {
+			node.RespawnDelayMs = 1000
+		}
+		s.gatheringNodeOrder = append(s.gatheringNodeOrder, node.ID)
+		s.gatheringNodes[node.ID] = &gatheringNodeState{Definition: node}
 	}
 }
 

@@ -59,6 +59,7 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/quest/track", server.instrumentEndpointFunc("quest_track", server.handleQuestTrack))
 	mux.HandleFunc("POST /v1/world/trainer/learn", server.instrumentEndpointFunc("trainer_learn", server.handleTrainerLearn))
 	mux.HandleFunc("POST /v1/world/profession/learn", server.instrumentEndpointFunc("profession_learn", server.handleProfessionLearn))
+	mux.HandleFunc("POST /v1/world/gather", server.instrumentEndpointFunc("gather", server.handleGather))
 	mux.HandleFunc("POST /v1/world/talent/select", server.instrumentEndpointFunc("talent_select", server.handleTalentSelect))
 	mux.HandleFunc("POST /v1/world/action-bar/assign", server.instrumentEndpointFunc("action_bar_assign", server.handleActionBarAssign))
 	mux.HandleFunc("POST /v1/world/action-bar/move", server.instrumentEndpointFunc("action_bar_move", server.handleActionBarMove))
@@ -699,6 +700,35 @@ func (s *worldServer) handleProfessionLearn(w http.ResponseWriter, r *http.Reque
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 }
 
+func (s *worldServer) handleGather(w http.ResponseWriter, r *http.Request) {
+	var request gatherRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.gatherNodeLocked(session, request.NodeID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "gather_invalid", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
 func (s *worldServer) handleTalentSelect(w http.ResponseWriter, r *http.Request) {
 	var request talentSelectRequest
 	if err := httpapi.DecodeJSON(r, &request); err != nil {
@@ -841,16 +871,21 @@ func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
 
 func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 	s.ensureMobsLocked()
+	s.ensureGatheringNodesLocked()
 	s.touchSessionLocked(session)
 
 	if session.QuestProgress == nil {
 		session.QuestProgress = map[string]platform.CharacterQuestProgress{}
 	}
 
-	entities := make([]sessionEntity, 0, len(s.sessionsByToken)+len(s.mobOrder)+len(s.friendlyNPCOrder))
+	entities := make([]sessionEntity, 0, len(s.sessionsByToken)+len(s.mobOrder)+len(s.friendlyNPCOrder)+len(s.gatheringNodeOrder))
 	for _, npcID := range s.friendlyNPCOrder {
 		npc := s.friendlyNPCs[npcID]
-		if npc.ZoneID != session.ZoneID {
+		npcZoneID := npc.ZoneID
+		if npcZoneID == "" {
+			npcZoneID = defaultZoneID
+		}
+		if npcZoneID != session.ZoneID {
 			continue
 		}
 		entities = append(entities, sessionEntity{
@@ -867,6 +902,22 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 			AIState:     npc.AIState,
 			Services:    npc.Services,
 		})
+	}
+
+	nowMs := nowMillis()
+	for _, nodeID := range s.gatheringNodeOrder {
+		node := s.gatheringNodes[nodeID]
+		if node == nil {
+			continue
+		}
+		nodeZoneID := node.Definition.ZoneID
+		if nodeZoneID == "" {
+			nodeZoneID = defaultZoneID
+		}
+		if nodeZoneID != session.ZoneID {
+			continue
+		}
+		entities = append(entities, buildGatheringNodeEntity(node, nowMs))
 	}
 
 	for _, mobID := range s.mobOrder {

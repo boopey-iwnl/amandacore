@@ -54,6 +54,70 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool SocialState(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& afterMessageId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SendChat(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& channel,
+            const AZStd::string& targetName,
+            const AZStd::string& messageText,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AddFriend(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& name,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool RemoveFriend(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& name,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool InviteParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            const AZStd::string& targetCharacterId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AcceptPartyInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DeclinePartyInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool LeaveParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DisbandParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool SetTarget(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,

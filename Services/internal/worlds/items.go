@@ -13,6 +13,7 @@ const (
 	itemTypeWeapon     = "weapon"
 	itemTypeArmor      = "armor"
 	itemTypeConsumable = "consumable"
+	itemTypeMaterial   = "material"
 	itemTypeQuest      = "quest"
 	itemTypeJunk       = "junk"
 
@@ -39,6 +40,18 @@ type itemDefinition struct {
 }
 
 var itemDefinitions = map[string]itemDefinition{
+	itemValeIronChipID: {
+		ItemID:          itemValeIronChipID,
+		DisplayName:     "Vale Iron Chip",
+		Type:            itemTypeMaterial,
+		Subtype:         "ore",
+		Quality:         itemQualityCommon,
+		Stackable:       true,
+		MaxStack:        20,
+		SellPriceCopper: 1,
+		BuyPriceCopper:  0,
+		RequiredLevel:   1,
+	},
 	itemCampRationID: {
 		ItemID:          itemCampRationID,
 		DisplayName:     "Camp Ration",

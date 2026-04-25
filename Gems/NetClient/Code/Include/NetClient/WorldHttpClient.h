@@ -234,6 +234,70 @@ namespace NetClient
         AZStd::string m_revision;
     };
 
+    struct ChatMessageState
+    {
+        AZStd::string m_messageId;
+        AZStd::string m_channel;
+        AZStd::string m_senderCharacterId;
+        AZStd::string m_senderDisplayName;
+        AZStd::string m_targetCharacterId;
+        AZStd::string m_partyId;
+        AZStd::string m_zoneId;
+        AZStd::string m_messageText;
+        AZ::s64 m_timestamp = 0;
+    };
+
+    struct FriendState
+    {
+        AZStd::string m_characterId;
+        AZStd::string m_displayName;
+        int m_level = 0;
+        AZStd::string m_classId;
+        AZStd::string m_zoneId;
+        bool m_online = false;
+    };
+
+    struct PartyMemberState
+    {
+        AZStd::string m_characterId;
+        AZStd::string m_displayName;
+        int m_level = 0;
+        AZStd::string m_classId;
+        AZStd::string m_zoneId;
+        bool m_online = false;
+        bool m_leader = false;
+        double m_health = 0.0;
+        double m_maxHealth = 0.0;
+        double m_resource = 0.0;
+        double m_maxResource = 0.0;
+        bool m_disconnected = false;
+    };
+
+    struct PartyState
+    {
+        AZStd::string m_partyId;
+        AZStd::string m_leaderCharacterId;
+        AZStd::vector<PartyMemberState> m_members;
+    };
+
+    struct PartyInviteState
+    {
+        AZStd::string m_inviteId;
+        AZStd::string m_partyId;
+        AZStd::string m_inviterCharacterId;
+        AZStd::string m_inviterDisplayName;
+        AZ::s64 m_expiresAt = 0;
+    };
+
+    struct SocialStateResponse
+    {
+        AZStd::vector<ChatMessageState> m_chatMessages;
+        AZStd::vector<FriendState> m_friends;
+        bool m_hasParty = false;
+        PartyState m_party;
+        AZStd::vector<PartyInviteState> m_partyInvites;
+    };
+
     class IWorldHttpClient
     {
     public:
@@ -284,6 +348,70 @@ namespace NetClient
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
             WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool SocialState(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& afterMessageId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool SendChat(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& channel,
+            const AZStd::string& targetName,
+            const AZStd::string& messageText,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool AddFriend(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& name,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool RemoveFriend(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& name,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool InviteParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            const AZStd::string& targetCharacterId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool AcceptPartyInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool DeclinePartyInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool LeaveParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool DisbandParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
             AZStd::string& outError) = 0;
 
         virtual bool SetTarget(

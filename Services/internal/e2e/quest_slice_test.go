@@ -70,6 +70,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_01")
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_02")
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_03")
+	state = fixture.moveToPosition(t, 34.0, 18.0)
 	state = fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,

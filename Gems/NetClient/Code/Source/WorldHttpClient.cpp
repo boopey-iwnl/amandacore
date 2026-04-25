@@ -254,6 +254,61 @@ namespace NetClient
             return true;
         }
 
+        AZStd::string JsonEscape(const AZStd::string& text)
+        {
+            AZStd::string escaped;
+            escaped.reserve(text.size() + 8);
+            for (unsigned char value : text)
+            {
+                switch (value)
+                {
+                case '\\':
+                    escaped += "\\\\";
+                    break;
+                case '"':
+                    escaped += "\\\"";
+                    break;
+                case '\b':
+                    escaped += "\\b";
+                    break;
+                case '\f':
+                    escaped += "\\f";
+                    break;
+                case '\n':
+                    escaped += "\\n";
+                    break;
+                case '\r':
+                    escaped += "\\r";
+                    break;
+                case '\t':
+                    escaped += "\\t";
+                    break;
+                default:
+                    if (value < 0x20)
+                    {
+                        escaped += AZStd::string::format("\\u%04x", static_cast<unsigned int>(value));
+                    }
+                    else
+                    {
+                        escaped.push_back(static_cast<char>(value));
+                    }
+                    break;
+                }
+            }
+            return escaped;
+        }
+
+        bool ReadDouble(const rapidjson::Value& object, const char* name, double& outValue)
+        {
+            if (!object.HasMember(name) || !object[name].IsNumber())
+            {
+                return false;
+            }
+
+            outValue = object[name].GetDouble();
+            return true;
+        }
+
         void ParseQuestState(const rapidjson::Value& quest, QuestState& outQuest)
         {
             ReadString(quest, "id", outQuest.m_id);
@@ -702,6 +757,116 @@ namespace NetClient
             {
                 outError = "Bootstrap response was missing required fields.";
                 return false;
+            }
+
+            return true;
+        }
+
+        bool ParseSocialStateJson(const AZStd::string& payload, SocialStateResponse& outResponse, AZStd::string& outError)
+        {
+            outResponse = SocialStateResponse{};
+
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Social state response was not valid JSON.";
+                return false;
+            }
+
+            if (document.HasMember("chatMessages") && document["chatMessages"].IsArray())
+            {
+                for (const rapidjson::Value& messageValue : document["chatMessages"].GetArray())
+                {
+                    if (!messageValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    ChatMessageState message;
+                    ReadString(messageValue, "messageId", message.m_messageId);
+                    ReadString(messageValue, "channel", message.m_channel);
+                    ReadString(messageValue, "senderCharacterId", message.m_senderCharacterId);
+                    ReadString(messageValue, "senderDisplayName", message.m_senderDisplayName);
+                    ReadString(messageValue, "targetCharacterId", message.m_targetCharacterId);
+                    ReadString(messageValue, "partyId", message.m_partyId);
+                    ReadString(messageValue, "zoneId", message.m_zoneId);
+                    ReadString(messageValue, "messageText", message.m_messageText);
+                    ReadInt64(messageValue, "timestamp", message.m_timestamp);
+                    outResponse.m_chatMessages.push_back(AZStd::move(message));
+                }
+            }
+
+            if (document.HasMember("friends") && document["friends"].IsArray())
+            {
+                for (const rapidjson::Value& friendValue : document["friends"].GetArray())
+                {
+                    if (!friendValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    FriendState friendState;
+                    ReadString(friendValue, "characterId", friendState.m_characterId);
+                    ReadString(friendValue, "displayName", friendState.m_displayName);
+                    ReadInt(friendValue, "level", friendState.m_level);
+                    ReadString(friendValue, "classId", friendState.m_classId);
+                    ReadString(friendValue, "zoneId", friendState.m_zoneId);
+                    ReadBool(friendValue, "online", friendState.m_online);
+                    outResponse.m_friends.push_back(AZStd::move(friendState));
+                }
+            }
+
+            if (document.HasMember("party") && document["party"].IsObject())
+            {
+                outResponse.m_hasParty = true;
+                const rapidjson::Value& partyValue = document["party"];
+                ReadString(partyValue, "partyId", outResponse.m_party.m_partyId);
+                ReadString(partyValue, "leaderCharacterId", outResponse.m_party.m_leaderCharacterId);
+                if (partyValue.HasMember("members") && partyValue["members"].IsArray())
+                {
+                    for (const rapidjson::Value& memberValue : partyValue["members"].GetArray())
+                    {
+                        if (!memberValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        PartyMemberState member;
+                        ReadString(memberValue, "characterId", member.m_characterId);
+                        ReadString(memberValue, "displayName", member.m_displayName);
+                        ReadInt(memberValue, "level", member.m_level);
+                        ReadString(memberValue, "classId", member.m_classId);
+                        ReadString(memberValue, "zoneId", member.m_zoneId);
+                        ReadBool(memberValue, "online", member.m_online);
+                        ReadBool(memberValue, "leader", member.m_leader);
+                        ReadDouble(memberValue, "health", member.m_health);
+                        ReadDouble(memberValue, "maxHealth", member.m_maxHealth);
+                        ReadDouble(memberValue, "resource", member.m_resource);
+                        ReadDouble(memberValue, "maxResource", member.m_maxResource);
+                        ReadBool(memberValue, "disconnected", member.m_disconnected);
+                        outResponse.m_party.m_members.push_back(AZStd::move(member));
+                    }
+                }
+            }
+
+            if (document.HasMember("partyInvites") && document["partyInvites"].IsArray())
+            {
+                for (const rapidjson::Value& inviteValue : document["partyInvites"].GetArray())
+                {
+                    if (!inviteValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    PartyInviteState invite;
+                    ReadString(inviteValue, "inviteId", invite.m_inviteId);
+                    ReadString(inviteValue, "partyId", invite.m_partyId);
+                    ReadString(inviteValue, "inviterCharacterId", invite.m_inviterCharacterId);
+                    ReadString(inviteValue, "inviterDisplayName", invite.m_inviterDisplayName);
+                    ReadInt64(inviteValue, "expiresAt", invite.m_expiresAt);
+                    outResponse.m_partyInvites.push_back(AZStd::move(invite));
+                }
             }
 
             return true;
