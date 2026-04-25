@@ -152,6 +152,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			} else if session.ZoneID == "" {
 				session.ZoneID = character.ZoneID
 			}
+			s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 			s.resetSessionCombatStateLocked(session, "reconnect")
 			s.clearMobAggroForCharacterLocked(session.CharacterID)
 			if !session.Alive || session.Health <= 0.0 {
@@ -258,6 +259,7 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	session.X = character.PositionX
 	session.Y = character.PositionY
 	session.Z = character.PositionZ
+	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 	s.resetSessionCombatStateLocked(session, "reconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
 	if !session.Alive || session.Health <= 0.0 {
@@ -362,6 +364,7 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 
 	session.Connected = false
 	session.LastSeenAt = time.Now().Unix()
+	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
 
