@@ -170,8 +170,8 @@ function Invoke-PackageO3deLevelSmoke {
     param([string]$PackageRoot)
 
     $launcherCandidates = @(
-        Join-Path $PackageRoot "build\o3de-windows\bin\profile\amandacore.GameLauncher.exe",
-        Join-Path $PackageRoot "build\windows\bin\profile\amandacore.GameLauncher.exe"
+        (Join-Path $PackageRoot "build\o3de-windows\bin\profile\amandacore.GameLauncher.exe"),
+        (Join-Path $PackageRoot "build\windows\bin\profile\amandacore.GameLauncher.exe")
     )
     $gameLauncherPath = $launcherCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     if (-not $gameLauncherPath) {
