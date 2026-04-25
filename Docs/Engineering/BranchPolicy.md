@@ -2,6 +2,8 @@
 
 AmandaCore uses two permanent branches and short-lived task, hotfix, and release branches.
 
+Clean-room architecture references are documented in [Docs/Engineering/CleanRoomStudy-TrinityCore-AzerothCore.md](CleanRoomStudy-TrinityCore-AzerothCore.md).
+
 ## Permanent Branches
 
 ### main
