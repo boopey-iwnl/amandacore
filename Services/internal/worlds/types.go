@@ -611,6 +611,7 @@ func (s *worldServer) loadStarterContentLocked() {
 
 	allQuests := append([]questDefinition{}, stonewakeQuestDefinitions...)
 	allQuests = append(allQuests, brindlebrookQuestDefinitions...)
+	allQuests = append(allQuests, dungeonQuestDefinitions...)
 	s.questOrder = make([]string, 0, len(allQuests))
 	for _, quest := range allQuests {
 		if quest.ZoneID == "" {
@@ -628,6 +629,7 @@ func (s *worldServer) loadStarterContentLocked() {
 
 	allFriendlyNPCs := append([]friendlyNPCDefinition{}, stonewakeFriendlyNPCs...)
 	allFriendlyNPCs = append(allFriendlyNPCs, brindlebrookFriendlyNPCs...)
+	allFriendlyNPCs = append(allFriendlyNPCs, dungeonFriendlyNPCs...)
 	s.friendlyNPCOrder = make([]string, 0, len(allFriendlyNPCs))
 	for _, npc := range allFriendlyNPCs {
 		if npc.ZoneID == "" {

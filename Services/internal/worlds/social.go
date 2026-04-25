@@ -584,6 +584,22 @@ func (s *worldServer) sendChatMessageLocked(session *worldSessionState, request 
 			MessageText:       messageText,
 		}, recipientSet(party.MemberCharacterIDs...))
 		return nil
+	case chatChannelGuild:
+		if s.store == nil {
+			return fmt.Errorf("social persistence is unavailable")
+		}
+		guild, err := s.store.GetGuildForCharacter(session.CharacterID)
+		if err != nil {
+			return fmt.Errorf("you are not in a guild")
+		}
+		s.appendChatMessageLocked(platform.ChatMessage{
+			Channel:           channel,
+			SenderCharacterID: session.CharacterID,
+			SenderDisplayName: session.DisplayName,
+			GuildID:           guild.ID,
+			MessageText:       messageText,
+		}, s.onlineGuildRecipientSetLocked(*guild))
+		return nil
 	default:
 		return fmt.Errorf("unsupported chat channel")
 	}
@@ -613,6 +629,7 @@ func (s *worldServer) appendChatMessageLocked(message platform.ChatMessage, reci
 		"sender":    message.SenderCharacterID,
 		"target":    message.TargetCharacterID,
 		"partyId":   message.PartyID,
+		"guildId":   message.GuildID,
 	})
 	return message
 }
@@ -629,11 +646,16 @@ func (s *worldServer) sendSystemMessageLocked(messageText string, recipients map
 }
 
 func (s *worldServer) buildSocialStateLocked(session *worldSessionState, afterMessageID string) socialStateResponse {
+	if s.store != nil {
+		_ = s.store.CleanupExpiredGuildInvites(time.Now().Unix())
+	}
 	return socialStateResponse{
 		ChatMessages: s.visibleChatMessagesLocked(session.CharacterID, afterMessageID),
 		Friends:      s.buildFriendResponsesLocked(session),
 		Party:        s.buildPartyResponseLocked(session.CharacterID),
 		PartyInvites: s.buildPartyInviteResponsesLocked(session.CharacterID),
+		Guild:        s.buildGuildResponseLocked(session.CharacterID),
+		GuildInvites: s.buildGuildInviteResponsesLocked(session.CharacterID),
 	}
 }
 
