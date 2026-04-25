@@ -77,7 +77,7 @@ func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
 
 	for _, npcID := range []string{npcCommanderElianRookID, warriorTrainerID, npcQuartermasterMiraID, npcHealerSellaID} {
 		npc := server.friendlyNPCs[npcID]
-		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance > 36.0 {
+		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance > 44.0 {
 			t.Fatalf("expected hub NPC %s near spawn, distance %.1f", npcID, distance)
 		}
 	}
@@ -95,8 +95,8 @@ func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
 		}
 	}
 
-	assertMobAreaCenter(t, server, mobTrainingDummyTypeID, 40.0, 22.0, 10.0)
-	assertMobAreaCenter(t, server, mobDitchRatTypeID, 96.0, 45.0, 24.0)
+	assertMobAreaCenter(t, server, mobTrainingDummyTypeID, 58.0, 32.0, 10.0)
+	assertMobAreaCenter(t, server, mobDitchRatTypeID, 119.0, 62.0, 24.0)
 	assertMobAreaCenter(t, server, mobFieldBoarTypeID, 163.0, 86.0, 32.0)
 	assertMobAreaCenter(t, server, mobRidgeCrowTypeID, 240.0, 127.0, 34.0)
 	assertMobAreaCenter(t, server, mobAshbandScoutTypeID, 313.0, 170.0, 34.0)

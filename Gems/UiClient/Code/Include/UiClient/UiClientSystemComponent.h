@@ -55,6 +55,8 @@ namespace UiClient
             GameCore::IGameCoreRequests* gameCore,
             const NetClient::VisibleEntity& entity,
             const char* source);
+        bool CloseNpcInteraction(const char* reason);
+        bool CloseOpenGameplayPanel(const char* reason);
         bool SubmitChatInput(GameCore::IGameCoreRequests* gameCore, const AZStd::string& input);
 
         AZStd::string m_lastQuestState;
@@ -64,6 +66,8 @@ namespace UiClient
         AZStd::string m_lastHudTargetId;
         AZStd::string m_lastWorldSessionToken;
         AZStd::string m_lastErrorMessage;
+        AZStd::string m_activeInteractionEntityId;
+        AZStd::string m_activeInteractionKind;
         AZStd::string m_questToast;
         AZStd::deque<AZStd::string> m_eventLog;
         AZ::u64 m_lastHandledInteractionSequence = 0;
@@ -80,8 +84,8 @@ namespace UiClient
         bool m_mapOpen = false;
         bool m_talentsOpen = false;
         int m_settingsTab = 0;
-        bool m_extraUpperActionBarVisible = false;
-        bool m_rightActionBarOneVisible = false;
+        bool m_extraUpperActionBarVisible = true;
+        bool m_rightActionBarOneVisible = true;
         bool m_rightActionBarTwoVisible = false;
         bool m_shiftHeld = false;
         bool m_lastWorldConnected = false;

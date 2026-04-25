@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/ZoneManifest",
+  "id": "stonewake_vale",
+  "displayName": "Stonewake Vale",
+  "cellIds": [
+    "stonewake_vale"
+  ],
+  "hubCellId": "stonewake_vale",
+  "microInstanceCellId": "stonewake_vale",
+  "vendorNpcIds": [
+    "npc_quartermaster_mira_vale"
+  ]
+}

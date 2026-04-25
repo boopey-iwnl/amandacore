@@ -32,7 +32,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	assertQuestSummaryState(t, state, "sv_first_muster", "not_started", 0, 1, 0, 125)
 	assertStarterInventory(t, state)
 
-	state = fixture.moveToPosition(t, 13.0, 10.0)
+	state = fixture.moveToFriendly(t, "npc_commander_elian_rook")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/target", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 		"targetId":          "npc_commander_elian_rook",
@@ -53,8 +53,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	assertQuestSummaryState(t, state, "sv_first_muster", "active", 0, 1, 0, 125)
 	assertStarterInventory(t, state)
 
-	state = fixture.moveToPosition(t, 34.0, 18.0)
-	state = fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
+	state = fixture.moveToFriendly(t, "trainer_armsmaster_corin_vale")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 		"questId":           "sv_first_muster",
@@ -70,16 +69,14 @@ func TestQuestSlicePersistence(t *testing.T) {
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_01")
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_02")
 	killMobForQuestCredit(t, fixture, "mob_training_dummy_03")
-	state = fixture.moveToPosition(t, 34.0, 18.0)
-	state = fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
+	state = fixture.moveToFriendly(t, "trainer_armsmaster_corin_vale")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 		"questId":           "sv_yard_drills",
 	}, http.StatusOK, &state)
 	assertQuestSummaryState(t, state, "sv_yard_drills", "reward_granted", 3, 3, 80, 135)
 
-	state = fixture.moveToPosition(t, 13.0, 10.0)
-	state = fixture.targetFriendlyByID(t, "npc_commander_elian_rook")
+	state = fixture.moveToFriendly(t, "npc_commander_elian_rook")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 		"questId":           milestoneQuestID,
@@ -127,8 +124,7 @@ func TestQuestSlicePersistence(t *testing.T) {
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_04")
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_01")
 	killMobForQuestCredit(t, fixture, "mob_ditch_rat_02")
-	state = fixture.moveToPosition(t, 13.0, 10.0)
-	state = fixture.targetFriendlyByID(t, "npc_commander_elian_rook")
+	state = fixture.moveToFriendly(t, "npc_commander_elian_rook")
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/quest/accept", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 		"questId":           milestoneQuestID,
@@ -202,6 +198,15 @@ func killMobForQuestCredit(t *testing.T, fixture *combatFixture, mobID string) {
 	postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/reconnect", nil, map[string]any{
 		"worldSessionToken": fixture.worldSessionToken,
 	}, http.StatusOK, &state)
+}
+
+func (f *combatFixture) moveToFriendly(t *testing.T, friendlyID string) map[string]any {
+	t.Helper()
+
+	state := f.getWorldState(t)
+	entity := findVisibleEntityByID(t, state, friendlyID)
+	f.moveToPosition(t, entity["x"].(float64)-1.0, entity["y"].(float64)-1.0)
+	return f.targetFriendlyByID(t, friendlyID)
 }
 
 func topUpWarriorHealth(t *testing.T, fixture *combatFixture, state map[string]any, minimumHealth float64) map[string]any {

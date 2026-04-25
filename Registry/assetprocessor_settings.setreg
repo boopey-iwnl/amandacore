@@ -20,6 +20,15 @@
                 "Exclude export scripts": {
                     "pattern": ".*\\\\/ExportScripts\\\\/.*"
                 },
+                "Exclude generated packages": {
+                    "glob": "dist/*"
+                },
+                "Exclude project cache": {
+                    "glob": "Cache/*"
+                },
+                "Exclude dev logs": {
+                    "glob": "Infra/dev/logs/*"
+                },
                 "ProjectRelativeGemsScanFolderPriority":"higher"
             }
         }

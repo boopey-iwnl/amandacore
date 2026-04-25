@@ -115,9 +115,16 @@ func (s *worldServer) buildNavigationAreasResponse(session *worldSessionState) [
 
 func (s *worldServer) buildMapMarkersResponse(session *worldSessionState) []map[string]any {
 	markers := make([]map[string]any, 0, len(s.friendlyNPCOrder)+len(stonewakeNavigationAreas))
+	zoneID := defaultZoneID
+	if session != nil && session.ZoneID != "" {
+		zoneID = session.ZoneID
+	}
 
 	for _, npcID := range s.friendlyNPCOrder {
 		npc := s.friendlyNPCs[npcID]
+		if npc.ZoneID != zoneID {
+			continue
+		}
 		markerKind, questID := s.markerKindForNPCLocked(session, npc)
 		markers = append(markers, map[string]any{
 			"id":          "npc_" + npc.ID,
@@ -161,42 +168,44 @@ func (s *worldServer) buildMapMarkersResponse(session *worldSessionState) []map[
 		}
 	}
 
-	for _, questID := range session.TrackedQuestIDs {
-		quest, found := s.quests[questID]
-		if !found {
-			continue
-		}
-		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
-		if progress.State != questStateActive {
-			continue
-		}
-		area, found := s.findNavigationAreaForQuest(quest)
-		if found {
-			markers = append(markers, map[string]any{
-				"id":            "objective_" + quest.ID,
-				"displayName":   area.DisplayName,
-				"kind":          "tracked_objective",
-				"questId":       quest.ID,
-				"areaId":        area.ID,
-				"x":             area.CenterX,
-				"y":             area.CenterY,
-				"radius":        area.Radius,
-				"routeHintText": area.RouteHintText,
-			})
-			continue
-		}
-		if quest.MarkerX != 0 || quest.MarkerY != 0 {
-			markers = append(markers, map[string]any{
-				"id":            "objective_" + quest.ID,
-				"displayName":   quest.Title,
-				"kind":          "tracked_objective",
-				"questId":       quest.ID,
-				"areaId":        quest.ID + "_marker",
-				"x":             quest.MarkerX,
-				"y":             quest.MarkerY,
-				"radius":        starterInteractRadius,
-				"routeHintText": "Follow the road marker toward the objective.",
-			})
+	if session != nil {
+		for _, questID := range session.TrackedQuestIDs {
+			quest, found := s.quests[questID]
+			if !found || quest.ZoneID != zoneID {
+				continue
+			}
+			progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+			if progress.State != questStateActive {
+				continue
+			}
+			area, found := s.findNavigationAreaForQuest(quest)
+			if found {
+				markers = append(markers, map[string]any{
+					"id":            "objective_" + quest.ID,
+					"displayName":   area.DisplayName,
+					"kind":          "tracked_objective",
+					"questId":       quest.ID,
+					"areaId":        area.ID,
+					"x":             area.CenterX,
+					"y":             area.CenterY,
+					"radius":        area.Radius,
+					"routeHintText": area.RouteHintText,
+				})
+				continue
+			}
+			if quest.MarkerX != 0 || quest.MarkerY != 0 {
+				markers = append(markers, map[string]any{
+					"id":            "objective_" + quest.ID,
+					"displayName":   quest.Title,
+					"kind":          "tracked_objective",
+					"questId":       quest.ID,
+					"areaId":        quest.ID + "_marker",
+					"x":             quest.MarkerX,
+					"y":             quest.MarkerY,
+					"radius":        starterInteractRadius,
+					"routeHintText": "Follow the road marker toward the objective.",
+				})
+			}
 		}
 	}
 
@@ -215,8 +224,21 @@ func (s *worldServer) markerKindForNPCLocked(session *worldSessionState, npc fri
 		}
 	}
 
+	if session == nil {
+		if isTrainer {
+			return "trainer", ""
+		}
+		if isVendor {
+			return "vendor", ""
+		}
+		return "service", ""
+	}
+
 	for _, questID := range s.questOrder {
 		quest := s.quests[questID]
+		if quest.ZoneID != session.ZoneID {
+			continue
+		}
 		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
 		if progress.State == questStateCompleted && quest.TurnInNPCID == npc.ID {
 			return "quest_turn_in", quest.ID
@@ -225,6 +247,9 @@ func (s *worldServer) markerKindForNPCLocked(session *worldSessionState, npc fri
 
 	for _, questID := range s.questOrder {
 		quest := s.quests[questID]
+		if quest.ZoneID != session.ZoneID {
+			continue
+		}
 		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
 		if progress.State == questStateActive &&
 			(quest.TargetEntityID == npc.ID || quest.TurnInNPCID == npc.ID) &&
@@ -239,6 +264,9 @@ func (s *worldServer) markerKindForNPCLocked(session *worldSessionState, npc fri
 		}
 		quest, found := s.quests[service.ServiceID]
 		if !found {
+			continue
+		}
+		if quest.ZoneID != session.ZoneID {
 			continue
 		}
 		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])

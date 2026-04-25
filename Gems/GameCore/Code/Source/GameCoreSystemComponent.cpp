@@ -1600,9 +1600,10 @@ namespace GameCore
             return;
         }
 
-        const bool isStonewakeValeBootstrap = bootstrap.m_zoneId == "sunset_frontier" && bootstrap.m_cellId == "stonewake_vale";
+        const bool isStonewakeValeBootstrap = bootstrap.m_zoneId == "stonewake_vale" && bootstrap.m_cellId == "stonewake_vale";
+        const bool isLegacyStonewakeBootstrap = bootstrap.m_zoneId == "sunset_frontier" && bootstrap.m_cellId == "stonewake_vale";
         const bool isLegacyWestApproachBootstrap = bootstrap.m_zoneId == "sunset_frontier" && bootstrap.m_cellId == "west_approach";
-        if (!isStonewakeValeBootstrap && !isLegacyWestApproachBootstrap)
+        if (!isStonewakeValeBootstrap && !isLegacyStonewakeBootstrap && !isLegacyWestApproachBootstrap)
         {
             m_worldState.m_errorMessage = "Bootstrap zone mapping did not match the playable slice contract.";
             AZ_Warning(

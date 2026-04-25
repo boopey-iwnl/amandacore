@@ -1,7 +1,7 @@
 {
   "$schema": "../../../Schemas/gameplay.schema.json#/$defs/ZoneManifest",
   "id": "sunset_frontier",
-  "displayName": "Sunset Frontier",
+  "displayName": "Legacy Sunset Frontier Compatibility",
   "cellIds": [
     "west_approach",
     "ferry_crossing"

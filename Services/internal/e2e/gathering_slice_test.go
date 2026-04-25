@@ -100,7 +100,9 @@ func (f *combatFixture) learnOrekeeping(t *testing.T) {
 func (f *combatFixture) moveToOreNode(t *testing.T) map[string]any {
 	t.Helper()
 
-	return f.moveToPosition(t, 26.0, 29.0)
+	state := f.getWorldState(t)
+	node := findGatheringNode(t, state, stonewakeOreNodeID)
+	return f.moveToPosition(t, node["x"].(float64)-1.0, node["y"].(float64)-1.0)
 }
 
 func (f *combatFixture) gatherNode(t *testing.T, nodeID string, expectedStatus int) map[string]any {

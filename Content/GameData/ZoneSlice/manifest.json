@@ -1,5 +1,5 @@
 {
-  "zoneId": "sunset_frontier",
+  "zoneId": "stonewake_vale",
   "archetypes": [
     "Characters/wayfarer_warden.json"
   ],
@@ -45,6 +45,9 @@
     "Encounters/bridge_watch.json"
   ],
   "zones": [
+    "Zones/stonewake_vale.json"
+  ],
+  "legacyCompatibilityZones": [
     "Zones/west_approach.json",
     "Zones/ferry_crossing.json",
     "Zones/sunset_frontier.json"

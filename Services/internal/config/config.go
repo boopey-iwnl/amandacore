@@ -33,7 +33,7 @@ func Load(serviceName string, defaultPort string) ServiceConfig {
 		AdminSeedUsername: valueOrDefault("AMANDACORE_ADMIN_SEED_USERNAME", "amanda"),
 		AdminSeedPassword: os.Getenv("AMANDACORE_ADMIN_SEED_PASSWORD"),
 		AdminToolsEnabled: adminToolsEnabled(valueOrDefault("AMANDACORE_ENVIRONMENT", "development")),
-		BuildID:           valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-local-0.2.0"),
+		BuildID:           valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-alpha-0.1-local"),
 		WorldEndpoint:     valueOrDefault("AMANDACORE_WORLD_ENDPOINT", "http://localhost:8085"),
 	}
 }

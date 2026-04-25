@@ -137,10 +137,10 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	}
 	mux.HandleFunc("GET /v1/world/bootstrap", server.instrumentEndpointFunc("bootstrap", func(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, http.StatusOK, map[string]any{
-			"zoneId":   "sunset_frontier",
+			"zoneId":   defaultZoneID,
 			"cellId":   defaultZoneID,
 			"motd":     "Stonewake Vale is active. Muster at Hearthwatch Yard, train with Armsmaster Corin, and follow the westward road.",
-			"revision": "0.6.0-stonewake-starter-zone",
+			"revision": "alpha-0.1-stonewake-starter-zone",
 		})
 	}))
 }

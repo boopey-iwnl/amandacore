@@ -91,7 +91,9 @@ func TestProfessionLearningSlice(t *testing.T) {
 func (f *combatFixture) moveToProfessionTrainer(t *testing.T) map[string]any {
 	t.Helper()
 
-	f.moveToPosition(t, 58.0, 24.0)
+	state := f.getWorldState(t)
+	trainer := findVisibleEntityByID(t, state, professionTrainerNPCID)
+	f.moveToPosition(t, trainer["x"].(float64)-1.0, trainer["y"].(float64)-1.0)
 	return f.targetFriendlyByID(t, professionTrainerNPCID)
 }
 

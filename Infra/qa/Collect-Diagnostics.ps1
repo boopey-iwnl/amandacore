@@ -246,8 +246,10 @@ function Get-ServiceHealthSummary {
                 name = $service.Name
                 port = $service.Port
                 healthy = ($response.StatusCode -eq 200)
+                availableAtCollection = $true
                 statusCode = $response.StatusCode
                 error = ""
+                note = ""
             }
         }
         catch {
@@ -255,8 +257,10 @@ function Get-ServiceHealthSummary {
                 name = $service.Name
                 port = $service.Port
                 healthy = $false
+                availableAtCollection = $false
                 statusCode = 0
                 error = $_.Exception.Message
+                note = "Service was unavailable when diagnostics were collected; if the stack had already been stopped, this does not indicate a failed playtest session."
             }
         }
     }
