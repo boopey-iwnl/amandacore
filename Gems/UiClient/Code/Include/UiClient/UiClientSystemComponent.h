@@ -74,6 +74,7 @@ namespace UiClient
         bool m_settingsOpen = false;
         bool m_characterSheetOpen = false;
         bool m_questLogOpen = false;
+        bool m_mapOpen = false;
         int m_settingsTab = 0;
         bool m_extraUpperActionBarVisible = false;
         bool m_rightActionBarOneVisible = false;
@@ -90,6 +91,7 @@ namespace UiClient
         AZStd::string m_bagBinding;
         AZStd::string m_characterBinding;
         AZStd::string m_questLogBinding;
+        AZStd::string m_mapBinding;
         AZStd::string m_settingsBinding;
         AZStd::string m_interactBinding;
         AZStd::string m_targetHostileBinding;

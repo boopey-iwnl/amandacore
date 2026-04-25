@@ -242,7 +242,7 @@ func newTrainerFixture(t *testing.T, options trainerFixtureOptions) *combatFixtu
 		}
 		if _, err := fileStore.UpdateCharacterProgression(
 			characterID,
-			character.Experience,
+			options.startingExperience,
 			options.startingCopper,
 			character.Inventory,
 			character.LearnedAbilityIDs,
