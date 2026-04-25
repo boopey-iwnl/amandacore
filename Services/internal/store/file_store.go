@@ -765,6 +765,232 @@ func (s *FileStore) GetPartyForCharacter(characterID string) (*platform.Party, e
 	return nil, ErrPartyMissing
 }
 
+func (s *FileStore) CreateGuild(guildName string, leaderCharacterID string) (platform.Guild, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.Guild{}, err
+	}
+	defer s.unlockState()
+
+	leader, ok := s.state.Characters[leaderCharacterID]
+	if !ok {
+		return platform.Guild{}, fmt.Errorf("leader character not found")
+	}
+	if _, found := findGuildForCharacterLocked(s.state.Guilds, leaderCharacterID); found {
+		return platform.Guild{}, ErrGuildMemberExists
+	}
+
+	normalizedName := normalize(guildName)
+	for _, guild := range s.state.Guilds {
+		if guild.RealmID == leader.RealmID && normalize(guild.GuildName) == normalizedName {
+			return platform.Guild{}, ErrGuildNameExists
+		}
+	}
+
+	now := time.Now().Unix()
+	guild := platform.Guild{
+		ID:                   randomID("guild"),
+		RealmID:              leader.RealmID,
+		GuildName:            strings.TrimSpace(guildName),
+		CreatedAt:            now,
+		UpdatedAt:            now,
+		CreatedByCharacterID: leader.ID,
+		LeaderCharacterID:    leader.ID,
+		Ranks:                platform.DefaultGuildRanks(),
+		Members: []platform.GuildMember{
+			buildGuildMember(leader, platform.GuildRankLeader, now),
+		},
+	}
+	s.state.Guilds[guild.ID] = guild
+	return cloneGuild(guild), s.saveLocked()
+}
+
+func (s *FileStore) SaveGuild(guild platform.Guild) (platform.Guild, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.Guild{}, err
+	}
+	defer s.unlockState()
+
+	if guild.ID == "" {
+		return platform.Guild{}, ErrGuildMissing
+	}
+	if _, exists := s.state.Guilds[guild.ID]; !exists {
+		return platform.Guild{}, ErrGuildMissing
+	}
+	guild.GuildName = strings.TrimSpace(guild.GuildName)
+	guild.Ranks = normalizeGuildRanks(guild.Ranks)
+	guild.Members = normalizeGuildMembers(guild.Members)
+	if len(guild.Members) == 0 {
+		delete(s.state.Guilds, guild.ID)
+		return guild, s.saveLocked()
+	}
+	if !guildContainsMember(guild, guild.LeaderCharacterID) {
+		guild.LeaderCharacterID = guild.Members[0].CharacterID
+		guild.Members[0].RankID = platform.GuildRankLeader
+	}
+	for index, member := range guild.Members {
+		if character, ok := s.state.Characters[member.CharacterID]; ok {
+			guild.Members[index].DisplayName = character.DisplayName
+			guild.Members[index].RaceID = character.RaceID
+			guild.Members[index].ClassID = character.ClassID
+			guild.Members[index].Level = character.Level
+			guild.Members[index].LastOnlineAt = character.LastSeenAt
+		}
+	}
+	guild.UpdatedAt = time.Now().Unix()
+	s.state.Guilds[guild.ID] = guild
+	return cloneGuild(guild), s.saveLocked()
+}
+
+func (s *FileStore) DeleteGuild(guildID string) error {
+	if err := s.lockState(true); err != nil {
+		return err
+	}
+	defer s.unlockState()
+
+	if _, exists := s.state.Guilds[guildID]; !exists {
+		return ErrGuildMissing
+	}
+	delete(s.state.Guilds, guildID)
+	for inviteID, invite := range s.state.GuildInvites {
+		if invite.GuildID == guildID {
+			delete(s.state.GuildInvites, inviteID)
+		}
+	}
+	return s.saveLocked()
+}
+
+func (s *FileStore) GetGuildByID(guildID string) (*platform.Guild, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	guild, ok := s.state.Guilds[guildID]
+	if !ok {
+		return nil, ErrGuildMissing
+	}
+	copy := cloneGuild(guild)
+	return &copy, nil
+}
+
+func (s *FileStore) GetGuildForCharacter(characterID string) (*platform.Guild, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	guild, found := findGuildForCharacterLocked(s.state.Guilds, characterID)
+	if !found {
+		return nil, ErrGuildMissing
+	}
+	copy := cloneGuild(guild)
+	return &copy, nil
+}
+
+func (s *FileStore) CreateGuildInvite(guildID string, inviterCharacterID string, targetCharacterID string, expiresAt int64) (platform.GuildInvite, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.GuildInvite{}, err
+	}
+	defer s.unlockState()
+
+	guild, ok := s.state.Guilds[guildID]
+	if !ok {
+		return platform.GuildInvite{}, ErrGuildMissing
+	}
+	if _, ok := s.state.Characters[inviterCharacterID]; !ok {
+		return platform.GuildInvite{}, fmt.Errorf("inviter character not found")
+	}
+	target, ok := s.state.Characters[targetCharacterID]
+	if !ok {
+		return platform.GuildInvite{}, fmt.Errorf("target character not found")
+	}
+	if target.RealmID != guild.RealmID {
+		return platform.GuildInvite{}, fmt.Errorf("target player is not on this realm")
+	}
+	if _, found := findGuildForCharacterLocked(s.state.Guilds, targetCharacterID); found {
+		return platform.GuildInvite{}, ErrGuildMemberExists
+	}
+	for _, invite := range s.state.GuildInvites {
+		if invite.GuildID == guildID && invite.TargetCharacterID == targetCharacterID {
+			return platform.GuildInvite{}, fmt.Errorf("an invite is already pending for that player")
+		}
+	}
+
+	now := time.Now().Unix()
+	invite := platform.GuildInvite{
+		InviteID:           randomID("ginvite"),
+		GuildID:            guild.ID,
+		GuildName:          guild.GuildName,
+		InviterCharacterID: inviterCharacterID,
+		TargetCharacterID:  targetCharacterID,
+		CreatedAt:          now,
+		ExpiresAt:          expiresAt,
+	}
+	s.state.GuildInvites[invite.InviteID] = invite
+	return invite, s.saveLocked()
+}
+
+func (s *FileStore) GetGuildInvite(inviteID string) (*platform.GuildInvite, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	invite, ok := s.state.GuildInvites[inviteID]
+	if !ok {
+		return nil, ErrGuildInviteMissing
+	}
+	copy := invite
+	return &copy, nil
+}
+
+func (s *FileStore) ListGuildInvitesForCharacter(characterID string) ([]platform.GuildInvite, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	results := make([]platform.GuildInvite, 0)
+	for _, invite := range s.state.GuildInvites {
+		if invite.TargetCharacterID == characterID {
+			results = append(results, invite)
+		}
+	}
+	return results, nil
+}
+
+func (s *FileStore) DeleteGuildInvite(inviteID string) error {
+	if err := s.lockState(true); err != nil {
+		return err
+	}
+	defer s.unlockState()
+
+	if _, exists := s.state.GuildInvites[inviteID]; !exists {
+		return ErrGuildInviteMissing
+	}
+	delete(s.state.GuildInvites, inviteID)
+	return s.saveLocked()
+}
+
+func (s *FileStore) CleanupExpiredGuildInvites(nowUnix int64) error {
+	if err := s.lockState(true); err != nil {
+		return err
+	}
+	defer s.unlockState()
+
+	changed := false
+	for inviteID, invite := range s.state.GuildInvites {
+		if invite.ExpiresAt <= nowUnix {
+			delete(s.state.GuildInvites, inviteID)
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return s.saveLocked()
+}
+
 func (s *FileStore) UpdateCharacterState(characterID string, zoneID string, x float64, y float64, z float64) (*platform.Character, error) {
 	if err := s.lockState(true); err != nil {
 		return nil, err

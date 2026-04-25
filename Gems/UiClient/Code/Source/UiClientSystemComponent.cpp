@@ -786,7 +786,7 @@ namespace UiClient
             DrawPortraitBadge("!", ImVec2(origin.x + 34.0f, origin.y + 42.0f), ColorU32(146, 72, 44));
             ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
             ImGui::TextUnformatted(targetLabel.c_str());
-            ImGui::Text("%s  |  %s", "Hostile", targetEntity->m_alive ? "engageable" : "down");
+            ImGui::Text("%s  |  %s  |  %s", "Hostile", targetEntity->m_elite ? "elite" : "normal", targetEntity->m_alive ? "engageable" : "down");
             DrawMeter("Integrity", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(198, 93, 34), ImVec2(160.0f, 18.0f));
             ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
             ImGui::Text("Behavior: %s", targetEntity->m_aiState.empty() ? "idle" : targetEntity->m_aiState.c_str());
@@ -2184,9 +2184,15 @@ namespace UiClient
                     }
 
                     ImGui::PushID(quest.m_id.c_str());
-                    ImGui::TextUnformatted(quest.m_title.c_str());
+                    const AZStd::string questTitle = GetQuestDisplayTitle(quest);
+                    ImGui::TextUnformatted(questTitle.c_str());
                     ImGui::SameLine();
                     ImGui::TextDisabled("%s", quest.m_category.empty() ? "Stonewake Vale" : quest.m_category.c_str());
+                    if (quest.m_groupRecommended)
+                    {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("Recommended Group");
+                    }
                     ImGui::TextWrapped("%s", quest.m_objectiveText.c_str());
                     ImGui::Text(
                         "Progress: %d / %d  |  Reward: %d XP and %dg %ds %dc",

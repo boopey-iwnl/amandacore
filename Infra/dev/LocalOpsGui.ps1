@@ -11,6 +11,10 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $startScript = Join-Path $PSScriptRoot "start-local.ps1"
 $stopScript = Join-Path $PSScriptRoot "stop-local.ps1"
 $buildClientScript = Join-Path $PSScriptRoot "build-playable-client.ps1"
+$diagnosticsScript = Join-Path $repoRoot "Infra\qa\Collect-Diagnostics.ps1"
+$resetStateScript = Join-Path $repoRoot "Infra\qa\Reset-LocalTestState.ps1"
+$qaDocsRoot = Join-Path $repoRoot "Docs\QA"
+$diagnosticsOutputRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) "amandacore\diagnostics"
 $processManifest = Join-Path $PSScriptRoot "local-processes.json"
 $versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
 $serviceLogsRoot = Join-Path $PSScriptRoot "logs"
@@ -248,6 +252,21 @@ function Get-VersionManifestSummary {
     }
 }
 
+function Get-LatestDiagnosticBundle {
+    if (-not (Test-Path $diagnosticsOutputRoot)) {
+        return ""
+    }
+
+    $latest = Get-ChildItem -Path $diagnosticsOutputRoot -Filter "amandacore-diagnostics-*.zip" -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if ($latest) {
+        return $latest.FullName
+    }
+
+    return ""
+}
+
 function Set-StatusMessage {
     param(
         [Parameter(Mandatory = $true)]
@@ -302,6 +321,8 @@ function Refresh-Status {
         "Game client log: $gameLogPath",
         "User log folder: $userLogRoot",
         "Local state store: $stateStore",
+        "Diagnostic bundles: $diagnosticsOutputRoot",
+        "QA docs: $qaDocsRoot",
         "Process manifest: $processManifest",
         "Version manifest: $versionManifestPath",
         "Desktop shortcut: $desktopShortcut",
@@ -314,8 +335,8 @@ function Refresh-Status {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "amandacore Local Ops"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(900, 720)
-$form.MinimumSize = New-Object System.Drawing.Size(900, 720)
+$form.Size = New-Object System.Drawing.Size(940, 760)
+$form.MinimumSize = New-Object System.Drawing.Size(940, 760)
 $form.MaximizeBox = $false
 
 $titleLabel = New-Object System.Windows.Forms.Label
@@ -365,20 +386,38 @@ $form.Controls.Add($logsButton)
 $refreshButton = New-Object System.Windows.Forms.Button
 $refreshButton.Text = "Refresh Status"
 $refreshButton.Location = New-Object System.Drawing.Point(768, 92)
-$refreshButton.Size = New-Object System.Drawing.Size(100, 34)
+$refreshButton.Size = New-Object System.Drawing.Size(132, 34)
 $form.Controls.Add($refreshButton)
+
+$diagnosticsButton = New-Object System.Windows.Forms.Button
+$diagnosticsButton.Text = "Collect Diagnostics"
+$diagnosticsButton.Location = New-Object System.Drawing.Point(20, 134)
+$diagnosticsButton.Size = New-Object System.Drawing.Size(160, 34)
+$form.Controls.Add($diagnosticsButton)
+
+$qaDocsButton = New-Object System.Windows.Forms.Button
+$qaDocsButton.Text = "Open QA Docs"
+$qaDocsButton.Location = New-Object System.Drawing.Point(192, 134)
+$qaDocsButton.Size = New-Object System.Drawing.Size(132, 34)
+$form.Controls.Add($qaDocsButton)
+
+$resetStateButton = New-Object System.Windows.Forms.Button
+$resetStateButton.Text = "Reset Test State"
+$resetStateButton.Location = New-Object System.Drawing.Point(336, 134)
+$resetStateButton.Size = New-Object System.Drawing.Size(132, 34)
+$form.Controls.Add($resetStateButton)
 
 $statusLabel = New-Object System.Windows.Forms.Label
 $statusLabel.Text = "Ready."
-$statusLabel.Location = New-Object System.Drawing.Point(20, 138)
-$statusLabel.Size = New-Object System.Drawing.Size(848, 28)
+$statusLabel.Location = New-Object System.Drawing.Point(20, 180)
+$statusLabel.Size = New-Object System.Drawing.Size(888, 28)
 $statusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $form.Controls.Add($statusLabel)
 
 $statusGroup = New-Object System.Windows.Forms.GroupBox
 $statusGroup.Text = "Current Status"
-$statusGroup.Location = New-Object System.Drawing.Point(20, 180)
-$statusGroup.Size = New-Object System.Drawing.Size(848, 158)
+$statusGroup.Location = New-Object System.Drawing.Point(20, 220)
+$statusGroup.Size = New-Object System.Drawing.Size(888, 158)
 $form.Controls.Add($statusGroup)
 
 function Add-StatusRow {
@@ -395,7 +434,7 @@ function Add-StatusRow {
 
     $valueControl = New-Object System.Windows.Forms.Label
     $valueControl.Location = New-Object System.Drawing.Point(168, $Y)
-    $valueControl.Size = New-Object System.Drawing.Size(655, 22)
+    $valueControl.Size = New-Object System.Drawing.Size(695, 22)
     $valueControl.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
     $statusGroup.Controls.Add($valueControl)
     return $valueControl
@@ -409,25 +448,25 @@ $manifestValueLabel = Add-StatusRow -Label "Process Manifest" -Y 122
 
 $servicesLabel = New-Object System.Windows.Forms.Label
 $servicesLabel.Text = "Running Services"
-$servicesLabel.Location = New-Object System.Drawing.Point(20, 352)
+$servicesLabel.Location = New-Object System.Drawing.Point(20, 392)
 $servicesLabel.Size = New-Object System.Drawing.Size(140, 22)
 $form.Controls.Add($servicesLabel)
 
 $servicesValueLabel = New-Object System.Windows.Forms.Label
-$servicesValueLabel.Location = New-Object System.Drawing.Point(162, 352)
-$servicesValueLabel.Size = New-Object System.Drawing.Size(706, 118)
+$servicesValueLabel.Location = New-Object System.Drawing.Point(162, 392)
+$servicesValueLabel.Size = New-Object System.Drawing.Size(746, 118)
 $servicesValueLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $form.Controls.Add($servicesValueLabel)
 
 $failureLabel = New-Object System.Windows.Forms.Label
 $failureLabel.Text = "Failure Details"
-$failureLabel.Location = New-Object System.Drawing.Point(20, 478)
+$failureLabel.Location = New-Object System.Drawing.Point(20, 518)
 $failureLabel.Size = New-Object System.Drawing.Size(140, 22)
 $form.Controls.Add($failureLabel)
 
 $failureTextBox = New-Object System.Windows.Forms.TextBox
-$failureTextBox.Location = New-Object System.Drawing.Point(162, 478)
-$failureTextBox.Size = New-Object System.Drawing.Size(706, 74)
+$failureTextBox.Location = New-Object System.Drawing.Point(162, 518)
+$failureTextBox.Size = New-Object System.Drawing.Size(746, 74)
 $failureTextBox.Multiline = $true
 $failureTextBox.ReadOnly = $true
 $failureTextBox.ScrollBars = "Vertical"
@@ -436,13 +475,13 @@ $form.Controls.Add($failureTextBox)
 
 $pathsLabel = New-Object System.Windows.Forms.Label
 $pathsLabel.Text = "Main Paths"
-$pathsLabel.Location = New-Object System.Drawing.Point(20, 560)
+$pathsLabel.Location = New-Object System.Drawing.Point(20, 600)
 $pathsLabel.Size = New-Object System.Drawing.Size(120, 22)
 $form.Controls.Add($pathsLabel)
 
 $pathBox = New-Object System.Windows.Forms.TextBox
-$pathBox.Location = New-Object System.Drawing.Point(20, 586)
-$pathBox.Size = New-Object System.Drawing.Size(848, 74)
+$pathBox.Location = New-Object System.Drawing.Point(20, 626)
+$pathBox.Size = New-Object System.Drawing.Size(888, 74)
 $pathBox.Multiline = $true
 $pathBox.ReadOnly = $true
 $pathBox.ScrollBars = "Vertical"
@@ -543,6 +582,60 @@ $logsButton.Add_Click({
     }
 
     Set-StatusMessage -Message "Opened the service logs and user log folders." -Color ([System.Drawing.Color]::ForestGreen)
+    Refresh-Status
+})
+
+$diagnosticsButton.Add_Click({
+    if (-not (Test-Path $diagnosticsScript)) {
+        Set-StatusMessage -Message "Diagnostic script not found at $diagnosticsScript" -Color ([System.Drawing.Color]::Firebrick)
+        return
+    }
+
+    Set-StatusMessage -Message "Collecting diagnostic bundle..." -Color ([System.Drawing.Color]::DodgerBlue)
+    $exitCode = Invoke-WaitingPowerShell -Command "& '$diagnosticsScript'"
+    $bundlePath = Get-LatestDiagnosticBundle
+    if ($exitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($bundlePath)) {
+        Start-Process -FilePath "explorer.exe" -ArgumentList "/select,`"$bundlePath`"" | Out-Null
+        Set-StatusMessage -Message "Diagnostic bundle created: $bundlePath" -Color ([System.Drawing.Color]::ForestGreen)
+    }
+    elseif ($exitCode -eq 0) {
+        Set-StatusMessage -Message "Diagnostics completed, but no bundle zip was found under $diagnosticsOutputRoot." -Color ([System.Drawing.Color]::DarkOrange)
+    }
+    else {
+        Set-StatusMessage -Message "Diagnostics failed with exit code $exitCode." -Color ([System.Drawing.Color]::Firebrick)
+    }
+    Refresh-Status
+})
+
+$qaDocsButton.Add_Click({
+    if (Test-Path $qaDocsRoot) {
+        Start-Process -FilePath "explorer.exe" -ArgumentList $qaDocsRoot | Out-Null
+        Set-StatusMessage -Message "Opened QA docs." -Color ([System.Drawing.Color]::ForestGreen)
+    }
+    else {
+        Set-StatusMessage -Message "QA docs folder not found at $qaDocsRoot" -Color ([System.Drawing.Color]::Firebrick)
+    }
+})
+
+$resetStateButton.Add_Click({
+    $answer = [System.Windows.Forms.MessageBox]::Show(
+        "This backs up and resets all local account/character test state. Logs and diagnostic bundles are preserved. Stop the local stack first. Continue?",
+        "Reset Local Test State",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Warning)
+    if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) {
+        Set-StatusMessage -Message "Reset canceled." -Color ([System.Drawing.Color]::DarkOrange)
+        return
+    }
+
+    Set-StatusMessage -Message "Resetting local test state..." -Color ([System.Drawing.Color]::DodgerBlue)
+    $exitCode = Invoke-WaitingPowerShell -Command "& '$resetStateScript' -All -ConfirmReset"
+    if ($exitCode -eq 0) {
+        Set-StatusMessage -Message "Local test state reset. Logs were preserved." -Color ([System.Drawing.Color]::ForestGreen)
+    }
+    else {
+        Set-StatusMessage -Message "Reset failed with exit code $exitCode. Stop services first or use the script manually with -Force." -Color ([System.Drawing.Color]::Firebrick)
+    }
     Refresh-Status
 })
 

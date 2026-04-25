@@ -558,11 +558,26 @@ foreach ($relativeDoc in @(
     "KnownIssues.md",
     "ReleaseNotes.md",
     "TestFocus.md",
+    "TesterInstructions.md",
+    "PlaytestOperations.md",
     "checklists\closed-alpha-route.md"
 )) {
     $source = Join-Path $qaDocsRoot $relativeDoc
     if (Test-Path $source) {
         Copy-RedactedTextFile $source (Join-Path $docsDestination $relativeDoc) | Out-Null
+    }
+}
+
+$scriptsDestination = Join-Path $bundleRoot "qa-scripts"
+foreach ($scriptName in @(
+    "Collect-Diagnostics.ps1",
+    "Smoke-Test.ps1",
+    "Seed-TestAccount.ps1",
+    "Reset-LocalTestState.ps1"
+)) {
+    $source = Join-Path $PSScriptRoot $scriptName
+    if (Test-Path $source) {
+        Copy-RedactedTextFile $source (Join-Path $scriptsDestination $scriptName) | Out-Null
     }
 }
 

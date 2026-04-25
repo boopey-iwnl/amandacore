@@ -165,6 +165,49 @@ func removeInventorySlotCount(
 	return slot, stackCount, nil
 }
 
+func inventoryItemCount(inventory []platform.CharacterInventorySlot, itemID string) int {
+	if itemID == "" {
+		return 0
+	}
+
+	total := 0
+	for _, slot := range platform.NormalizeInventorySlots(inventory) {
+		if slot.ItemID == itemID && slot.StackCount > 0 {
+			total += slot.StackCount
+		}
+	}
+	return total
+}
+
+func removeInventoryItemCount(inventory *[]platform.CharacterInventorySlot, itemID string, stackCount int) error {
+	if itemID == "" || stackCount <= 0 {
+		return nil
+	}
+	if inventoryItemCount(*inventory, itemID) < stackCount {
+		return fmt.Errorf("not enough materials")
+	}
+
+	slots := platform.NormalizeInventorySlots(*inventory)
+	remaining := stackCount
+	for index := range slots {
+		if slots[index].ItemID != itemID || slots[index].StackCount <= 0 {
+			continue
+		}
+		removed := minInt(remaining, slots[index].StackCount)
+		slots[index].StackCount -= removed
+		remaining -= removed
+		if slots[index].StackCount <= 0 {
+			slots[index] = platform.CharacterInventorySlot{SlotIndex: index}
+		}
+		if remaining <= 0 {
+			*inventory = slots
+			return nil
+		}
+	}
+
+	return fmt.Errorf("not enough materials")
+}
+
 func (s *worldServer) equipInventorySlotLocked(session *worldSessionState, slotIndex int) error {
 	if session == nil {
 		return fmt.Errorf("world session token was not found")
