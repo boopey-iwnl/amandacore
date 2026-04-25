@@ -1,6 +1,6 @@
 # Closed-Alpha Tester Instructions
 
-Use these steps for every assigned closed-alpha build. Stay on the assigned route and report only issues that block or degrade the existing playable slice.
+Use these steps for every assigned Alpha 0.1 release-candidate build. Stay on the assigned route and report only issues that block or degrade the existing playable slice.
 
 ## Start
 
@@ -11,6 +11,7 @@ Use these steps for every assigned closed-alpha build. Stay on the assigned rout
 5. Click `Open Launcher`.
 6. Register or log in with the assigned test account.
 7. Load realms, load characters, create or select a Human Warrior, then join world.
+8. Confirm `Docs\QA\Alpha01FeatureFreeze.md`, `Docs\QA\KnownIssues.md`, and `Docs\QA\ReleaseNotes.md` are present.
 
 ## Assigned Route
 
@@ -26,7 +27,9 @@ Primary areas:
 - map, minimap, navigation markers
 - chat, friends, party if available in the build
 - persistence after exit and local stack restart
-- second-zone handoff if reachable
+- second-zone handoff, professions, chat/friends/party, and dungeon entry only if assigned as optional rough coverage
+
+Do not test guild management, mail, direct trade, auction house, housing/storage, achievements, travel, mounts, or PvP duels unless the build owner explicitly assigns that area. These systems are hidden, disabled, or deferred for Alpha 0.1.
 
 ## Bug Reports
 
@@ -63,3 +66,4 @@ The reset tool backs up state under `%LOCALAPPDATA%\amandacore\state-backups` an
 - If the launcher cannot reach the realm list, restart the local stack once and collect diagnostics if it still fails.
 - If the game client does not launch, collect diagnostics and include the launcher log text.
 - If world state looks corrupted, stop services, collect diagnostics, then reset only when instructed.
+- If a disabled or hidden system is reachable, report it as a release-scope issue instead of continuing deeper into that system.
