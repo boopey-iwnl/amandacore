@@ -1,11 +1,40 @@
-# Alpha 0.1 Release Candidate Notes
+# AmandaCore Alpha 0.1 Release Notes
 
-Build ID: generated per package in `Infra\dev\version-manifest.json`
+Release tag: `alpha-0.1`
+Package asset: `AmandaCore-Alpha-0.1-Windows-x64.zip`
+Package SHA256: `5F09D4224EE51D4C56114B162B1171821992E4625264E3972E9F1F98DF008660`
+Package size: `562,503,909` bytes
+Build label: `amandacore-local-0.1.0+codex-alpha-0-1-all-branch-integration.44c73130765e.20260425085118`
 Package manifest: `release-package-manifest.json`
 
-## Test Scope
+## Scope
 
-This build is for Alpha 0.1 release-candidate validation of the existing playable slice. It does not add gameplay content and should be treated as feature frozen.
+Alpha 0.1 is a closed test build for the current playable slice. It covers local launcher startup, account and realm flow, Human Warrior character creation, Stonewake Vale world entry, the assigned quest route, combat, hostile AI, trainer/vendor/inventory/equipment flow, map/minimap support, persistence, diagnostics, and recovery tooling.
+
+This build is feature frozen for the Alpha 0.1 test pass. Testers should use the assigned route and file only issues that block or degrade the existing playable slice, packaging, diagnostics, local reset, or tester instructions.
+
+## Extract And Run
+
+1. Download `AmandaCore-Alpha-0.1-Windows-x64.zip` from the GitHub release.
+2. Extract it to a short writable path, for example `C:\AmandaCoreAlpha01`.
+3. Open `Infra\dev\Launch-LocalOpsGui.cmd`.
+4. Click `Start Services`.
+5. Wait until all services show healthy.
+6. Click `Open Launcher`.
+7. Register or log in, load realms, create or select a Human Warrior, and join the world.
+8. Follow `Docs\QA\checklists\closed-alpha-route.md`.
+
+If Local Ops is unavailable, start from an elevated PowerShell in the extracted package root:
+
+```powershell
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "& '.\Infra\dev\start-local.ps1' -BuildFirst:`$false -StartLauncher"
+```
+
+Stop local services after testing:
+
+```powershell
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Infra\dev\stop-local.ps1
+```
 
 ## Included Test Areas
 
@@ -20,23 +49,32 @@ This build is for Alpha 0.1 release-candidate validation of the existing playabl
 - Structured bug report and checklist templates
 - Optional rough validation for professions, second-zone handoff, chat/friends/party, and dungeon entry only when assigned
 
-## Out of Scope
+## Rough Or Deferred Systems
 
-- New races, classes, zones, raids, PvP modes, guild features, auction house, mail, housing, achievements, travel, or mounts
-- Public launch operations
-- External bug tracking integration
-- Production telemetry
-- Cloud operations or load testing
+- Professions, second-zone handoff, chat/friends/party, and dungeon entry are rough optional coverage only when assigned.
+- Guild management, mail, direct trade, auction house, housing/storage, achievements/titles/collections, travel, mounts, and PvP duels are hidden, disabled, or deferred.
+- Admin/support tools are build-owner tools and must stay admin-gated.
+- Cloud operations, public launch operations, production telemetry, load testing, external bug tracking, monetization, and anti-cheat are out of scope.
 
-## Disabled Or Hidden
+## Known Issues
 
-- PvP duels are disabled in local Alpha 0.1 startup.
-- Guild, mail, trade, auction, housing/storage, achievements/titles/collections, travel, and mounts are not part of the main tester flow.
-- Admin/support tools are for build owners only and must stay admin-gated.
+No approved duplicate known issues are listed for this build. Use `Docs\QA\KnownIssues.md` for the current known-issue table and scope notes.
 
-## Reporting
+## Diagnostics And Reports
 
-For every `FAIL` or `BLOCKED` checklist item, attach a diagnostic bundle and complete `bug-report-template.md`.
+For every `FAIL` or `BLOCKED` checklist item:
+
+1. Click `Collect Diagnostics` in Local Ops, or run:
+
+   ```powershell
+   powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Infra\qa\Collect-Diagnostics.ps1
+   ```
+
+2. Attach the diagnostic zip from `%LOCALAPPDATA%\amandacore\diagnostics`.
+3. Complete `Docs\QA\bug-report-template.md`.
+4. Include the completed route checklist.
+
+Do not include real passwords, private keys, personal documents, or unrelated screenshots.
 
 ## Local QA Tools
 
