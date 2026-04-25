@@ -871,6 +871,7 @@ namespace GameCore
 
         ApplyWorldSessionResponse(AZStd::move(response), "reconnect");
         m_worldState.m_worldConnected = true;
+        PollSocialState();
         AZ_Printf(
             "amandacore",
             "client.world_connected reconnect=true token=%s position=(%.3f, %.3f, %.3f)",
@@ -990,6 +991,7 @@ namespace GameCore
         m_worldState.m_bootstrapReady = true;
         m_worldState.m_worldConnected = true;
         m_worldState.m_errorMessage.clear();
+        PollSocialState();
         AZ_Printf(
             "amandacore",
             "client.world_bootstrap_applied zone=%s cell=%s revision=%s motd=%s",
@@ -1023,6 +1025,50 @@ namespace GameCore
         LogAbilityStateIfChanged(previousSession, source);
         LogQuestStateIfChanged(previousSession, source);
         LogTrainerStateIfChanged(previousSession, source);
+        return true;
+    }
+
+    bool GameCoreSystemComponent::ApplySocialStateResponse(NetClient::SocialStateResponse&& response, const char* source)
+    {
+        for (const auto& message : response.m_chatMessages)
+        {
+            const bool alreadyPresent = AZStd::find_if(
+                m_worldState.m_social.m_chatMessages.begin(),
+                m_worldState.m_social.m_chatMessages.end(),
+                [&message](const NetClient::ChatMessageState& existing)
+                {
+                    return existing.m_messageId == message.m_messageId;
+                }) != m_worldState.m_social.m_chatMessages.end();
+            if (alreadyPresent)
+            {
+                continue;
+            }
+
+            m_worldState.m_social.m_chatMessages.push_back(message);
+            if (!message.m_messageId.empty())
+            {
+                m_lastChatMessageId = message.m_messageId;
+            }
+        }
+
+        while (m_worldState.m_social.m_chatMessages.size() > 120)
+        {
+            m_worldState.m_social.m_chatMessages.erase(m_worldState.m_social.m_chatMessages.begin());
+        }
+
+        m_worldState.m_social.m_friends = AZStd::move(response.m_friends);
+        m_worldState.m_social.m_hasParty = response.m_hasParty;
+        m_worldState.m_social.m_party = AZStd::move(response.m_party);
+        m_worldState.m_social.m_partyInvites = AZStd::move(response.m_partyInvites);
+
+        AZ_Printf(
+            "amandacore",
+            "client.social_state_applied source=%s messages=%zu friends=%zu party=%s invites=%zu",
+            source,
+            m_worldState.m_social.m_chatMessages.size(),
+            m_worldState.m_social.m_friends.size(),
+            m_worldState.m_social.m_hasParty ? "true" : "false",
+            m_worldState.m_social.m_partyInvites.size());
         return true;
     }
 
@@ -1145,6 +1191,33 @@ namespace GameCore
 
         m_worldState.m_errorMessage.clear();
         ApplyWorldSessionResponse(AZStd::move(response), "state");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::PollSocialState()
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->SocialState(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                m_lastChatMessageId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "Social state poll failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "social_state");
         return true;
     }
 

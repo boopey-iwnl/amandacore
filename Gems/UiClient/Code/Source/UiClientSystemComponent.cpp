@@ -732,6 +732,37 @@ namespace UiClient
                 }
             };
 
+            for (const auto& marker : worldState.m_session.m_mapMarkers)
+            {
+                ImU32 color = ColorU32(226, 183, 74);
+                float pointRadius = 4.0f;
+                if (marker.m_kind == "quest_turn_in")
+                {
+                    color = ColorU32(76, 218, 141);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "quest_available")
+                {
+                    color = ColorU32(214, 194, 84);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "tracked_objective" || marker.m_kind == "quest_objective")
+                {
+                    color = ColorU32(228, 111, 54);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "trainer")
+                {
+                    color = ColorU32(88, 165, 235);
+                    pointRadius = 5.0f;
+                }
+                else if (marker.m_kind == "vendor")
+                {
+                    color = ColorU32(183, 135, 223);
+                    pointRadius = 5.0f;
+                }
+                plotWorldPoint(static_cast<float>(marker.m_x), static_cast<float>(marker.m_y), color, pointRadius);
+            }
             plotWorldPoint(EncounterAnchorX, EncounterAnchorY, ColorU32(228, 111, 54), 5.0f);
             for (const auto& entity : worldState.m_session.m_entities)
             {
@@ -758,6 +789,109 @@ namespace UiClient
                 ImVec2(center.x + 7.0f, center.y + 8.0f),
                 ColorU32(226, 240, 243));
             ImGui::TextUnformatted("Markers: quest giver, trainer, route, hostiles");
+        }
+
+        ImU32 MapMarkerColor(const AZStd::string& kind)
+        {
+            if (kind == "quest_turn_in")
+            {
+                return ColorU32(76, 218, 141);
+            }
+            if (kind == "quest_available")
+            {
+                return ColorU32(214, 194, 84);
+            }
+            if (kind == "tracked_objective" || kind == "quest_objective")
+            {
+                return ColorU32(228, 111, 54);
+            }
+            if (kind == "trainer")
+            {
+                return ColorU32(88, 165, 235);
+            }
+            if (kind == "vendor")
+            {
+                return ColorU32(183, 135, 223);
+            }
+            return ColorU32(210, 210, 198);
+        }
+
+        void DrawZoneMapWindow(
+            const GameCore::ClientWorldState& worldState,
+            float playerX,
+            float playerY)
+        {
+            const auto& zoneMap = worldState.m_session.m_zoneMap;
+            ImGui::Text("%s", zoneMap.m_displayName.empty() ? "Stonewake Vale" : zoneMap.m_displayName.c_str());
+            ImGui::TextUnformatted("Authored navigation blockout");
+
+            const ImVec2 canvasSize(590.0f, 360.0f);
+            const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
+            ImGui::InvisibleButton("##stonewake_zone_map_canvas", canvasSize);
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
+            drawList->AddRectFilled(canvasMin, canvasMax, ColorU32(18, 25, 29, 245), 6.0f);
+            drawList->AddRect(canvasMin, canvasMax, ColorU32(126, 132, 117), 6.0f, 0, 1.5f);
+
+            const double minX = zoneMap.m_minX;
+            const double minY = zoneMap.m_minY;
+            const double width = (zoneMap.m_maxX - zoneMap.m_minX) > 1.0 ? (zoneMap.m_maxX - zoneMap.m_minX) : 1.0;
+            const double height = (zoneMap.m_maxY - zoneMap.m_minY) > 1.0 ? (zoneMap.m_maxY - zoneMap.m_minY) : 1.0;
+            auto mapToScreen = [&](double x, double y) -> ImVec2
+            {
+                const float normalizedX = static_cast<float>((x - minX) / width);
+                const float normalizedY = static_cast<float>((y - minY) / height);
+                return ImVec2(
+                    canvasMin.x + 18.0f + (normalizedX * (canvasSize.x - 36.0f)),
+                    canvasMax.y - 18.0f - (normalizedY * (canvasSize.y - 36.0f)));
+            };
+
+            for (const auto& road : zoneMap.m_roads)
+            {
+                for (size_t pointIndex = 1; pointIndex < road.m_points.size(); ++pointIndex)
+                {
+                    const ImVec2 previous = mapToScreen(road.m_points[pointIndex - 1].m_x, road.m_points[pointIndex - 1].m_y);
+                    const ImVec2 current = mapToScreen(road.m_points[pointIndex].m_x, road.m_points[pointIndex].m_y);
+                    drawList->AddLine(previous, current, ColorU32(136, 112, 70), 4.0f);
+                    drawList->AddLine(previous, current, ColorU32(196, 169, 103), 1.5f);
+                }
+            }
+
+            for (const auto& area : worldState.m_session.m_navigationAreas)
+            {
+                const ImVec2 center = mapToScreen(area.m_centerX, area.m_centerY);
+                const float radius = static_cast<float>((area.m_radius / width) * (canvasSize.x - 36.0f));
+                const ImU32 areaColor = area.m_kind == "hostile_objective" ? ColorU32(135, 74, 52, 65) : ColorU32(72, 121, 112, 55);
+                drawList->AddCircleFilled(center, AZ::GetClamp(radius, 8.0f, 42.0f), areaColor, 32);
+                drawList->AddCircle(center, AZ::GetClamp(radius, 8.0f, 42.0f), ColorU32(178, 166, 124, 130), 32, 1.0f);
+            }
+
+            for (const auto& landmark : zoneMap.m_landmarks)
+            {
+                const ImVec2 point = mapToScreen(landmark.m_x, landmark.m_y);
+                drawList->AddCircleFilled(point, 3.5f, ColorU32(199, 211, 194), 16);
+                drawList->AddText(ImVec2(point.x + 5.0f, point.y - 7.0f), ColorU32(223, 219, 199), landmark.m_displayName.c_str());
+            }
+
+            for (const auto& marker : worldState.m_session.m_mapMarkers)
+            {
+                const ImVec2 point = mapToScreen(marker.m_x, marker.m_y);
+                drawList->AddCircleFilled(point, 6.0f, MapMarkerColor(marker.m_kind), 20);
+                drawList->AddCircle(point, 7.5f, ColorU32(21, 25, 27), 20, 1.5f);
+                if (!marker.m_displayName.empty())
+                {
+                    drawList->AddText(ImVec2(point.x + 8.0f, point.y - 8.0f), ColorU32(240, 232, 206), marker.m_displayName.c_str());
+                }
+            }
+
+            const ImVec2 playerPoint = mapToScreen(playerX, playerY);
+            drawList->AddTriangleFilled(
+                ImVec2(playerPoint.x, playerPoint.y - 9.0f),
+                ImVec2(playerPoint.x - 7.0f, playerPoint.y + 7.0f),
+                ImVec2(playerPoint.x + 7.0f, playerPoint.y + 7.0f),
+                ColorU32(226, 240, 243));
+
+            ImGui::TextUnformatted("Legend: gold available, green turn-in, rust objective, blue trainer, violet vendor");
         }
 
         void DrawFriendlyNpcNameplates(
@@ -1607,6 +1741,7 @@ namespace UiClient
             AZStd::string& bagBinding,
             AZStd::string& characterBinding,
             AZStd::string& questLogBinding,
+            AZStd::string& mapBinding,
             AZStd::string& settingsBinding,
             AZStd::string& interactBinding,
             AZStd::string& targetHostileBinding,
@@ -1638,6 +1773,7 @@ namespace UiClient
                         changed |= DrawKeyBindingRow("Bag", "bag", bagBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Character", "character", characterBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Quest Log", "questLog", questLogBinding, pendingKeybindActionId);
+                        changed |= DrawKeyBindingRow("Map", "map", mapBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Settings/Menu", "settings", settingsBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Interact", "interact", interactBinding, pendingKeybindActionId);
                         changed |= DrawKeyBindingRow("Target Hostile", "targetHostile", targetHostileBinding, pendingKeybindActionId);
@@ -1815,6 +1951,7 @@ namespace UiClient
         void DrawMicroMenuBar(
             bool& characterSheetOpen,
             bool& questLogOpen,
+            bool& mapOpen,
             bool& spellbookOpen,
             bool& bagOpen,
             bool& settingsOpen)
@@ -1828,6 +1965,7 @@ namespace UiClient
             MenuButtonState buttons[] = {
                 {"Character", &characterSheetOpen},
                 {"Quest Log", &questLogOpen},
+                {"Map", &mapOpen},
                 {"Spellbook", &spellbookOpen},
                 {"Bag", &bagOpen},
                 {"Settings", &settingsOpen},

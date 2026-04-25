@@ -55,6 +55,7 @@ namespace UiClient
             GameCore::IGameCoreRequests* gameCore,
             const NetClient::VisibleEntity& entity,
             const char* source);
+        bool SubmitChatInput(GameCore::IGameCoreRequests* gameCore, const AZStd::string& input);
 
         AZStd::string m_lastQuestState;
         int m_lastQuestCount = -1;
@@ -72,6 +73,7 @@ namespace UiClient
         bool m_trainerOpen = false;
         bool m_bagOpen = false;
         bool m_settingsOpen = false;
+        bool m_socialOpen = false;
         bool m_characterSheetOpen = false;
         bool m_questLogOpen = false;
         bool m_mapOpen = false;
@@ -95,6 +97,10 @@ namespace UiClient
         AZStd::string m_settingsBinding;
         AZStd::string m_interactBinding;
         AZStd::string m_targetHostileBinding;
+        AZStd::string m_chatChannel = "say";
+        char m_chatInputBuffer[257]{};
+        char m_chatWhisperTargetBuffer[65]{};
+        char m_socialNameBuffer[65]{};
         int m_pendingActionMoveSlot = -1;
         int m_pendingInventoryMoveSlot = -1;
     };
