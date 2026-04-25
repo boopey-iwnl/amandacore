@@ -449,312 +449,6 @@ func (s *worldServer) handlePartyDisband(w http.ResponseWriter, r *http.Request)
 	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
 }
 
-func (s *worldServer) handleGuildCreate(w http.ResponseWriter, r *http.Request) {
-	var request guildCreateRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	if s.store == nil {
-		httpapi.Error(w, http.StatusServiceUnavailable, "store_unavailable", "Guild persistence is unavailable.")
-		return
-	}
-	guildName, err := validateGuildName(request.GuildName)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_name_invalid", err.Error())
-		return
-	}
-
-	guild, err := s.store.CreateGuild(guildName, session.CharacterID)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_create_failed", err.Error())
-		return
-	}
-
-	s.sendSystemMessageLocked(fmt.Sprintf("Guild %s created.", guild.GuildName), recipientSet(session.CharacterID))
-	httpapi.WriteJSON(w, http.StatusCreated, s.buildSocialStateLocked(session, ""))
-}
-
-func (s *worldServer) handleGuildInvite(w http.ResponseWriter, r *http.Request) {
-	var request guildInviteRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	if s.store == nil {
-		httpapi.Error(w, http.StatusServiceUnavailable, "store_unavailable", "Guild persistence is unavailable.")
-		return
-	}
-	if err := s.store.CleanupExpiredGuildInvites(time.Now().Unix()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "guild_invite_cleanup_failed", err.Error())
-		return
-	}
-
-	guild, err := s.store.GetGuildForCharacter(session.CharacterID)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_missing", "You are not in a guild.")
-		return
-	}
-	if !guildMemberHasPermission(*guild, session.CharacterID, platform.GuildPermissionInviteMember) {
-		httpapi.Error(w, http.StatusBadRequest, "guild_permission_denied", "You do not have permission to invite guild members.")
-		return
-	}
-
-	target, err := s.store.GetCharacterByName(session.RealmID, request.TargetName)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_invite_target_missing", "Target character not found.")
-		return
-	}
-	if target.ID == session.CharacterID {
-		httpapi.Error(w, http.StatusBadRequest, "guild_invite_self", "Cannot invite yourself.")
-		return
-	}
-	if targetGuild, err := s.store.GetGuildForCharacter(target.ID); err == nil && targetGuild != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_target_already_member", "Target player is already in a guild.")
-		return
-	}
-
-	expiresAt := time.Now().Add(guildInviteTTL).Unix()
-	invite, err := s.store.CreateGuildInvite(guild.ID, session.CharacterID, target.ID, expiresAt)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_invite_failed", err.Error())
-		return
-	}
-
-	s.sendSystemMessageLocked(fmt.Sprintf("Guild invite sent to %s.", target.DisplayName), recipientSet(session.CharacterID))
-	s.sendSystemMessageLocked(fmt.Sprintf("%s invited you to join %s.", session.DisplayName, invite.GuildName), recipientSet(target.ID))
-	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
-}
-
-func (s *worldServer) handleGuildAccept(w http.ResponseWriter, r *http.Request) {
-	var request guildInviteActionRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	guild, recipients, err := s.acceptGuildInviteLocked(session, request.InviteID)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_accept_failed", err.Error())
-		return
-	}
-
-	s.sendSystemMessageLocked(fmt.Sprintf("%s joined %s.", session.DisplayName, guild.GuildName), recipients)
-	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
-}
-
-func (s *worldServer) handleGuildDecline(w http.ResponseWriter, r *http.Request) {
-	var request guildInviteActionRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	if s.store == nil {
-		httpapi.Error(w, http.StatusServiceUnavailable, "store_unavailable", "Guild persistence is unavailable.")
-		return
-	}
-	_ = s.store.CleanupExpiredGuildInvites(time.Now().Unix())
-	invite, err := s.store.GetGuildInvite(request.InviteID)
-	if err != nil || invite.TargetCharacterID != session.CharacterID {
-		httpapi.Error(w, http.StatusBadRequest, "guild_invite_missing", "Guild invite was not found.")
-		return
-	}
-	if err := s.store.DeleteGuildInvite(invite.InviteID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_decline_failed", err.Error())
-		return
-	}
-
-	s.sendSystemMessageLocked("Guild invite declined.", recipientSet(session.CharacterID, invite.InviterCharacterID))
-	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
-}
-
-func (s *worldServer) handleGuildLeave(w http.ResponseWriter, r *http.Request) {
-	var request partyActionRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	guild, err := s.store.GetGuildForCharacter(session.CharacterID)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_missing", "You are not in a guild.")
-		return
-	}
-	if guild.LeaderCharacterID == session.CharacterID {
-		httpapi.Error(w, http.StatusBadRequest, "guild_leader_leave_blocked", "Guild leaders must disband the guild.")
-		return
-	}
-	recipients := guildRecipientSet(*guild)
-	guild.Members = removeGuildMember(guild.Members, session.CharacterID)
-	if _, err := s.store.SaveGuild(*guild); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_leave_failed", err.Error())
-		return
-	}
-	s.sendSystemMessageLocked(fmt.Sprintf("%s left the guild.", session.DisplayName), recipients)
-	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
-}
-
-func (s *worldServer) handleGuildDisband(w http.ResponseWriter, r *http.Request) {
-	var request partyActionRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	guild, err := s.store.GetGuildForCharacter(session.CharacterID)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_missing", "You are not in a guild.")
-		return
-	}
-	if !guildMemberHasPermission(*guild, session.CharacterID, platform.GuildPermissionDisbandGuild) {
-		httpapi.Error(w, http.StatusBadRequest, "guild_permission_denied", "You do not have permission to disband the guild.")
-		return
-	}
-	recipients := guildRecipientSet(*guild)
-	if err := s.store.DeleteGuild(guild.ID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_disband_failed", err.Error())
-		return
-	}
-	s.sendSystemMessageLocked(fmt.Sprintf("%s disbanded.", guild.GuildName), recipients)
-	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
-}
-
-func (s *worldServer) handleGuildPromote(w http.ResponseWriter, r *http.Request) {
-	s.handleGuildRankChange(w, r, true)
-}
-
-func (s *worldServer) handleGuildDemote(w http.ResponseWriter, r *http.Request) {
-	s.handleGuildRankChange(w, r, false)
-}
-
-func (s *worldServer) handleGuildRemove(w http.ResponseWriter, r *http.Request) {
-	var request guildMemberActionRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	guild, target, err := s.resolveGuildTargetLocked(session, request.TargetName)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_remove_failed", err.Error())
-		return
-	}
-	if target.CharacterID == session.CharacterID {
-		httpapi.Error(w, http.StatusBadRequest, "guild_remove_self", "Use leave guild instead.")
-		return
-	}
-	if !guildMemberHasPermission(*guild, session.CharacterID, platform.GuildPermissionRemoveMember) ||
-		!guildCanActOnMember(*guild, session.CharacterID, target.CharacterID) {
-		httpapi.Error(w, http.StatusBadRequest, "guild_permission_denied", "You do not have permission to remove that guild member.")
-		return
-	}
-
-	recipients := guildRecipientSet(*guild)
-	guild.Members = removeGuildMember(guild.Members, target.CharacterID)
-	if _, err := s.store.SaveGuild(*guild); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_remove_failed", err.Error())
-		return
-	}
-	s.sendSystemMessageLocked(fmt.Sprintf("%s was removed from the guild.", target.DisplayName), recipients)
-	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
-}
-
-func (s *worldServer) handleGuildMOTD(w http.ResponseWriter, r *http.Request) {
-	var request guildMOTDRequest
-	if err := httpapi.DecodeJSON(r, &request); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	guild, err := s.store.GetGuildForCharacter(session.CharacterID)
-	if err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_missing", "You are not in a guild.")
-		return
-	}
-	if !guildMemberHasPermission(*guild, session.CharacterID, platform.GuildPermissionEditMOTD) {
-		httpapi.Error(w, http.StatusBadRequest, "guild_permission_denied", "You do not have permission to edit the guild message.")
-		return
-	}
-	guild.MessageOfTheDay = strings.TrimSpace(request.MessageOfTheDay)
-	if len(guild.MessageOfTheDay) > 160 {
-		httpapi.Error(w, http.StatusBadRequest, "guild_motd_too_long", "Guild message of the day cannot exceed 160 characters.")
-		return
-	}
-	if _, err := s.store.SaveGuild(*guild); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "guild_motd_failed", err.Error())
-		return
-	}
-	s.sendSystemMessageLocked("Guild message of the day updated.", guildRecipientSet(*guild))
-	httpapi.WriteJSON(w, http.StatusOK, s.buildSocialStateLocked(session, ""))
-}
-
 func (s *worldServer) sendChatMessageLocked(session *worldSessionState, request chatSendRequest) error {
 	channel := strings.ToLower(strings.TrimSpace(request.Channel))
 	messageText := strings.TrimSpace(request.MessageText)
@@ -837,7 +531,7 @@ func (s *worldServer) sendChatMessageLocked(session *worldSessionState, request 
 			SenderDisplayName: session.DisplayName,
 			GuildID:           guild.ID,
 			MessageText:       messageText,
-		}, guildRecipientSet(*guild))
+		}, s.onlineGuildRecipientSetLocked(*guild))
 		return nil
 	default:
 		return fmt.Errorf("unsupported chat channel")
@@ -1331,6 +1025,142 @@ func recipientSet(characterIDs ...string) map[string]struct{} {
 		recipients[characterID] = struct{}{}
 	}
 	return recipients
+}
+
+func guildRecipientSet(guild platform.Guild) map[string]struct{} {
+	recipients := map[string]struct{}{}
+	for _, member := range guild.Members {
+		if strings.TrimSpace(member.CharacterID) == "" {
+			continue
+		}
+		recipients[member.CharacterID] = struct{}{}
+	}
+	return recipients
+}
+
+func (s *worldServer) onlineGuildRecipientSetLocked(guild platform.Guild) map[string]struct{} {
+	recipients := map[string]struct{}{}
+	for _, member := range guild.Members {
+		if s.findConnectedSessionByCharacterLocked(member.CharacterID) == nil {
+			continue
+		}
+		recipients[member.CharacterID] = struct{}{}
+	}
+	return recipients
+}
+
+func validateGuildName(name string) (string, error) {
+	trimmed := strings.Join(strings.Fields(strings.TrimSpace(name)), " ")
+	if len(trimmed) < guildNameMinLength {
+		return "", fmt.Errorf("guild name must be at least %d characters", guildNameMinLength)
+	}
+	if len(trimmed) > guildNameMaxLength {
+		return "", fmt.Errorf("guild name cannot exceed %d characters", guildNameMaxLength)
+	}
+	for _, r := range trimmed {
+		if r < 32 || r == 127 {
+			return "", fmt.Errorf("guild name contains unsupported characters")
+		}
+	}
+	return trimmed, nil
+}
+
+func guildMemberByID(guild platform.Guild, characterID string) (platform.GuildMember, bool) {
+	for _, member := range guild.Members {
+		if member.CharacterID == characterID {
+			return member, true
+		}
+	}
+	return platform.GuildMember{}, false
+}
+
+func guildRankByID(guild platform.Guild, rankID string) platform.GuildRank {
+	for _, rank := range guild.Ranks {
+		if rank.RankID == rankID {
+			return rank
+		}
+	}
+	for _, rank := range platform.DefaultGuildRanks() {
+		if rank.RankID == rankID {
+			return rank
+		}
+	}
+	return platform.DefaultGuildRanks()[len(platform.DefaultGuildRanks())-1]
+}
+
+func guildMemberHasPermission(guild platform.Guild, characterID string, permission string) bool {
+	member, ok := guildMemberByID(guild, characterID)
+	if !ok {
+		return false
+	}
+	rank := guildRankByID(guild, member.RankID)
+	for _, allowed := range rank.Permissions {
+		if allowed == permission {
+			return true
+		}
+	}
+	return false
+}
+
+func guildCanActOnMember(guild platform.Guild, actorCharacterID string, targetCharacterID string) bool {
+	actor, ok := guildMemberByID(guild, actorCharacterID)
+	if !ok {
+		return false
+	}
+	target, ok := guildMemberByID(guild, targetCharacterID)
+	if !ok {
+		return false
+	}
+	if target.RankID == platform.GuildRankLeader {
+		return false
+	}
+	return guildRankByID(guild, actor.RankID).Priority < guildRankByID(guild, target.RankID).Priority
+}
+
+func guildCanAssignRank(guild platform.Guild, actorCharacterID string, rankID string) bool {
+	actor, ok := guildMemberByID(guild, actorCharacterID)
+	if !ok {
+		return false
+	}
+	if rankID == platform.GuildRankLeader {
+		return false
+	}
+	return guildRankByID(guild, actor.RankID).Priority < guildRankByID(guild, rankID).Priority
+}
+
+func nextGuildRank(guild platform.Guild, currentRankID string, promote bool) (platform.GuildRank, bool) {
+	current := guildRankByID(guild, currentRankID)
+	ranks := append([]platform.GuildRank(nil), guild.Ranks...)
+	sort.Slice(ranks, func(left int, right int) bool {
+		return ranks[left].Priority < ranks[right].Priority
+	})
+	for index, rank := range ranks {
+		if rank.RankID != current.RankID {
+			continue
+		}
+		if promote {
+			if index <= 0 {
+				return platform.GuildRank{}, false
+			}
+			return ranks[index-1], true
+		}
+		if index >= len(ranks)-1 {
+			return platform.GuildRank{}, false
+		}
+		return ranks[index+1], true
+	}
+	return platform.GuildRank{}, false
+}
+
+func removeGuildMember(members []platform.GuildMember, characterID string) []platform.GuildMember {
+	remaining := make([]platform.GuildMember, 0, len(members))
+	for _, member := range members {
+		if member.CharacterID == characterID {
+			continue
+		}
+		remaining = append(remaining, member)
+	}
+	return remaining
 }
 
 func chatMessageSequence(messageID string) int64 {

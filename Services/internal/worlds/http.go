@@ -300,17 +300,29 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nextX, nextY := resolveStarterZoneMovement(session.X, session.Y, request.DeltaX, request.DeltaY)
+	nextX, nextY := s.resolveMovementLocked(session, request.DeltaX, request.DeltaY)
 	session.X = nextX
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
 
-	persistStartedAt := time.Now()
-	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
-	s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
-	if err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
-		return
+	var character *platform.Character
+	if session.InstanceID == "" {
+		persistStartedAt := time.Now()
+		var err error
+		character, err = s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
+		s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
+		if err != nil {
+			httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
+			return
+		}
+	} else {
+		character = &platform.Character{
+			ID:        session.CharacterID,
+			ZoneID:    session.ZoneID,
+			PositionX: session.X,
+			PositionY: session.Y,
+			PositionZ: session.Z,
+		}
 	}
 
 	observability.LogEvent("world-service", "world.character_saved", map[string]any{
@@ -352,9 +364,19 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	session.LastSeenAt = time.Now().Unix()
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
+	if session.InstanceID != "" {
+		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
+			delete(instance.PlayersInside, session.CharacterID)
+			s.markDungeonEmptyIfNeededLocked(instance)
+		}
+	}
 
 	persistStartedAt := time.Now()
-	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
+	persistZoneID, persistX, persistY, persistZ := session.ZoneID, session.X, session.Y, session.Z
+	if session.InstanceID != "" && session.ReturnZoneID != "" {
+		persistZoneID, persistX, persistY, persistZ = session.ReturnZoneID, session.ReturnX, session.ReturnY, session.ReturnZ
+	}
+	character, err := s.store.UpdateCharacterState(session.CharacterID, persistZoneID, persistX, persistY, persistZ)
 	s.recordPersistenceDuration("character_state_disconnect", persistStartedAt, err)
 	if err != nil {
 		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
@@ -915,6 +937,7 @@ func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
 func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 	s.ensureMobsLocked()
 	s.ensureGatheringNodesLocked()
+	s.recoverExpiredDungeonSessionLocked(session)
 	s.touchSessionLocked(session)
 
 	if session.QuestProgress == nil {
@@ -949,6 +972,9 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 
 	nowMs := nowMillis()
 	for _, nodeID := range s.gatheringNodeOrder {
+		if session.InstanceID != "" {
+			break
+		}
 		node := s.gatheringNodes[nodeID]
 		if node == nil {
 			continue
@@ -963,8 +989,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		entities = append(entities, buildGatheringNodeEntity(node, nowMs))
 	}
 
-	for _, mobID := range s.mobOrder {
-		mob := s.mobs[mobID]
+	for _, mob := range s.hostileMobsForSessionLocked(session) {
 		if mob == nil || mob.ZoneID != session.ZoneID {
 			continue
 		}
@@ -988,7 +1013,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 	}
 
 	for _, candidate := range s.sessionsByToken {
-		if candidate.Token == session.Token || !candidate.Connected || candidate.ZoneID != session.ZoneID {
+		if candidate.Token == session.Token || !candidate.Connected || candidate.ZoneID != session.ZoneID || candidate.InstanceID != session.InstanceID {
 			continue
 		}
 
@@ -1048,6 +1073,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"zoneMap":              s.buildZoneMapResponse(session.ZoneID),
 		"navigationAreas":      s.buildNavigationAreasResponse(),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
+		"instance":             s.buildDungeonInstanceResponse(session),
 		"currentTargetId":      session.CurrentTargetID,
 		"autoAttackActive":     session.AutoAttackActive,
 		"globalCooldownEndsAt": session.GlobalCooldownEnds,

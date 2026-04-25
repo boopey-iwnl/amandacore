@@ -119,8 +119,8 @@ const (
 	GuildRankMember  = "member"
 	GuildRankRecruit = "recruit"
 
-	GuildPermissionInviteMember = "invite_member"
-	GuildPermissionRemoveMember = "remove_member"
+	GuildPermissionInviteMember  = "invite_member"
+	GuildPermissionRemoveMember  = "remove_member"
 	GuildPermissionPromoteMember = "promote_member"
 	GuildPermissionDemoteMember  = "demote_member"
 	GuildPermissionEditMOTD      = "edit_motd"
@@ -135,13 +135,13 @@ type GuildRank struct {
 }
 
 type GuildMember struct {
-	CharacterID string `json:"characterId"`
-	DisplayName string `json:"displayName"`
-	RaceID      string `json:"raceId"`
-	ClassID     string `json:"classId"`
-	Level       int    `json:"level"`
-	RankID      string `json:"rankId"`
-	JoinedAt    int64  `json:"joinedAt"`
+	CharacterID  string `json:"characterId"`
+	DisplayName  string `json:"displayName"`
+	RaceID       string `json:"raceId"`
+	ClassID      string `json:"classId"`
+	Level        int    `json:"level"`
+	RankID       string `json:"rankId"`
+	JoinedAt     int64  `json:"joinedAt"`
 	LastOnlineAt int64  `json:"lastOnlineAt"`
 }
 
