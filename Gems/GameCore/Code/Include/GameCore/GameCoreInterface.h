@@ -27,6 +27,8 @@ namespace GameCore
         AZStd::string m_errorMessage;
         NetClient::WorldBootstrapResponse m_bootstrap;
         NetClient::WorldSessionResponse m_session;
+        NetClient::SocialStateResponse m_social;
+        NetClient::AuctionStateResponse m_auction;
         AZStd::string m_pendingInteractionEntityId;
         AZ::u64 m_pendingInteractionSequence = 0;
     };
@@ -67,13 +69,50 @@ namespace GameCore
         virtual bool SetTarget(const AZStd::string& targetId) = 0;
         virtual bool InteractWithEntity(const AZStd::string& entityId) = 0;
         virtual bool AcceptQuest(const AZStd::string& questId) = 0;
+        virtual bool EnterDungeon(const AZStd::string& dungeonId) = 0;
+        virtual bool ExitDungeon() = 0;
+        virtual bool TrackQuest(const AZStd::string& questId, bool tracked) = 0;
         virtual bool SetAutoAttack(bool enabled) = 0;
         virtual bool ActivateAbility(const AZStd::string& abilityId) = 0;
+        virtual bool RequestDuel(const AZStd::string& targetCharacterId, const AZStd::string& targetName) = 0;
+        virtual bool AcceptDuel(const AZStd::string& duelId) = 0;
+        virtual bool DeclineDuel(const AZStd::string& duelId) = 0;
+        virtual bool CancelDuel(const AZStd::string& duelId) = 0;
+        virtual bool SurrenderDuel(const AZStd::string& duelId) = 0;
         virtual bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) = 0;
+        virtual bool SelectTalent(const AZStd::string& talentId) = 0;
         virtual bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) = 0;
         virtual bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) = 0;
         virtual bool ClearActionBarSlot(int slotIndex) = 0;
         virtual bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) = 0;
+        virtual bool BrowseAuctions(
+            const AZStd::string& search,
+            const AZStd::string& itemType,
+            const AZStd::string& sort) = 0;
+        virtual bool ListAuctionItem(int slotIndex, int stackCount, int buyoutCopper, AZ::s64 durationSeconds) = 0;
+        virtual bool BuyoutAuction(const AZStd::string& auctionId) = 0;
+        virtual bool CancelAuction(const AZStd::string& auctionId) = 0;
+        virtual bool SubmitChatMessage(
+            const AZStd::string& channel,
+            const AZStd::string& targetName,
+            const AZStd::string& messageText) = 0;
+        virtual bool AddFriend(const AZStd::string& name) = 0;
+        virtual bool RemoveFriend(const AZStd::string& name) = 0;
+        virtual bool InviteParty(const AZStd::string& targetName, const AZStd::string& targetCharacterId) = 0;
+        virtual bool AcceptPartyInvite(const AZStd::string& inviteId) = 0;
+        virtual bool DeclinePartyInvite(const AZStd::string& inviteId) = 0;
+        virtual bool LeaveParty() = 0;
+        virtual bool DisbandParty() = 0;
+        virtual bool CreateGuild(const AZStd::string& guildName) = 0;
+        virtual bool InviteGuild(const AZStd::string& targetName) = 0;
+        virtual bool AcceptGuildInvite(const AZStd::string& inviteId) = 0;
+        virtual bool DeclineGuildInvite(const AZStd::string& inviteId) = 0;
+        virtual bool LeaveGuild() = 0;
+        virtual bool DisbandGuild() = 0;
+        virtual bool PromoteGuildMember(const AZStd::string& targetName) = 0;
+        virtual bool DemoteGuildMember(const AZStd::string& targetName) = 0;
+        virtual bool RemoveGuildMember(const AZStd::string& targetName) = 0;
+        virtual bool SetGuildMessageOfTheDay(const AZStd::string& messageOfTheDay) = 0;
         virtual bool DisconnectWorld() = 0;
         virtual bool ReconnectWorld() = 0;
         virtual void SetCameraState(const ClientCameraState& cameraState) = 0;

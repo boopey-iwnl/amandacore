@@ -1,0 +1,285 @@
+package worlds
+
+import "amandacore/services/internal/platform"
+
+func (s *worldServer) buildZoneMapResponse(session *worldSessionState) map[string]any {
+	zoneID := ""
+	if session != nil {
+		zoneID = session.ZoneID
+	}
+	if zoneID == "" || zoneID == defaultZoneID {
+		return buildZoneMapPayload(stonewakeZoneMap)
+	}
+
+	if zone, ok := s.zones[zoneID]; ok {
+		roads := make([]map[string]any, 0, len(zone.Roads))
+		for _, road := range zone.Roads {
+			roads = append(roads, map[string]any{
+				"id":          road.ID,
+				"displayName": road.DisplayName,
+				"points":      road.Points,
+			})
+		}
+		landmarks := make([]map[string]any, 0, len(zone.Landmarks)+len(zone.Transitions))
+		for _, landmark := range append(zone.Landmarks, zone.Transitions...) {
+			landmarks = append(landmarks, map[string]any{
+				"id":          landmark.ID,
+				"displayName": landmark.DisplayName,
+				"kind":        landmark.Type,
+				"x":           landmark.X,
+				"y":           landmark.Y,
+			})
+		}
+		return map[string]any{
+			"zoneId":      zone.ID,
+			"displayName": zone.DisplayName,
+			"bounds": map[string]float64{
+				"minX": zone.Bounds.MinX,
+				"minY": zone.Bounds.MinY,
+				"maxX": zone.Bounds.MaxX,
+				"maxY": zone.Bounds.MaxY,
+			},
+			"roads":     roads,
+			"landmarks": landmarks,
+		}
+	}
+
+	return map[string]any{
+		"zoneId":      defaultZoneID,
+		"displayName": "Stonewake Vale",
+		"bounds": map[string]float64{
+			"minX": stonewakeZoneMap.MinX,
+			"minY": stonewakeZoneMap.MinY,
+			"maxX": stonewakeZoneMap.MaxX,
+			"maxY": stonewakeZoneMap.MaxY,
+		},
+		"roads":     []map[string]any{},
+		"landmarks": []map[string]any{},
+	}
+}
+
+func buildZoneMapPayload(zone zoneMapDefinition) map[string]any {
+	roads := make([]map[string]any, 0, len(zone.Roads))
+	for _, road := range zone.Roads {
+		roads = append(roads, map[string]any{
+			"id":          road.ID,
+			"displayName": road.DisplayName,
+			"points":      road.Points,
+		})
+	}
+
+	landmarks := make([]map[string]any, 0, len(zone.Landmarks))
+	for _, landmark := range zone.Landmarks {
+		landmarks = append(landmarks, map[string]any{
+			"id":          landmark.ID,
+			"displayName": landmark.DisplayName,
+			"kind":        landmark.Kind,
+			"x":           landmark.X,
+			"y":           landmark.Y,
+		})
+	}
+
+	return map[string]any{
+		"zoneId":      zone.ZoneID,
+		"displayName": zone.DisplayName,
+		"bounds": map[string]float64{
+			"minX": zone.MinX,
+			"minY": zone.MinY,
+			"maxX": zone.MaxX,
+			"maxY": zone.MaxY,
+		},
+		"roads":     roads,
+		"landmarks": landmarks,
+	}
+}
+
+func (s *worldServer) buildNavigationAreasResponse(session *worldSessionState) []map[string]any {
+	source := stonewakeNavigationAreas
+	areas := make([]map[string]any, 0, len(source))
+	for _, area := range source {
+		areas = append(areas, map[string]any{
+			"areaId":         area.ID,
+			"displayName":    area.DisplayName,
+			"kind":           area.Kind,
+			"centerX":        area.CenterX,
+			"centerY":        area.CenterY,
+			"radius":         area.Radius,
+			"routeHintText":  area.RouteHintText,
+			"questIds":       platform.NormalizeStringIDs(area.QuestIDs),
+			"targetMobType":  area.TargetMobType,
+			"targetEntityId": area.TargetEntityID,
+		})
+	}
+	return areas
+}
+
+func (s *worldServer) buildMapMarkersResponse(session *worldSessionState) []map[string]any {
+	markers := make([]map[string]any, 0, len(s.friendlyNPCOrder)+len(stonewakeNavigationAreas))
+	zoneID := defaultZoneID
+	if session != nil && session.ZoneID != "" {
+		zoneID = session.ZoneID
+	}
+
+	for _, npcID := range s.friendlyNPCOrder {
+		npc := s.friendlyNPCs[npcID]
+		if npc.ZoneID != zoneID {
+			continue
+		}
+		markerKind, questID := s.markerKindForNPCLocked(session, npc)
+		markers = append(markers, map[string]any{
+			"id":          "npc_" + npc.ID,
+			"displayName": npc.DisplayName,
+			"kind":        markerKind,
+			"questId":     questID,
+			"entityId":    npc.ID,
+			"x":           npc.X,
+			"y":           npc.Y,
+		})
+	}
+
+	if session != nil {
+		bindPoint := platform.NormalizeCharacterBindPoint(session.CharacterID, session.BindPoint)
+		if bindPoint.ZoneID == session.ZoneID {
+			markers = append(markers, map[string]any{
+				"id":             "bind_" + bindPoint.BindLocationID,
+				"displayName":    bindPoint.DisplayName,
+				"kind":           "bind_point",
+				"bindLocationId": bindPoint.BindLocationID,
+				"x":              bindPoint.X,
+				"y":              bindPoint.Y,
+			})
+		}
+		discovered := map[string]bool{}
+		for _, pointID := range platform.NormalizeCharacterTravelState(session.TravelState).DiscoveredTravelPointIDs {
+			discovered[pointID] = true
+		}
+		for _, point := range travelPointDefinitions {
+			if point.ZoneID != session.ZoneID || !discovered[point.ID] {
+				continue
+			}
+			markers = append(markers, map[string]any{
+				"id":            "travel_" + point.ID,
+				"displayName":   point.DisplayName,
+				"kind":          "travel_point",
+				"travelPointId": point.ID,
+				"x":             point.X,
+				"y":             point.Y,
+			})
+		}
+	}
+
+	if session != nil {
+		for _, questID := range session.TrackedQuestIDs {
+			quest, found := s.quests[questID]
+			if !found || quest.ZoneID != zoneID {
+				continue
+			}
+			progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+			if progress.State != questStateActive {
+				continue
+			}
+			area, found := s.findNavigationAreaForQuest(quest)
+			if found {
+				markers = append(markers, map[string]any{
+					"id":            "objective_" + quest.ID,
+					"displayName":   area.DisplayName,
+					"kind":          "tracked_objective",
+					"questId":       quest.ID,
+					"areaId":        area.ID,
+					"x":             area.CenterX,
+					"y":             area.CenterY,
+					"radius":        area.Radius,
+					"routeHintText": area.RouteHintText,
+				})
+				continue
+			}
+			if quest.MarkerX != 0 || quest.MarkerY != 0 {
+				markers = append(markers, map[string]any{
+					"id":            "objective_" + quest.ID,
+					"displayName":   quest.Title,
+					"kind":          "tracked_objective",
+					"questId":       quest.ID,
+					"areaId":        quest.ID + "_marker",
+					"x":             quest.MarkerX,
+					"y":             quest.MarkerY,
+					"radius":        starterInteractRadius,
+					"routeHintText": "Follow the road marker toward the objective.",
+				})
+			}
+		}
+	}
+
+	return markers
+}
+
+func (s *worldServer) markerKindForNPCLocked(session *worldSessionState, npc friendlyNPCDefinition) (string, string) {
+	isTrainer := false
+	isVendor := false
+	for _, service := range npc.Services {
+		if service.Type == "trainer" {
+			isTrainer = true
+		}
+		if service.Type == "vendor" {
+			isVendor = true
+		}
+	}
+
+	if session == nil {
+		if isTrainer {
+			return "trainer", ""
+		}
+		if isVendor {
+			return "vendor", ""
+		}
+		return "service", ""
+	}
+
+	for _, questID := range s.questOrder {
+		quest := s.quests[questID]
+		if quest.ZoneID != session.ZoneID {
+			continue
+		}
+		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+		if progress.State == questStateCompleted && quest.TurnInNPCID == npc.ID {
+			return "quest_turn_in", quest.ID
+		}
+	}
+
+	for _, questID := range s.questOrder {
+		quest := s.quests[questID]
+		if quest.ZoneID != session.ZoneID {
+			continue
+		}
+		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+		if progress.State == questStateActive &&
+			(quest.TargetEntityID == npc.ID || quest.TurnInNPCID == npc.ID) &&
+			(quest.ObjectiveType == objectiveTalk || quest.ObjectiveType == objectiveTrainer || quest.ObjectiveType == objectiveUse || quest.ObjectiveType == objectiveExplore) {
+			return "quest_objective", quest.ID
+		}
+	}
+
+	for _, service := range npc.Services {
+		if service.Type != "quest" {
+			continue
+		}
+		quest, found := s.quests[service.ServiceID]
+		if !found {
+			continue
+		}
+		if quest.ZoneID != session.ZoneID {
+			continue
+		}
+		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+		if progress.State == questStateNotStarted && s.prerequisitesMetLocked(session, quest) {
+			return "quest_available", quest.ID
+		}
+	}
+
+	if isTrainer {
+		return "trainer", ""
+	}
+	if isVendor {
+		return "vendor", ""
+	}
+	return "service", ""
+}

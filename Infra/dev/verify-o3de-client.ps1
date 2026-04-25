@@ -92,9 +92,9 @@ if (-not $runtimeLog) {
     Write-Host "Manual runtime verification is required:"
     Write-Host "  1. Start the local stack and launcher."
     Write-Host "  2. Join the world through the launcher and confirm the O3DE GameLauncher is selected."
-    Write-Host "  3. Confirm TestZone01 loads, the player remains grounded, and the west-approach landmarks render."
-    Write-Host "  4. Accept field orders at the command post, defeat all three Ember Hounds, and confirm the reward grants once."
-    Write-Host "  5. Disconnect/reconnect and restart the stack to confirm position and quest persistence."
+    Write-Host "  3. Confirm the Stonewake scene loads and the player remains grounded."
+    Write-Host "  4. Accept a starter quest, confirm the NPC window closes cleanly, complete an objective, and confirm rewards grant once."
+    Write-Host "  5. Disconnect/reconnect and restart the stack to confirm position, quest, and interaction-state persistence."
     return
 }
 
@@ -126,6 +126,6 @@ Write-Host "Latest AssetProcessorBatch log: $($assetProcessorLog.FullName)"
 Write-Host "Runtime log: $($runtimeLog.FullName)"
 Write-Host ""
 Write-Host "Verified runtime phases:"
-Write-Host "  1. GameLauncher starts and TestZone01 loads."
+Write-Host "  1. GameLauncher starts and the runtime level loads."
 Write-Host "  2. World bootstrap/connect runs after level-ready."
 Write-Host "  3. Player spawn occurs after successful world connect."

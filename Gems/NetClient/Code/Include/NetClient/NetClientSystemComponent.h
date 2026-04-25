@@ -54,6 +54,138 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool SocialState(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& afterMessageId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SendChat(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& channel,
+            const AZStd::string& targetName,
+            const AZStd::string& messageText,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AddFriend(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& name,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool RemoveFriend(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& name,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool InviteParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            const AZStd::string& targetCharacterId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AcceptPartyInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DeclinePartyInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool LeaveParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DisbandParty(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool CreateGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& guildName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool InviteGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AcceptGuildInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DeclineGuildInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool LeaveGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DisbandGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool PromoteGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DemoteGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool RemoveGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SetGuildMessageOfTheDay(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& messageOfTheDay,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool SetTarget(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
@@ -65,6 +197,27 @@ namespace NetClient
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
             const AZStd::string& questId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool EnterDungeon(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& dungeonId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool ExitDungeon(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool TrackQuest(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& questId,
+            bool tracked,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
@@ -82,11 +235,54 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool RequestDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetCharacterId,
+            const AZStd::string& targetName,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AcceptDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DeclineDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool CancelDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SurrenderDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool LearnTrainerAbility(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
             const AZStd::string& trainerId,
             const AZStd::string& abilityId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SelectTalent(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& talentId,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
@@ -119,6 +315,39 @@ namespace NetClient
             int fromSlotIndex,
             int toSlotIndex,
             WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool BrowseAuctions(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& search,
+            const AZStd::string& itemType,
+            const AZStd::string& sort,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool ListAuctionItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            int slotIndex,
+            int stackCount,
+            int buyoutCopper,
+            AZ::s64 durationSeconds,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool BuyoutAuction(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& auctionId,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool CancelAuction(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& auctionId,
+            AuctionStateResponse& outResponse,
             AZStd::string& outError) override;
 
         bool Reconnect(

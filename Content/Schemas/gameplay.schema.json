@@ -97,6 +97,92 @@
       },
       "additionalProperties": false
     },
+    "ProfessionDefinition": {
+      "type": "object",
+      "required": ["id", "displayName", "category", "maxStarterSkill", "implemented"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": ["crafting", "gathering", "secondary"]
+        },
+        "maxStarterSkill": { "type": "integer", "minimum": 1 },
+        "learnCostCopper": { "type": "integer", "minimum": 0 },
+        "defaultRecipeIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "implemented": { "type": "boolean" },
+        "unavailableReason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "RecipeDefinition": {
+      "type": "object",
+      "required": ["id", "professionId", "displayName", "requiredSkill", "requiredMaterials", "outputItemId", "outputQuantity", "learnedByDefault", "trainerTaught", "category"],
+      "properties": {
+        "id": { "type": "string" },
+        "professionId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "requiredSkill": { "type": "integer", "minimum": 1 },
+        "requiredMaterials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["itemId", "quantity"],
+            "properties": {
+              "itemId": { "type": "string" },
+              "displayName": { "type": "string" },
+              "quantity": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "outputItemId": { "type": "string" },
+        "outputDisplayName": { "type": "string" },
+        "outputQuantity": { "type": "integer", "minimum": 1 },
+        "learnedByDefault": { "type": "boolean" },
+        "trainerTaught": { "type": "boolean" },
+        "craftTimeMs": { "type": "integer", "minimum": 0 },
+        "category": { "type": "string" },
+        "implemented": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "GatheringNodeDefinition": {
+      "type": "object",
+      "required": ["id", "nodeTypeId", "displayName", "zoneId", "x", "y", "requiredProfessionId", "requiredSkill", "loot", "respawnDelayMs"],
+      "properties": {
+        "id": { "type": "string" },
+        "nodeTypeId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "zoneId": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "radius": { "type": "number", "minimum": 0 },
+        "requiredProfessionId": { "type": "string" },
+        "requiredSkill": { "type": "integer", "minimum": 1 },
+        "loot": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["itemId", "minCount", "maxCount", "guaranteed"],
+            "properties": {
+              "itemId": { "type": "string" },
+              "minCount": { "type": "integer", "minimum": 1 },
+              "maxCount": { "type": "integer", "minimum": 1 },
+              "guaranteed": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "respawnDelayMs": { "type": "integer", "minimum": 0 },
+        "interactionLabel": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "LootTable": {
       "type": "object",
       "required": ["id", "entries"],

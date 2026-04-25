@@ -25,28 +25,31 @@
 #include <Atom/RPI.Public/ViewportContextBus.h>
 #include <GameCore/GameCoreInterface.h>
 #include <PhysX/CharacterGameplayBus.h>
+#include <imgui/imgui.h>
 
 namespace MovementPhysics
 {
     namespace
     {
         constexpr float ValidationFloorZ = 0.0f;
-        constexpr float ValidationFloorExtent = 100.0f;
+        constexpr float ValidationFloorExtent = 480.0f;
+        constexpr float ValidationFloorExtentY = 300.0f;
         constexpr float ValidationMarkerZ = 0.08f;
         constexpr float ValidationSpawnMarkerRadius = 0.18f;
-        constexpr float ValidationSpawnX = 8.0f;
-        constexpr float ValidationSpawnY = 8.0f;
-        constexpr float EncounterAnchorX = 58.0f;
-        constexpr float EncounterAnchorY = 36.0f;
+        constexpr float ValidationSpawnX = 10.0f;
+        constexpr float ValidationSpawnY = 10.0f;
+        constexpr float EncounterAnchorX = 322.0f;
+        constexpr float EncounterAnchorY = 174.0f;
         constexpr float MoveSpeedUnitsPerSecond = 6.0f;
         constexpr float BackpedalSpeedFactor = 0.62f;
         constexpr float SubmitIntervalSeconds = 0.10f;
         constexpr float CorrectionSnapDistance = 1.25f;
-        constexpr float CorrectionBlendFactor = 0.5f;
+        constexpr float CorrectionBlendRate = 7.5f;
+        constexpr float CorrectionEpsilon = 0.002f;
         constexpr float CharacterBaseSnapZ = 0.05f;
         constexpr float AvatarTurnRate = 2.75f;
-        constexpr float CameraEncounterAnchorX = 58.0f;
-        constexpr float CameraEncounterAnchorY = 36.0f;
+        constexpr float CameraEncounterAnchorX = 34.0f;
+        constexpr float CameraEncounterAnchorY = 18.0f;
         constexpr float CameraPivotOffsetZ = 1.42f;
         constexpr float CameraLookAheadDistance = 0.82f;
         constexpr float CameraLookLiftZ = 0.16f;
@@ -90,15 +93,15 @@ namespace MovementPhysics
 
         bool IsInsideWestApproachObstacle(const AZ::Vector3& position)
         {
-            return position.GetX() >= 17.0f && position.GetX() <= 22.0f &&
-                position.GetY() >= 14.0f && position.GetY() <= 19.0f;
+            return position.GetX() >= 72.0f && position.GetX() <= 80.0f &&
+                position.GetY() >= 28.0f && position.GetY() <= 46.0f;
         }
 
         AZ::Vector3 ResolveMovementCollision(const AZ::Vector3& currentPosition, const AZ::Vector3& requestedPosition)
         {
             AZ::Vector3 clampedPosition = requestedPosition;
-            clampedPosition.SetX(AZ::GetClamp(clampedPosition.GetX(), 0.0f, 100.0f));
-            clampedPosition.SetY(AZ::GetClamp(clampedPosition.GetY(), 0.0f, 100.0f));
+            clampedPosition.SetX(AZ::GetClamp(clampedPosition.GetX(), 0.0f, ValidationFloorExtent));
+            clampedPosition.SetY(AZ::GetClamp(clampedPosition.GetY(), 0.0f, ValidationFloorExtentY));
             return IsInsideWestApproachObstacle(clampedPosition) ? currentPosition : clampedPosition;
         }
 
@@ -200,6 +203,7 @@ namespace MovementPhysics
             gameCore->DisconnectWorld();
             m_requestDisconnect = false;
             m_pendingServerDelta = AZ::Vector2::CreateZero();
+            m_pendingServerCorrection = AZ::Vector2::CreateZero();
             m_cachedFinalPoseValid = false;
             return;
         }
@@ -227,6 +231,7 @@ namespace MovementPhysics
             }
             m_requestReconnect = false;
             m_pendingServerDelta = AZ::Vector2::CreateZero();
+            m_pendingServerCorrection = AZ::Vector2::CreateZero();
             return;
         }
 
@@ -248,6 +253,8 @@ namespace MovementPhysics
         if (worldState.m_session.m_worldSessionToken != m_lastWorldSessionToken)
         {
             m_lastWorldSessionToken = worldState.m_session.m_worldSessionToken;
+            m_pendingServerDelta = AZ::Vector2::CreateZero();
+            m_pendingServerCorrection = AZ::Vector2::CreateZero();
             ApplyWorldPosition(
                 static_cast<float>(worldState.m_session.m_position.m_x),
                 static_cast<float>(worldState.m_session.m_position.m_y),
@@ -361,16 +368,22 @@ namespace MovementPhysics
             AZ::Vector3 requestedPosition = currentPosition + AZ::Vector3(move2d.GetX(), move2d.GetY(), 0.0f);
             requestedPosition = ResolveMovementCollision(currentPosition, requestedPosition);
             const AZ::Vector3 appliedDelta = requestedPosition - currentPosition;
-            if (deltaTime > 0.0f && appliedDelta.GetLengthSq() > 0.0f)
-            {
-                Physics::CharacterRequestBus::Event(
-                    GetEntityId(),
-                    &Physics::CharacterRequestBus::Events::AddVelocityForTick,
-                    AZ::Vector3(appliedDelta.GetX() / deltaTime, appliedDelta.GetY() / deltaTime, 0.0f));
-            }
             visualPlanarDelta = AZ::Vector2(appliedDelta.GetX(), appliedDelta.GetY());
             m_pendingServerDelta += visualPlanarDelta;
             finalPresentationPosition = requestedPosition;
+        }
+
+        if (m_pendingServerCorrection.GetLengthSq() > CorrectionEpsilon * CorrectionEpsilon)
+        {
+            const float correctionBlend = AZ::GetClamp(deltaTime * CorrectionBlendRate, 0.0f, 1.0f);
+            const AZ::Vector2 correctionStep = m_pendingServerCorrection * correctionBlend;
+            finalPresentationPosition.SetX(finalPresentationPosition.GetX() + correctionStep.GetX());
+            finalPresentationPosition.SetY(finalPresentationPosition.GetY() + correctionStep.GetY());
+            m_pendingServerCorrection -= correctionStep;
+            if (m_pendingServerCorrection.GetLengthSq() <= CorrectionEpsilon * CorrectionEpsilon)
+            {
+                m_pendingServerCorrection = AZ::Vector2::CreateZero();
+            }
         }
 
         m_submitAccumulator += deltaTime;
@@ -396,7 +409,8 @@ namespace MovementPhysics
                     finalPresentationPosition.SetX(authoritativePosition.GetX());
                     finalPresentationPosition.SetY(authoritativePosition.GetY());
                     finalPresentationPosition.SetZ(locallyPredictedPosition.GetZ());
-                    ApplyWorldPosition(authoritativePosition.GetX(), authoritativePosition.GetY(), locallyPredictedPosition.GetZ());
+                    m_pendingServerCorrection = AZ::Vector2::CreateZero();
+                    SetCharacterBasePosition(finalPresentationPosition);
                     AZ_Printf(
                         "amandacore",
                         "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=snap",
@@ -407,14 +421,10 @@ namespace MovementPhysics
                 }
                 else if (correctionDistance > 0.001f)
                 {
-                    const AZ::Vector2 blendedPlanarPosition = localPlanarPosition + (correctionVector * CorrectionBlendFactor);
-                    finalPresentationPosition.SetX(blendedPlanarPosition.GetX());
-                    finalPresentationPosition.SetY(blendedPlanarPosition.GetY());
-                    finalPresentationPosition.SetZ(locallyPredictedPosition.GetZ());
-                    ApplyWorldPosition(blendedPlanarPosition.GetX(), blendedPlanarPosition.GetY(), locallyPredictedPosition.GetZ());
+                    m_pendingServerCorrection += correctionVector;
                     AZ_Printf(
                         "amandacore",
-                        "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=blend",
+                        "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=queued_blend",
                         localPlanarPosition.GetX(),
                         localPlanarPosition.GetY(),
                         authoritativePosition.GetX(),
@@ -462,6 +472,7 @@ namespace MovementPhysics
         }
 
         UpdateAvatarPresentation(deltaTime, visualPlanarDelta);
+        SetCharacterBasePosition(m_cachedFinalPresentationPosition);
         SyncEntityTransformToCharacterBase(m_cachedFinalPresentationPosition);
         UpdateCameraComponent();
         DrawValidationArena();
@@ -472,6 +483,27 @@ namespace MovementPhysics
     {
         const auto& channelId = inputChannel.GetInputChannelId();
         const bool active = inputChannel.IsActive();
+
+        if (ImGui::GetIO().WantTextInput)
+        {
+            if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericW)
+            {
+                m_moveForward = false;
+            }
+            else if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericS)
+            {
+                m_moveBackward = false;
+            }
+            else if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericA)
+            {
+                m_strafeLeft = false;
+            }
+            else if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericD)
+            {
+                m_strafeRight = false;
+            }
+            return false;
+        }
 
         if (channelId == AzFramework::InputDeviceMouse::Button::Left)
         {
@@ -981,6 +1013,14 @@ namespace MovementPhysics
         }
     }
 
+    void LocalPlayerControllerComponent::SetCharacterBasePosition(const AZ::Vector3& basePosition)
+    {
+        Physics::CharacterRequestBus::Event(
+            GetEntityId(),
+            &Physics::CharacterRequestBus::Events::SetBasePosition,
+            basePosition);
+    }
+
     void LocalPlayerControllerComponent::ApplyWorldPosition(float x, float y, float z)
     {
         AZ::Vector3 currentBasePosition = AZ::Vector3::CreateZero();
@@ -1002,10 +1042,7 @@ namespace MovementPhysics
                 ValidationFloorZ);
         }
 
-        Physics::CharacterRequestBus::Event(
-            GetEntityId(),
-            &Physics::CharacterRequestBus::Events::SetBasePosition,
-            requestedPosition);
+        SetCharacterBasePosition(requestedPosition);
         m_cachedFinalPresentationPosition = requestedPosition;
         m_cachedFinalAvatarFacingRadians = m_avatarFacingRadians;
         m_cachedFinalPoseValid = true;
@@ -1032,7 +1069,7 @@ namespace MovementPhysics
                 "amandacore",
                 "client.validation_floor_visible center=(%.1f, %.1f, %.1f) extent=%.1f spawn=(%.1f, %.1f, %.1f)",
                 ValidationFloorExtent * 0.5f,
-                ValidationFloorExtent * 0.5f,
+                ValidationFloorExtentY * 0.5f,
                 ValidationFloorZ,
                 ValidationFloorExtent,
                 ValidationSpawnX,
@@ -1052,42 +1089,51 @@ namespace MovementPhysics
         const AZ::Color roadColor(0.47f, 0.38f, 0.27f, 1.0f);
         const AZ::Color fieldColor(0.33f, 0.43f, 0.24f, 1.0f);
         const AZ::Color buildingColor(0.25f, 0.29f, 0.32f, 1.0f);
+        const AZ::Color trunkColor(0.34f, 0.24f, 0.16f, 1.0f);
+        const AZ::Color canopyColor(0.18f, 0.42f, 0.24f, 1.0f);
+        const AZ::Color trainingRingColor(0.70f, 0.55f, 0.28f, 1.0f);
 
         auxGeom->DrawAabb(
             AZ::Aabb::CreateCenterHalfExtents(
-                AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtent * 0.5f, -0.22f),
-                AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtent * 0.5f, 0.22f)),
+                AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtentY * 0.5f, -0.22f),
+                AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtentY * 0.5f, 0.22f)),
             groundBaseColor,
             AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
 
         for (int tileY = 0; tileY < 25; ++tileY)
         {
-            for (int tileX = 0; tileX < 25; ++tileX)
+            for (int tileX = 0; tileX < 40; ++tileX)
             {
-                const float centerX = (static_cast<float>(tileX) * 4.0f) + 2.0f;
-                const float centerY = (static_cast<float>(tileY) * 4.0f) + 2.0f;
+                const float centerX = (static_cast<float>(tileX) * 12.0f) + 6.0f;
+                const float centerY = (static_cast<float>(tileY) * 12.0f) + 6.0f;
                 auxGeom->DrawAabb(
                     AZ::Aabb::CreateCenterHalfExtents(
                         AZ::Vector3(centerX, centerY, -0.03f),
-                        AZ::Vector3(1.95f, 1.95f, 0.03f)),
+                        AZ::Vector3(5.9f, 5.9f, 0.03f)),
                     ((tileX + tileY) % 2) == 0 ? groundTileLight : groundTileDark,
                     AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
             }
         }
 
         const AZ::Vector3 roadCenters[] = {
-            AZ::Vector3(16.0f, 12.0f, 0.015f),
-            AZ::Vector3(31.0f, 18.5f, 0.015f),
-            AZ::Vector3(48.0f, 28.0f, 0.015f),
-            AZ::Vector3(66.0f, 43.0f, 0.015f),
-            AZ::Vector3(84.0f, 58.0f, 0.015f),
+            AZ::Vector3(22.0f, 14.0f, 0.015f),
+            AZ::Vector3(55.0f, 26.0f, 0.015f),
+            AZ::Vector3(96.0f, 44.0f, 0.015f),
+            AZ::Vector3(154.0f, 82.0f, 0.015f),
+            AZ::Vector3(232.0f, 122.0f, 0.015f),
+            AZ::Vector3(314.0f, 172.0f, 0.015f),
+            AZ::Vector3(382.0f, 214.0f, 0.015f),
+            AZ::Vector3(438.0f, 246.0f, 0.015f),
         };
         const AZ::Vector3 roadExtents[] = {
-            AZ::Vector3(10.0f, 1.25f, 0.035f),
-            AZ::Vector3(10.0f, 1.45f, 0.035f),
-            AZ::Vector3(12.0f, 1.55f, 0.035f),
-            AZ::Vector3(13.5f, 1.6f, 0.035f),
-            AZ::Vector3(13.0f, 1.7f, 0.035f),
+            AZ::Vector3(16.0f, 1.35f, 0.035f),
+            AZ::Vector3(24.0f, 1.45f, 0.035f),
+            AZ::Vector3(30.0f, 1.55f, 0.035f),
+            AZ::Vector3(34.0f, 1.70f, 0.035f),
+            AZ::Vector3(40.0f, 1.80f, 0.035f),
+            AZ::Vector3(38.0f, 1.90f, 0.035f),
+            AZ::Vector3(34.0f, 1.95f, 0.035f),
+            AZ::Vector3(18.0f, 2.05f, 0.035f),
         };
         for (size_t roadIndex = 0; roadIndex < AZ_ARRAY_SIZE(roadCenters); ++roadIndex)
         {
@@ -1098,31 +1144,43 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 fieldCenters[] = {
-            AZ::Vector3(34.0f, 24.0f, 0.02f),
-            AZ::Vector3(42.0f, 22.0f, 0.02f),
-            AZ::Vector3(50.0f, 24.5f, 0.02f),
+            AZ::Vector3(142.0f, 72.0f, 0.02f),
+            AZ::Vector3(156.0f, 78.0f, 0.02f),
+            AZ::Vector3(170.0f, 84.0f, 0.02f),
+            AZ::Vector3(184.0f, 90.0f, 0.02f),
+            AZ::Vector3(164.0f, 104.0f, 0.02f),
         };
         for (const AZ::Vector3& fieldCenter : fieldCenters)
         {
             auxGeom->DrawAabb(
-                AZ::Aabb::CreateCenterHalfExtents(fieldCenter, AZ::Vector3(3.2f, 0.25f, 0.04f)),
+                AZ::Aabb::CreateCenterHalfExtents(fieldCenter, AZ::Vector3(9.0f, 0.28f, 0.04f)),
                 fieldColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
         }
 
         const AZ::Vector3 buildingCenters[] = {
-            AZ::Vector3(5.0f, 5.0f, 1.0f),
-            AZ::Vector3(12.0f, 4.8f, 0.9f),
-            AZ::Vector3(7.0f, 14.0f, 0.85f),
-            AZ::Vector3(62.0f, 36.0f, 1.1f),
-            AZ::Vector3(88.0f, 62.0f, 1.0f),
+            AZ::Vector3(7.0f, 7.0f, 1.0f),
+            AZ::Vector3(18.0f, 7.0f, 0.9f),
+            AZ::Vector3(8.0f, 29.0f, 0.85f),
+            AZ::Vector3(22.0f, 29.0f, 0.85f),
+            AZ::Vector3(42.0f, 22.0f, 0.65f),
+            AZ::Vector3(76.0f, 37.0f, 1.1f),
+            AZ::Vector3(232.0f, 118.0f, 1.2f),
+            AZ::Vector3(322.0f, 174.0f, 2.6f),
+            AZ::Vector3(420.0f, 224.0f, 1.0f),
+            AZ::Vector3(438.0f, 246.0f, 1.7f),
         };
         const AZ::Vector3 buildingExtents[] = {
             AZ::Vector3(2.8f, 2.0f, 1.0f),
             AZ::Vector3(2.0f, 1.8f, 0.9f),
             AZ::Vector3(2.4f, 1.6f, 0.85f),
-            AZ::Vector3(3.0f, 2.4f, 1.1f),
-            AZ::Vector3(2.4f, 2.0f, 1.0f),
+            AZ::Vector3(3.0f, 1.8f, 0.85f),
+            AZ::Vector3(7.0f, 0.35f, 0.65f),
+            AZ::Vector3(6.0f, 0.9f, 1.1f),
+            AZ::Vector3(2.4f, 2.4f, 1.2f),
+            AZ::Vector3(4.4f, 4.4f, 2.6f),
+            AZ::Vector3(3.8f, 1.6f, 1.0f),
+            AZ::Vector3(6.5f, 1.2f, 1.7f),
         };
         for (size_t buildingIndex = 0; buildingIndex < AZ_ARRAY_SIZE(buildingCenters); ++buildingIndex)
         {
@@ -1134,15 +1192,15 @@ namespace MovementPhysics
 
         const AZ::Vector3 horizonCenters[] = {
             AZ::Vector3(ValidationFloorExtent * 0.5f, -5.0f, 3.0f),
-            AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtent + 5.0f, 3.0f),
-            AZ::Vector3(-5.0f, ValidationFloorExtent * 0.5f, 3.0f),
-            AZ::Vector3(ValidationFloorExtent + 5.0f, ValidationFloorExtent * 0.5f, 3.0f),
+            AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtentY + 5.0f, 3.0f),
+            AZ::Vector3(-5.0f, ValidationFloorExtentY * 0.5f, 3.0f),
+            AZ::Vector3(ValidationFloorExtent + 5.0f, ValidationFloorExtentY * 0.5f, 3.0f),
         };
         const AZ::Vector3 horizonHalfExtents[] = {
             AZ::Vector3(ValidationFloorExtent * 0.5f, 0.5f, 3.0f),
             AZ::Vector3(ValidationFloorExtent * 0.5f, 0.5f, 3.0f),
-            AZ::Vector3(0.5f, ValidationFloorExtent * 0.5f, 3.0f),
-            AZ::Vector3(0.5f, ValidationFloorExtent * 0.5f, 3.0f),
+            AZ::Vector3(0.5f, ValidationFloorExtentY * 0.5f, 3.0f),
+            AZ::Vector3(0.5f, ValidationFloorExtentY * 0.5f, 3.0f),
         };
         for (size_t horizonIndex = 0; horizonIndex < AZ_ARRAY_SIZE(horizonCenters); ++horizonIndex)
         {
@@ -1153,18 +1211,18 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 ridgeCenters[] = {
-            AZ::Vector3(4.0f, 6.0f, 1.2f),
-            AZ::Vector3(10.0f, 3.5f, 1.0f),
-            AZ::Vector3(22.0f, 2.8f, 1.3f),
-            AZ::Vector3(36.0f, 3.8f, 1.1f),
-            AZ::Vector3(47.5f, 7.0f, 1.2f),
-            AZ::Vector3(49.0f, 20.0f, 1.4f),
-            AZ::Vector3(46.0f, 34.0f, 1.1f),
-            AZ::Vector3(38.0f, 47.5f, 1.3f),
-            AZ::Vector3(24.0f, 49.0f, 1.2f),
-            AZ::Vector3(9.0f, 46.0f, 1.0f),
-            AZ::Vector3(3.4f, 33.0f, 1.3f),
-            AZ::Vector3(2.8f, 18.0f, 1.1f),
+            AZ::Vector3(5.0f, 6.0f, 1.2f),
+            AZ::Vector3(18.0f, 4.0f, 1.0f),
+            AZ::Vector3(42.0f, 5.0f, 1.3f),
+            AZ::Vector3(72.0f, 7.0f, 1.1f),
+            AZ::Vector3(104.0f, 18.0f, 1.2f),
+            AZ::Vector3(120.0f, 48.0f, 1.4f),
+            AZ::Vector3(190.0f, 92.0f, 1.1f),
+            AZ::Vector3(230.0f, 112.0f, 1.4f),
+            AZ::Vector3(268.0f, 142.0f, 1.2f),
+            AZ::Vector3(330.0f, 184.0f, 1.3f),
+            AZ::Vector3(402.0f, 232.0f, 1.1f),
+            AZ::Vector3(460.0f, 270.0f, 1.3f),
         };
         for (const AZ::Vector3& ridgeCenter : ridgeCenters)
         {
@@ -1174,6 +1232,42 @@ namespace MovementPhysics
                     AZ::Vector3(1.8f, 1.4f, 1.1f)),
                 ridgeColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+        }
+
+        const AZ::Vector3 treeCenters[] = {
+            AZ::Vector3(29.0f, 48.0f, 0.0f),
+            AZ::Vector3(41.0f, 50.0f, 0.0f),
+            AZ::Vector3(90.0f, 63.0f, 0.0f),
+            AZ::Vector3(112.0f, 83.0f, 0.0f),
+            AZ::Vector3(188.0f, 118.0f, 0.0f),
+            AZ::Vector3(210.0f, 136.0f, 0.0f),
+            AZ::Vector3(270.0f, 154.0f, 0.0f),
+            AZ::Vector3(350.0f, 162.0f, 0.0f),
+            AZ::Vector3(396.0f, 244.0f, 0.0f),
+        };
+        for (const AZ::Vector3& treeBase : treeCenters)
+        {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    treeBase + AZ::Vector3(0.0f, 0.0f, 0.65f),
+                    AZ::Vector3(0.18f, 0.18f, 0.65f)),
+                trunkColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawSphere(treeBase + AZ::Vector3(0.0f, 0.0f, 1.75f), 0.82f, canopyColor);
+            auxGeom->DrawSphere(treeBase + AZ::Vector3(0.42f, 0.12f, 1.55f), 0.55f, canopyColor);
+            auxGeom->DrawSphere(treeBase + AZ::Vector3(-0.38f, -0.16f, 1.55f), 0.55f, canopyColor);
+        }
+
+        for (int segmentIndex = 0; segmentIndex < 18; ++segmentIndex)
+        {
+            const float angleRadians = (AZ::Constants::TwoPi / 18.0f) * static_cast<float>(segmentIndex);
+            auxGeom->DrawSphere(
+                AZ::Vector3(
+                    58.0f + (AZStd::cos(angleRadians) * 9.0f),
+                    32.0f + (AZStd::sin(angleRadians) * 7.0f),
+                    ValidationMarkerZ),
+                0.14f,
+                trainingRingColor);
         }
 
         for (int segmentIndex = 0; segmentIndex < 10; ++segmentIndex)
@@ -1206,20 +1300,24 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 trailMarkers[] = {
-            AZ::Vector3(15.5f, 15.7f, ValidationMarkerZ),
-            AZ::Vector3(18.8f, 18.9f, ValidationMarkerZ),
-            AZ::Vector3(22.2f, 21.3f, ValidationMarkerZ),
-            AZ::Vector3(24.7f, 22.6f, ValidationMarkerZ)};
+            AZ::Vector3(22.0f, 14.0f, ValidationMarkerZ),
+            AZ::Vector3(52.0f, 26.0f, ValidationMarkerZ),
+            AZ::Vector3(84.0f, 36.0f, ValidationMarkerZ),
+            AZ::Vector3(134.0f, 64.0f, ValidationMarkerZ),
+            AZ::Vector3(184.0f, 96.0f, ValidationMarkerZ),
+            AZ::Vector3(232.0f, 118.0f, ValidationMarkerZ),
+            AZ::Vector3(322.0f, 174.0f, ValidationMarkerZ),
+            AZ::Vector3(438.0f, 246.0f, ValidationMarkerZ)};
         for (const AZ::Vector3& marker : trailMarkers)
         {
             auxGeom->DrawSphere(marker, 0.18f, pathColor);
         }
 
         const AZ::Vector3 boulderCluster[] = {
-            AZ::Vector3(17.8f, 14.6f, 0.30f),
-            AZ::Vector3(19.4f, 15.8f, 0.55f),
-            AZ::Vector3(21.0f, 17.3f, 0.42f),
-            AZ::Vector3(20.1f, 18.6f, 0.38f)};
+            AZ::Vector3(72.0f, 28.0f, 0.30f),
+            AZ::Vector3(76.0f, 36.0f, 0.55f),
+            AZ::Vector3(80.0f, 44.0f, 0.42f),
+            AZ::Vector3(74.0f, 46.0f, 0.38f)};
         for (const AZ::Vector3& boulder : boulderCluster)
         {
             auxGeom->DrawSphere(boulder, 0.75f, obstacleColor);

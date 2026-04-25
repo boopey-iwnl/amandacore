@@ -15,6 +15,7 @@ type ServiceConfig struct {
 	LocalSeedFile     string
 	AdminSeedUsername string
 	AdminSeedPassword string
+	AdminToolsEnabled bool
 	BuildID           string
 	WorldEndpoint     string
 }
@@ -31,8 +32,26 @@ func Load(serviceName string, defaultPort string) ServiceConfig {
 		LocalSeedFile:     localSeedFile,
 		AdminSeedUsername: valueOrDefault("AMANDACORE_ADMIN_SEED_USERNAME", "amanda"),
 		AdminSeedPassword: os.Getenv("AMANDACORE_ADMIN_SEED_PASSWORD"),
-		BuildID:           valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-local-0.2.0"),
+		AdminToolsEnabled: adminToolsEnabled(valueOrDefault("AMANDACORE_ENVIRONMENT", "development")),
+		BuildID:           valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-alpha-0.1-local"),
 		WorldEndpoint:     valueOrDefault("AMANDACORE_WORLD_ENDPOINT", "http://localhost:8085"),
+	}
+}
+
+func adminToolsEnabled(environment string) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv("AMANDACORE_ADMIN_TOOLS_ENABLED")))
+	switch value {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+
+	switch strings.ToLower(strings.TrimSpace(environment)) {
+	case "development", "dev", "local", "test", "testing":
+		return true
+	default:
+		return false
 	}
 }
 

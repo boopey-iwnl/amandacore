@@ -15,11 +15,11 @@ namespace NpcAi
 {
     namespace
     {
-        constexpr float SelectedRingRadius = 2.1f;
-        constexpr float SelectedRingSphereRadius = 0.18f;
+        constexpr float SelectedRingRadius = 1.45f;
+        constexpr float SelectedRingSphereRadius = 0.12f;
         constexpr int SelectedRingSegments = 18;
-        constexpr float SelectedMarkerTopOffset = 3.7f;
-        constexpr float SelectedMarkerStep = 0.35f;
+        constexpr float SelectedMarkerTopOffset = 2.75f;
+        constexpr float SelectedMarkerStep = 0.28f;
         constexpr int SelectedMarkerSteps = 5;
 
         AZ::Color GetInstanceAccentColor(int ordinal)
@@ -107,13 +107,19 @@ namespace NpcAi
         const int mobOrdinal = GameCore::MobProxyGeometry::GetMobOrdinal(m_stateComponent->GetMobId());
         const bool isTrainerNpc = m_stateComponent->GetAiState() == "trainer";
         const bool isQuestGiverNpc = m_stateComponent->GetAiState() == "quest_giver";
+        const bool isServiceNpc = m_stateComponent->GetAiState() == "profession_trainer" ||
+            m_stateComponent->GetAiState() == "quest_object";
         const AZ::Color instanceAccent = isTrainerNpc
             ? AZ::Color(0.95f, 0.72f, 0.22f, 1.0f)
-            : (isQuestGiverNpc ? AZ::Color(0.30f, 0.95f, 0.70f, 1.0f) : GetInstanceAccentColor(mobOrdinal));
+            : (isQuestGiverNpc
+                ? AZ::Color(0.30f, 0.95f, 0.70f, 1.0f)
+                : (isServiceNpc ? AZ::Color(0.68f, 0.82f, 1.0f, 1.0f) : GetInstanceAccentColor(mobOrdinal)));
         AZ::Color color = m_stateComponent->IsAlive()
             ? (isTrainerNpc
                 ? AZ::Color(0.18f, 0.56f, 0.92f, 1.0f)
-                : (isQuestGiverNpc ? AZ::Color(0.20f, 0.70f, 0.38f, 1.0f) : AZ::Color(0.85f, 0.25f, 0.15f, 1.0f)))
+                : (isQuestGiverNpc
+                    ? AZ::Color(0.20f, 0.70f, 0.38f, 1.0f)
+                    : (isServiceNpc ? AZ::Color(0.34f, 0.46f, 0.72f, 1.0f) : AZ::Color(0.85f, 0.25f, 0.15f, 1.0f))))
             : AZ::Color(0.4f, 0.4f, 0.4f, 1.0f);
         const bool isSelected = [&]() -> bool
         {
@@ -141,11 +147,11 @@ namespace NpcAi
             // Instance pips are already drawn via shared proxy geometry.
         }
 
-        if ((isTrainerNpc || isQuestGiverNpc) && m_stateComponent->IsAlive())
+        if ((isTrainerNpc || isQuestGiverNpc || isServiceNpc) && m_stateComponent->IsAlive())
         {
             const AZ::Color trainerPromptColor = isTrainerNpc
                 ? AZ::Color(0.95f, 0.78f, 0.28f, 1.0f)
-                : AZ::Color(0.35f, 1.0f, 0.72f, 1.0f);
+                : (isQuestGiverNpc ? AZ::Color(0.35f, 1.0f, 0.72f, 1.0f) : AZ::Color(0.62f, 0.78f, 1.0f, 1.0f));
             for (int markerIndex = 0; markerIndex < SelectedMarkerSteps; ++markerIndex)
             {
                 const float heightOffset = SelectedMarkerTopOffset + (SelectedMarkerStep * static_cast<float>(markerIndex));

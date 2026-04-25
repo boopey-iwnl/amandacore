@@ -22,6 +22,8 @@ ly_add_target(
             AZ::AzFramework
             Gem::GameCore
             Gem::CombatRules
+            Gem::ImGui
+            Gem::ImGui.imguilib
             Gem::PhysX5.Static
             Gem::Atom_Component_DebugCamera.Static
 )

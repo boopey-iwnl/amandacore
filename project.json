@@ -1,7 +1,7 @@
 {
   "project_name": "amandacore",
   "project_id": "{7AE6D49F-8E88-4C70-8F36-6E2E0B0DAA4D}",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "display_name": "amandacore",
   "summary": "amandacore clean-room O3DE MMO foundation with shared gameplay-domain code, launcher, and backend services.",
   "origin": "OpenAI Codex scaffold",

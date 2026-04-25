@@ -22,7 +22,11 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	admin.RegisterRoutes(mux, fileStore)
+	if cfg.AdminToolsEnabled {
+		admin.RegisterRoutes(mux, fileStore)
+	} else {
+		log.Printf("%s admin routes disabled by configuration", cfg.ServiceName)
+	}
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})

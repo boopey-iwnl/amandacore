@@ -55,6 +55,7 @@ Services/.cache/
 Services/pkg/
 Infra/dev/platform-state.json
 Infra/dev/local-processes.json
+Infra/dev/version-manifest.json
 Infra/dev/logs/
 
 imgui.ini
@@ -62,3 +63,9 @@ Infra/dev/imgui.ini
 m2_*.png
 milestone*_*.png
 milestone*_runtime_ticket.txt
+required-go-test-output.txt
+Services/required-go-test-output.txt
+combat-test-output.txt
+worlds-compile-output*.txt
+e2e-*.txt
+e2e-*.json
