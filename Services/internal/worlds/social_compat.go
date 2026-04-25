@@ -10,11 +10,6 @@ import (
 	"amandacore/services/internal/platform"
 )
 
-const (
-	guildNameMinLength = 3
-	guildNameMaxLength = 32
-)
-
 func validateGuildName(name string) (string, error) {
 	trimmed := strings.TrimSpace(name)
 	if len(trimmed) < guildNameMinLength || len(trimmed) > guildNameMaxLength {

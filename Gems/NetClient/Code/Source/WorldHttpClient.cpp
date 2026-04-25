@@ -1421,6 +1421,58 @@ namespace NetClient
         return ParseWorldSessionJson(responseBody, outResponse, outError);
     }
 
+    bool EnterDungeonRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& dungeonId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"dungeonId\":\"%s\"}",
+            worldSessionToken.c_str(),
+            dungeonId.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/dungeon/enter", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool ExitDungeonRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\"}",
+            worldSessionToken.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/dungeon/exit", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
     bool TrackQuestRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,

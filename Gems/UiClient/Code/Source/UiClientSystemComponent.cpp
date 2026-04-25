@@ -367,6 +367,18 @@ namespace UiClient
             return false;
         }
 
+        AZStd::string EntityServiceId(const NetClient::VisibleEntity& entity, const char* serviceType)
+        {
+            for (const auto& service : entity.m_services)
+            {
+                if (service.m_type == serviceType)
+                {
+                    return service.m_serviceId;
+                }
+            }
+            return {};
+        }
+
         bool IsTrainerNpc(const NetClient::VisibleEntity& entity)
         {
             return entity.m_kind == TrainerNpcKind || EntityHasService(entity, "trainer");
@@ -3085,6 +3097,40 @@ namespace UiClient
         if (distanceToTarget > CommandPointRadius)
         {
             AddHudEvent(AZStd::string::format("Move closer to %s", entity.m_displayName.c_str()));
+            return false;
+        }
+
+        if (EntityHasService(entity, "dungeon_entrance"))
+        {
+            const AZStd::string dungeonId = EntityServiceId(entity, "dungeon_entrance");
+            if (dungeonId.empty())
+            {
+                AddHudEvent("Dungeon entrance is unavailable");
+                return false;
+            }
+            if (gameCore->EnterDungeon(dungeonId))
+            {
+                m_questGossipOpen = false;
+                m_trainerOpen = false;
+                AddHudEvent(AZStd::string::format("Entering %s", entity.m_displayName.c_str()));
+                return true;
+            }
+            const auto& latestState = gameCore->GetClientWorldState();
+            AddHudEvent(latestState.m_errorMessage.empty() ? "Unable to enter dungeon" : latestState.m_errorMessage);
+            return false;
+        }
+
+        if (EntityHasService(entity, "dungeon_exit"))
+        {
+            if (gameCore->ExitDungeon())
+            {
+                m_questGossipOpen = false;
+                m_trainerOpen = false;
+                AddHudEvent("Leaving dungeon");
+                return true;
+            }
+            const auto& latestState = gameCore->GetClientWorldState();
+            AddHudEvent(latestState.m_errorMessage.empty() ? "Unable to leave dungeon" : latestState.m_errorMessage);
             return false;
         }
 
