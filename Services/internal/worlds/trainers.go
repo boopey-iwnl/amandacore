@@ -25,8 +25,8 @@ var warriorTrainer = trainerDefinition{
 	ID:          warriorTrainerID,
 	DisplayName: "Armsmaster Corin Vale",
 	ClassID:     platform.DefaultClassID,
-	X:           12.0,
-	Y:           8.0,
+	X:           34.0,
+	Y:           18.0,
 	Z:           0.0,
 	Radius:      starterInteractRadius,
 	AbilityIDs: []string{

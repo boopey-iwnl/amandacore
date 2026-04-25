@@ -15,11 +15,11 @@ namespace NpcAi
 {
     namespace
     {
-        constexpr float SelectedRingRadius = 2.1f;
-        constexpr float SelectedRingSphereRadius = 0.18f;
+        constexpr float SelectedRingRadius = 1.45f;
+        constexpr float SelectedRingSphereRadius = 0.12f;
         constexpr int SelectedRingSegments = 18;
-        constexpr float SelectedMarkerTopOffset = 3.7f;
-        constexpr float SelectedMarkerStep = 0.35f;
+        constexpr float SelectedMarkerTopOffset = 2.75f;
+        constexpr float SelectedMarkerStep = 0.28f;
         constexpr int SelectedMarkerSteps = 5;
 
         AZ::Color GetInstanceAccentColor(int ordinal)
