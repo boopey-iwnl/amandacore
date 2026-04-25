@@ -92,6 +92,7 @@ type ChatMessage struct {
 	SenderDisplayName string `json:"senderDisplayName"`
 	TargetCharacterID string `json:"targetCharacterId,omitempty"`
 	PartyID           string `json:"partyId,omitempty"`
+	GuildID           string `json:"guildId,omitempty"`
 	ZoneID            string `json:"zoneId,omitempty"`
 	MessageText       string `json:"messageText"`
 	Timestamp         int64  `json:"timestamp"`
@@ -110,6 +111,61 @@ type Party struct {
 	MemberCharacterIDs []string `json:"memberCharacterIds"`
 	CreatedAt          int64    `json:"createdAt"`
 	UpdatedAt          int64    `json:"updatedAt"`
+}
+
+const (
+	GuildRankLeader  = "leader"
+	GuildRankOfficer = "officer"
+	GuildRankMember  = "member"
+	GuildRankRecruit = "recruit"
+
+	GuildPermissionInviteMember = "invite_member"
+	GuildPermissionRemoveMember = "remove_member"
+	GuildPermissionPromoteMember = "promote_member"
+	GuildPermissionDemoteMember  = "demote_member"
+	GuildPermissionEditMOTD      = "edit_motd"
+	GuildPermissionDisbandGuild  = "disband_guild"
+)
+
+type GuildRank struct {
+	RankID      string   `json:"rankId"`
+	DisplayName string   `json:"displayName"`
+	Priority    int      `json:"priority"`
+	Permissions []string `json:"permissions"`
+}
+
+type GuildMember struct {
+	CharacterID string `json:"characterId"`
+	DisplayName string `json:"displayName"`
+	RaceID      string `json:"raceId"`
+	ClassID     string `json:"classId"`
+	Level       int    `json:"level"`
+	RankID      string `json:"rankId"`
+	JoinedAt    int64  `json:"joinedAt"`
+	LastOnlineAt int64  `json:"lastOnlineAt"`
+}
+
+type Guild struct {
+	ID                   string        `json:"guildId"`
+	RealmID              string        `json:"realmId"`
+	GuildName            string        `json:"guildName"`
+	CreatedAt            int64         `json:"createdAt"`
+	UpdatedAt            int64         `json:"updatedAt"`
+	CreatedByCharacterID string        `json:"createdByCharacterId"`
+	LeaderCharacterID    string        `json:"leaderCharacterId"`
+	MessageOfTheDay      string        `json:"messageOfTheDay,omitempty"`
+	Ranks                []GuildRank   `json:"ranks"`
+	Members              []GuildMember `json:"members"`
+}
+
+type GuildInvite struct {
+	InviteID           string `json:"inviteId"`
+	GuildID            string `json:"guildId"`
+	GuildName          string `json:"guildName"`
+	InviterCharacterID string `json:"inviterCharacterId"`
+	TargetCharacterID  string `json:"targetCharacterId"`
+	CreatedAt          int64  `json:"createdAt"`
+	ExpiresAt          int64  `json:"expiresAt"`
 }
 
 type Account struct {
@@ -304,6 +360,48 @@ func NormalizeCharacter(character Character) Character {
 		character.PositionZ = DefaultStarterSpawnZ
 	}
 	return character
+}
+
+func DefaultGuildRanks() []GuildRank {
+	return []GuildRank{
+		{
+			RankID:      GuildRankLeader,
+			DisplayName: "Leader",
+			Priority:    0,
+			Permissions: []string{
+				GuildPermissionInviteMember,
+				GuildPermissionRemoveMember,
+				GuildPermissionPromoteMember,
+				GuildPermissionDemoteMember,
+				GuildPermissionEditMOTD,
+				GuildPermissionDisbandGuild,
+			},
+		},
+		{
+			RankID:      GuildRankOfficer,
+			DisplayName: "Officer",
+			Priority:    1,
+			Permissions: []string{
+				GuildPermissionInviteMember,
+				GuildPermissionRemoveMember,
+				GuildPermissionPromoteMember,
+				GuildPermissionDemoteMember,
+				GuildPermissionEditMOTD,
+			},
+		},
+		{
+			RankID:      GuildRankMember,
+			DisplayName: "Member",
+			Priority:    2,
+			Permissions: []string{},
+		},
+		{
+			RankID:      GuildRankRecruit,
+			DisplayName: "Recruit",
+			Priority:    3,
+			Permissions: []string{},
+		},
+	}
 }
 
 func NormalizeStringIDs(source []string) []string {

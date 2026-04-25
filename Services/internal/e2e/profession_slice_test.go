@@ -91,7 +91,7 @@ func TestProfessionLearningSlice(t *testing.T) {
 func (f *combatFixture) moveToProfessionTrainer(t *testing.T) map[string]any {
 	t.Helper()
 
-	f.moveToPosition(t, 17.0, 20.0)
+	f.moveToPosition(t, 58.0, 24.0)
 	return f.targetFriendlyByID(t, professionTrainerNPCID)
 }
 
