@@ -71,6 +71,23 @@ function Test-TextFileDoesNotMatch {
     Add-Result -Name $Name -Passed ($content -notmatch $Pattern) -Detail $(if ($content -match $Pattern) { $FailureDetail } else { $Path })
 }
 
+function Get-RelativePackagePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $pathFull = [System.IO.Path]::GetFullPath($Path)
+    if ($pathFull.StartsWith($rootFull + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $pathFull.Substring($rootFull.Length + 1)
+    }
+
+    return Split-Path -Leaf $Path
+}
+
 function Test-PackageDoesNotContain {
     param(
         [string]$Name,
@@ -80,7 +97,7 @@ function Test-PackageDoesNotContain {
 
     $violations = @()
     foreach ($item in Get-ChildItem -Path $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue) {
-        $relative = [System.IO.Path]::GetRelativePath($PackageRoot, $item.FullName).Replace("\", "/")
+        $relative = (Get-RelativePackagePath -Root $PackageRoot -Path $item.FullName).Replace("\", "/")
         foreach ($pattern in $RelativePatterns) {
             if ($relative -match $pattern) {
                 $violations += $relative

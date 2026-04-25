@@ -90,7 +90,7 @@ function Test-ExcludedPackagePath {
 
     if ($path -match '(^|/)(\.git|\.secrets|\.vs|Cache|cache|logs|user)(/|$)') { return $true }
     if ($path -match '^Client/Portal/') { return $true }
-    if ($path -match '^Infra/dev/(local-processes\.json|platform-state\.json|version-manifest\.json|logs/)') { return $true }
+    if ($path -match '^Infra/dev/(local-processes\.json|platform-state\.json|logs/)') { return $true }
     if ($path -match '^dist/') { return $true }
     if ($fileName -match '(?i)\.(log|tmp|png|jpg|jpeg|pdb|ilk)$') { return $true }
     if ($fileName -match '(?i)(^required-go-test-output\.txt$|^combat-test-output\.txt$|^worlds-compile-output.*\.txt$|^e2e-.*\.(txt|json|log)$|^milestone.*_runtime_ticket\.txt$|^imgui\.ini$)') { return $true }
@@ -127,6 +127,23 @@ function Copy-PackageFile {
     return $true
 }
 
+function Get-PackageRelativePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $pathFull = [System.IO.Path]::GetFullPath($Path)
+    if ($pathFull.StartsWith($rootFull + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $pathFull.Substring($rootFull.Length + 1)
+    }
+
+    return Split-Path -Leaf $Path
+}
+
 function Copy-PackageDirectory {
     param(
         [Parameter(Mandatory = $true)]
@@ -141,7 +158,7 @@ function Copy-PackageDirectory {
 
     $copied = 0
     Get-ChildItem -Path $SourceDirectory -Recurse -File -Force | ForEach-Object {
-        $relativeFile = [System.IO.Path]::GetRelativePath($SourceDirectory, $_.FullName)
+        $relativeFile = Get-PackageRelativePath -Root $SourceDirectory -Path $_.FullName
         $packageRelative = Join-Path $RelativeDirectory $relativeFile
         if (-not (Test-ExcludedPackagePath $packageRelative)) {
             if (Copy-PackageFile -SourcePath $_.FullName -RelativePath $packageRelative) {
@@ -157,7 +174,7 @@ function Assert-PackageSafety {
 
     $forbidden = @()
     Get-ChildItem -Path $PackageRoot -Recurse -Force | ForEach-Object {
-        $relative = [System.IO.Path]::GetRelativePath($PackageRoot, $_.FullName)
+        $relative = Get-PackageRelativePath -Root $PackageRoot -Path $_.FullName
         if (Test-ExcludedPackagePath $relative) {
             $forbidden += $relative
         }
