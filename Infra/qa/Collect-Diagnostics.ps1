@@ -554,6 +554,7 @@ Write-JsonFile $crashIndex (Join-Path $bundleRoot "crash-error-index.json") 6
 
 $docsDestination = Join-Path $bundleRoot "tester-docs"
 foreach ($relativeDoc in @(
+    "Alpha01FeatureFreeze.md",
     "bug-report-template.md",
     "KnownIssues.md",
     "ReleaseNotes.md",
@@ -570,6 +571,7 @@ foreach ($relativeDoc in @(
 
 $scriptsDestination = Join-Path $bundleRoot "qa-scripts"
 foreach ($scriptName in @(
+    "..\dev\package-alpha.ps1",
     "Collect-Diagnostics.ps1",
     "Smoke-Test.ps1",
     "Seed-TestAccount.ps1",
@@ -577,7 +579,7 @@ foreach ($scriptName in @(
 )) {
     $source = Join-Path $PSScriptRoot $scriptName
     if (Test-Path $source) {
-        Copy-RedactedTextFile $source (Join-Path $scriptsDestination $scriptName) | Out-Null
+        Copy-RedactedTextFile $source (Join-Path $scriptsDestination (Split-Path -Leaf $scriptName)) | Out-Null
     }
 }
 
