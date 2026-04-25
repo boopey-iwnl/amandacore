@@ -2,40 +2,16 @@ package worlds
 
 import "amandacore/services/internal/platform"
 
-func (s *worldServer) buildZoneMapResponse(zoneID string) map[string]any {
+func (s *worldServer) buildZoneMapResponse(session *worldSessionState) map[string]any {
+	zoneID := ""
+	if session != nil {
+		zoneID = session.ZoneID
+	}
+	if zoneID == dungeonZoneID {
+		return buildZoneMapPayload(tallowdeepZoneMap)
+	}
 	if zoneID == "" || zoneID == defaultZoneID {
-		roads := make([]map[string]any, 0, len(stonewakeZoneMap.Roads))
-		for _, road := range stonewakeZoneMap.Roads {
-			roads = append(roads, map[string]any{
-				"id":          road.ID,
-				"displayName": road.DisplayName,
-				"points":      road.Points,
-			})
-		}
-
-		landmarks := make([]map[string]any, 0, len(stonewakeZoneMap.Landmarks))
-		for _, landmark := range stonewakeZoneMap.Landmarks {
-			landmarks = append(landmarks, map[string]any{
-				"id":          landmark.ID,
-				"displayName": landmark.DisplayName,
-				"kind":        landmark.Kind,
-				"x":           landmark.X,
-				"y":           landmark.Y,
-			})
-		}
-
-		return map[string]any{
-			"zoneId":      stonewakeZoneMap.ZoneID,
-			"displayName": stonewakeZoneMap.DisplayName,
-			"bounds": map[string]float64{
-				"minX": stonewakeZoneMap.MinX,
-				"minY": stonewakeZoneMap.MinY,
-				"maxX": stonewakeZoneMap.MaxX,
-				"maxY": stonewakeZoneMap.MaxY,
-			},
-			"roads":     roads,
-			"landmarks": landmarks,
-		}
+		return buildZoneMapPayload(stonewakeZoneMap)
 	}
 
 	if zone, ok := s.zones[zoneID]; ok {
@@ -85,9 +61,13 @@ func (s *worldServer) buildZoneMapResponse(zoneID string) map[string]any {
 	}
 }
 
-func (s *worldServer) buildNavigationAreasResponse() []map[string]any {
-	areas := make([]map[string]any, 0, len(stonewakeNavigationAreas))
-	for _, area := range stonewakeNavigationAreas {
+func (s *worldServer) buildNavigationAreasResponse(session *worldSessionState) []map[string]any {
+	source := stonewakeNavigationAreas
+	if session != nil && session.ZoneID == dungeonZoneID {
+		source = tallowdeepNavigationAreas
+	}
+	areas := make([]map[string]any, 0, len(source))
+	for _, area := range source {
 		areas = append(areas, map[string]any{
 			"areaId":         area.ID,
 			"displayName":    area.DisplayName,

@@ -486,11 +486,11 @@ func (s *worldServer) cleanupDungeonInstancesLocked(now time.Time) {
 
 func (s *worldServer) applyDungeonKillCreditLocked(session *worldSessionState, mob *mobState) error {
 	if session == nil || mob == nil || mob.InstanceID == "" {
-		return s.applyQuestKillCreditLocked(session, mob.MobTypeID)
+		return s.applyQuestKillCreditLocked(session, mob)
 	}
 	instance := s.dungeonInstances[mob.InstanceID]
 	if instance == nil {
-		return s.applyQuestKillCreditLocked(session, mob.MobTypeID)
+		return s.applyQuestKillCreditLocked(session, mob)
 	}
 	definition := dungeonDefinitions[instance.DungeonID]
 	if mob.MobTypeID != definition.BossMobTypeID {
@@ -509,7 +509,7 @@ func (s *worldServer) applyDungeonKillCreditLocked(session *worldSessionState, m
 		if memberSession == nil || memberSession.InstanceID != instance.InstanceID {
 			continue
 		}
-		if err := s.applyQuestKillCreditLocked(memberSession, mob.MobTypeID); err != nil && firstErr == nil {
+		if err := s.applyQuestKillCreditLocked(memberSession, mob); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
@@ -527,15 +527,24 @@ func (s *worldServer) buildDungeonInstanceResponse(session *worldSessionState) m
 	}
 	definition := dungeonDefinitions[instance.DungeonID]
 	return map[string]any{
-		"instanceId":    instance.InstanceID,
-		"dungeonId":     instance.DungeonID,
-		"displayName":   definition.DisplayName,
-		"levelBand":     definition.LevelBand,
-		"state":         instance.State,
-		"createdAt":     instance.CreatedAtMs,
-		"expiresAt":     instance.ExpiresAtMs,
+		"instanceId":     instance.InstanceID,
+		"dungeonId":      instance.DungeonID,
+		"displayName":    definition.DisplayName,
+		"levelBand":      definition.LevelBand,
+		"state":          instance.State,
+		"createdAt":      instance.CreatedAtMs,
+		"expiresAt":      instance.ExpiresAtMs,
 		"objectiveState": instance.Objective,
 	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *worldServer) recoverExpiredDungeonSessionLocked(session *worldSessionState) {
