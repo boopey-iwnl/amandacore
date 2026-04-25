@@ -2078,6 +2078,7 @@ namespace UiClient
         m_bagBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericB.GetName();
         m_characterBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericC.GetName();
         m_questLogBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericL.GetName();
+        m_mapBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericM.GetName();
         m_settingsBinding = AzFramework::InputDeviceKeyboard::Key::Escape.GetName();
         m_interactBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericE.GetName();
         m_targetHostileBinding = AzFramework::InputDeviceKeyboard::Key::EditTab.GetName();
@@ -2125,6 +2126,7 @@ namespace UiClient
             readString("bind.bag", m_bagBinding);
             readString("bind.character", m_characterBinding);
             readString("bind.questLog", m_questLogBinding);
+            readString("bind.map", m_mapBinding);
             readString("bind.settings", m_settingsBinding);
             readString("bind.interact", m_interactBinding);
             readString("bind.targetHostile", m_targetHostileBinding);
@@ -2162,6 +2164,7 @@ namespace UiClient
         fprintf(settingsFile, "bind.bag=%s\n", m_bagBinding.c_str());
         fprintf(settingsFile, "bind.character=%s\n", m_characterBinding.c_str());
         fprintf(settingsFile, "bind.questLog=%s\n", m_questLogBinding.c_str());
+        fprintf(settingsFile, "bind.map=%s\n", m_mapBinding.c_str());
         fprintf(settingsFile, "bind.settings=%s\n", m_settingsBinding.c_str());
         fprintf(settingsFile, "bind.interact=%s\n", m_interactBinding.c_str());
         fprintf(settingsFile, "bind.targetHostile=%s\n", m_targetHostileBinding.c_str());
@@ -2187,6 +2190,7 @@ namespace UiClient
         clearConflicts(m_bagBinding);
         clearConflicts(m_characterBinding);
         clearConflicts(m_questLogBinding);
+        clearConflicts(m_mapBinding);
         clearConflicts(m_settingsBinding);
         clearConflicts(m_interactBinding);
         clearConflicts(m_targetHostileBinding);
@@ -2215,6 +2219,10 @@ namespace UiClient
         else if (actionId == "questLog")
         {
             m_questLogBinding = keyName;
+        }
+        else if (actionId == "map")
+        {
+            m_mapBinding = keyName;
         }
         else if (actionId == "settings")
         {
@@ -2332,6 +2340,11 @@ namespace UiClient
         if (keyName == m_questLogBinding)
         {
             m_questLogOpen = !m_questLogOpen;
+            return true;
+        }
+        if (keyName == m_mapBinding)
+        {
+            m_mapOpen = !m_mapOpen;
             return true;
         }
         if (keyName == m_settingsBinding)
