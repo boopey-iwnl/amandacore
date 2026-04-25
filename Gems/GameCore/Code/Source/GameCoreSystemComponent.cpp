@@ -21,6 +21,7 @@ namespace GameCore
             const char* m_displayName;
             const char* m_description;
             const char* m_requirementText;
+            const char* m_iconKind;
             int m_requiredLevel;
             int m_actionBarSlot;
             const char* m_actionBarHotkey;
@@ -34,6 +35,7 @@ namespace GameCore
                 "Auto Attack",
                 "Maintain pressure with your weapon while a target stays in melee range.",
                 "Known by all Warriors.",
+                "weapon",
                 1,
                 0,
                 "F",
@@ -45,6 +47,7 @@ namespace GameCore
                 "Steady Strike",
                 "A measured weapon strike that builds Grit through steady contact.",
                 "Known by default.",
+                "strike",
                 1,
                 1,
                 "1",
@@ -56,6 +59,7 @@ namespace GameCore
                 "Brace",
                 "Set your stance and recover a small amount of health without needing a target.",
                 "Known by default.",
+                "defense",
                 1,
                 2,
                 "2",
@@ -67,6 +71,7 @@ namespace GameCore
                 "Driving Blow",
                 "A harder follow-through strike trained early in the starter journey.",
                 "Requires level 2 and a Warrior trainer.",
+                "strike",
                 2,
                 -1,
                 "",
@@ -78,6 +83,7 @@ namespace GameCore
                 "Rallying Call",
                 "A short shout that restores Grit before the next exchange.",
                 "Requires level 4 and a Warrior trainer.",
+                "utility",
                 4,
                 -1,
                 "",
@@ -89,6 +95,7 @@ namespace GameCore
                 "Hampering Strike",
                 "A controlling strike previewed for the next band of Warrior progression.",
                 "Requires level 6 and a Warrior trainer.",
+                "strike",
                 6,
                 -1,
                 "",
@@ -100,6 +107,7 @@ namespace GameCore
                 "Guarded Form",
                 "Set your feet and recover while under pressure.",
                 "Requires level 8 and a Warrior trainer.",
+                "defense",
                 8,
                 -1,
                 "",
@@ -111,6 +119,7 @@ namespace GameCore
                 "Overhand Cut",
                 "Spend stored Grit on a heavy weapon attack.",
                 "Requires level 10 and a Warrior trainer.",
+                "strike",
                 10,
                 -1,
                 "",
@@ -1777,6 +1786,7 @@ namespace GameCore
                 entry.m_displayName = definition.m_displayName;
                 entry.m_description = definition.m_description;
                 entry.m_requirementText = definition.m_requirementText;
+                entry.m_iconKind = definition.m_iconKind;
                 entry.m_requiredLevel = definition.m_requiredLevel;
                 entry.m_learned = knowsAbility(definition.m_id);
                 session.m_spellbookEntries.push_back(AZStd::move(entry));
@@ -1807,6 +1817,7 @@ namespace GameCore
                 slot.m_abilityId = definition.m_id;
                 slot.m_displayName = definition.m_displayName;
                 slot.m_buttonLabel = definition.m_actionBarLabel;
+                slot.m_iconKind = definition.m_iconKind;
                 slot.m_requiresTarget = definition.m_requiresTarget;
                 slot.m_learned = true;
             }

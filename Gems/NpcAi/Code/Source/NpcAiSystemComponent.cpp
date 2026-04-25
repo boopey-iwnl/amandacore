@@ -37,6 +37,9 @@ namespace NpcAi
         constexpr const char* HostileMobKind = "hostile_mob";
         constexpr const char* TrainerNpcKind = "trainer_npc";
         constexpr const char* QuestGiverNpcKind = "quest_giver_npc";
+        constexpr const char* ProfessionTrainerNpcKind = "profession_trainer_npc";
+        constexpr const char* QuestObjectKind = "quest_object";
+        constexpr float ProxyGroundZ = 0.05f;
 
         float Distance2D(const AZ::Vector3& left, const AZ::Vector3& right)
         {
@@ -215,7 +218,10 @@ namespace NpcAi
             const bool isHostileMob = entity.m_kind == HostileMobKind;
             const bool isTrainerNpc = entity.m_kind == TrainerNpcKind;
             const bool isQuestGiverNpc = entity.m_kind == QuestGiverNpcKind;
-            if (!isHostileMob && !isTrainerNpc && !isQuestGiverNpc)
+            const bool isServiceNpc = entity.m_kind == ProfessionTrainerNpcKind ||
+                entity.m_kind == QuestObjectKind ||
+                (!entity.m_services.empty() && !isHostileMob);
+            if (!isHostileMob && !isTrainerNpc && !isQuestGiverNpc && !isServiceNpc)
             {
                 continue;
             }
@@ -224,7 +230,7 @@ namespace NpcAi
             const AZ::Vector3 entityPosition(
                 static_cast<float>(entity.m_x),
                 static_cast<float>(entity.m_y),
-                static_cast<float>(entity.m_z));
+                AZ::GetMax(static_cast<float>(entity.m_z), ProxyGroundZ));
             if (isHostileMob)
             {
                 visibleMobIds.push_back(entity.m_id);
@@ -268,7 +274,9 @@ namespace NpcAi
                         ? "client.trainer_npc_proxy_spawned trainerId=%s displayName=%s"
                         : (isQuestGiverNpc
                             ? "client.quest_giver_npc_proxy_spawned questGiverId=%s displayName=%s"
-                            : "client.mob_proxy_spawned mobId=%s displayName=%s"),
+                            : (isServiceNpc
+                                ? "client.service_npc_proxy_spawned npcId=%s displayName=%s"
+                                : "client.mob_proxy_spawned mobId=%s displayName=%s")),
                     entity.m_id.c_str(),
                     entity.m_displayName.c_str());
             }
@@ -279,7 +287,7 @@ namespace NpcAi
                 AZ::Vector3(
                     static_cast<float>(entity.m_x),
                     static_cast<float>(entity.m_y),
-                    static_cast<float>(entity.m_z)));
+                    AZ::GetMax(static_cast<float>(entity.m_z), ProxyGroundZ)));
 
             if (auto* combatState = proxyState.m_entity->FindComponent<MobCombatStateComponent>())
             {

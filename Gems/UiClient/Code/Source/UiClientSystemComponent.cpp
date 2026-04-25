@@ -38,6 +38,14 @@ namespace UiClient
         constexpr float SpellRange = 24.0f;
         constexpr size_t MaxEventLogEntries = 9;
         constexpr const char* AutoAttackAbilityId = "auto_attack";
+        constexpr const char* SteadyStrikeAbilityId = "steady_strike";
+        constexpr const char* BraceAbilityId = "brace";
+        constexpr const char* DrivingBlowAbilityId = "driving_blow";
+        constexpr const char* RallyingCallAbilityId = "rallying_call";
+        constexpr const char* HamperingStrikeAbilityId = "hampering_strike";
+        constexpr const char* GuardedFormAbilityId = "guarded_form";
+        constexpr const char* OverhandCutAbilityId = "overhand_cut";
+        constexpr const char* IronResolveAbilityId = "iron_resolve";
         constexpr const char* TrainerNpcKind = "trainer_npc";
         constexpr const char* QuestGiverNpcKind = "quest_giver_npc";
         constexpr const char* QuestGiverNpcId = "npc_commander_elian_rook";
@@ -680,14 +688,14 @@ namespace UiClient
             }
         }
 
-        bool BeginHudPanel(const char* identifier, const char* title, const ImVec2& position, const ImVec2& size)
+        bool BeginHudPanel(const char* identifier, const char* title, const ImVec2& position, const ImVec2& size, bool compact = false)
         {
             ImGui::SetNextWindowPos(position, ImGuiCond_Always);
             ImGui::SetNextWindowSize(size, ImGuiCond_Always);
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 14.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 16.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, compact ? ImVec2(7.0f, 7.0f) : ImVec2(14.0f, 14.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, compact ? 8.0f : 16.0f);
             const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
                 ImGuiWindowFlags_NoResize |
                 ImGuiWindowFlags_NoMove |
@@ -700,12 +708,31 @@ namespace UiClient
             const ImVec2 windowPosition = ImGui::GetWindowPos();
             const ImVec2 windowSize = ImGui::GetWindowSize();
 
-            DrawPanelChrome(
-                ImGui::GetWindowDrawList(),
-                windowPosition,
-                AddVec2(windowPosition, windowSize),
-                title);
-            ImGui::SetCursorScreenPos(ImVec2(windowPosition.x + 14.0f, windowPosition.y + 40.0f));
+            if (compact)
+            {
+                ImGui::GetWindowDrawList()->AddRectFilled(
+                    windowPosition,
+                    AddVec2(windowPosition, windowSize),
+                    ColorU32(10, 14, 19, 212),
+                    8.0f);
+                ImGui::GetWindowDrawList()->AddRect(
+                    windowPosition,
+                    AddVec2(windowPosition, windowSize),
+                    ColorU32(153, 119, 56, 190),
+                    8.0f,
+                    0,
+                    1.4f);
+                ImGui::SetCursorScreenPos(ImVec2(windowPosition.x + 7.0f, windowPosition.y + 7.0f));
+            }
+            else
+            {
+                DrawPanelChrome(
+                    ImGui::GetWindowDrawList(),
+                    windowPosition,
+                    AddVec2(windowPosition, windowSize),
+                    title);
+                ImGui::SetCursorScreenPos(ImVec2(windowPosition.x + 14.0f, windowPosition.y + 40.0f));
+            }
             return visible;
         }
 
@@ -747,6 +774,160 @@ namespace UiClient
                 ImVec2(center.x - (glyphSize.x * 0.5f), center.y - (glyphSize.y * 0.5f)),
                 ColorU32(250, 246, 238),
                 glyph.c_str());
+        }
+
+        AZStd::string AbilityIconKind(const AZStd::string& abilityId)
+        {
+            if (abilityId == AutoAttackAbilityId)
+            {
+                return "weapon";
+            }
+            if (abilityId == SteadyStrikeAbilityId || abilityId == DrivingBlowAbilityId ||
+                abilityId == HamperingStrikeAbilityId || abilityId == OverhandCutAbilityId)
+            {
+                return "strike";
+            }
+            if (abilityId == BraceAbilityId || abilityId == GuardedFormAbilityId || abilityId == IronResolveAbilityId)
+            {
+                return "defense";
+            }
+            if (abilityId == RallyingCallAbilityId)
+            {
+                return "utility";
+            }
+            return "ability";
+        }
+
+        AZStd::string ItemIconKind(const NetClient::InventorySlotState& slot)
+        {
+            if (!slot.m_iconKind.empty())
+            {
+                return slot.m_iconKind;
+            }
+            if (slot.m_itemType == "weapon")
+            {
+                return "weapon";
+            }
+            if (slot.m_itemType == "armor")
+            {
+                return "armor";
+            }
+            if (slot.m_itemType == "consumable")
+            {
+                return "consumable";
+            }
+            if (slot.m_itemType == "material")
+            {
+                return "material";
+            }
+            if (slot.m_itemType == "quest")
+            {
+                return "quest";
+            }
+            if (slot.m_itemType == "junk")
+            {
+                return "junk";
+            }
+            return "item";
+        }
+
+        void DrawProceduralIcon(
+            ImDrawList* drawList,
+            const ImVec2& minBounds,
+            const ImVec2& maxBounds,
+            const AZStd::string& kind,
+            bool muted = false)
+        {
+            const ImU32 baseColor = muted
+                ? ColorU32(55, 52, 49, 255)
+                : (kind == "weapon" || kind == "strike"
+                    ? ColorU32(94, 58, 44, 255)
+                    : (kind == "defense" || kind == "armor"
+                        ? ColorU32(43, 73, 88, 255)
+                        : (kind == "consumable" || kind == "utility"
+                            ? ColorU32(50, 91, 68, 255)
+                            : (kind == "material"
+                                ? ColorU32(76, 67, 49, 255)
+                                : (kind == "quest"
+                                    ? ColorU32(91, 73, 35, 255)
+                                    : ColorU32(58, 62, 72, 255))))));
+            const ImU32 accentColor = muted
+                ? ColorU32(128, 118, 96, 255)
+                : (kind == "weapon" || kind == "strike"
+                    ? ColorU32(232, 187, 96, 255)
+                    : (kind == "defense" || kind == "armor"
+                        ? ColorU32(146, 203, 221, 255)
+                        : (kind == "consumable" || kind == "utility"
+                            ? ColorU32(163, 220, 145, 255)
+                            : (kind == "material"
+                                ? ColorU32(214, 183, 118, 255)
+                                : (kind == "quest"
+                                    ? ColorU32(238, 213, 109, 255)
+                                    : ColorU32(205, 205, 194, 255))))));
+
+            const ImVec2 center((minBounds.x + maxBounds.x) * 0.5f, (minBounds.y + maxBounds.y) * 0.5f);
+            const float width = maxBounds.x - minBounds.x;
+            const float height = maxBounds.y - minBounds.y;
+            drawList->AddRectFilled(minBounds, maxBounds, baseColor, 7.0f);
+            drawList->AddRect(minBounds, maxBounds, ColorU32(201, 159, 78, muted ? 120 : 210), 7.0f, 0, 1.5f);
+
+            if (kind == "weapon" || kind == "strike")
+            {
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.25f, maxBounds.y - height * 0.23f),
+                    ImVec2(maxBounds.x - width * 0.22f, minBounds.y + height * 0.22f),
+                    accentColor,
+                    3.2f);
+                drawList->AddTriangleFilled(
+                    ImVec2(maxBounds.x - width * 0.17f, minBounds.y + height * 0.17f),
+                    ImVec2(maxBounds.x - width * 0.33f, minBounds.y + height * 0.20f),
+                    ImVec2(maxBounds.x - width * 0.20f, minBounds.y + height * 0.34f),
+                    accentColor);
+            }
+            else if (kind == "defense" || kind == "armor")
+            {
+                drawList->AddTriangleFilled(
+                    ImVec2(center.x, minBounds.y + height * 0.18f),
+                    ImVec2(maxBounds.x - width * 0.22f, minBounds.y + height * 0.34f),
+                    ImVec2(center.x, maxBounds.y - height * 0.16f),
+                    accentColor);
+                drawList->AddTriangleFilled(
+                    ImVec2(center.x, minBounds.y + height * 0.18f),
+                    ImVec2(minBounds.x + width * 0.22f, minBounds.y + height * 0.34f),
+                    ImVec2(center.x, maxBounds.y - height * 0.16f),
+                    ColorU32(100, 151, 171, muted ? 160 : 255));
+            }
+            else if (kind == "consumable" || kind == "utility")
+            {
+                drawList->AddCircleFilled(center, AZ::GetMin(width, height) * 0.22f, accentColor, 24);
+                drawList->AddRectFilled(
+                    ImVec2(center.x - width * 0.07f, minBounds.y + height * 0.18f),
+                    ImVec2(center.x + width * 0.07f, center.y),
+                    ColorU32(226, 237, 202, muted ? 120 : 230),
+                    3.0f);
+            }
+            else if (kind == "material")
+            {
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.10f, center.y + height * 0.06f), width * 0.16f, accentColor, 16);
+                drawList->AddCircleFilled(ImVec2(center.x + width * 0.13f, center.y - height * 0.08f), width * 0.13f, ColorU32(184, 160, 103, muted ? 120 : 255), 16);
+            }
+            else if (kind == "quest")
+            {
+                drawList->AddRectFilled(
+                    ImVec2(minBounds.x + width * 0.28f, minBounds.y + height * 0.18f),
+                    ImVec2(maxBounds.x - width * 0.25f, maxBounds.y - height * 0.18f),
+                    accentColor,
+                    4.0f);
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.36f, minBounds.y + height * 0.36f),
+                    ImVec2(maxBounds.x - width * 0.34f, minBounds.y + height * 0.36f),
+                    baseColor,
+                    2.0f);
+            }
+            else
+            {
+                drawList->AddCircleFilled(center, AZ::GetMin(width, height) * 0.22f, accentColor, 20);
+            }
         }
 
         void DrawPlayerFrame(
@@ -1073,7 +1254,10 @@ namespace UiClient
             ImGui::Text("%s", zoneMap.m_displayName.empty() ? "Stonewake Vale" : zoneMap.m_displayName.c_str());
             ImGui::TextUnformatted("Authored navigation blockout");
 
-            const ImVec2 canvasSize(590.0f, 360.0f);
+            const ImVec2 availableRegion = ImGui::GetContentRegionAvail();
+            const ImVec2 canvasSize(
+                AZ::GetMax(590.0f, availableRegion.x),
+                AZ::GetMax(360.0f, availableRegion.y - 26.0f));
             const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
             ImGui::InvisibleButton("##stonewake_zone_map_canvas", canvasSize);
             ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -1464,11 +1648,35 @@ namespace UiClient
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.10f, 0.13f, 1.0f));
                 }
 
-                const char* buttonLabel = (slotState && !slotState->m_buttonLabel.empty()) ? slotState->m_buttonLabel.c_str() : "";
-                const bool pressed = ImGui::Button(buttonLabel, slotSize);
+                const bool pressed = ImGui::Button("##action_slot_button", slotSize);
                 ImGui::PopStyleColor(3);
                 const ImVec2 slotMin = ImGui::GetItemRectMin();
                 const ImVec2 slotMax = ImGui::GetItemRectMax();
+                if (hasAbility)
+                {
+                    const AZStd::string iconKind = slotState->m_iconKind.empty()
+                        ? AbilityIconKind(slotState->m_abilityId)
+                        : slotState->m_iconKind;
+                    DrawProceduralIcon(
+                        drawList,
+                        ImVec2(slotMin.x + 4.0f, slotMin.y + 4.0f),
+                        ImVec2(slotMax.x - 4.0f, slotMax.y - 4.0f),
+                        iconKind);
+                    const size_t shortLabelLength = slotState->m_displayName.size() < 5 ? slotState->m_displayName.size() : 5;
+                    const AZStd::string buttonLabel = !slotState->m_buttonLabel.empty()
+                        ? slotState->m_buttonLabel
+                        : slotState->m_displayName.substr(0, shortLabelLength);
+                    const ImVec2 labelSize = ImGui::CalcTextSize(buttonLabel.c_str());
+                    drawList->AddRectFilled(
+                        ImVec2(slotMin.x + 3.0f, slotMax.y - 18.0f),
+                        ImVec2(slotMax.x - 3.0f, slotMax.y - 3.0f),
+                        ColorU32(8, 11, 15, 170),
+                        4.0f);
+                    drawList->AddText(
+                        ImVec2(slotMin.x + ((slotSize.x - labelSize.x) * 0.5f), slotMax.y - 17.0f),
+                        ColorU32(246, 236, 204),
+                        buttonLabel.c_str());
+                }
                 drawList->AddRect(slotMin, slotMax, ColorU32(153, 119, 56), 8.0f, 0, 2.0f);
                 const AZStd::string keyLabel = slotIndex >= 0 && slotIndex < ActionBarSlotCount
                     ? DisplayKeyName(actionSlotBindings[slotIndex])
@@ -1688,17 +1896,13 @@ namespace UiClient
                 pendingActionMoveSlot);
 
             ImGui::Spacing();
-            ImGui::TextWrapped(
-                "%s",
-                BuildActionBarHelpText(
-                    worldState.m_session,
-                    actionSlotBindings,
-                    spellbookBinding,
-                    bagBinding,
-                    settingsBinding,
-                    interactBinding,
-                    targetHostileBinding)
-                    .c_str());
+            ImGui::Text(
+                "%s interact  |  %s target  |  %s bag  |  %s spells  |  %s menu  |  Hold SHIFT to edit",
+                DisplayKeyName(interactBinding).c_str(),
+                DisplayKeyName(targetHostileBinding).c_str(),
+                DisplayKeyName(bagBinding).c_str(),
+                DisplayKeyName(spellbookBinding).c_str(),
+                DisplayKeyName(settingsBinding).c_str());
             if (editMode)
             {
                 if (!pendingActionAssignmentAbilityId.empty())
@@ -1776,12 +1980,11 @@ namespace UiClient
                 ImGui::PushID(entry.m_id.c_str());
                 const ImVec2 cardStart = ImGui::GetCursorScreenPos();
                 ImGui::InvisibleButton("##spell_card_icon", ImVec2(42.0f, 42.0f));
-                ImGui::GetWindowDrawList()->AddRectFilled(cardStart, AddVec2(cardStart, ImVec2(42.0f, 42.0f)), ColorU32(36, 72, 88), 7.0f);
-                ImGui::GetWindowDrawList()->AddRect(cardStart, AddVec2(cardStart, ImVec2(42.0f, 42.0f)), ColorU32(187, 143, 65), 7.0f, 0, 2.0f);
-                ImGui::GetWindowDrawList()->AddText(
-                    ImVec2(cardStart.x + 14.0f, cardStart.y + 12.0f),
-                    ColorU32(240, 230, 198),
-                    entry.m_displayName.empty() ? "?" : AZStd::string::format("%c", entry.m_displayName.front()).c_str());
+                DrawProceduralIcon(
+                    ImGui::GetWindowDrawList(),
+                    cardStart,
+                    AddVec2(cardStart, ImVec2(42.0f, 42.0f)),
+                    entry.m_iconKind.empty() ? AbilityIconKind(entry.m_id) : entry.m_iconKind);
                 ImGui::SameLine();
                 ImGui::BeginGroup();
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.90f, 0.76f, 1.0f));
@@ -1834,9 +2037,12 @@ namespace UiClient
                 ImGui::PushID(entry.m_id.c_str());
                 const ImVec2 cardStart = ImGui::GetCursorScreenPos();
                 ImGui::InvisibleButton("##locked_spell_icon", ImVec2(42.0f, 42.0f));
-                ImGui::GetWindowDrawList()->AddRectFilled(cardStart, AddVec2(cardStart, ImVec2(42.0f, 42.0f)), ColorU32(54, 47, 39), 7.0f);
-                ImGui::GetWindowDrawList()->AddRect(cardStart, AddVec2(cardStart, ImVec2(42.0f, 42.0f)), ColorU32(121, 91, 54), 7.0f, 0, 2.0f);
-                ImGui::GetWindowDrawList()->AddText(ImVec2(cardStart.x + 16.0f, cardStart.y + 12.0f), ColorU32(181, 151, 92), "?");
+                DrawProceduralIcon(
+                    ImGui::GetWindowDrawList(),
+                    cardStart,
+                    AddVec2(cardStart, ImVec2(42.0f, 42.0f)),
+                    entry.m_iconKind.empty() ? AbilityIconKind(entry.m_id) : entry.m_iconKind,
+                    true);
                 ImGui::SameLine();
                 ImGui::BeginGroup();
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.80f, 0.66f, 0.38f, 1.0f));
@@ -1887,6 +2093,16 @@ namespace UiClient
             for (const auto& offer : trainer.m_offers)
             {
                 ImGui::PushID(offer.m_abilityId.c_str());
+                const ImVec2 iconStart = ImGui::GetCursorScreenPos();
+                ImGui::InvisibleButton("##trainer_offer_icon", ImVec2(38.0f, 38.0f));
+                DrawProceduralIcon(
+                    ImGui::GetWindowDrawList(),
+                    iconStart,
+                    AddVec2(iconStart, ImVec2(38.0f, 38.0f)),
+                    offer.m_iconKind.empty() ? AbilityIconKind(offer.m_abilityId) : offer.m_iconKind,
+                    offer.m_learned || !offer.m_canLearn);
+                ImGui::SameLine();
+                ImGui::BeginGroup();
                 ImGui::Text("%s", offer.m_displayName.c_str());
                 ImGui::TextWrapped("%s", offer.m_description.c_str());
                 const AZStd::string offerFacts = FormatAbilityFacts(offer);
@@ -1924,6 +2140,7 @@ namespace UiClient
                 {
                     ImGui::TextWrapped("%s", offer.m_requirementText.c_str());
                 }
+                ImGui::EndGroup();
                 ImGui::Separator();
                 ImGui::PopID();
             }
@@ -2022,6 +2239,7 @@ namespace UiClient
             }
             ImGui::Separator();
 
+            ImGui::BeginChild("##inventory_slots_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
             const ImVec2 slotSize(66.0f, 66.0f);
             for (int slotIndex = 0; slotIndex < slotCount; ++slotIndex)
             {
@@ -2040,11 +2258,38 @@ namespace UiClient
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.14f, 0.18f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.14f, 0.20f, 0.25f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.23f, 0.29f, 1.0f));
-                const AZStd::string slotLabel = slotState ? GetInventorySlotLabel(*slotState) : AZStd::string{};
-                const bool pressed = ImGui::Button(slotLabel.c_str(), slotSize);
+                const bool pressed = ImGui::Button("##inventory_slot_button", slotSize);
                 ImGui::PopStyleColor(3);
                 const ImVec2 slotMin = ImGui::GetItemRectMin();
                 const ImVec2 slotMax = ImGui::GetItemRectMax();
+                if (slotState && !slotState->m_itemId.empty() && slotState->m_stackCount > 0)
+                {
+                    DrawProceduralIcon(
+                        ImGui::GetWindowDrawList(),
+                        ImVec2(slotMin.x + 8.0f, slotMin.y + 10.0f),
+                        ImVec2(slotMax.x - 8.0f, slotMax.y - 12.0f),
+                        ItemIconKind(*slotState));
+                    if (slotState->m_stackCount > 1)
+                    {
+                        const AZStd::string stackText = AZStd::string::format("%d", slotState->m_stackCount);
+                        const ImVec2 stackSize = ImGui::CalcTextSize(stackText.c_str());
+                        ImGui::GetWindowDrawList()->AddText(
+                            ImVec2(slotMax.x - stackSize.x - 7.0f, slotMax.y - 18.0f),
+                            ColorU32(246, 236, 204),
+                            stackText.c_str());
+                    }
+                    const AZStd::string itemLabel = GetInventorySlotLabel(*slotState);
+                    const size_t shortLabelLength = itemLabel.size() < 8 ? itemLabel.size() : 8;
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        ImVec2(slotMin.x + 5.0f, slotMax.y - 18.0f),
+                        ImVec2(slotMax.x - 5.0f, slotMax.y - 3.0f),
+                        ColorU32(8, 11, 15, 150),
+                        4.0f);
+                    ImGui::GetWindowDrawList()->AddText(
+                        ImVec2(slotMin.x + 7.0f, slotMax.y - 17.0f),
+                        ColorU32(231, 220, 190),
+                        itemLabel.substr(0, shortLabelLength).c_str());
+                }
                 ImGui::GetWindowDrawList()->AddRect(slotMin, slotMax, ColorU32(149, 118, 59), 8.0f, 0, 2.0f);
                 ImGui::GetWindowDrawList()->AddText(
                     ImVec2(slotMin.x + 6.0f, slotMin.y + 6.0f),
@@ -2109,6 +2354,7 @@ namespace UiClient
                 }
                 ImGui::PopID();
             }
+            ImGui::EndChild();
         }
 
         AZStd::string FormatCopperAmount(int totalCopper)
@@ -2835,6 +3081,7 @@ namespace UiClient
             size_t inputBufferSize,
             char* whisperTargetBuffer,
             size_t whisperTargetBufferSize,
+            bool& focusRequested,
             AZStd::string& outSubmittedInput)
         {
             ImGui::BeginChild("##chat_scrollback", ImVec2(0.0f, 158.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -2868,18 +3115,33 @@ namespace UiClient
             {
                 selectedChannel = "whisper";
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Party", ImVec2(66.0f, 24.0f)))
+            if (worldState.m_social.m_hasParty)
             {
-                selectedChannel = "party";
+                ImGui::SameLine();
+                if (ImGui::Button("Party", ImVec2(66.0f, 24.0f)))
+                {
+                    selectedChannel = "party";
+                }
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Guild", ImVec2(66.0f, 24.0f)))
+            if (worldState.m_social.m_hasGuild)
             {
-                selectedChannel = "guild";
+                ImGui::SameLine();
+                if (ImGui::Button("Guild", ImVec2(66.0f, 24.0f)))
+                {
+                    selectedChannel = "guild";
+                }
             }
             ImGui::SameLine();
             ImGui::Text("Channel: %s", ChatChannelLabel(selectedChannel));
+
+            if (selectedChannel == "party" && !worldState.m_social.m_hasParty)
+            {
+                selectedChannel = "say";
+            }
+            if (selectedChannel == "guild" && !worldState.m_social.m_hasGuild)
+            {
+                selectedChannel = "say";
+            }
 
             if (selectedChannel == "whisper")
             {
@@ -2889,6 +3151,11 @@ namespace UiClient
             }
 
             ImGui::SetNextItemWidth(-1.0f);
+            if (focusRequested)
+            {
+                ImGui::SetKeyboardFocusHere();
+                focusRequested = false;
+            }
             const bool submitted = ImGui::InputText(
                 "##chat_input",
                 inputBuffer,
@@ -3255,12 +3522,11 @@ namespace UiClient
             talentsOpen = false;
             MenuButtonState buttons[] = {
                 {"Char", &characterSheetOpen},
+                {"Spells", &spellbookOpen},
                 {"Quests", &questLogOpen},
                 {"Map", &mapOpen},
-                {"Spells", &spellbookOpen},
                 {"Bag", &bagOpen},
-                {"Social", &socialOpen},
-                {"Menu", &settingsOpen},
+                {"Settings", &settingsOpen},
             };
 
             for (size_t index = 0; index < AZ_ARRAY_SIZE(buttons); ++index)
@@ -3269,13 +3535,12 @@ namespace UiClient
                 {
                     ImGui::SameLine();
                 }
-                if (ImGui::Button(buttons[index].m_label, ImVec2(54.0f, 26.0f)))
+                if (ImGui::Button(buttons[index].m_label, ImVec2(index == 5 ? 74.0f : 58.0f, 28.0f)))
                 {
                     *buttons[index].m_toggle = !*buttons[index].m_toggle;
                 }
             }
-            ImGui::Spacing();
-            ImGui::TextDisabled("Alpha 0.1: talents and finder tools are unavailable.");
+            socialOpen = false;
         }
     } // namespace
 
@@ -3348,6 +3613,8 @@ namespace UiClient
         m_pendingAuctionSellSlot = -1;
         m_pendingAuctionBuyoutIndex = -1;
         m_auctionStackCount = 1;
+        m_chatChannel = "say";
+        m_chatFocusRequested = false;
         m_auctionSearchBuffer[0] = '\0';
         m_auctionBuyoutBuffer[0] = '\0';
         LoadDefaultKeybindings();
@@ -3933,6 +4200,17 @@ namespace UiClient
             return true;
         }
 
+        if (!entity.m_services.empty())
+        {
+            AddHudEvent(AZStd::string::format("%s service is unavailable in Alpha 0.1", entity.m_displayName.c_str()));
+            AZ_Printf(
+                "amandacore",
+                "client.npc_service_unavailable targetId=%s serviceCount=%zu",
+                entity.m_id.c_str(),
+                entity.m_services.size());
+            return true;
+        }
+
         AddHudEvent(AZStd::string::format("%s has nothing new right now", entity.m_displayName.c_str()));
         return false;
     }
@@ -4069,6 +4347,12 @@ namespace UiClient
         auto* gameCore = GameCore::IGameCoreRequests::Get();
         const AZStd::string keyName = channelId.GetName();
 
+        if (channelId == AzFramework::InputDeviceKeyboard::Key::EditEnter && !ImGui::GetIO().WantTextInput)
+        {
+            m_chatFocusRequested = true;
+            return true;
+        }
+
         if (!m_pendingKeybindActionId.empty())
         {
             if (IsBindableKeyboardChannel(channelId))
@@ -4079,6 +4363,11 @@ namespace UiClient
                 AddHudEvent(AZStd::string::format("Keybinding updated: %s", DisplayKeyName(keyName).c_str()));
             }
             return true;
+        }
+
+        if (ImGui::GetIO().WantTextInput)
+        {
+            return false;
         }
 
         if (TryHandleBoundAction(gameCore, keyName))
@@ -4283,21 +4572,23 @@ namespace UiClient
         const ImVec2 targetFrameSize(250.0f, 132.0f);
         const ImVec2 minimapSize(250.0f, 244.0f);
         const ImVec2 minimapPos(displaySize.x - minimapSize.x - 18.0f, 18.0f);
-        const ImVec2 rightActionBarSize(82.0f, AZ::GetClamp(displaySize.y - 330.0f, 360.0f, 748.0f));
-        const ImVec2 rightActionBarOnePos(displaySize.x - rightActionBarSize.x - 14.0f, 312.0f);
+        const ImVec2 rightActionBarSize(66.0f, AZ::GetClamp(displaySize.y - 330.0f, 360.0f, 748.0f));
+        const ImVec2 rightActionBarOnePos(displaySize.x - rightActionBarSize.x - 12.0f, 312.0f);
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 4.0f, 312.0f);
         const ImVec2 trackerSize(292.0f, 292.0f);
         const ImVec2 trackerPos(rightActionBarTwoPos.x - trackerSize.x - 12.0f, 286.0f);
-        const ImVec2 actionBarSize(744.0f, 148.0f);
+        const ImVec2 actionBarSize(744.0f, 122.0f);
         const ImVec2 actionBarPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
-        const ImVec2 microMenuSize(438.0f, 80.0f);
+        const ImVec2 upperActionBarSize(744.0f, 66.0f);
+        const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
+        const ImVec2 microMenuSize(410.0f, 42.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
         const bool microMenuFitsRight = microMenuRightX + microMenuSize.x < rightActionBarTwoPos.x - 12.0f;
         const ImVec2 microMenuPos(
             microMenuFitsRight ? microMenuRightX : actionBarPos.x + actionBarSize.x - microMenuSize.x,
-            microMenuFitsRight ? actionBarPos.y + 26.0f : actionBarPos.y - microMenuSize.y - 4.0f);
+            microMenuFitsRight ? actionBarPos.y + 40.0f : upperActionBarPos.y - microMenuSize.y - 6.0f);
         const ImVec2 spellbookSize(720.0f, 590.0f);
         const ImVec2 spellbookPos(
             AZ::GetMax(18.0f, rightActionBarTwoPos.x - spellbookSize.x - 18.0f),
@@ -4322,8 +4613,6 @@ namespace UiClient
         const ImVec2 questLogPos(280.0f, AZ::GetMax(18.0f, displaySize.y - questLogSize.y - 176.0f));
         const ImVec2 mapSize(700.0f, 510.0f);
         const ImVec2 mapPos((displaySize.x - mapSize.x) * 0.5f, (displaySize.y - mapSize.y) * 0.5f);
-        const ImVec2 upperActionBarSize(744.0f, 76.0f);
-        const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 4.0f);
         const ImVec2 partyFramesSize(250.0f, 250.0f);
         const ImVec2 partyFramesPos(18.0f, 158.0f);
         const ImVec2 chatSize(displaySize.x < 1500.0f ? 360.0f : 440.0f, 230.0f);
@@ -4430,6 +4719,7 @@ namespace UiClient
                     AZ_ARRAY_SIZE(m_chatInputBuffer),
                     m_chatWhisperTargetBuffer,
                     AZ_ARRAY_SIZE(m_chatWhisperTargetBuffer),
+                    m_chatFocusRequested,
                     submittedInput))
             {
                 SubmitChatInput(gameCore, submittedInput);
@@ -4507,7 +4797,7 @@ namespace UiClient
         }
         ImGui::End();
 
-        if (BeginHudPanel("##micro_menu_bar", "Menu", microMenuPos, microMenuSize))
+        if (BeginHudPanel("##micro_menu_bar", "", microMenuPos, microMenuSize, true))
         {
             DrawMicroMenuBar(
                 m_characterSheetOpen,
@@ -4521,7 +4811,7 @@ namespace UiClient
         }
         ImGui::End();
 
-        if (m_extraUpperActionBarVisible && BeginHudPanel("##upper_action_bar", "", upperActionBarPos, upperActionBarSize))
+        if (m_extraUpperActionBarVisible && BeginHudPanel("##upper_action_bar", "", upperActionBarPos, upperActionBarSize, true))
         {
             DrawAuxiliaryActionBar(
                 gameCore,
@@ -4539,7 +4829,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_rightActionBarTwoVisible && BeginHudPanel("##right_action_bar_two", "", rightActionBarTwoPos, rightActionBarSize))
+        if (m_rightActionBarTwoVisible && BeginHudPanel("##right_action_bar_two", "", rightActionBarTwoPos, rightActionBarSize, true))
         {
             DrawAuxiliaryActionBar(
                 gameCore,
@@ -4557,7 +4847,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_rightActionBarOneVisible && BeginHudPanel("##right_action_bar_one", "", rightActionBarOnePos, rightActionBarSize))
+        if (m_rightActionBarOneVisible && BeginHudPanel("##right_action_bar_one", "", rightActionBarOnePos, rightActionBarSize, true))
         {
             DrawAuxiliaryActionBar(
                 gameCore,

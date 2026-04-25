@@ -424,6 +424,10 @@ namespace NetClient
                         ReadInt(slotValue, "slotIndex", slot.m_slotIndex);
                         ReadString(slotValue, "itemId", slot.m_itemId);
                         ReadString(slotValue, "displayName", slot.m_displayName);
+                        ReadString(slotValue, "itemType", slot.m_itemType);
+                        ReadString(slotValue, "itemSubtype", slot.m_itemSubtype);
+                        ReadString(slotValue, "quality", slot.m_quality);
+                        ReadString(slotValue, "iconKind", slot.m_iconKind);
                         ReadInt(slotValue, "stackCount", slot.m_stackCount);
                         outResponse.m_inventory.m_slots.push_back(AZStd::move(slot));
                     }
@@ -515,6 +519,7 @@ namespace NetClient
                     ReadString(spellValue, "tooltipText", entry.m_tooltipText);
                     ReadString(spellValue, "requirementText", entry.m_requirementText);
                     ReadString(spellValue, "resourceName", entry.m_resourceName);
+                    ReadString(spellValue, "iconKind", entry.m_iconKind);
                     ReadInt(spellValue, "requiredLevel", entry.m_requiredLevel);
                     ReadDouble(spellValue, "resourceCost", entry.m_resourceCost);
                     ReadDouble(spellValue, "resourceGeneration", entry.m_resourceGeneration);
@@ -544,6 +549,7 @@ namespace NetClient
                     ReadString(actionValue, "buttonLabel", slot.m_buttonLabel);
                     ReadString(actionValue, "resourceName", slot.m_resourceName);
                     ReadString(actionValue, "tooltipText", slot.m_tooltipText);
+                    ReadString(actionValue, "iconKind", slot.m_iconKind);
                     ReadDouble(actionValue, "resourceCost", slot.m_resourceCost);
                     ReadDouble(actionValue, "resourceGeneration", slot.m_resourceGeneration);
                     ReadInt64(actionValue, "cooldownMs", slot.m_cooldownMs);
@@ -582,6 +588,7 @@ namespace NetClient
                         ReadString(offerValue, "tooltipText", offer.m_tooltipText);
                         ReadString(offerValue, "requirementText", offer.m_requirementText);
                         ReadString(offerValue, "resourceName", offer.m_resourceName);
+                        ReadString(offerValue, "iconKind", offer.m_iconKind);
                         ReadInt(offerValue, "requiredLevel", offer.m_requiredLevel);
                         ReadInt(offerValue, "costCopper", offer.m_costCopper);
                         ReadDouble(offerValue, "resourceCost", offer.m_resourceCost);

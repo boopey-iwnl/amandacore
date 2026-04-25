@@ -42,6 +42,7 @@ namespace MovementPhysics
         void UpdateAvatarPresentation(float deltaTime, const AZ::Vector2& planarDelta);
         AZ::Vector3 GetPresentationPosition() const;
         void SyncEntityTransformToCharacterBase(const AZ::Vector3& basePosition);
+        void SetCharacterBasePosition(const AZ::Vector3& basePosition);
         void ApplyWorldPosition(float x, float y, float z);
         void DrawValidationArena();
         void DrawLocalPlayerProxy();
@@ -103,6 +104,7 @@ namespace MovementPhysics
         AZ::Vector3 m_lastLoggedEntitySyncPosition = AZ::Vector3::CreateZero();
         AZ::Vector3 m_lastLoggedCameraSourcePosition = AZ::Vector3::CreateZero();
         AZ::Vector2 m_pendingServerDelta = AZ::Vector2::CreateZero();
+        AZ::Vector2 m_pendingServerCorrection = AZ::Vector2::CreateZero();
         AZStd::string m_lastWorldSessionToken;
         AzFramework::ViewportId m_defaultViewportId = AzFramework::InvalidViewportId;
     };

@@ -112,6 +112,7 @@ func (s *worldServer) buildTrainerResponse(session *worldSessionState) map[strin
 			"learned":            learned,
 			"canLearn":           canLearn,
 			"requirementText":    requirementText,
+			"iconKind":           abilityIconKind(ability),
 			"actionBarSlot":      ability.ActionBarSlot,
 			"actionBarHotkey":    ability.ActionBarHotkey,
 			"actionBarLabel":     ability.ActionBarLabel,

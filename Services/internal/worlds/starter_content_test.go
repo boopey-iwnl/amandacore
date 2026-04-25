@@ -108,6 +108,26 @@ func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
 	}
 }
 
+func TestStonewakeSpawnsAreGrounded(t *testing.T) {
+	server := newWorldServer(nil)
+
+	for _, npc := range server.friendlyNPCs {
+		if npc.ZoneID == defaultZoneID && npc.Z < playableGroundZ {
+			t.Fatalf("expected friendly NPC %s to be grounded at %.2f or above, got %.2f", npc.ID, playableGroundZ, npc.Z)
+		}
+	}
+	for _, mob := range server.mobs {
+		if mob.ZoneID == defaultZoneID && (mob.Z < playableGroundZ || mob.SpawnZ < playableGroundZ) {
+			t.Fatalf("expected mob %s to be grounded at %.2f or above, got z %.2f spawnZ %.2f", mob.ID, playableGroundZ, mob.Z, mob.SpawnZ)
+		}
+	}
+	for _, node := range server.gatheringNodes {
+		if node.Definition.ZoneID == defaultZoneID && node.Definition.Z < playableGroundZ {
+			t.Fatalf("expected gathering node %s to be grounded at %.2f or above, got %.2f", node.Definition.ID, playableGroundZ, node.Definition.Z)
+		}
+	}
+}
+
 func assertMobAreaCenter(t *testing.T, server *worldServer, mobTypeID string, centerX float64, centerY float64, maxRadius float64) {
 	t.Helper()
 

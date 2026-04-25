@@ -1143,7 +1143,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"currency":       breakdownCurrency(session.CurrencyCopper),
 		"inventory": inventoryResponse{
 			SlotCount: platform.InventorySlotCount,
-			Slots:     platform.NormalizeInventorySlots(session.Inventory),
+			Slots:     buildInventorySlotsResponse(session.Inventory),
 		},
 		"equipment": equipmentResponse{
 			Slots: platform.NormalizeEquipmentSlots(session.Equipment),

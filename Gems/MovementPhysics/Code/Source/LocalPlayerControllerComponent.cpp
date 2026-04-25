@@ -25,6 +25,7 @@
 #include <Atom/RPI.Public/ViewportContextBus.h>
 #include <GameCore/GameCoreInterface.h>
 #include <PhysX/CharacterGameplayBus.h>
+#include <imgui/imgui.h>
 
 namespace MovementPhysics
 {
@@ -43,7 +44,8 @@ namespace MovementPhysics
         constexpr float BackpedalSpeedFactor = 0.62f;
         constexpr float SubmitIntervalSeconds = 0.10f;
         constexpr float CorrectionSnapDistance = 1.25f;
-        constexpr float CorrectionBlendFactor = 0.5f;
+        constexpr float CorrectionBlendRate = 7.5f;
+        constexpr float CorrectionEpsilon = 0.002f;
         constexpr float CharacterBaseSnapZ = 0.05f;
         constexpr float AvatarTurnRate = 2.75f;
         constexpr float CameraEncounterAnchorX = 34.0f;
@@ -201,6 +203,7 @@ namespace MovementPhysics
             gameCore->DisconnectWorld();
             m_requestDisconnect = false;
             m_pendingServerDelta = AZ::Vector2::CreateZero();
+            m_pendingServerCorrection = AZ::Vector2::CreateZero();
             m_cachedFinalPoseValid = false;
             return;
         }
@@ -228,6 +231,7 @@ namespace MovementPhysics
             }
             m_requestReconnect = false;
             m_pendingServerDelta = AZ::Vector2::CreateZero();
+            m_pendingServerCorrection = AZ::Vector2::CreateZero();
             return;
         }
 
@@ -249,6 +253,8 @@ namespace MovementPhysics
         if (worldState.m_session.m_worldSessionToken != m_lastWorldSessionToken)
         {
             m_lastWorldSessionToken = worldState.m_session.m_worldSessionToken;
+            m_pendingServerDelta = AZ::Vector2::CreateZero();
+            m_pendingServerCorrection = AZ::Vector2::CreateZero();
             ApplyWorldPosition(
                 static_cast<float>(worldState.m_session.m_position.m_x),
                 static_cast<float>(worldState.m_session.m_position.m_y),
@@ -362,16 +368,22 @@ namespace MovementPhysics
             AZ::Vector3 requestedPosition = currentPosition + AZ::Vector3(move2d.GetX(), move2d.GetY(), 0.0f);
             requestedPosition = ResolveMovementCollision(currentPosition, requestedPosition);
             const AZ::Vector3 appliedDelta = requestedPosition - currentPosition;
-            if (deltaTime > 0.0f && appliedDelta.GetLengthSq() > 0.0f)
-            {
-                Physics::CharacterRequestBus::Event(
-                    GetEntityId(),
-                    &Physics::CharacterRequestBus::Events::AddVelocityForTick,
-                    AZ::Vector3(appliedDelta.GetX() / deltaTime, appliedDelta.GetY() / deltaTime, 0.0f));
-            }
             visualPlanarDelta = AZ::Vector2(appliedDelta.GetX(), appliedDelta.GetY());
             m_pendingServerDelta += visualPlanarDelta;
             finalPresentationPosition = requestedPosition;
+        }
+
+        if (m_pendingServerCorrection.GetLengthSq() > CorrectionEpsilon * CorrectionEpsilon)
+        {
+            const float correctionBlend = AZ::GetClamp(deltaTime * CorrectionBlendRate, 0.0f, 1.0f);
+            const AZ::Vector2 correctionStep = m_pendingServerCorrection * correctionBlend;
+            finalPresentationPosition.SetX(finalPresentationPosition.GetX() + correctionStep.GetX());
+            finalPresentationPosition.SetY(finalPresentationPosition.GetY() + correctionStep.GetY());
+            m_pendingServerCorrection -= correctionStep;
+            if (m_pendingServerCorrection.GetLengthSq() <= CorrectionEpsilon * CorrectionEpsilon)
+            {
+                m_pendingServerCorrection = AZ::Vector2::CreateZero();
+            }
         }
 
         m_submitAccumulator += deltaTime;
@@ -397,7 +409,8 @@ namespace MovementPhysics
                     finalPresentationPosition.SetX(authoritativePosition.GetX());
                     finalPresentationPosition.SetY(authoritativePosition.GetY());
                     finalPresentationPosition.SetZ(locallyPredictedPosition.GetZ());
-                    ApplyWorldPosition(authoritativePosition.GetX(), authoritativePosition.GetY(), locallyPredictedPosition.GetZ());
+                    m_pendingServerCorrection = AZ::Vector2::CreateZero();
+                    SetCharacterBasePosition(finalPresentationPosition);
                     AZ_Printf(
                         "amandacore",
                         "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=snap",
@@ -408,14 +421,10 @@ namespace MovementPhysics
                 }
                 else if (correctionDistance > 0.001f)
                 {
-                    const AZ::Vector2 blendedPlanarPosition = localPlanarPosition + (correctionVector * CorrectionBlendFactor);
-                    finalPresentationPosition.SetX(blendedPlanarPosition.GetX());
-                    finalPresentationPosition.SetY(blendedPlanarPosition.GetY());
-                    finalPresentationPosition.SetZ(locallyPredictedPosition.GetZ());
-                    ApplyWorldPosition(blendedPlanarPosition.GetX(), blendedPlanarPosition.GetY(), locallyPredictedPosition.GetZ());
+                    m_pendingServerCorrection += correctionVector;
                     AZ_Printf(
                         "amandacore",
-                        "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=blend",
+                        "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=queued_blend",
                         localPlanarPosition.GetX(),
                         localPlanarPosition.GetY(),
                         authoritativePosition.GetX(),
@@ -463,6 +472,7 @@ namespace MovementPhysics
         }
 
         UpdateAvatarPresentation(deltaTime, visualPlanarDelta);
+        SetCharacterBasePosition(m_cachedFinalPresentationPosition);
         SyncEntityTransformToCharacterBase(m_cachedFinalPresentationPosition);
         UpdateCameraComponent();
         DrawValidationArena();
@@ -473,6 +483,27 @@ namespace MovementPhysics
     {
         const auto& channelId = inputChannel.GetInputChannelId();
         const bool active = inputChannel.IsActive();
+
+        if (ImGui::GetIO().WantTextInput)
+        {
+            if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericW)
+            {
+                m_moveForward = false;
+            }
+            else if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericS)
+            {
+                m_moveBackward = false;
+            }
+            else if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericA)
+            {
+                m_strafeLeft = false;
+            }
+            else if (channelId == AzFramework::InputDeviceKeyboard::Key::AlphanumericD)
+            {
+                m_strafeRight = false;
+            }
+            return false;
+        }
 
         if (channelId == AzFramework::InputDeviceMouse::Button::Left)
         {
@@ -982,6 +1013,14 @@ namespace MovementPhysics
         }
     }
 
+    void LocalPlayerControllerComponent::SetCharacterBasePosition(const AZ::Vector3& basePosition)
+    {
+        Physics::CharacterRequestBus::Event(
+            GetEntityId(),
+            &Physics::CharacterRequestBus::Events::SetBasePosition,
+            basePosition);
+    }
+
     void LocalPlayerControllerComponent::ApplyWorldPosition(float x, float y, float z)
     {
         AZ::Vector3 currentBasePosition = AZ::Vector3::CreateZero();
@@ -1003,10 +1042,7 @@ namespace MovementPhysics
                 ValidationFloorZ);
         }
 
-        Physics::CharacterRequestBus::Event(
-            GetEntityId(),
-            &Physics::CharacterRequestBus::Events::SetBasePosition,
-            requestedPosition);
+        SetCharacterBasePosition(requestedPosition);
         m_cachedFinalPresentationPosition = requestedPosition;
         m_cachedFinalAvatarFacingRadians = m_avatarFacingRadians;
         m_cachedFinalPoseValid = true;
@@ -1053,6 +1089,9 @@ namespace MovementPhysics
         const AZ::Color roadColor(0.47f, 0.38f, 0.27f, 1.0f);
         const AZ::Color fieldColor(0.33f, 0.43f, 0.24f, 1.0f);
         const AZ::Color buildingColor(0.25f, 0.29f, 0.32f, 1.0f);
+        const AZ::Color trunkColor(0.34f, 0.24f, 0.16f, 1.0f);
+        const AZ::Color canopyColor(0.18f, 0.42f, 0.24f, 1.0f);
+        const AZ::Color trainingRingColor(0.70f, 0.55f, 0.28f, 1.0f);
 
         auxGeom->DrawAabb(
             AZ::Aabb::CreateCenterHalfExtents(
@@ -1193,6 +1232,42 @@ namespace MovementPhysics
                     AZ::Vector3(1.8f, 1.4f, 1.1f)),
                 ridgeColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+        }
+
+        const AZ::Vector3 treeCenters[] = {
+            AZ::Vector3(29.0f, 48.0f, 0.0f),
+            AZ::Vector3(41.0f, 50.0f, 0.0f),
+            AZ::Vector3(90.0f, 63.0f, 0.0f),
+            AZ::Vector3(112.0f, 83.0f, 0.0f),
+            AZ::Vector3(188.0f, 118.0f, 0.0f),
+            AZ::Vector3(210.0f, 136.0f, 0.0f),
+            AZ::Vector3(270.0f, 154.0f, 0.0f),
+            AZ::Vector3(350.0f, 162.0f, 0.0f),
+            AZ::Vector3(396.0f, 244.0f, 0.0f),
+        };
+        for (const AZ::Vector3& treeBase : treeCenters)
+        {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    treeBase + AZ::Vector3(0.0f, 0.0f, 0.65f),
+                    AZ::Vector3(0.18f, 0.18f, 0.65f)),
+                trunkColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawSphere(treeBase + AZ::Vector3(0.0f, 0.0f, 1.75f), 0.82f, canopyColor);
+            auxGeom->DrawSphere(treeBase + AZ::Vector3(0.42f, 0.12f, 1.55f), 0.55f, canopyColor);
+            auxGeom->DrawSphere(treeBase + AZ::Vector3(-0.38f, -0.16f, 1.55f), 0.55f, canopyColor);
+        }
+
+        for (int segmentIndex = 0; segmentIndex < 18; ++segmentIndex)
+        {
+            const float angleRadians = (AZ::Constants::TwoPi / 18.0f) * static_cast<float>(segmentIndex);
+            auxGeom->DrawSphere(
+                AZ::Vector3(
+                    58.0f + (AZStd::cos(angleRadians) * 9.0f),
+                    32.0f + (AZStd::sin(angleRadians) * 7.0f),
+                    ValidationMarkerZ),
+                0.14f,
+                trainingRingColor);
         }
 
         for (int segmentIndex = 0; segmentIndex < 10; ++segmentIndex)

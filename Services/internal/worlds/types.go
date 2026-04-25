@@ -67,6 +67,7 @@ const (
 	starterSpawnX         = 10.0
 	starterSpawnY         = 10.0
 	starterSpawnZ         = 0.0
+	playableGroundZ       = 0.05
 	starterInteractRadius = 5.0
 	starterZoneMaxX       = 480.0
 	starterZoneMaxY       = 300.0
@@ -470,8 +471,19 @@ type currencyBreakdown struct {
 }
 
 type inventoryResponse struct {
-	SlotCount int                               `json:"slotCount"`
-	Slots     []platform.CharacterInventorySlot `json:"slots"`
+	SlotCount int                     `json:"slotCount"`
+	Slots     []inventorySlotResponse `json:"slots"`
+}
+
+type inventorySlotResponse struct {
+	SlotIndex   int    `json:"slotIndex"`
+	ItemID      string `json:"itemId"`
+	DisplayName string `json:"displayName"`
+	StackCount  int    `json:"stackCount"`
+	ItemType    string `json:"itemType,omitempty"`
+	ItemSubtype string `json:"itemSubtype,omitempty"`
+	Quality     string `json:"quality,omitempty"`
+	IconKind    string `json:"iconKind,omitempty"`
 }
 
 type equipmentResponse struct {
@@ -769,6 +781,7 @@ func (s *worldServer) loadStarterContentLocked() {
 		if npc.Radius <= 0 {
 			npc.Radius = starterInteractRadius
 		}
+		npc.Z = clampSpawnGroundZ(npc.Z)
 		s.friendlyNPCs[npc.ID] = npc
 		s.friendlyNPCOrder = append(s.friendlyNPCOrder, npc.ID)
 	}
@@ -787,6 +800,7 @@ func (s *worldServer) ensureMobsLocked() {
 		if zoneID == "" {
 			zoneID = defaultZoneID
 		}
+		spawn.Z = clampSpawnGroundZ(spawn.Z)
 		s.mobOrder = append(s.mobOrder, spawn.ID)
 		s.mobs[spawn.ID] = &mobState{
 			ID:              spawn.ID,
@@ -837,9 +851,17 @@ func (s *worldServer) ensureGatheringNodesLocked() {
 		if node.RespawnDelayMs <= 0 {
 			node.RespawnDelayMs = 1000
 		}
+		node.Z = clampSpawnGroundZ(node.Z)
 		s.gatheringNodeOrder = append(s.gatheringNodeOrder, node.ID)
 		s.gatheringNodes[node.ID] = &gatheringNodeState{Definition: node}
 	}
+}
+
+func clampSpawnGroundZ(z float64) float64 {
+	if z < playableGroundZ {
+		return playableGroundZ
+	}
+	return z
 }
 
 func nowMillis() int64 {

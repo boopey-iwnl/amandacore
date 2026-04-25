@@ -150,6 +150,10 @@ namespace NetClient
         int m_slotIndex = 0;
         AZStd::string m_itemId;
         AZStd::string m_displayName;
+        AZStd::string m_itemType;
+        AZStd::string m_itemSubtype;
+        AZStd::string m_quality;
+        AZStd::string m_iconKind;
         int m_stackCount = 0;
     };
 
@@ -238,6 +242,7 @@ namespace NetClient
         AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
         AZStd::string m_resourceName;
+        AZStd::string m_iconKind;
         int m_requiredLevel = 1;
         double m_resourceCost = 0.0;
         double m_resourceGeneration = 0.0;
@@ -257,6 +262,7 @@ namespace NetClient
         AZStd::string m_buttonLabel;
         AZStd::string m_resourceName;
         AZStd::string m_tooltipText;
+        AZStd::string m_iconKind;
         double m_resourceCost = 0.0;
         double m_resourceGeneration = 0.0;
         AZ::s64 m_cooldownMs = 0;
@@ -276,6 +282,7 @@ namespace NetClient
         AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
         AZStd::string m_resourceName;
+        AZStd::string m_iconKind;
         int m_requiredLevel = 1;
         int m_costCopper = 0;
         double m_resourceCost = 0.0;

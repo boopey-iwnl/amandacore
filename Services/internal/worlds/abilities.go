@@ -218,6 +218,26 @@ func normalizeAbilityID(abilityID string) string {
 	}
 }
 
+func abilityIconKind(ability abilityDefinition) string {
+	switch ability.ID {
+	case platform.AutoAttackAbilityID:
+		return "weapon"
+	case platform.SteadyStrikeAbilityID,
+		platform.DrivingBlowAbilityID,
+		platform.HamperingStrikeAbilityID,
+		platform.OverhandCutAbilityID:
+		return "strike"
+	case platform.BraceAbilityID,
+		platform.GuardedFormAbilityID,
+		platform.IronResolveAbilityID:
+		return "defense"
+	case platform.RallyingCallAbilityID:
+		return "utility"
+	default:
+		return "ability"
+	}
+}
+
 func findAbilityDefinition(abilityID string) (abilityDefinition, bool) {
 	normalizedAbilityID := normalizeAbilityID(abilityID)
 	for _, ability := range warriorAbilityCatalog {
@@ -267,6 +287,7 @@ func (s *worldServer) buildSpellbookResponse(session *worldSessionState) []map[s
 			"requiredLevel":      ability.RequiredLevel,
 			"learned":            learned,
 			"requirementText":    ability.RequirementText,
+			"iconKind":           abilityIconKind(ability),
 			"resourceName":       "Grit",
 			"resourceCost":       ability.ResourceCost,
 			"resourceGeneration": ability.ResourceGeneration,
@@ -327,6 +348,7 @@ func (s *worldServer) buildActionBarResponse(session *worldSessionState) []map[s
 			"abilityId":           ability.ID,
 			"displayName":         ability.DisplayName,
 			"buttonLabel":         ability.ActionBarLabel,
+			"iconKind":            abilityIconKind(ability),
 			"requiresTarget":      ability.RequiresTarget,
 			"learned":             true,
 			"resourceName":        "Grit",

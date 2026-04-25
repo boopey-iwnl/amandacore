@@ -40,6 +40,25 @@ type itemDefinition struct {
 	Armor           int
 }
 
+func itemIconKind(item itemDefinition) string {
+	switch item.Type {
+	case itemTypeWeapon:
+		return "weapon"
+	case itemTypeArmor:
+		return "armor"
+	case itemTypeConsumable:
+		return "consumable"
+	case itemTypeMaterial:
+		return "material"
+	case itemTypeQuest:
+		return "quest"
+	case itemTypeJunk:
+		return "junk"
+	default:
+		return "item"
+	}
+}
+
 var itemDefinitions = map[string]itemDefinition{
 	itemWornRivetID: {
 		ItemID:          itemWornRivetID,

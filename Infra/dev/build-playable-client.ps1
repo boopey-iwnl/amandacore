@@ -49,7 +49,7 @@ Invoke-Native $dotnet "build" $worldClientProject
 
 foreach ($o3deBuildRoot in $o3deBuildRoots) {
     if (Test-Path $o3deBuildRoot) {
-        Invoke-Native $cmake "--build" $o3deBuildRoot "--config" "profile" "--target" "amandacore.GameLauncher"
+        Invoke-Native $cmake "--build" $o3deBuildRoot "--config" "profile" "--target" "amandacore.GameLauncher" "--" "/m:1" "/p:CL_MPCount=1"
     }
 }
 

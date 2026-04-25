@@ -104,6 +104,7 @@ namespace UiClient
         AZStd::string m_interactBinding;
         AZStd::string m_targetHostileBinding;
         AZStd::string m_chatChannel = "say";
+        bool m_chatFocusRequested = false;
         char m_chatInputBuffer[257]{};
         char m_chatWhisperTargetBuffer[65]{};
         char m_socialNameBuffer[65]{};

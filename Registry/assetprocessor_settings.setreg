@@ -20,6 +20,15 @@
                 "Exclude export scripts": {
                     "pattern": ".*\\\\/ExportScripts\\\\/.*"
                 },
+                "Exclude local build artifacts": {
+                    "pattern": ".*[\\\\/](build|dist|Cache|cache|user|\\.vs)[\\\\/].*"
+                },
+                "Exclude local service artifacts": {
+                    "pattern": ".*[\\\\/](Services[\\\\/]bin|Infra[\\\\/]dev[\\\\/]logs|Infra[\\\\/]dev[\\\\/]platform-state.*|Client[\\\\/].*[\\\\/](bin|obj))[\\\\/]?.*"
+                },
+                "Exclude root test output artifacts": {
+                    "pattern": ".*/?(combat-test-output|e2e-.*|required-go-test-output|worlds-compile-output.*)\\.(txt|json|log)$"
+                },
                 "Exclude generated packages": {
                     "glob": "dist/*"
                 },

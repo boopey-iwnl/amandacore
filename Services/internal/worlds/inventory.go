@@ -61,6 +61,32 @@ func (s *worldServer) moveInventorySlotLocked(session *worldSessionState, fromSl
 	return nil
 }
 
+func buildInventorySlotsResponse(inventory []platform.CharacterInventorySlot) []inventorySlotResponse {
+	normalized := platform.NormalizeInventorySlots(inventory)
+	slots := make([]inventorySlotResponse, 0, len(normalized))
+	for _, slot := range normalized {
+		response := inventorySlotResponse{
+			SlotIndex:   slot.SlotIndex,
+			ItemID:      slot.ItemID,
+			DisplayName: slot.DisplayName,
+			StackCount:  slot.StackCount,
+		}
+		if slot.ItemID != "" && slot.StackCount > 0 {
+			if item, found := findItemDefinition(slot.ItemID); found {
+				response.DisplayName = item.DisplayName
+				response.ItemType = item.Type
+				response.ItemSubtype = item.Subtype
+				response.Quality = item.Quality
+				response.IconKind = itemIconKind(item)
+			} else {
+				response.IconKind = "item"
+			}
+		}
+		slots = append(slots, response)
+	}
+	return slots
+}
+
 func (s *worldServer) persistSessionEconomyLocked(session *worldSessionState) error {
 	persistStartedAt := time.Now()
 	character, err := s.store.UpdateCharacterEconomy(
