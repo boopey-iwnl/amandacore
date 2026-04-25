@@ -259,12 +259,29 @@ namespace UiClient
         AZStd::string GetMobDisplayLabel(const NetClient::VisibleEntity& entity)
         {
             const AZStd::string suffix = GetMobDebugSuffix(entity.m_id);
+            const bool isElite = entity.m_elite || entity.m_classification == "elite";
+            const AZStd::string baseLabel = isElite
+                ? AZStd::string::format("%s (Elite)", entity.m_displayName.c_str())
+                : entity.m_displayName;
             if (suffix.empty())
             {
-                return entity.m_displayName;
+                return baseLabel;
             }
 
-            return AZStd::string::format("%s %s", entity.m_displayName.c_str(), suffix.c_str());
+            return AZStd::string::format("%s %s", baseLabel.c_str(), suffix.c_str());
+        }
+
+        AZStd::string GetQuestDisplayTitle(const NetClient::QuestState& quest)
+        {
+            if (!quest.m_groupRecommended)
+            {
+                return quest.m_title;
+            }
+            if (quest.m_recommendedPlayers > 0)
+            {
+                return AZStd::string::format("[Group %d] %s", quest.m_recommendedPlayers, quest.m_title.c_str());
+            }
+            return AZStd::string::format("[Group] %s", quest.m_title.c_str());
         }
 
         AZStd::string FormatCurrency(const NetClient::CurrencyState& currency)
@@ -1045,7 +1062,21 @@ namespace UiClient
 
             ImGui::TextUnformatted("Stonewake Orders");
             ImGui::Separator();
-            ImGui::TextUnformatted(trackerQuest->m_title.c_str());
+            const AZStd::string trackerTitle = GetQuestDisplayTitle(*trackerQuest);
+            ImGui::TextUnformatted(trackerTitle.c_str());
+            if (trackerQuest->m_groupRecommended)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.93f, 0.70f, 0.33f, 1.0f));
+                if (trackerQuest->m_recommendedPlayers > 0)
+                {
+                    ImGui::Text("Recommended group: %d players", trackerQuest->m_recommendedPlayers);
+                }
+                else
+                {
+                    ImGui::TextUnformatted("Recommended group");
+                }
+                ImGui::PopStyleColor();
+            }
 
             if (trackerQuest->m_state == "not_started")
             {
