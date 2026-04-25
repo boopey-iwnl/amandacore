@@ -599,9 +599,6 @@ func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform
 }
 
 func (s *worldServer) questCategory(quest questDefinition) string {
-	if quest.ID == dungeonQuestTallowdeepID {
-		return "Dungeon - Group Recommended"
-	}
 	if zone, ok := s.zones[quest.ZoneID]; ok && zone.DisplayName != "" {
 		return zone.DisplayName
 	}

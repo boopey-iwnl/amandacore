@@ -586,23 +586,6 @@ func containsString(values []string, target string) bool {
 	return false
 }
 
-func (s *worldServer) hostileMobsForSessionLocked(session *worldSessionState) []*mobState {
-	if session == nil || session.InstanceID == "" {
-		return s.hostileMobsLocked()
-	}
-	instance := s.dungeonInstances[session.InstanceID]
-	if instance == nil {
-		return nil
-	}
-	mobs := make([]*mobState, 0, len(instance.MobOrder))
-	for _, mobID := range instance.MobOrder {
-		if mob := instance.Mobs[mobID]; mob != nil {
-			mobs = append(mobs, mob)
-		}
-	}
-	return mobs
-}
-
 func (s *worldServer) recoverExpiredDungeonSessionLocked(session *worldSessionState) {
 	if session == nil || session.InstanceID == "" || s.dungeonInstanceActiveForSessionLocked(session) {
 		return

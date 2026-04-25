@@ -58,6 +58,41 @@ func (s *worldServer) buildZoneMapResponse(session *worldSessionState) map[strin
 	}
 }
 
+func buildZoneMapPayload(zone zoneMapDefinition) map[string]any {
+	roads := make([]map[string]any, 0, len(zone.Roads))
+	for _, road := range zone.Roads {
+		roads = append(roads, map[string]any{
+			"id":          road.ID,
+			"displayName": road.DisplayName,
+			"points":      road.Points,
+		})
+	}
+
+	landmarks := make([]map[string]any, 0, len(zone.Landmarks))
+	for _, landmark := range zone.Landmarks {
+		landmarks = append(landmarks, map[string]any{
+			"id":          landmark.ID,
+			"displayName": landmark.DisplayName,
+			"kind":        landmark.Kind,
+			"x":           landmark.X,
+			"y":           landmark.Y,
+		})
+	}
+
+	return map[string]any{
+		"zoneId":      zone.ZoneID,
+		"displayName": zone.DisplayName,
+		"bounds": map[string]float64{
+			"minX": zone.MinX,
+			"minY": zone.MinY,
+			"maxX": zone.MaxX,
+			"maxY": zone.MaxY,
+		},
+		"roads":     roads,
+		"landmarks": landmarks,
+	}
+}
+
 func (s *worldServer) buildNavigationAreasResponse(session *worldSessionState) []map[string]any {
 	source := stonewakeNavigationAreas
 	areas := make([]map[string]any, 0, len(source))

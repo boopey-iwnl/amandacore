@@ -877,6 +877,274 @@ namespace GameCore
         return true;
     }
 
+    bool GameCoreSystemComponent::CreateGuild(const AZStd::string& guildName)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->CreateGuild(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                guildName,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "CreateGuild failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_create");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::InviteGuild(const AZStd::string& targetName)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->InviteGuild(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                targetName,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "InviteGuild failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_invite");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::AcceptGuildInvite(const AZStd::string& inviteId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->AcceptGuildInvite(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                inviteId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "AcceptGuildInvite failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_accept");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::DeclineGuildInvite(const AZStd::string& inviteId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->DeclineGuildInvite(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                inviteId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "DeclineGuildInvite failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_decline");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::LeaveGuild()
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->LeaveGuild(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "LeaveGuild failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_leave");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::DisbandGuild()
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->DisbandGuild(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "DisbandGuild failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_disband");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::PromoteGuildMember(const AZStd::string& targetName)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->PromoteGuildMember(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                targetName,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "PromoteGuildMember failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_promote");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::DemoteGuildMember(const AZStd::string& targetName)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->DemoteGuildMember(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                targetName,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "DemoteGuildMember failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_demote");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::RemoveGuildMember(const AZStd::string& targetName)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->RemoveGuildMember(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                targetName,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "RemoveGuildMember failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_remove");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::SetGuildMessageOfTheDay(const AZStd::string& messageOfTheDay)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::SocialStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->SetGuildMessageOfTheDay(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                messageOfTheDay,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "SetGuildMessageOfTheDay failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplySocialStateResponse(AZStd::move(response), "guild_motd");
+        return true;
+    }
+
     bool GameCoreSystemComponent::DisconnectWorld()
     {
         if (!m_worldState.m_worldConnected)
@@ -1113,15 +1381,20 @@ namespace GameCore
         m_worldState.m_social.m_hasParty = response.m_hasParty;
         m_worldState.m_social.m_party = AZStd::move(response.m_party);
         m_worldState.m_social.m_partyInvites = AZStd::move(response.m_partyInvites);
+        m_worldState.m_social.m_hasGuild = response.m_hasGuild;
+        m_worldState.m_social.m_guild = AZStd::move(response.m_guild);
+        m_worldState.m_social.m_guildInvites = AZStd::move(response.m_guildInvites);
 
         AZ_Printf(
             "amandacore",
-            "client.social_state_applied source=%s messages=%zu friends=%zu party=%s invites=%zu",
+            "client.social_state_applied source=%s messages=%zu friends=%zu party=%s partyInvites=%zu guild=%s guildInvites=%zu",
             source,
             m_worldState.m_social.m_chatMessages.size(),
             m_worldState.m_social.m_friends.size(),
             m_worldState.m_social.m_hasParty ? "true" : "false",
-            m_worldState.m_social.m_partyInvites.size());
+            m_worldState.m_social.m_partyInvites.size(),
+            m_worldState.m_social.m_hasGuild ? "true" : "false",
+            m_worldState.m_social.m_guildInvites.size());
         return true;
     }
 

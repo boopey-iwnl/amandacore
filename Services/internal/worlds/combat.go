@@ -136,10 +136,6 @@ func (s *worldServer) hostileMobsForSessionLocked(session *worldSessionState) []
 	return mobs
 }
 
-func (s *worldServer) hostileMobsForSessionLocked(session *worldSessionState) []*mobState {
-	return s.hostileMobsLocked()
-}
-
 func (s *worldServer) setMobAIStateLocked(mob *mobState, nextState string, reason string) {
 	if mob == nil || nextState == "" {
 		return
