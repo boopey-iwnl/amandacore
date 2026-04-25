@@ -4,7 +4,7 @@ Release tag: `alpha-0.1`
 Package asset: `AmandaCore-Alpha-0.1-Windows-x64.zip`
 Package SHA256: verify against the GitHub release asset digest and the final release report.
 Package size: verify against the GitHub release asset metadata.
-Source commit: `ab1308811c5e1c7479019748a2a3ac593b42cb8a`
+Source commit: recorded in the GitHub release package verification and packaged `Infra\dev\version-manifest.json`
 Build label: recorded in packaged `Infra\dev\version-manifest.json`
 Package manifest: `release-package-manifest.json`
 
