@@ -53,7 +53,7 @@ Push-Location $servicesRoot
 try {
     Invoke-Native $go "test" "./..."
     foreach ($service in @("auth-service", "account-service", "realm-service", "character-service", "world-service", "admin-service")) {
-        Invoke-Native $go "build" "-o" (Join-Path $serviceOutput "$service.exe") "./cmd/$service"
+        Invoke-Native $go "build" "-buildvcs=false" "-o" (Join-Path $serviceOutput "$service.exe") "./cmd/$service"
     }
 }
 finally {

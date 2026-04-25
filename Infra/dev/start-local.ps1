@@ -34,6 +34,7 @@ if (!(Test-Path $versionManifestPath)) {
 $versionManifest = Get-Content -Path $versionManifestPath -Raw | ConvertFrom-Json
 
 if (!(Test-Path $secretPath)) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $secretPath) | Out-Null
     Copy-Item $secretExamplePath $secretPath
 }
 
