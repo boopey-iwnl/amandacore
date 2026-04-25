@@ -40,6 +40,18 @@ type itemDefinition struct {
 }
 
 var itemDefinitions = map[string]itemDefinition{
+	itemWornRivetID: {
+		ItemID:          itemWornRivetID,
+		DisplayName:     "Worn Rivet",
+		Type:            itemTypeMaterial,
+		Subtype:         "forged_part",
+		Quality:         itemQualityCommon,
+		Stackable:       true,
+		MaxStack:        20,
+		SellPriceCopper: 1,
+		BuyPriceCopper:  0,
+		RequiredLevel:   1,
+	},
 	itemValeIronChipID: {
 		ItemID:          itemValeIronChipID,
 		DisplayName:     "Vale Iron Chip",

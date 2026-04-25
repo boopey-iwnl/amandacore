@@ -128,6 +128,11 @@ type gatherRequest struct {
 	NodeID            string `json:"nodeId"`
 }
 
+type craftRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	RecipeID          string `json:"recipeId"`
+}
+
 type actionBarAssignRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	SlotIndex         int    `json:"slotIndex"`

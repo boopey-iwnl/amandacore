@@ -25,6 +25,7 @@ const (
 	itemLinenWrapID         = "linen_wrap"
 	itemMilitiaTokenID      = "militia_token"
 	itemValeIronChipID      = "vale_iron_chip"
+	itemWornRivetID         = "worn_rivet"
 )
 
 var stonewakeFriendlyNPCs = []friendlyNPCDefinition{

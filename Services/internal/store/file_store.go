@@ -31,6 +31,10 @@ var (
 	ErrFriendSelf          = errors.New("cannot add yourself as a friend")
 	ErrFriendMissing       = errors.New("friend entry does not exist")
 	ErrPartyMissing        = errors.New("party does not exist")
+	ErrGuildMissing        = errors.New("guild does not exist")
+	ErrGuildNameExists     = errors.New("guild name already exists in this realm")
+	ErrGuildMemberExists   = errors.New("character is already in a guild")
+	ErrGuildInviteMissing  = errors.New("guild invite does not exist")
 )
 
 type state struct {
@@ -42,6 +46,8 @@ type state struct {
 	PasswordReset    map[string]platform.PasswordResetTicket `json:"passwordReset"`
 	Friends          map[string]platform.FriendRelationship  `json:"friends"`
 	Parties          map[string]platform.Party               `json:"parties"`
+	Guilds           map[string]platform.Guild               `json:"guilds"`
+	GuildInvites     map[string]platform.GuildInvite         `json:"guildInvites"`
 	BuildManifest    platform.BuildManifest                  `json:"buildManifest"`
 }
 
@@ -66,6 +72,8 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 			PasswordReset:    map[string]platform.PasswordResetTicket{},
 			Friends:          map[string]platform.FriendRelationship{},
 			Parties:          map[string]platform.Party{},
+			Guilds:           map[string]platform.Guild{},
+			GuildInvites:     map[string]platform.GuildInvite{},
 			BuildManifest:    buildManifest,
 		},
 	}
@@ -1034,6 +1042,12 @@ func (s *FileStore) load() error {
 	if loaded.Parties != nil {
 		s.state.Parties = loaded.Parties
 	}
+	if loaded.Guilds != nil {
+		s.state.Guilds = loaded.Guilds
+	}
+	if loaded.GuildInvites != nil {
+		s.state.GuildInvites = loaded.GuildInvites
+	}
 	if loaded.BuildManifest.ID != "" {
 		s.state.BuildManifest = loaded.BuildManifest
 	}
@@ -1083,6 +1097,12 @@ func (s *FileStore) reloadLocked() error {
 	}
 	if loaded.Parties == nil {
 		loaded.Parties = map[string]platform.Party{}
+	}
+	if loaded.Guilds == nil {
+		loaded.Guilds = map[string]platform.Guild{}
+	}
+	if loaded.GuildInvites == nil {
+		loaded.GuildInvites = map[string]platform.GuildInvite{}
 	}
 	if loaded.BuildManifest.ID == "" {
 		loaded.BuildManifest = s.state.BuildManifest

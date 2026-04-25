@@ -392,6 +392,11 @@ func (s *worldServer) killCreditCandidatesLocked(killer *worldSessionState, ques
 		}
 	}
 
+	if s.store == nil {
+		addIfEligible(killer)
+		return candidates
+	}
+
 	party, err := s.store.GetPartyForCharacter(killer.CharacterID)
 	if err != nil {
 		if !errors.Is(err, storepkg.ErrPartyMissing) {

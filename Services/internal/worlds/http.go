@@ -60,6 +60,7 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/trainer/learn", server.instrumentEndpointFunc("trainer_learn", server.handleTrainerLearn))
 	mux.HandleFunc("POST /v1/world/profession/learn", server.instrumentEndpointFunc("profession_learn", server.handleProfessionLearn))
 	mux.HandleFunc("POST /v1/world/gather", server.instrumentEndpointFunc("gather", server.handleGather))
+	mux.HandleFunc("POST /v1/world/craft", server.instrumentEndpointFunc("craft", server.handleCraft))
 	mux.HandleFunc("POST /v1/world/talent/select", server.instrumentEndpointFunc("talent_select", server.handleTalentSelect))
 	mux.HandleFunc("POST /v1/world/action-bar/assign", server.instrumentEndpointFunc("action_bar_assign", server.handleActionBarAssign))
 	mux.HandleFunc("POST /v1/world/action-bar/move", server.instrumentEndpointFunc("action_bar_move", server.handleActionBarMove))
@@ -723,6 +724,35 @@ func (s *worldServer) handleGather(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.gatherNodeLocked(session, request.NodeID); err != nil {
 		httpapi.Error(w, http.StatusBadRequest, "gather_invalid", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleCraft(w http.ResponseWriter, r *http.Request) {
+	var request craftRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.craftRecipeLocked(session, request.RecipeID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "craft_invalid", err.Error())
 		return
 	}
 

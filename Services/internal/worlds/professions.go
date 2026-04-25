@@ -188,11 +188,12 @@ var recipeDefinitions = map[string]recipeDefinition{
 		RequiredMaterials: []recipeMaterialDefinition{
 			{ItemID: itemValeIronChipID, DisplayName: "Vale Iron Chip", Quantity: 2},
 		},
-		OutputItemID:      "worn_rivet",
+		OutputItemID:      itemWornRivetID,
 		OutputDisplayName: "Worn Rivet",
 		OutputQuantity:    2,
 		LearnedByDefault:  true,
 		Category:          "material",
+		Implemented:       true,
 	},
 	"recipe_training_bandage": {
 		ID:            "recipe_training_bandage",
