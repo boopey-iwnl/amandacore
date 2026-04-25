@@ -73,7 +73,7 @@ world_1234567890abcdef1234567890abcdef
 
     $userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
     $localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
-    $sample += "`r`nrepoRoot=$userProfile\OneDrive\Desktop\Code Project"
+    $sample += "`r`nrepoRoot=$userProfile\OneDrive\Desktop\Code Project - Alpha Integration"
     $sample += "`r`nstatePath=$localAppData\amandacore\platform-state.json"
 
     $redacted = ConvertTo-RedactedText $sample
@@ -147,6 +147,36 @@ function Write-TextFile {
 
     New-BundleDirectory (Split-Path -Parent $Path)
     Set-Content -Path $Path -Value $Value -Encoding UTF8
+}
+
+function Get-ShortPathHash {
+    param([string]$Value)
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+        $hashBytes = $sha256.ComputeHash($bytes)
+        return ([System.BitConverter]::ToString($hashBytes) -replace "-", "").Substring(0, 12).ToLowerInvariant()
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
+function Get-DiagnosticLogRelativePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath
+    )
+
+    $normalized = $RelativePath.Replace("/", "\")
+    if ($normalized.Length -le 150) {
+        return $normalized
+    }
+
+    $leaf = Split-Path -Leaf $normalized
+    $hash = Get-ShortPathHash $normalized
+    return (Join-Path "long-paths" "$hash-$leaf")
 }
 
 function Read-JsonSafe {
@@ -517,7 +547,7 @@ if (Test-Path $userLogRoot) {
     }
 
     foreach ($file in $clientLogFiles | Sort-Object FullName -Unique) {
-        $relative = Get-RelativePath $userLogRoot $file.FullName
+        $relative = Get-DiagnosticLogRelativePath (Get-RelativePath $userLogRoot $file.FullName)
         $destination = Join-Path $bundleRoot (Join-Path "logs\client" $relative)
         if (Copy-RedactedTextFile $file.FullName $destination -TailIfLarge) {
             $copiedLogs += [pscustomobject]@{ source = $file.FullName; destination = $destination; bytes = $file.Length }
