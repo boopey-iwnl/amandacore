@@ -13,6 +13,7 @@ namespace GameCore
     namespace
     {
         constexpr float WorldStatePollIntervalSeconds = 0.10f;
+        constexpr float SocialStatePollIntervalSeconds = 0.50f;
 
         struct AbilityPresentationDefinition
         {
@@ -225,11 +226,24 @@ namespace GameCore
         m_statePollAccumulator += deltaTime;
         if (m_statePollAccumulator < WorldStatePollIntervalSeconds)
         {
+            m_socialPollAccumulator += deltaTime;
+            if (m_socialPollAccumulator >= SocialStatePollIntervalSeconds)
+            {
+                m_socialPollAccumulator = 0.0f;
+                PollSocialState();
+            }
             return;
         }
 
         m_statePollAccumulator = 0.0f;
         PollWorldState();
+
+        m_socialPollAccumulator += deltaTime;
+        if (m_socialPollAccumulator >= SocialStatePollIntervalSeconds)
+        {
+            m_socialPollAccumulator = 0.0f;
+            PollSocialState();
+        }
     }
 
     void GameCoreSystemComponent::OnLoadingComplete(const char* levelName)

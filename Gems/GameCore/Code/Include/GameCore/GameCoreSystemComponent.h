@@ -46,6 +46,17 @@ namespace GameCore
         bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) override;
         bool ClearActionBarSlot(int slotIndex) override;
         bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) override;
+        bool SubmitChatMessage(
+            const AZStd::string& channel,
+            const AZStd::string& targetName,
+            const AZStd::string& messageText) override;
+        bool AddFriend(const AZStd::string& name) override;
+        bool RemoveFriend(const AZStd::string& name) override;
+        bool InviteParty(const AZStd::string& targetName, const AZStd::string& targetCharacterId) override;
+        bool AcceptPartyInvite(const AZStd::string& inviteId) override;
+        bool DeclinePartyInvite(const AZStd::string& inviteId) override;
+        bool LeaveParty() override;
+        bool DisbandParty() override;
         bool DisconnectWorld() override;
         bool ReconnectWorld() override;
         void SetCameraState(const ClientCameraState& cameraState) override;
@@ -55,8 +66,10 @@ namespace GameCore
         void MarkLevelReady(const char* levelName);
         void AttemptInitialWorldConnect();
         bool ApplyWorldSessionResponse(NetClient::WorldSessionResponse&& response, const char* source);
+        bool ApplySocialStateResponse(NetClient::SocialStateResponse&& response, const char* source);
         void EnsureAbilityPresentationDefaults(NetClient::WorldSessionResponse& session, const char* source);
         bool PollWorldState();
+        bool PollSocialState();
         void LogCombatStateIfChanged(const NetClient::WorldSessionResponse& previousSession, const char* source);
         void LogAbilityStateIfChanged(const NetClient::WorldSessionResponse& previousSession, const char* source);
         void LogQuestStateIfChanged(const NetClient::WorldSessionResponse& previousSession, const char* source);
@@ -69,5 +82,7 @@ namespace GameCore
         bool m_worldConnectStartLogged = false;
         bool m_levelReadyLogged = false;
         float m_statePollAccumulator = 0.0f;
+        float m_socialPollAccumulator = 0.0f;
+        AZStd::string m_lastChatMessageId;
     };
 }
