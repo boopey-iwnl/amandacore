@@ -603,7 +603,9 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 }
 
 func (s *worldServer) loadStarterContentLocked() {
-	for _, zone := range zoneDefinitions {
+	allZones := append([]zoneDefinition{}, zoneDefinitions...)
+	allZones = append(allZones, dungeonZoneDefinitions...)
+	for _, zone := range allZones {
 		s.zones[zone.ID] = zone
 	}
 

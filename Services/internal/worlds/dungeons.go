@@ -116,19 +116,19 @@ func init() {
 			TargetCount:   1,
 			RewardXP:      650,
 			RewardCopper:  160,
-		RewardItems: []itemRewardDefinition{
-			{ItemID: itemTDSSluiceguardHandwrapsID, DisplayName: "Sluiceguard Handwraps", StackCount: 1},
+			RewardItems: []itemRewardDefinition{
+				{ItemID: itemTDSSluiceguardHandwrapsID, DisplayName: "Sluiceguard Handwraps", StackCount: 1},
+			},
+			PrerequisiteIDs:    []string{"bb_teeth_in_shallows"},
+			LevelBand:          "8-12 Dungeon",
+			MarkerX:            590.0,
+			MarkerY:            342.0,
+			PartyShareable:     true,
+			GroupRecommended:   true,
+			RecommendedPlayers: 3,
+			PartyCreditRadius:  80.0,
 		},
-		PrerequisiteIDs: []string{"bb_teeth_in_shallows"},
-		LevelBand:          "8-12 Dungeon",
-		MarkerX:            590.0,
-		MarkerY:            342.0,
-		PartyShareable:     true,
-		GroupRecommended:   true,
-		RecommendedPlayers: 3,
-		PartyCreditRadius:  80.0,
-	},
-}
+	}
 }
 
 var tallowdeepZoneMap = zoneMapDefinition{

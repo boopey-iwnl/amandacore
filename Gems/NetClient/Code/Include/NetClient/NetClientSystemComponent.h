@@ -118,6 +118,74 @@ namespace NetClient
             SocialStateResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool CreateGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& guildName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool InviteGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AcceptGuildInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DeclineGuildInvite(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& inviteId,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool LeaveGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DisbandGuild(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool PromoteGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DemoteGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool RemoveGuildMember(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetName,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SetGuildMessageOfTheDay(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& messageOfTheDay,
+            SocialStateResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool SetTarget(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
