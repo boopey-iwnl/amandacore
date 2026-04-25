@@ -226,27 +226,53 @@ func (s *worldServer) setAutoAttackLocked(session *worldSessionState, enabled bo
 }
 
 func (s *worldServer) activateAbilityLocked(session *worldSessionState, abilityID string) error {
+	normalizedAbilityID := normalizeAbilityID(abilityID)
+	s.emitDomainEventLocked(eventCombatIntentSubmitted, map[string]any{
+		"worldSessionToken": session.Token,
+		"characterId":       session.CharacterID,
+		"abilityId":         normalizedAbilityID,
+		"targetId":          session.CurrentTargetID,
+	})
+	var err error
+	defer func() {
+		if err != nil {
+			s.emitDomainEventLocked(eventCombatAbilityRejected, map[string]any{
+				"worldSessionToken": session.Token,
+				"characterId":       session.CharacterID,
+				"abilityId":         normalizedAbilityID,
+				"targetId":          session.CurrentTargetID,
+				"reason":            err.Error(),
+			})
+		}
+	}()
+
 	if !session.Alive {
-		return fmt.Errorf("player is dead")
+		err = fmt.Errorf("player is dead")
+		return err
 	}
 	if session.CastingAbilityID != "" && session.CastEndsAtMs > nowMillis() {
-		return fmt.Errorf("already casting")
+		err = fmt.Errorf("already casting")
+		return err
 	}
 	if session.GlobalCooldownEnds > nowMillis() {
-		return fmt.Errorf("on cooldown")
+		err = fmt.Errorf("on cooldown")
+		return err
 	}
-	if !s.sessionKnowsAbilityLocked(session, abilityID) {
-		return fmt.Errorf("ability is not learned")
+	if !s.sessionKnowsAbilityLocked(session, normalizedAbilityID) {
+		err = fmt.Errorf("ability is not learned")
+		return err
 	}
 
-	ability, found := findAbilityDefinition(abilityID)
+	ability, found := findAbilityDefinition(normalizedAbilityID)
 	if !found {
-		return fmt.Errorf("ability is not available")
+		err = fmt.Errorf("ability is not available")
+		return err
 	}
 
 	targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
 	targetPlayer := s.findPlayerTargetForSessionLocked(session, session.CurrentTargetID)
-	return s.applyAbilityEffectLocked(session, targetMob, targetPlayer, ability)
+	err = s.applyAbilityEffectLocked(session, targetMob, targetPlayer, ability)
+	return err
 }
 
 func (s *worldServer) advanceWorldLocked(now time.Time) error {
@@ -355,6 +381,7 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 			mob.CurrentTargetCharacter = ""
 			mob.LastAttackAtMs = 0
 			mob.RespawnAtMs = 0
+			mob.RespawnTick = nowMs
 			s.setMobAIStateLocked(mob, mobAIStateIdle, "respawn_complete")
 			observability.LogEvent("world-service", "world.mob_respawned", map[string]any{
 				"mobId":  mob.ID,
@@ -363,12 +390,24 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 				"y":      mob.Y,
 				"z":      mob.Z,
 			})
+			s.emitDomainEventLocked(eventNPCRespawned, mobSpawnPayload(mob))
+			s.emitDomainEventLocked(eventWorldEntitySpawned, mobSpawnPayload(mob))
+			s.emitStateDiffLocked(diffEntitySpawn, mob.ID, mobSpawnPayload(mob))
 		}
 		return
 	}
 
 	targetSession := s.resolveMobTargetLocked(mob)
 	if targetSession == nil {
+		if mob.CurrentTargetCharacter != "" {
+			s.emitDomainEventLocked(eventNPCTargetLost, map[string]any{
+				"entityId":   mob.ID,
+				"targetId":   mob.CurrentTargetCharacter,
+				"reason":     "target_missing",
+				"zoneId":     mob.ZoneID,
+				"instanceId": mob.InstanceID,
+			})
+		}
 		if mob.AIState == mobAIStateEvading {
 			s.setMobAIStateLocked(mob, mobAIStateReturning, "evade_complete")
 		}
@@ -419,12 +458,41 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 		"amount":            damage,
 		"remainingHealth":   targetSession.Health,
 	})
+	s.emitDomainEventLocked(eventNPCAttackResolved, map[string]any{
+		"entityId":          mob.ID,
+		"targetCharacterId": targetSession.CharacterID,
+		"amount":            damage,
+		"remainingHealth":   targetSession.Health,
+	})
+	s.emitDomainEventLocked(eventEntityHealthChanged, map[string]any{
+		"entityId":       targetSession.CharacterID,
+		"sourceEntityId": mob.ID,
+		"currentHealth":  targetSession.Health,
+		"maxHealth":      targetSession.MaxHealth,
+	})
+	s.emitStateDiffLocked(diffEntityHealth, targetSession.CharacterID, map[string]any{
+		"entityId":      targetSession.CharacterID,
+		"currentHealth": targetSession.Health,
+		"maxHealth":     targetSession.MaxHealth,
+	})
 
 	if targetSession.Health <= 0.0 {
 		targetSession.Alive = false
 		s.resetSessionCombatStateLocked(targetSession, "player_dead")
 		mob.CurrentTargetCharacter = ""
 		s.setMobAIStateLocked(mob, mobAIStateIdle, "target_dead")
+		s.emitDomainEventLocked(eventPlayerDied, map[string]any{
+			"characterId":      targetSession.CharacterID,
+			"killedByEntityId": mob.ID,
+		})
+		s.emitDomainEventLocked(eventEntityDied, map[string]any{
+			"entityId":         targetSession.CharacterID,
+			"killedByEntityId": mob.ID,
+		})
+		s.emitStateDiffLocked(diffEntityDeath, targetSession.CharacterID, map[string]any{
+			"entityId": targetSession.CharacterID,
+			"killedBy": mob.ID,
+		})
 	}
 }
 
@@ -467,6 +535,13 @@ func (s *worldServer) resolveMobTargetLocked(mob *mobState) *worldSessionState {
 				"characterId": closest.CharacterID,
 				"distance":    closestDistance,
 			})
+			s.emitDomainEventLocked(eventNPCAggroStarted, map[string]any{
+				"entityId":          mob.ID,
+				"targetCharacterId": closest.CharacterID,
+				"distance":          closestDistance,
+				"zoneId":            mob.ZoneID,
+				"instanceId":        mob.InstanceID,
+			})
 			s.setMobAIStateLocked(mob, mobAIStateAlerted, "target_acquired")
 		}
 	}
@@ -497,11 +572,19 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 	}
 
 	mob.CurrentTargetCharacter = session.CharacterID
+	mob.LastDamagedByEntityID = session.CharacterID
 	if mob.AIState == mobAIStateIdle || mob.AIState == mobAIStatePatrolling {
 		observability.LogEvent("world-service", "world.mob_aggroed", map[string]any{
 			"mobId":       mob.ID,
 			"characterId": session.CharacterID,
 			"reason":      source,
+		})
+		s.emitDomainEventLocked(eventNPCAggroStarted, map[string]any{
+			"entityId":          mob.ID,
+			"targetCharacterId": session.CharacterID,
+			"reason":            source,
+			"zoneId":            mob.ZoneID,
+			"instanceId":        mob.InstanceID,
 		})
 		s.setMobAIStateLocked(mob, mobAIStateAlerted, "damage_taken")
 	}
@@ -514,6 +597,24 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 		"amount":            amount,
 		"remainingHealth":   mob.Health,
 	})
+	s.emitDomainEventLocked(eventCombatDamageApplied, map[string]any{
+		"sourceCharacterId": session.CharacterID,
+		"targetId":          mob.ID,
+		"abilityId":         source,
+		"amount":            amount,
+		"remainingHealth":   mob.Health,
+	})
+	s.emitDomainEventLocked(eventEntityHealthChanged, map[string]any{
+		"entityId":       mob.ID,
+		"sourceEntityId": session.CharacterID,
+		"currentHealth":  mob.Health,
+		"maxHealth":      mob.MaxHealth,
+	})
+	s.emitStateDiffLocked(diffEntityHealth, mob.ID, map[string]any{
+		"entityId":      mob.ID,
+		"currentHealth": mob.Health,
+		"maxHealth":     mob.MaxHealth,
+	})
 
 	if mob.Health > 0.0 {
 		return nil
@@ -521,14 +622,20 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 
 	mob.Alive = false
 	mob.Targetable = false
+	mob.DeathTick = nowMillis()
 	s.setMobAIStateLocked(mob, mobAIStateDead, "killed")
 	if mob.RespawnDelayMs > 0 {
-		mob.RespawnAtMs = nowMillis() + mob.RespawnDelayMs
+		mob.RespawnAtMs = mob.DeathTick + mob.RespawnDelayMs
+		mob.RespawnTick = mob.RespawnAtMs
 	} else {
 		mob.RespawnAtMs = 0
+		mob.RespawnTick = 0
 	}
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "target_dead")
+	if err := s.awardKillCreditLocked(session, mob, "killing_blow"); err != nil {
+		return err
+	}
 	if mob.InstanceID != "" {
 		if err := s.applyDungeonKillCreditLocked(session, mob); err != nil {
 			return err
@@ -541,6 +648,23 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 		"killedBy":  session.CharacterID,
 		"respawnAt": mob.RespawnAtMs,
 	})
+	deathPayload := map[string]any{
+		"entityId":       mob.ID,
+		"archetypeId":    mob.ArchetypeID,
+		"spawnPointId":   mob.SpawnPointID,
+		"killedBy":       session.CharacterID,
+		"deathTick":      mob.DeathTick,
+		"respawnTick":    mob.RespawnTick,
+		"respawnDelayMs": mob.RespawnDelayMs,
+	}
+	s.emitDomainEventLocked(eventCombatTargetDefeated, deathPayload)
+	s.emitDomainEventLocked(eventEntityDied, deathPayload)
+	s.emitDomainEventLocked(eventNPCDied, deathPayload)
+	s.emitDomainEventLocked(eventWorldEntityRemoved, deathPayload)
+	s.emitStateDiffLocked(diffEntityDeath, mob.ID, deathPayload)
+	if mob.RespawnAtMs > 0 {
+		s.emitDomainEventLocked(eventNPCRespawnScheduled, deathPayload)
+	}
 	return nil
 }
 
@@ -551,6 +675,24 @@ func (s *worldServer) enterEvadeLocked(mob *mobState, reason string) {
 
 	mob.Targetable = false
 	s.setMobAIStateLocked(mob, mobAIStateEvading, reason)
+	s.emitDomainEventLocked(eventNPCLeashReset, map[string]any{
+		"entityId":   mob.ID,
+		"reason":     reason,
+		"zoneId":     mob.ZoneID,
+		"instanceId": mob.InstanceID,
+	})
+	s.emitDomainEventLocked(eventNPCAggroLost, map[string]any{
+		"entityId":   mob.ID,
+		"reason":     reason,
+		"zoneId":     mob.ZoneID,
+		"instanceId": mob.InstanceID,
+	})
+	s.emitStateDiffLocked(diffEntityCombatState, mob.ID, map[string]any{
+		"entityId":              mob.ID,
+		"isInCombat":            false,
+		"currentTargetEntityId": "",
+		"reason":                reason,
+	})
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "leash_reset")
 }

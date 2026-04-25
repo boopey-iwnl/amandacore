@@ -85,8 +85,8 @@ func TestCharacterCreationAndJoinTicket(t *testing.T) {
 	if character.CurrencyCopper != platform.StarterCurrencyCopper {
 		t.Fatalf("expected starter copper %d, got %d", platform.StarterCurrencyCopper, character.CurrencyCopper)
 	}
-	if len(character.LearnedAbilityIDs) != 3 {
-		t.Fatalf("expected 3 starting learned abilities, got %d", len(character.LearnedAbilityIDs))
+	if len(character.LearnedAbilityIDs) != 4 {
+		t.Fatalf("expected 4 starting learned abilities, got %d", len(character.LearnedAbilityIDs))
 	}
 	if character.LearnedAbilityIDs[0] != platform.AutoAttackAbilityID {
 		t.Fatalf("expected auto attack as first learned ability, got %s", character.LearnedAbilityIDs[0])
@@ -183,7 +183,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 	if character.ClassID != platform.DefaultClassID {
 		t.Fatalf("expected legacy class %s, got %s", platform.DefaultClassID, character.ClassID)
 	}
-	if len(character.LearnedAbilityIDs) != 3 {
+	if len(character.LearnedAbilityIDs) != 4 {
 		t.Fatalf("expected normalized legacy abilities, got %d entries", len(character.LearnedAbilityIDs))
 	}
 
@@ -213,7 +213,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 	if persisted.ClassID != platform.DefaultClassID {
 		t.Fatalf("expected persisted class %s, got %s", platform.DefaultClassID, persisted.ClassID)
 	}
-	if len(persisted.LearnedAbilityIDs) != 3 {
+	if len(persisted.LearnedAbilityIDs) != 4 {
 		t.Fatalf("expected persisted learned abilities, got %d", len(persisted.LearnedAbilityIDs))
 	}
 }
@@ -254,7 +254,7 @@ func TestUpdateCharacterProgressionPersistsLearnedAbilities(t *testing.T) {
 		t.Fatalf("failed to update character progression: %v", err)
 	}
 
-	if len(updated.LearnedAbilityIDs) != 4 {
+	if len(updated.LearnedAbilityIDs) != 5 {
 		t.Fatalf("expected learned abilities to persist driving blow, got %#v", updated.LearnedAbilityIDs)
 	}
 

@@ -2,11 +2,12 @@
 
 ## Goals
 
-- Preserve mechanically faithful `3.3.5a`-structured MMO behavior through shared simulation rules.
+- Build original AmandaCore MMO behavior through shared, server-authoritative simulation rules.
 - Keep engine integration thin so gameplay logic remains project-owned and portable.
 - Support server-authoritative multiplayer from the beginning.
-- Use replacement content and black-box reference captures instead of copied internals.
+- Use original AmandaCore content and clean-room architecture notes instead of copied internals or compatibility artifacts.
 - Support a real login flow with launcher, account services, character selection, realm routing, and world join tickets.
+- Keep all gameplay protocols, schemas, command names, content IDs, formulas, and assets AmandaCore-original.
 
 ## High-level split
 
@@ -70,6 +71,16 @@ The data model is deliberately wider than the first slice so future work can sca
 - Server simulates the canonical world state using the same domain rules and publishes snapshots.
 - Client performs prediction and interpolation but always accepts authoritative corrections.
 - Domain message and snapshot shapes are defined in `AmandaCoreShared/Messages.h` so alternate transports or backends can adapt without rewriting gameplay code.
+
+## Server-authoritative NPC combat loop
+
+The current server slice includes an original dev hostile NPC archetype, `dev_isle_stalker`, spawned as `Isle Stalker` for combat validation. Players can select the NPC, use the original `dev_basic_strike` ability, receive authoritative damage and cooldown results, kill the NPC, receive persisted kill credit, and observe server-scheduled respawn.
+
+The world response exposes protocol-neutral state diffs for entity spawn, health, combat state, target selection, ability results, death, and progression. These are internal AmandaCore contracts, not copied packet or emulator surfaces.
+
+## Clean-room reference boundary
+
+This implementation uses original AmandaCore code and data. TrinityCore/AzerothCore were used only as high-level architectural reference. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, assets, formulas, or stat tables were copied or adapted.
 
 ## Milestone one slice
 

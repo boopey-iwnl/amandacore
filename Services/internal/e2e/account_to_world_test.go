@@ -66,8 +66,8 @@ func TestAccountToWorldGoldenPath(t *testing.T) {
 		t.Fatalf("expected created character class warrior, got %v", characterResponse["classId"])
 	}
 	learnedAbilityIds := characterResponse["learnedAbilityIds"].([]any)
-	if len(learnedAbilityIds) != 3 {
-		t.Fatalf("expected 3 starting learned abilities, got %d", len(learnedAbilityIds))
+	if len(learnedAbilityIds) != 4 {
+		t.Fatalf("expected 4 starting learned abilities, got %d", len(learnedAbilityIds))
 	}
 	characterID := characterResponse["id"].(string)
 
@@ -302,8 +302,8 @@ func assertAbilityPayloadWithoutDefaultBarLayout(t *testing.T, response map[stri
 	if !ok {
 		t.Fatalf("world session response missing learnedAbilityIds: %#v", response["learnedAbilityIds"])
 	}
-	if len(learnedAbilityIds) != 3 {
-		t.Fatalf("expected 3 learned abilities in session payload, got %d", len(learnedAbilityIds))
+	if len(learnedAbilityIds) != 4 {
+		t.Fatalf("expected 4 learned abilities in session payload, got %d", len(learnedAbilityIds))
 	}
 
 	spellbook, ok := response["spellbook"].([]any)

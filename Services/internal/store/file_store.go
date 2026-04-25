@@ -537,6 +537,7 @@ func (s *FileStore) CreateCharacter(accountID string, realmID string, displayNam
 		Professions:     []platform.CharacterProfessionState{},
 		Talents:         map[string]int{},
 		Quests:          map[string]platform.CharacterQuestProgress{},
+		KillCredits:     map[string]platform.CharacterKillCredit{},
 		TrackedQuestIDs: []string{},
 		LastSeenAt:      time.Now().Unix(),
 	}
@@ -1344,6 +1345,30 @@ func (s *FileStore) UpdateCharacterProgression(
 	return &copy, nil
 }
 
+func (s *FileStore) UpdateCharacterKillCredits(characterID string, killCredits map[string]platform.CharacterKillCredit) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	character.KillCredits = cloneKillCreditsMap(killCredits)
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
 func (s *FileStore) UpdateCharacterTrackedQuests(characterID string, trackedQuestIDs []string) (*platform.Character, error) {
 	if err := s.lockState(true); err != nil {
 		return nil, err
@@ -1943,6 +1968,10 @@ func cloneQuestProgressMap(source map[string]platform.CharacterQuestProgress) ma
 	return cloned
 }
 
+func cloneKillCreditsMap(source map[string]platform.CharacterKillCredit) map[string]platform.CharacterKillCredit {
+	return platform.NormalizeCharacterKillCredits(source)
+}
+
 func cloneInventorySlots(source []platform.CharacterInventorySlot) []platform.CharacterInventorySlot {
 	return platform.NormalizeInventorySlots(source)
 }
@@ -2005,6 +2034,7 @@ func normalizedCharacterCopy(source platform.Character) platform.Character {
 	normalized.Talents = cloneTalentRanks(normalized.Talents)
 	normalized.ActionBarSlots = cloneActionBarSlots(normalized.ActionBarSlots, normalized.LearnedAbilityIDs)
 	normalized.Quests = cloneQuestProgressMap(normalized.Quests)
+	normalized.KillCredits = cloneKillCreditsMap(normalized.KillCredits)
 	normalized.TrackedQuestIDs = cloneStringIDs(normalized.TrackedQuestIDs)
 	normalized.BindPoint = platform.NormalizeCharacterBindPoint(normalized.ID, normalized.BindPoint)
 	normalized.TravelState = platform.NormalizeCharacterTravelState(normalized.TravelState)

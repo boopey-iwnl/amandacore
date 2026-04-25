@@ -1078,20 +1078,29 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		}
 
 		entities = append(entities, sessionEntity{
-			ID:             mob.ID,
-			DisplayName:    mob.DisplayName,
-			Kind:           mob.Kind,
-			MobTypeID:      mob.MobTypeID,
-			Classification: mob.Classification,
-			Elite:          mob.Elite,
-			X:              mob.X,
-			Y:              mob.Y,
-			Z:              mob.Z,
-			Health:         mob.Health,
-			MaxHealth:      mob.MaxHealth,
-			Alive:          mob.Alive,
-			Targetable:     mob.Targetable,
-			AIState:        mob.AIState,
+			ID:              mob.ID,
+			ArchetypeID:     mob.ArchetypeID,
+			SpawnPointID:    mob.SpawnPointID,
+			DisplayName:     mob.DisplayName,
+			Kind:            mob.Kind,
+			MobTypeID:       mob.MobTypeID,
+			Disposition:     mob.Disposition,
+			Classification:  mob.Classification,
+			Elite:           mob.Elite,
+			X:               mob.X,
+			Y:               mob.Y,
+			Z:               mob.Z,
+			Health:          mob.Health,
+			MaxHealth:       mob.MaxHealth,
+			Alive:           mob.Alive,
+			Targetable:      mob.Targetable,
+			IsInCombat:      mob.CurrentTargetCharacter != "" && mob.Alive,
+			CurrentTargetID: mob.CurrentTargetCharacter,
+			LastDamagedByID: mob.LastDamagedByEntityID,
+			RespawnDelayMs:  mob.RespawnDelayMs,
+			DeathTick:       mob.DeathTick,
+			RespawnTick:     mob.RespawnTick,
+			AIState:         mob.AIState,
 		})
 	}
 
@@ -1160,6 +1169,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"quest":                s.buildQuestResponse(session),
 		"quests":               s.buildQuestListResponse(session),
 		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
+		"killCredits":          buildKillCreditResponse(session.KillCredits),
 		"zoneMap":              s.buildZoneMapResponse(session),
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
@@ -1174,6 +1184,8 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"castEndsAt":           session.CastEndsAtMs,
 		"castingAbilityId":     session.CastingAbilityID,
 		"entities":             entities,
+		"stateDiffs":           s.recentStateDiffsLocked(),
+		"domainEvents":         s.recentDomainEventsLocked(),
 	}
 }
 

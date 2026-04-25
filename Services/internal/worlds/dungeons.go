@@ -324,34 +324,16 @@ func (s *worldServer) createDungeonInstanceLocked(definition dungeonDefinition, 
 	}
 	for _, spawn := range definition.MobSpawns {
 		mobID := instanceID + "_" + spawn.ID
+		spawn.ID = mobID
+		spawn.ZoneID = definition.InstanceZoneID
+		spawn.Z = clampSpawnGroundZ(spawn.Z)
 		instance.MobOrder = append(instance.MobOrder, mobID)
-		instance.Mobs[mobID] = &mobState{
-			ID:              mobID,
-			InstanceID:      instanceID,
-			MobTypeID:       spawn.MobTypeID,
-			DisplayName:     spawn.DisplayName,
-			Kind:            hostileMobKind,
-			ZoneID:          definition.InstanceZoneID,
-			Level:           spawn.Level,
-			X:               spawn.X,
-			Y:               spawn.Y,
-			Z:               spawn.Z,
-			SpawnX:          spawn.X,
-			SpawnY:          spawn.Y,
-			SpawnZ:          spawn.Z,
-			Health:          spawn.MaxHealth,
-			MaxHealth:       spawn.MaxHealth,
-			AggroRadius:     spawn.AggroRadius,
-			AttackRange:     spawn.AttackRange,
-			AttackDamage:    spawn.AttackDamage,
-			AttackCadenceMs: spawn.AttackCadenceMs,
-			MoveSpeedPerSec: spawn.MoveSpeedPerSec,
-			LeashRadius:     spawn.LeashRadius,
-			RespawnDelayMs:  spawn.RespawnDelayMs,
-			Alive:           true,
-			Targetable:      true,
-			AIState:         mobAIStateIdle,
-		}
+		mob := newMobStateFromSpawn(spawn, instanceID)
+		instance.Mobs[mobID] = mob
+		s.emitDomainEventLocked(eventNPCSpawnPointLoaded, mobSpawnPayload(mob))
+		s.emitDomainEventLocked(eventNPCSpawned, mobSpawnPayload(mob))
+		s.emitDomainEventLocked(eventWorldEntitySpawned, mobSpawnPayload(mob))
+		s.emitStateDiffLocked(diffEntitySpawn, mob.ID, mobSpawnPayload(mob))
 	}
 	s.dungeonInstances[instanceID] = instance
 	s.instanceByParty[partyID] = instanceID
