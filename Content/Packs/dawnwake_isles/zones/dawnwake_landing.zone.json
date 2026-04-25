@@ -1,0 +1,13 @@
+{
+  "zone_id": "dawnwake_landing",
+  "display_name": "Dawnwake Landing",
+  "bounds": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 120, "max_y": 90, "max_z": 30},
+  "entry_points": [
+    {"entry_id": "default", "position": {"x": 18, "y": 18, "z": 0}},
+    {"entry_id": "from_kingsfall_harbor", "position": {"x": 104, "y": 46, "z": 0}}
+  ],
+  "transition_gates": [
+    {"transition_id": "landing_to_harbor", "to_zone_id": "kingsfall_harbor", "entry_id_on_arrival": "from_dawnwake_landing"}
+  ],
+  "runtime": {"max_sessions": 80, "max_entities": 160}
+}

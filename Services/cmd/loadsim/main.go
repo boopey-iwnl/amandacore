@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"amandacore/services/internal/loadsim"
 	"amandacore/services/internal/worlds"
 )
 
@@ -21,6 +23,34 @@ type options struct {
 }
 
 func main() {
+	scenario := scenarioFromArgs(os.Args[1:], "quest-basic")
+	if isRuntimeLoadsimScenario(scenario) {
+		runRuntimeLoadsim()
+		return
+	}
+	runWorldLoadsim()
+}
+
+func runRuntimeLoadsim() {
+	cfg, err := loadsim.ParseConfig(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "loadsim: %v\n", err)
+		os.Exit(2)
+	}
+	report, err := loadsim.Run(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "loadsim run failed: %v\n", err)
+		fmt.Print(loadsim.RenderTextReport(report))
+		os.Exit(1)
+	}
+	if err := loadsim.WriteJSONReport(cfg.ReportPath, report); err != nil {
+		fmt.Fprintf(os.Stderr, "write report failed: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Print(loadsim.RenderTextReport(report))
+}
+
+func runWorldLoadsim() {
 	opts := parseOptions()
 
 	switch opts.Scenario {
@@ -74,6 +104,32 @@ func parseOptions() options {
 		exitf("--cmd-rate must be greater than zero")
 	}
 	return opts
+}
+
+func isRuntimeLoadsimScenario(scenario string) bool {
+	switch strings.ToLower(strings.TrimSpace(scenario)) {
+	case loadsim.ScenarioMovementBasic,
+		loadsim.ScenarioAbilityBasic,
+		loadsim.ScenarioDawnwakeTraversal,
+		loadsim.ScenarioMultizonePressure,
+		loadsim.ScenarioShardAssignmentBasic,
+		loadsim.ScenarioReconnectPressure:
+		return true
+	default:
+		return false
+	}
+}
+
+func scenarioFromArgs(args []string, fallback string) string {
+	for index, arg := range args {
+		if arg == "--scenario" && index+1 < len(args) {
+			return strings.ToLower(strings.TrimSpace(args[index+1]))
+		}
+		if strings.HasPrefix(arg, "--scenario=") {
+			return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(arg, "--scenario=")))
+		}
+	}
+	return fallback
 }
 
 func printQuestReport(report worlds.QuestBasicLoadsimReport) {

@@ -68,13 +68,20 @@ The local stack waits for each service to report healthy before returning contro
 
 Milestone `0.1` hardening details, commands, and pass/fail behavior are documented in `Docs/Milestone01-AccountToWorld.md`.
 
-## Content package loadsim
+## Local load simulation
 
-Run from the Go module root:
+Run the in-process content package harness from `Services`:
 
 ```powershell
-cd Services
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
 ```
 
 The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`.
+
+Run the in-process multi-zone load harness from `Services`:
+
+```powershell
+go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizone-pressure --content ../Content/Packs/dawnwake_isles/package.json --seed 42
+```
+
+Scale tiers, scenarios, reports, and sharding behavior are documented in `Docs/LoadTesting.md` and `Docs/MultiZoneSharding.md`.

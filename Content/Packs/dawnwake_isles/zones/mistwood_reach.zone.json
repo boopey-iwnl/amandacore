@@ -1,0 +1,13 @@
+{
+  "zone_id": "mistwood_reach",
+  "display_name": "Mistwood Reach",
+  "bounds": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 130, "max_y": 140, "max_z": 40},
+  "entry_points": [
+    {"entry_id": "default", "position": {"x": 26, "y": 30, "z": 0}},
+    {"entry_id": "from_highroad_pass", "position": {"x": 88, "y": 124, "z": 0}}
+  ],
+  "transition_gates": [
+    {"transition_id": "mistwood_to_highroad", "to_zone_id": "highroad_pass", "entry_id_on_arrival": "from_mistwood_reach"}
+  ],
+  "runtime": {"max_sessions": 75, "max_entities": 170}
+}

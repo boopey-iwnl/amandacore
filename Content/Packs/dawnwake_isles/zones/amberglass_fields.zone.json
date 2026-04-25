@@ -1,0 +1,13 @@
+{
+  "zone_id": "amberglass_fields",
+  "display_name": "Amberglass Fields",
+  "bounds": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 150, "max_y": 120, "max_z": 30},
+  "entry_points": [
+    {"entry_id": "default", "position": {"x": 36, "y": 36, "z": 0}},
+    {"entry_id": "from_highroad_pass", "position": {"x": 18, "y": 84, "z": 0}}
+  ],
+  "transition_gates": [
+    {"transition_id": "amberglass_to_highroad", "to_zone_id": "highroad_pass", "entry_id_on_arrival": "from_amberglass_fields"}
+  ],
+  "runtime": {"max_sessions": 90, "max_entities": 180}
+}

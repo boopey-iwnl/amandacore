@@ -1,0 +1,15 @@
+{
+  "zone_id": "kingsfall_harbor",
+  "display_name": "Kingsfall Harbor",
+  "bounds": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 160, "max_y": 110, "max_z": 35},
+  "entry_points": [
+    {"entry_id": "default", "position": {"x": 30, "y": 48, "z": 0}},
+    {"entry_id": "from_dawnwake_landing", "position": {"x": 12, "y": 48, "z": 0}},
+    {"entry_id": "from_highroad_pass", "position": {"x": 144, "y": 68, "z": 0}}
+  ],
+  "transition_gates": [
+    {"transition_id": "harbor_to_landing", "to_zone_id": "dawnwake_landing", "entry_id_on_arrival": "from_kingsfall_harbor"},
+    {"transition_id": "harbor_to_highroad", "to_zone_id": "highroad_pass", "entry_id_on_arrival": "from_kingsfall_harbor"}
+  ],
+  "runtime": {"max_sessions": 140, "max_entities": 260}
+}
