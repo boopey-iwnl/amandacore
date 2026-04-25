@@ -14,6 +14,8 @@ Use `PASS`, `FAIL`, `BLOCKED`, or `N/A`. Every `FAIL` or `BLOCKED` needs a bug r
 - [ ] Start Local Stack reaches all services healthy:
 - [ ] Open Launcher works:
 - [ ] Known issues and release notes are available:
+- [ ] Feature freeze document is available:
+- [ ] Package manifest and version manifest are available:
 - [ ] Smoke test can be run by the build owner:
 - [ ] Diagnostic collection button is visible in Local Ops:
 
@@ -73,7 +75,14 @@ Use `PASS`, `FAIL`, `BLOCKED`, or `N/A`. Every `FAIL` or `BLOCKED` needs a bug r
 - [ ] Friends flow is testable if available:
 - [ ] Party flow is testable if available:
 
-## 8. Persistence and Recovery
+## 8. Optional Rough Coverage
+
+- [ ] Second-zone handoff is reachable if assigned:
+- [ ] Professions learn/gather/craft smoke works if assigned:
+- [ ] Dungeon entry/exit/reset works if assigned:
+- [ ] Hidden/deferred systems are not part of the main route:
+
+## 9. Persistence and Recovery
 
 - [ ] Logout/exit returns cleanly:
 - [ ] Reconnect keeps position and quest state:
