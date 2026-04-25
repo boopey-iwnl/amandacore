@@ -1947,13 +1947,235 @@ namespace UiClient
             ImGui::EndChild();
         }
 
+        ImVec4 ChatChannelColor(const AZStd::string& channel)
+        {
+            if (channel == "system")
+            {
+                return ImVec4(0.95f, 0.75f, 0.42f, 1.0f);
+            }
+            if (channel == "whisper")
+            {
+                return ImVec4(0.86f, 0.48f, 0.92f, 1.0f);
+            }
+            if (channel == "party")
+            {
+                return ImVec4(0.42f, 0.68f, 1.0f, 1.0f);
+            }
+            return ImVec4(0.92f, 0.92f, 0.86f, 1.0f);
+        }
+
+        const char* ChatChannelLabel(const AZStd::string& channel)
+        {
+            if (channel == "system")
+            {
+                return "System";
+            }
+            if (channel == "whisper")
+            {
+                return "Whisper";
+            }
+            if (channel == "party")
+            {
+                return "Party";
+            }
+            return "Say";
+        }
+
+        bool DrawChatWindow(
+            const GameCore::ClientWorldState& worldState,
+            AZStd::string& selectedChannel,
+            char* inputBuffer,
+            size_t inputBufferSize,
+            char* whisperTargetBuffer,
+            size_t whisperTargetBufferSize,
+            AZStd::string& outSubmittedInput)
+        {
+            ImGui::BeginChild("##chat_scrollback", ImVec2(0.0f, 158.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            for (const auto& message : worldState.m_social.m_chatMessages)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ChatChannelColor(message.m_channel));
+                ImGui::Text("[%s]", ChatChannelLabel(message.m_channel));
+                ImGui::PopStyleColor();
+                ImGui::SameLine();
+                if (message.m_channel == "system")
+                {
+                    ImGui::TextWrapped("%s", message.m_messageText.c_str());
+                }
+                else
+                {
+                    ImGui::TextWrapped("%s: %s", message.m_senderDisplayName.c_str(), message.m_messageText.c_str());
+                }
+            }
+            if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f)
+            {
+                ImGui::SetScrollHereY(1.0f);
+            }
+            ImGui::EndChild();
+
+            if (ImGui::Button("Say", ImVec2(58.0f, 24.0f)))
+            {
+                selectedChannel = "say";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Whisper", ImVec2(82.0f, 24.0f)))
+            {
+                selectedChannel = "whisper";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Party", ImVec2(66.0f, 24.0f)))
+            {
+                selectedChannel = "party";
+            }
+            ImGui::SameLine();
+            ImGui::Text("Channel: %s", ChatChannelLabel(selectedChannel));
+
+            if (selectedChannel == "whisper")
+            {
+                ImGui::SetNextItemWidth(138.0f);
+                ImGui::InputText("Target", whisperTargetBuffer, whisperTargetBufferSize);
+                ImGui::SameLine();
+            }
+
+            ImGui::SetNextItemWidth(-1.0f);
+            const bool submitted = ImGui::InputText(
+                "##chat_input",
+                inputBuffer,
+                inputBufferSize,
+                ImGuiInputTextFlags_EnterReturnsTrue);
+            if (submitted)
+            {
+                outSubmittedInput = inputBuffer;
+                inputBuffer[0] = '\0';
+            }
+            return submitted;
+        }
+
+        void DrawPartyFrames(const GameCore::ClientWorldState& worldState)
+        {
+            if (!worldState.m_social.m_hasParty)
+            {
+                ImGui::TextUnformatted("No party");
+                return;
+            }
+
+            for (const auto& member : worldState.m_social.m_party.m_members)
+            {
+                ImGui::Separator();
+                ImGui::Text(
+                    "%s%s  |  Level %d %s",
+                    member.m_leader ? "* " : "",
+                    member.m_displayName.c_str(),
+                    member.m_level,
+                    member.m_classId.c_str());
+                ImGui::Text("%s  |  %s", member.m_zoneId.c_str(), member.m_online ? "online" : "offline");
+                if (member.m_online)
+                {
+                    DrawMeter("Health", static_cast<float>(member.m_health), static_cast<float>(member.m_maxHealth), ColorU32(173, 52, 44), ImVec2(204.0f, 14.0f));
+                    DrawMeter("Grit", static_cast<float>(member.m_resource), static_cast<float>(member.m_maxResource), ColorU32(54, 117, 181), ImVec2(204.0f, 14.0f));
+                }
+            }
+        }
+
+        void DrawPartyInvitePrompt(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            if (!gameCore || worldState.m_social.m_partyInvites.empty())
+            {
+                return;
+            }
+
+            const auto& invite = worldState.m_social.m_partyInvites.front();
+            ImGui::Text("%s invited you to a party.", invite.m_inviterDisplayName.c_str());
+            if (ImGui::Button("Accept", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->AcceptPartyInvite(invite.m_inviteId);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Decline", ImVec2(104.0f, 28.0f)))
+            {
+                gameCore->DeclinePartyInvite(invite.m_inviteId);
+            }
+        }
+
+        void DrawSocialWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            char* nameBuffer,
+            size_t nameBufferSize)
+        {
+            if (ImGui::BeginTabBar("##social_tabs"))
+            {
+                if (ImGui::BeginTabItem("Friends"))
+                {
+                    ImGui::SetNextItemWidth(210.0f);
+                    ImGui::InputText("Name", nameBuffer, nameBufferSize);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Add", ImVec2(62.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->AddFriend(nameBuffer);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove", ImVec2(86.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->RemoveFriend(nameBuffer);
+                    }
+
+                    ImGui::Separator();
+                    ImGui::BeginChild("##friends_list", ImVec2(0.0f, 280.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (const auto& friendState : worldState.m_social.m_friends)
+                    {
+                        ImGui::Text(
+                            "%s  |  L%d %s  |  %s",
+                            friendState.m_displayName.c_str(),
+                            friendState.m_level,
+                            friendState.m_classId.c_str(),
+                            friendState.m_online ? "online" : "offline");
+                        if (friendState.m_online)
+                        {
+                            ImGui::SameLine();
+                            ImGui::Text(" | %s", friendState.m_zoneId.c_str());
+                            ImGui::SameLine();
+                            ImGui::PushID(friendState.m_characterId.c_str());
+                            if (ImGui::Button("Invite", ImVec2(72.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->InviteParty(friendState.m_displayName, friendState.m_characterId);
+                            }
+                            ImGui::PopID();
+                        }
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Party"))
+                {
+                    ImGui::SetNextItemWidth(210.0f);
+                    ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->InviteParty(nameBuffer, {});
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->LeaveParty();
+                    }
+                    ImGui::Separator();
+                    DrawPartyFrames(worldState);
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+        }
+
         void DrawMicroMenuBar(
             bool& characterSheetOpen,
             bool& questLogOpen,
             bool& mapOpen,
             bool& spellbookOpen,
             bool& bagOpen,
-            bool& settingsOpen)
+            bool& settingsOpen,
+            bool& socialOpen)
         {
             struct MenuButtonState
             {
@@ -1967,6 +2189,7 @@ namespace UiClient
                 {"Map", &mapOpen},
                 {"Spellbook", &spellbookOpen},
                 {"Bag", &bagOpen},
+                {"Social", &socialOpen},
                 {"Settings", &settingsOpen},
             };
 
