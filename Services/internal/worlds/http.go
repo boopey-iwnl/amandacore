@@ -140,6 +140,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			session.DisplayName = character.DisplayName
 			session.Connected = true
 			session.LastSeenAt = time.Now().Unix()
+			s.recoverExpiredDungeonSessionLocked(session)
 			if session.ZoneID == "" {
 				session.ZoneID = character.ZoneID
 			}
