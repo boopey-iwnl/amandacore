@@ -102,6 +102,8 @@ namespace UiClient
         char m_chatInputBuffer[257]{};
         char m_chatWhisperTargetBuffer[65]{};
         char m_socialNameBuffer[65]{};
+        char m_guildNameBuffer[65]{};
+        char m_guildMotdBuffer[161]{};
         int m_pendingActionMoveSlot = -1;
         int m_pendingInventoryMoveSlot = -1;
     };
