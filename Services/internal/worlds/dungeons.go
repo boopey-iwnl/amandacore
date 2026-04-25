@@ -24,8 +24,6 @@ const (
 	mobTDSPressureHandTypeID = "tds_pressure_hand"
 	mobTDSVellOrdrinTypeID   = "tds_vell_ordrin"
 
-	itemTDSSluiceguardHandwrapsID = "tds_sluiceguard_handwraps"
-
 	dungeonStateActive        = "active"
 	dungeonStateCompleted     = "completed"
 	dungeonStateEmptyExpiring = "empty_expiring"
