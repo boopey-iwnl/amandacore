@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	contentpkg "amandacore/services/internal/content"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
 )
@@ -591,6 +592,8 @@ type worldSessionState struct {
 type mobState struct {
 	ID                     string
 	InstanceID             string
+	SpawnPointID           string
+	ArchetypeID            string
 	MobTypeID              string
 	DisplayName            string
 	Kind                   string
@@ -611,6 +614,8 @@ type mobState struct {
 	MoveSpeedPerSec        float64
 	LeashRadius            float64
 	RespawnDelayMs         int64
+	Disposition            string
+	LootTableID            string
 	Classification         string
 	Elite                  bool
 	Alive                  bool
@@ -623,6 +628,8 @@ type mobState struct {
 
 type mobSpawnDefinition struct {
 	ID              string
+	SpawnPointID    string
+	ArchetypeID     string
 	ZoneID          string
 	MobTypeID       string
 	DisplayName     string
@@ -638,6 +645,8 @@ type mobSpawnDefinition struct {
 	MoveSpeedPerSec float64
 	LeashRadius     float64
 	RespawnDelayMs  int64
+	Disposition     string
+	LootTableID     string
 	Classification  string
 	Elite           bool
 }
@@ -713,6 +722,10 @@ type worldServer struct {
 	gatheringNodes         map[string]*gatheringNodeState
 	gatheringNodeOrder     []string
 	zones                  map[string]zoneDefinition
+	contentRegistry        *contentpkg.RuntimeContentRegistry
+	zoneRuntimes           map[string]*ZoneRuntime
+	contentMobSpawns       []mobSpawnDefinition
+	contentActivation      ContentActivationResult
 	chatMessages           []chatEnvelope
 	chatSequence           int64
 	partyInvites           map[string]partyInviteState
@@ -721,6 +734,10 @@ type worldServer struct {
 }
 
 func newWorldServer(fileStore *store.FileStore) *worldServer {
+	return newWorldServerWithContentPackage(fileStore, "")
+}
+
+func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackagePath string) *worldServer {
 	server := &worldServer{
 		store:              fileStore,
 		metrics:            newWorldMetrics(),
@@ -735,9 +752,11 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		friendlyNPCs:       map[string]friendlyNPCDefinition{},
 		gatheringNodes:     map[string]*gatheringNodeState{},
 		zones:              map[string]zoneDefinition{},
+		zoneRuntimes:       map[string]*ZoneRuntime{},
 		partyInvites:       map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
+	server.loadConfiguredContentPackageLocked(contentPackagePath)
 	server.ensureMobsLocked()
 	server.ensureGatheringNodesLocked()
 	return server
@@ -794,6 +813,7 @@ func (s *worldServer) ensureMobsLocked() {
 
 	allMobSpawns := append([]mobSpawnDefinition{}, stonewakeMobSpawns...)
 	allMobSpawns = append(allMobSpawns, brindlebrookMobSpawns...)
+	allMobSpawns = append(allMobSpawns, s.contentMobSpawns...)
 	s.mobOrder = make([]string, 0, len(allMobSpawns))
 	for _, spawn := range allMobSpawns {
 		zoneID := spawn.ZoneID
@@ -801,10 +821,20 @@ func (s *worldServer) ensureMobsLocked() {
 			zoneID = defaultZoneID
 		}
 		spawn.Z = clampSpawnGroundZ(spawn.Z)
+		archetypeID := spawn.ArchetypeID
+		if archetypeID == "" {
+			archetypeID = spawn.MobTypeID
+		}
+		spawnPointID := spawn.SpawnPointID
+		if spawnPointID == "" {
+			spawnPointID = spawn.ID
+		}
 		s.mobOrder = append(s.mobOrder, spawn.ID)
 		s.mobs[spawn.ID] = &mobState{
 			ID:              spawn.ID,
 			InstanceID:      "",
+			SpawnPointID:    spawnPointID,
+			ArchetypeID:     archetypeID,
 			MobTypeID:       spawn.MobTypeID,
 			DisplayName:     spawn.DisplayName,
 			Kind:            hostileMobKind,
@@ -825,6 +855,8 @@ func (s *worldServer) ensureMobsLocked() {
 			MoveSpeedPerSec: spawn.MoveSpeedPerSec,
 			LeashRadius:     spawn.LeashRadius,
 			RespawnDelayMs:  spawn.RespawnDelayMs,
+			Disposition:     spawn.Disposition,
+			LootTableID:     spawn.LootTableID,
 			Classification:  spawn.Classification,
 			Elite:           spawn.Elite,
 			Alive:           true,
