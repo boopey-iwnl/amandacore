@@ -708,10 +708,18 @@ namespace GameCore
             return;
         }
 
-        if (bootstrap.m_zoneId != "sunset_frontier" || bootstrap.m_cellId != "west_approach")
+        const bool isStonewakeValeBootstrap = bootstrap.m_zoneId == "sunset_frontier" && bootstrap.m_cellId == "stonewake_vale";
+        const bool isLegacyWestApproachBootstrap = bootstrap.m_zoneId == "sunset_frontier" && bootstrap.m_cellId == "west_approach";
+        if (!isStonewakeValeBootstrap && !isLegacyWestApproachBootstrap)
         {
             m_worldState.m_errorMessage = "Bootstrap zone mapping did not match the playable slice contract.";
-            AZ_Warning("amandacore", false, "%s", m_worldState.m_errorMessage.c_str());
+            AZ_Warning(
+                "amandacore",
+                false,
+                "%s zone=%s cell=%s",
+                m_worldState.m_errorMessage.c_str(),
+                bootstrap.m_zoneId.c_str(),
+                bootstrap.m_cellId.c_str());
             return;
         }
 
