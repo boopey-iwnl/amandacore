@@ -10,6 +10,10 @@ const (
 	itemBentBuckleID              = "bent_buckle"
 	itemCrackedTuskID             = "cracked_tusk"
 	itemCampRationID              = "camp_ration"
+	itemDevGlimmerShardID         = "dev_glimmer_shard"
+	itemDevStalkerFangID          = "dev_stalker_fang"
+	itemDevFieldRationID          = "dev_field_ration"
+	itemDevCopperTokenID          = "dev_copper_token"
 
 	itemTypeWeapon     = "weapon"
 	itemTypeArmor      = "armor"
@@ -17,19 +21,40 @@ const (
 	itemTypeMaterial   = "material"
 	itemTypeQuest      = "quest"
 	itemTypeJunk       = "junk"
+	itemTypeCurrency   = "currency_token"
+	itemTypeEquipment  = "equipment_placeholder"
 
-	itemQualityPoor   = "poor"
-	itemQualityCommon = "common"
+	itemKindCurrencyToken        = itemTypeCurrency
+	itemKindCraftingMaterial     = itemTypeMaterial
+	itemKindConsumable           = itemTypeConsumable
+	itemKindQuestItem            = itemTypeQuest
+	itemKindEquipmentPlaceholder = itemTypeEquipment
+	itemKindMisc                 = itemTypeJunk
+
+	itemQualityPoor            = "poor"
+	itemQualityCommon          = "common"
+	itemQualityUncommon        = "uncommon"
+	itemQualityRare            = "rare"
+	itemQualityEpicPlaceholder = "epic_placeholder"
 )
+
+type ItemID = string
+type ItemKind = string
+type ItemQuality = string
+type ItemDefinition = itemDefinition
+type ItemCatalog = map[string]itemDefinition
 
 type itemDefinition struct {
 	ItemID          string
 	DisplayName     string
+	Description     string
+	Kind            string
 	Type            string
 	Subtype         string
 	Quality         string
 	Stackable       bool
 	MaxStack        int
+	Tags            []string
 	SellPriceCopper int
 	BuyPriceCopper  int
 	RequiredClass   string
@@ -54,6 +79,10 @@ func itemIconKind(item itemDefinition) string {
 		return "quest"
 	case itemTypeJunk:
 		return "junk"
+	case itemTypeCurrency:
+		return "currency"
+	case itemTypeEquipment:
+		return "equipment"
 	default:
 		return "item"
 	}
@@ -95,6 +124,58 @@ var itemDefinitions = map[string]itemDefinition{
 		SellPriceCopper: 1,
 		BuyPriceCopper:  3,
 		RequiredLevel:   1,
+	},
+	itemDevGlimmerShardID: {
+		ItemID:        itemDevGlimmerShardID,
+		DisplayName:   "Glimmer Shard",
+		Description:   "A faintly reflective shard used by AmandaCore development scenarios.",
+		Kind:          itemKindCraftingMaterial,
+		Type:          itemTypeMaterial,
+		Subtype:       "dev_material",
+		Quality:       itemQualityCommon,
+		Stackable:     true,
+		MaxStack:      99,
+		RequiredLevel: 1,
+		Tags:          []string{"dev", "progression"},
+	},
+	itemDevStalkerFangID: {
+		ItemID:        itemDevStalkerFangID,
+		DisplayName:   "Stalker Fang",
+		Description:   "A proof token recovered from an Isle Stalker.",
+		Kind:          itemKindQuestItem,
+		Type:          itemTypeQuest,
+		Subtype:       "dev_quest",
+		Quality:       itemQualityCommon,
+		Stackable:     true,
+		MaxStack:      20,
+		RequiredLevel: 1,
+		Tags:          []string{"dev", "quest"},
+	},
+	itemDevFieldRationID: {
+		ItemID:        itemDevFieldRationID,
+		DisplayName:   "Field Ration",
+		Description:   "A compact ration for early AmandaCore survival loops.",
+		Kind:          itemKindConsumable,
+		Type:          itemTypeConsumable,
+		Subtype:       "dev_ration",
+		Quality:       itemQualityCommon,
+		Stackable:     true,
+		MaxStack:      10,
+		RequiredLevel: 1,
+		Tags:          []string{"dev", "consumable"},
+	},
+	itemDevCopperTokenID: {
+		ItemID:        itemDevCopperTokenID,
+		DisplayName:   "Copper Token",
+		Description:   "A small placeholder currency token for progression tests.",
+		Kind:          itemKindCurrencyToken,
+		Type:          itemTypeCurrency,
+		Subtype:       "dev_currency",
+		Quality:       itemQualityCommon,
+		Stackable:     true,
+		MaxStack:      999,
+		RequiredLevel: 1,
+		Tags:          []string{"dev", "currency"},
 	},
 	itemLinenWrapID: {
 		ItemID:          itemLinenWrapID,
@@ -273,6 +354,12 @@ func findItemDefinition(itemID string) (itemDefinition, bool) {
 	if !ok {
 		return itemDefinition{}, false
 	}
+	if item.Kind == "" {
+		item.Kind = item.Type
+	}
+	if item.Type == "" {
+		item.Type = item.Kind
+	}
 	if item.MaxStack <= 0 {
 		item.MaxStack = 1
 	}
@@ -283,4 +370,12 @@ func findItemDefinition(itemID string) (itemDefinition, bool) {
 		item.RequiredLevel = 1
 	}
 	return item, true
+}
+
+func itemCatalogIDs() []string {
+	ids := make([]string, 0, len(itemDefinitions))
+	for itemID := range itemDefinitions {
+		ids = append(ids, itemID)
+	}
+	return ids
 }

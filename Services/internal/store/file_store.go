@@ -1938,6 +1938,13 @@ func cloneQuestProgressMap(source map[string]platform.CharacterQuestProgress) ma
 
 	cloned := make(map[string]platform.CharacterQuestProgress, len(source))
 	for key, value := range source {
+		if len(value.ObjectiveProgress) > 0 {
+			objectives := make(map[string]platform.CharacterQuestObjectiveProgress, len(value.ObjectiveProgress))
+			for nodeID, objective := range value.ObjectiveProgress {
+				objectives[nodeID] = objective
+			}
+			value.ObjectiveProgress = objectives
+		}
 		cloned[key] = value
 	}
 	return cloned

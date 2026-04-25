@@ -324,15 +324,27 @@ func (s *worldServer) createDungeonInstanceLocked(definition dungeonDefinition, 
 	}
 	for _, spawn := range definition.MobSpawns {
 		mobID := instanceID + "_" + spawn.ID
+		archetypeID := spawn.ArchetypeID
+		if archetypeID == "" {
+			archetypeID = spawn.MobTypeID
+		}
+		disposition := spawn.Disposition
+		if disposition == "" {
+			disposition = string(NpcDispositionHostile)
+		}
 		instance.MobOrder = append(instance.MobOrder, mobID)
 		instance.Mobs[mobID] = &mobState{
 			ID:              mobID,
 			InstanceID:      instanceID,
+			SpawnPointID:    spawn.ID,
 			MobTypeID:       spawn.MobTypeID,
+			ArchetypeID:     archetypeID,
 			DisplayName:     spawn.DisplayName,
 			Kind:            hostileMobKind,
 			ZoneID:          definition.InstanceZoneID,
 			Level:           spawn.Level,
+			Disposition:     disposition,
+			LootTableID:     spawn.LootTableID,
 			X:               spawn.X,
 			Y:               spawn.Y,
 			Z:               spawn.Z,

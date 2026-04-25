@@ -71,6 +71,7 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	mux.HandleFunc("POST /v1/world/mount/summon", server.instrumentEndpointFunc("mount_summon", server.handleSummonMount))
 	mux.HandleFunc("POST /v1/world/mount/dismiss", server.instrumentEndpointFunc("mount_dismiss", server.handleDismissMount))
 	mux.HandleFunc("POST /v1/world/quest/accept", server.instrumentEndpointFunc("quest_accept", server.handleQuestAccept))
+	mux.HandleFunc("POST /v1/world/quest/complete", server.instrumentEndpointFunc("quest_complete", server.handleQuestComplete))
 	mux.HandleFunc("POST /v1/world/quest/track", server.instrumentEndpointFunc("quest_track", server.handleQuestTrack))
 	mux.HandleFunc("POST /v1/world/dungeon/enter", server.instrumentEndpointFunc("dungeon_enter", server.handleDungeonEnter))
 	mux.HandleFunc("POST /v1/world/dungeon/exit", server.instrumentEndpointFunc("dungeon_exit", server.handleDungeonExit))
@@ -85,6 +86,8 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	mux.HandleFunc("POST /v1/world/action-bar/clear", server.instrumentEndpointFunc("action_bar_clear", server.handleActionBarClear))
 	mux.HandleFunc("POST /v1/world/inventory/move", server.instrumentEndpointFunc("inventory_move", server.handleInventoryMove))
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
+	mux.HandleFunc("POST /v1/world/loot/inspect", server.instrumentEndpointFunc("loot_inspect", server.handleLootInspect))
+	mux.HandleFunc("POST /v1/world/loot/claim", server.instrumentEndpointFunc("loot_claim", server.handleLootClaim))
 	mux.HandleFunc("GET /v1/world/housing/status", server.instrumentEndpointFunc("housing_status", server.handleHousingStatus))
 	mux.HandleFunc("POST /v1/world/housing/enter", server.instrumentEndpointFunc("housing_enter", server.handleHousingEnter))
 	mux.HandleFunc("POST /v1/world/housing/leave", server.instrumentEndpointFunc("housing_leave", server.handleHousingLeave))
@@ -568,6 +571,60 @@ func (s *worldServer) handleInventoryEquip(w http.ResponseWriter, r *http.Reques
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 }
 
+func (s *worldServer) handleLootInspect(w http.ResponseWriter, r *http.Request) {
+	var request lootInspectRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+	if _, err := s.inspectLootLocked(session, request.LootContainerID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "loot_inspect_failed", err.Error())
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleLootClaim(w http.ResponseWriter, r *http.Request) {
+	var request lootClaimRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+	if err := s.claimLootLocked(session, request.LootContainerID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "loot_claim_failed", err.Error())
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
 func (s *worldServer) handleVendorBuy(w http.ResponseWriter, r *http.Request) {
 	var request vendorBuyRequest
 	if err := httpapi.DecodeJSON(r, &request); err != nil {
@@ -678,6 +735,35 @@ func (s *worldServer) handleQuestAccept(w http.ResponseWriter, r *http.Request) 
 
 	if err := s.acceptQuestLocked(session, request.QuestID); err != nil {
 		httpapi.Error(w, http.StatusBadRequest, "quest_invalid", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleQuestComplete(w http.ResponseWriter, r *http.Request) {
+	var request questCompleteRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.completeQuestLocked(session, request.QuestID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "quest_complete_invalid", err.Error())
 		return
 	}
 
@@ -1078,20 +1164,29 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		}
 
 		entities = append(entities, sessionEntity{
-			ID:             mob.ID,
-			DisplayName:    mob.DisplayName,
-			Kind:           mob.Kind,
-			MobTypeID:      mob.MobTypeID,
-			Classification: mob.Classification,
-			Elite:          mob.Elite,
-			X:              mob.X,
-			Y:              mob.Y,
-			Z:              mob.Z,
-			Health:         mob.Health,
-			MaxHealth:      mob.MaxHealth,
-			Alive:          mob.Alive,
-			Targetable:     mob.Targetable,
-			AIState:        mob.AIState,
+			ID:              mob.ID,
+			ArchetypeID:     mob.ArchetypeID,
+			SpawnPointID:    mob.SpawnPointID,
+			DisplayName:     mob.DisplayName,
+			Kind:            mob.Kind,
+			MobTypeID:       mob.MobTypeID,
+			Disposition:     mob.Disposition,
+			Classification:  mob.Classification,
+			Elite:           mob.Elite,
+			X:               mob.X,
+			Y:               mob.Y,
+			Z:               mob.Z,
+			Health:          mob.Health,
+			MaxHealth:       mob.MaxHealth,
+			Alive:           mob.Alive,
+			Targetable:      mob.Targetable,
+			IsInCombat:      mob.CurrentTargetCharacter != "",
+			CurrentTargetID: mob.CurrentTargetCharacter,
+			LastDamagedByID: mob.LastDamagedByCharacter,
+			RespawnDelayMs:  mob.RespawnDelayMs,
+			DeathTick:       mob.DeathTick,
+			RespawnTick:     mob.RespawnTick,
+			AIState:         mob.AIState,
 		})
 	}
 
@@ -1159,6 +1254,9 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"vendor":               s.buildVendorResponse(session),
 		"quest":                s.buildQuestResponse(session),
 		"quests":               s.buildQuestListResponse(session),
+		"lootContainers":       s.buildLootContainersResponseLocked(session),
+		"domainEvents":         cloneDomainEvents(s.domainEvents),
+		"stateDiffs":           cloneStateDiffs(s.stateDiffs),
 		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
 		"zoneMap":              s.buildZoneMapResponse(session),
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
