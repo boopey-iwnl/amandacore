@@ -58,6 +58,16 @@ namespace GameCore
         bool DeclinePartyInvite(const AZStd::string& inviteId) override;
         bool LeaveParty() override;
         bool DisbandParty() override;
+        bool CreateGuild(const AZStd::string& guildName) override;
+        bool InviteGuild(const AZStd::string& targetName) override;
+        bool AcceptGuildInvite(const AZStd::string& inviteId) override;
+        bool DeclineGuildInvite(const AZStd::string& inviteId) override;
+        bool LeaveGuild() override;
+        bool DisbandGuild() override;
+        bool PromoteGuildMember(const AZStd::string& targetName) override;
+        bool DemoteGuildMember(const AZStd::string& targetName) override;
+        bool RemoveGuildMember(const AZStd::string& targetName) override;
+        bool SetGuildMessageOfTheDay(const AZStd::string& messageOfTheDay) override;
         bool DisconnectWorld() override;
         bool ReconnectWorld() override;
         void SetCameraState(const ClientCameraState& cameraState) override;

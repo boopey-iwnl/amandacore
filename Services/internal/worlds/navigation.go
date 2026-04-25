@@ -7,9 +7,6 @@ func (s *worldServer) buildZoneMapResponse(session *worldSessionState) map[strin
 	if session != nil {
 		zoneID = session.ZoneID
 	}
-	if zoneID == dungeonZoneID {
-		return buildZoneMapPayload(tallowdeepZoneMap)
-	}
 	if zoneID == "" || zoneID == defaultZoneID {
 		return buildZoneMapPayload(stonewakeZoneMap)
 	}
@@ -63,9 +60,6 @@ func (s *worldServer) buildZoneMapResponse(session *worldSessionState) map[strin
 
 func (s *worldServer) buildNavigationAreasResponse(session *worldSessionState) []map[string]any {
 	source := stonewakeNavigationAreas
-	if session != nil && session.ZoneID == dungeonZoneID {
-		source = tallowdeepNavigationAreas
-	}
 	areas := make([]map[string]any, 0, len(source))
 	for _, area := range source {
 		areas = append(areas, map[string]any{
@@ -85,29 +79,6 @@ func (s *worldServer) buildNavigationAreasResponse(session *worldSessionState) [
 }
 
 func (s *worldServer) buildMapMarkersResponse(session *worldSessionState) []map[string]any {
-	if session != nil && session.ZoneID == dungeonZoneID {
-		return []map[string]any{
-			{
-				"id":          "dungeon_exit_" + npcTallowdeepExitID,
-				"displayName": "Exit Winch",
-				"kind":        "dungeon_exit",
-				"entityId":    npcTallowdeepExitID,
-				"x":           166.0,
-				"y":           34.0,
-			},
-			{
-				"id":            "dungeon_boss_tallowdeep",
-				"displayName":   "Sluice Warden Platform",
-				"kind":          "tracked_objective",
-				"questId":       dungeonQuestTallowdeepID,
-				"areaId":        "tds_boss_platform",
-				"x":             148.0,
-				"y":             34.0,
-				"radius":        18.0,
-				"routeHintText": "Push through the lower sluice and defeat the warden.",
-			},
-		}
-	}
 	markers := make([]map[string]any, 0, len(s.friendlyNPCOrder)+len(stonewakeNavigationAreas))
 
 	for _, npcID := range s.friendlyNPCOrder {

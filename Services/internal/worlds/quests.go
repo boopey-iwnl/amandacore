@@ -420,7 +420,7 @@ func (s *worldServer) partyQuestCreditEligibleLocked(killer *worldSessionState, 
 	if killer == nil || candidate == nil || killedMob == nil {
 		return false
 	}
-	if !candidate.Connected || candidate.RealmID != killer.RealmID || candidate.ZoneID != killedMob.ZoneID {
+	if !candidate.Connected || candidate.RealmID != killer.RealmID || candidate.ZoneID != killedMob.ZoneID || candidate.InstanceID != killedMob.InstanceID {
 		s.logPartyCreditSkipped(candidate, quest, killedMob, "offline_or_wrong_zone")
 		return false
 	}

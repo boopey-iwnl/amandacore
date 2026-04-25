@@ -12,9 +12,9 @@ func (s *worldServer) setTargetLocked(session *worldSessionState, targetID strin
 		return nil
 	}
 
-	targetMob := s.findMobByIDLocked(targetID)
+	targetMob := s.findMobForSessionLocked(session, targetID)
 	if targetMob == nil {
-		if friendly, ok := s.findFriendlyNPCDefinition(targetID); ok {
+		if friendly, ok := s.findFriendlyNPCDefinition(targetID); ok && friendly.ZoneID == session.ZoneID {
 			if distance2D(session.X, session.Y, friendly.X, friendly.Y) > playerTargetRange {
 				observability.LogEvent("world-service", "world.target_rejected", map[string]any{
 					"worldSessionToken": session.Token,
@@ -86,6 +86,9 @@ func (s *worldServer) friendlyInRangeLocked(session *worldSessionState, targetID
 	}
 	friendly, ok := s.findFriendlyNPCDefinition(targetID)
 	if !ok {
+		return false
+	}
+	if friendly.ZoneID != "" && friendly.ZoneID != session.ZoneID {
 		return false
 	}
 	radius := friendly.Radius

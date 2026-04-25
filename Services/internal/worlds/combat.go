@@ -485,7 +485,11 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 	mob.Alive = false
 	mob.Targetable = false
 	s.setMobAIStateLocked(mob, mobAIStateDead, "killed")
-	mob.RespawnAtMs = nowMillis() + mob.RespawnDelayMs
+	if mob.RespawnDelayMs > 0 {
+		mob.RespawnAtMs = nowMillis() + mob.RespawnDelayMs
+	} else {
+		mob.RespawnAtMs = 0
+	}
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "target_dead")
 	if mob.InstanceID != "" {
