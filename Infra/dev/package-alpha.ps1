@@ -88,11 +88,12 @@ function Test-ExcludedPackagePath {
     $path = $RelativePath.Replace("\", "/")
     $fileName = [System.IO.Path]::GetFileName($path)
 
-    if ($path -match '(^|/)(\.git|\.secrets|\.vs|Cache|cache|logs|user)(/|$)') { return $true }
+    if ($path -match '(^|/)(\.git|\.secrets|\.vs|logs|user)(/|$)') { return $true }
+    if ($path -match '(^|/)(Cache|cache)(/|$)' -and $path -notmatch '^Cache/pc/') { return $true }
     if ($path -match '^Client/Portal/') { return $true }
     if ($path -match '^Infra/dev/(local-processes\.json|platform-state\.json|logs/)') { return $true }
     if ($path -match '^dist/') { return $true }
-    if ($fileName -match '(?i)\.(log|tmp|png|jpg|jpeg|pdb|ilk)$') { return $true }
+    if ($fileName -match '(?i)\.(log|tmp|png|jpg|jpeg|pdb|ilk|lock)$') { return $true }
     if ($fileName -match '(?i)(^required-go-test-output\.txt$|^combat-test-output\.txt$|^worlds-compile-output.*\.txt$|^e2e-.*\.(txt|json|log)$|^milestone.*_runtime_ticket\.txt$|^imgui\.ini$)') { return $true }
 
     return $false
@@ -221,30 +222,28 @@ if (Test-Path $script:stagingRoot) {
 }
 New-Item -ItemType Directory -Force -Path $script:stagingRoot | Out-Null
 
-$trackedFiles = @()
-Push-Location $repoRoot
-try {
-    $trackedFiles = & git ls-files --cached --others --exclude-standard
-    if ($LASTEXITCODE -ne 0) {
-        throw "git ls-files failed."
-    }
-}
-finally {
-    Pop-Location
-}
-
-$sourceFilesCopied = 0
-foreach ($relativePath in $trackedFiles) {
-    if ([string]::IsNullOrWhiteSpace($relativePath) -or (Test-ExcludedPackagePath $relativePath)) {
-        continue
-    }
-
+$releaseFilesCopied = 0
+foreach ($relativePath in @("project.json")) {
     $sourcePath = Join-Path $repoRoot $relativePath
-    if (Test-Path $sourcePath -PathType Leaf) {
+    if (-not (Test-ExcludedPackagePath $relativePath)) {
         if (Copy-PackageFile -SourcePath $sourcePath -RelativePath $relativePath) {
-            $sourceFilesCopied++
+            $releaseFilesCopied++
         }
     }
+}
+
+$releaseDirectories = @(
+    @{ Source = Join-Path $repoRoot "Docs\QA"; Relative = "Docs\QA" },
+    @{ Source = Join-Path $repoRoot "Docs\Config"; Relative = "Docs\Config" },
+    @{ Source = Join-Path $repoRoot "Content\GameData"; Relative = "Content\GameData" },
+    @{ Source = Join-Path $repoRoot "Content\Schemas"; Relative = "Content\Schemas" },
+    @{ Source = Join-Path $repoRoot "Infra\dev"; Relative = "Infra\dev" },
+    @{ Source = Join-Path $repoRoot "Infra\qa"; Relative = "Infra\qa" },
+    @{ Source = Join-Path $repoRoot "Registry"; Relative = "Registry" }
+)
+
+foreach ($releaseDirectory in $releaseDirectories) {
+    $releaseFilesCopied += Copy-PackageDirectory -SourceDirectory $releaseDirectory.Source -RelativeDirectory $releaseDirectory.Relative
 }
 
 Copy-PackageFile -SourcePath $versionManifestPath -RelativePath "Infra\dev\version-manifest.json" -ScrubRepoPath | Out-Null
@@ -254,7 +253,8 @@ $runtimePaths = @(
     @{ Source = Join-Path $repoRoot "Client\Launcher\AmandaCore.Launcher\bin\Debug\net8.0-windows"; Relative = "Client\Launcher\AmandaCore.Launcher\bin\Debug\net8.0-windows" },
     @{ Source = Join-Path $repoRoot "Client\Game\AmandaCore.WorldClient\bin\Debug\net8.0"; Relative = "Client\Game\AmandaCore.WorldClient\bin\Debug\net8.0" },
     @{ Source = Join-Path $repoRoot "build\windows\bin\profile"; Relative = "build\windows\bin\profile" },
-    @{ Source = Join-Path $repoRoot "build\o3de-windows\bin\profile"; Relative = "build\o3de-windows\bin\profile" }
+    @{ Source = Join-Path $repoRoot "build\o3de-windows\bin\profile"; Relative = "build\o3de-windows\bin\profile" },
+    @{ Source = Join-Path $repoRoot "Cache\pc"; Relative = "Cache\pc" }
 )
 
 $runtimeSummary = @()
@@ -278,7 +278,8 @@ $packageManifest = [ordered]@{
     sourceDirty = -not [string]::IsNullOrWhiteSpace($gitStatus)
     buildId = [string]$versionManifest.buildId
     displayVersion = [string]$versionManifest.displayVersion
-    sourceFilesCopied = $sourceFilesCopied
+    releaseFilesCopied = $releaseFilesCopied
+    sourceFilesCopied = 0
     runtimePaths = $runtimeSummary
     excludedAreas = @(
         ".git",
