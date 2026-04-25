@@ -12,8 +12,8 @@ const (
 	ActionBarSlotCount    = 48
 	StarterCurrencyCopper = 125
 	DefaultStarterZoneID  = "stonewake_vale"
-	DefaultStarterSpawnX  = 8.0
-	DefaultStarterSpawnY  = 8.0
+	DefaultStarterSpawnX  = 10.0
+	DefaultStarterSpawnY  = 10.0
 	DefaultStarterSpawnZ  = 0.0
 
 	DefaultRaceID             = "human"

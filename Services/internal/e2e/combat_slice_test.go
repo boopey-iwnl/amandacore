@@ -197,7 +197,7 @@ func TestCombatSliceHardening(t *testing.T) {
 
 	t.Run("target switching between hostile mobs stays authoritative", func(t *testing.T) {
 		fixture := newCombatFixture(t)
-		state := fixture.moveToPosition(t, 18.0, 16.0)
+		state := fixture.moveToPosition(t, 52.0, 27.0)
 		firstMobID := stonewakeCombatMob1
 		secondMobID := stonewakeCombatMob2
 
@@ -214,7 +214,7 @@ func TestCombatSliceHardening(t *testing.T) {
 
 	t.Run("auto attack cleanly switches to the new target without continuing on the old target", func(t *testing.T) {
 		fixture := newCombatFixture(t)
-		state := fixture.moveToPosition(t, 18.0, 16.0)
+		state := fixture.moveToPosition(t, 52.0, 27.0)
 		state = fixture.targetMobByID(t, stonewakeCombatMob1)
 
 		postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/attack/auto", nil, map[string]any{
@@ -248,7 +248,7 @@ func TestCombatSliceHardening(t *testing.T) {
 
 	t.Run("steady strike stays bound to the currently selected target", func(t *testing.T) {
 		fixture := newCombatFixture(t)
-		state := fixture.moveToPosition(t, 18.0, 16.0)
+		state := fixture.moveToPosition(t, 52.0, 27.0)
 		state = fixture.targetMobByID(t, stonewakeCombatMob1)
 		firstMob := findHostileMobByID(t, state, stonewakeCombatMob1)
 		secondMob := findHostileMobByID(t, state, stonewakeCombatMob2)
@@ -435,12 +435,37 @@ func (f *combatFixture) targetMobByID(t *testing.T, mobID string) map[string]any
 func (f *combatFixture) targetFriendlyByID(t *testing.T, friendlyID string) map[string]any {
 	t.Helper()
 
-	var state map[string]any
+	state := f.getWorldState(t)
+	friendly := findEntityByID(t, state, friendlyID)
+	f.moveToPosition(t, friendly["x"].(float64)-1.0, friendly["y"].(float64)-1.0)
+
+	var targetState map[string]any
 	postJSON(t, f.server.Client(), f.server.URL+"/v1/world/target", nil, map[string]any{
 		"worldSessionToken": f.worldSessionToken,
 		"targetId":          friendlyID,
-	}, http.StatusOK, &state)
-	return state
+	}, http.StatusOK, &targetState)
+	return targetState
+}
+
+func findEntityByID(t *testing.T, state map[string]any, entityID string) map[string]any {
+	t.Helper()
+
+	entities, ok := state["entities"].([]any)
+	if !ok {
+		t.Fatalf("state response missing entities: %#v", state["entities"])
+	}
+	for _, entityValue := range entities {
+		entity, ok := entityValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		if entity["id"] == entityID {
+			return entity
+		}
+	}
+
+	t.Fatalf("expected entity %s in world state, got %#v", entityID, entities)
+	return nil
 }
 
 func findHostileMobs(t *testing.T, state map[string]any) []map[string]any {

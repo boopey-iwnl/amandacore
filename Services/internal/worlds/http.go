@@ -753,10 +753,10 @@ func clamp(value float64, minimum float64, maximum float64) float64 {
 }
 
 func resolveStarterZoneMovement(currentX float64, currentY float64, deltaX float64, deltaY float64) (float64, float64) {
-	candidateX := clamp(currentX+deltaX, 0.0, 100.0)
-	candidateY := clamp(currentY+deltaY, 0.0, 100.0)
+	candidateX := clamp(currentX+deltaX, 0.0, starterZoneMaxX)
+	candidateY := clamp(currentY+deltaY, 0.0, starterZoneMaxY)
 
-	if candidateX >= 18.0 && candidateX <= 22.0 && candidateY >= 6.0 && candidateY <= 11.0 {
+	if candidateX >= 72.0 && candidateX <= 80.0 && candidateY >= 28.0 && candidateY <= 46.0 {
 		return currentX, currentY
 	}
 

@@ -28,11 +28,12 @@ namespace UiClient
 {
     namespace
     {
-        constexpr float CommandPointX = 8.0f;
-        constexpr float CommandPointY = 8.0f;
+        constexpr float CommandPointX = 13.0f;
+        constexpr float CommandPointY = 10.0f;
         constexpr float CommandPointRadius = 5.0f;
-        constexpr float EncounterAnchorX = 58.0f;
-        constexpr float EncounterAnchorY = 36.0f;
+        constexpr float EncounterAnchorX = 112.0f;
+        constexpr float EncounterAnchorY = 60.0f;
+        constexpr float FriendlyNameplateDrawDistance = 48.0f;
         constexpr float MeleeRange = 5.5f;
         constexpr float SpellRange = 24.0f;
         constexpr size_t MaxEventLogEntries = 9;
@@ -772,6 +773,17 @@ namespace UiClient
                     continue;
                 }
 
+                const float distanceToPlayer = Distance2D(
+                    static_cast<float>(worldState.m_session.m_position.m_x),
+                    static_cast<float>(worldState.m_session.m_position.m_y),
+                    static_cast<float>(entity.m_x),
+                    static_cast<float>(entity.m_y));
+                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
+                if (!isSelected && distanceToPlayer > FriendlyNameplateDrawDistance)
+                {
+                    continue;
+                }
+
                 ImVec2 screenPosition{};
                 if (!ProjectWorldPointToScreen(
                         cameraState,
@@ -786,7 +798,6 @@ namespace UiClient
                 }
 
                 const bool isTrainer = IsTrainerNpc(entity);
-                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
                 const AZStd::string label = AZStd::string::format(
                     "%s  %s",
                     isTrainer ? "Trainer" : "Quest",
@@ -2447,7 +2458,7 @@ namespace UiClient
         if (!m_loggedPlayableZoneReady &&
             gameCore->GetCameraState().m_ready &&
             worldState.m_session.m_alive &&
-            visibleHostileCount == 3)
+            visibleHostileCount >= 3)
         {
             AZ_Printf("amandacore", "client.playable_zone_ready visible=true mobs=3 hud=true grounded=true");
             m_loggedPlayableZoneReady = true;

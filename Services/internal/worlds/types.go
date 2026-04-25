@@ -40,12 +40,14 @@ const (
 	objectiveExplore = "explore"
 	objectiveUse     = "use_location"
 
-	starterQuestID         = "sv_first_muster"
+	starterQuestID        = "sv_first_muster"
 	legacyEmberQuestID    = "defeat_ember_hounds_01"
-	starterSpawnX         = 8.0
-	starterSpawnY         = 8.0
+	starterSpawnX         = 10.0
+	starterSpawnY         = 10.0
 	starterSpawnZ         = 0.0
 	starterInteractRadius = 5.0
+	starterZoneMaxX       = 480.0
+	starterZoneMaxY       = 300.0
 )
 
 type joinTicketRequest struct {
@@ -257,21 +259,21 @@ type mobState struct {
 }
 
 type mobSpawnDefinition struct {
-	ID               string
-	MobTypeID        string
-	DisplayName      string
-	Level            int
-	X                float64
-	Y                float64
-	Z                float64
-	MaxHealth        float64
-	AggroRadius      float64
-	AttackRange      float64
-	AttackDamage     float64
-	AttackCadenceMs  int64
-	MoveSpeedPerSec  float64
-	LeashRadius      float64
-	RespawnDelayMs   int64
+	ID              string
+	MobTypeID       string
+	DisplayName     string
+	Level           int
+	X               float64
+	Y               float64
+	Z               float64
+	MaxHealth       float64
+	AggroRadius     float64
+	AttackRange     float64
+	AttackDamage    float64
+	AttackCadenceMs int64
+	MoveSpeedPerSec float64
+	LeashRadius     float64
+	RespawnDelayMs  int64
 }
 
 type worldServer struct {
