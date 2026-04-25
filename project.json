@@ -1,0 +1,33 @@
+{
+  "project_name": "amandacore",
+  "project_id": "{7AE6D49F-8E88-4C70-8F36-6E2E0B0DAA4D}",
+  "version": "0.2.0",
+  "display_name": "amandacore",
+  "summary": "amandacore clean-room O3DE MMO foundation with shared gameplay-domain code, launcher, and backend services.",
+  "origin": "OpenAI Codex scaffold",
+  "license": "Apache-2.0",
+  "engine": "o3de-sdk",
+  "engine_version": "2.5.2",
+  "external_subdirectories": [
+    "Gems/GameCore",
+    "Gems/NetClient",
+    "Gems/MovementPhysics",
+    "Gems/CombatRules",
+    "Gems/NpcAi",
+    "Gems/UiClient"
+  ],
+  "gem_names": [
+    "GameCore",
+    "NetClient",
+    "MovementPhysics",
+    "CombatRules",
+    "NpcAi",
+    "UiClient",
+    "Atom",
+    "PhysXCommon",
+    "PhysX5",
+    "CameraFramework",
+    "Atom_Component_DebugCamera",
+    "ImGui"
+  ]
+}

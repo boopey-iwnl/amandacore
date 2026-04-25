@@ -1,0 +1,17 @@
+build/
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+Services/.cache/
+Services/bin/
+Services/pkg/
+Infra/dev/platform-state.json
+Infra/dev/local-processes.json
+Infra/dev/logs/
+.secrets/*.env
+Client/Launcher/AmandaCore.Launcher/bin/
+Client/Launcher/AmandaCore.Launcher/obj/
+Client/Game/AmandaCore.WorldClient/bin/
+Client/Game/AmandaCore.WorldClient/obj/
