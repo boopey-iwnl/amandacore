@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	contentpkg "amandacore/services/internal/content"
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
@@ -812,6 +813,10 @@ type worldServer struct {
 	stateDiffs             []StateDiff
 	killCreditLedger       KillCreditLedger
 	zones                  map[string]zoneDefinition
+	contentRegistry        *contentpkg.RuntimeContentRegistry
+	zoneRuntimes           map[string]*ZoneRuntime
+	contentMobSpawns       []mobSpawnDefinition
+	contentActivation      ContentActivationResult
 	chatMessages           []chatEnvelope
 	chatSequence           int64
 	partyInvites           map[string]partyInviteState
@@ -820,6 +825,10 @@ type worldServer struct {
 }
 
 func newWorldServer(fileStore *store.FileStore) *worldServer {
+	return newWorldServerWithContentPackage(fileStore, "")
+}
+
+func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackagePath string) *worldServer {
 	server := &worldServer{
 		store:              fileStore,
 		metrics:            newWorldMetrics(),
@@ -839,9 +848,11 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 			CreditsByCharacter: map[string]map[string]int{},
 		},
 		zones:        map[string]zoneDefinition{},
+		zoneRuntimes: map[string]*ZoneRuntime{},
 		partyInvites: map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
+	server.loadConfiguredContentPackageLocked(contentPackagePath)
 	server.ensureMobsLocked()
 	server.ensureGatheringNodesLocked()
 	server.emitWorldEventLocked(eventItemCatalogLoaded, map[string]any{"itemCount": len(itemDefinitions)})
@@ -907,6 +918,7 @@ func (s *worldServer) ensureMobsLocked() {
 	allMobSpawns := append([]mobSpawnDefinition{}, stonewakeMobSpawns...)
 	allMobSpawns = append(allMobSpawns, brindlebrookMobSpawns...)
 	allMobSpawns = append(allMobSpawns, devProgressionMobSpawns...)
+	allMobSpawns = append(allMobSpawns, s.contentMobSpawns...)
 	s.mobOrder = make([]string, 0, len(allMobSpawns))
 	for _, spawn := range allMobSpawns {
 		zoneID := spawn.ZoneID

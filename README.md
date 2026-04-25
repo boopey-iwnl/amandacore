@@ -67,3 +67,14 @@ The local stack waits for each service to report healthy before returning contro
 - retain position state
 
 Milestone `0.1` hardening details, commands, and pass/fail behavior are documented in `Docs/Milestone01-AccountToWorld.md`.
+
+## Content package loadsim
+
+Run from the Go module root:
+
+```powershell
+cd Services
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
+```
+
+The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`.

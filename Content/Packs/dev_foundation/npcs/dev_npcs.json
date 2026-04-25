@@ -1,0 +1,23 @@
+{
+  "npcs": [
+    {
+      "archetype_id": "dev_isle_stalker",
+      "display_name": "Isle Stalker",
+      "level": 1,
+      "max_health": 30,
+      "disposition": "hostile",
+      "attack_range": 2.5,
+      "aggro_range": 8,
+      "leash_range": 18,
+      "base_damage": 3,
+      "attack_interval_ms": 1500,
+      "default_ability_ids": [
+        "dev_stalker_swipe"
+      ],
+      "tags": [
+        "dev",
+        "beastlike"
+      ]
+    }
+  ]
+}
