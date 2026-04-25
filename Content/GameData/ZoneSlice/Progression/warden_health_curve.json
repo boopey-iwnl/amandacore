@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/StatCurve",
+  "id": "warden_health_curve",
+  "stat": "Health",
+  "points": [
+    { "level": 1, "value": 105 },
+    { "level": 5, "value": 182 },
+    { "level": 10, "value": 315 }
+  ]
+}

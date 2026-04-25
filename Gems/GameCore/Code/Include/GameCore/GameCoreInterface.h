@@ -1,0 +1,81 @@
+#pragma once
+
+#include <AzCore/Interface/Interface.h>
+#include <AzCore/Math/Transform.h>
+#include <AzCore/std/string/string.h>
+#include <NetClient/WorldHttpClient.h>
+
+namespace GameCore
+{
+    struct ClientLaunchOptions
+    {
+        AZStd::string m_joinTicketId;
+        AZStd::string m_worldEndpoint;
+
+        bool IsValid() const
+        {
+            return !m_joinTicketId.empty() && !m_worldEndpoint.empty();
+        }
+    };
+
+    struct ClientWorldState
+    {
+        bool m_launchOptionsPresent = false;
+        bool m_connectAttempted = false;
+        bool m_worldConnected = false;
+        bool m_bootstrapReady = false;
+        AZStd::string m_errorMessage;
+        NetClient::WorldBootstrapResponse m_bootstrap;
+        NetClient::WorldSessionResponse m_session;
+        AZStd::string m_pendingInteractionEntityId;
+        AZ::u64 m_pendingInteractionSequence = 0;
+    };
+
+    struct ClientCameraState
+    {
+        bool m_ready = false;
+        AZ::Transform m_worldTransform = AZ::Transform::CreateIdentity();
+        float m_verticalFovDegrees = 60.0f;
+    };
+
+    class IGameCoreRequests
+    {
+    public:
+        AZ_RTTI(IGameCoreRequests, "{C657226D-7206-41D7-BD90-A0723B830C26}");
+
+        virtual ~IGameCoreRequests() = default;
+
+        static IGameCoreRequests* Get()
+        {
+            return AZ::Interface<IGameCoreRequests>::Get();
+        }
+
+        static void Register(IGameCoreRequests* instance)
+        {
+            AZ::Interface<IGameCoreRequests>::Register(instance);
+        }
+
+        static void Unregister(IGameCoreRequests* instance)
+        {
+            AZ::Interface<IGameCoreRequests>::Unregister(instance);
+        }
+
+        virtual const ClientLaunchOptions& GetLaunchOptions() const = 0;
+        virtual const ClientWorldState& GetClientWorldState() const = 0;
+        virtual const ClientCameraState& GetCameraState() const = 0;
+        virtual bool SubmitMove(double deltaX, double deltaY) = 0;
+        virtual bool SetTarget(const AZStd::string& targetId) = 0;
+        virtual bool InteractWithEntity(const AZStd::string& entityId) = 0;
+        virtual bool AcceptQuest(const AZStd::string& questId) = 0;
+        virtual bool SetAutoAttack(bool enabled) = 0;
+        virtual bool ActivateAbility(const AZStd::string& abilityId) = 0;
+        virtual bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) = 0;
+        virtual bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) = 0;
+        virtual bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) = 0;
+        virtual bool ClearActionBarSlot(int slotIndex) = 0;
+        virtual bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) = 0;
+        virtual bool DisconnectWorld() = 0;
+        virtual bool ReconnectWorld() = 0;
+        virtual void SetCameraState(const ClientCameraState& cameraState) = 0;
+    };
+} // namespace GameCore

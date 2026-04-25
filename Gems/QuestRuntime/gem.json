@@ -1,0 +1,10 @@
+{
+  "gem_name": "QuestRuntime",
+  "display_name": "QuestRuntime",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "summary": "Quest acceptance, objective tracking, completion, turn-in, and player-facing quest state.",
+  "canonical_tags": ["MMO", "Quests", "Runtime"],
+  "dependencies": ["GameCore"]
+}

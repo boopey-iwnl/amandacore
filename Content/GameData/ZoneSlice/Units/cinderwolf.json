@@ -1,0 +1,23 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/UnitDefinition",
+  "id": "cinderwolf",
+  "displayName": "Cinderwolf",
+  "level": 2,
+  "baseStats": {
+    "Health": 62,
+    "Resource": 0,
+    "Strength": 8,
+    "Agility": 10,
+    "Intellect": 1,
+    "Spirit": 3,
+    "Stamina": 7,
+    "Armor": 12,
+    "CritChance": 0.03
+  },
+  "moveSpeedMetersPerSecond": 4.5,
+  "meleeSwingSeconds": 2,
+  "collisionRadiusMeters": 0.6,
+  "brainId": "predator_pack",
+  "lootTableId": "cinderwolf_pelt_loot",
+  "spellIds": []
+}

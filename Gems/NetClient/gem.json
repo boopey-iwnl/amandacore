@@ -1,0 +1,11 @@
+{
+  "gem_name": "NetClient",
+  "display_name": "NetClient",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "type": "Code",
+  "summary": "Transport, snapshot ingestion, interpolation, client prediction, and correction feeds.",
+  "canonical_tags": ["MMO", "Networking", "Client"],
+  "dependencies": []
+}

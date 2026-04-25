@@ -1,0 +1,25 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/QuestDefinition",
+  "id": "clear_the_road",
+  "title": "Clear the Road",
+  "minLevel": 1,
+  "prerequisiteQuestIds": [],
+  "objectives": [
+    {
+      "id": "defeat_fen_raiders",
+      "type": "Kill",
+      "targetId": "fen_raider",
+      "requiredCount": 4
+    },
+    {
+      "id": "gather_cinder_pelts",
+      "type": "Collect",
+      "targetId": "cinder_pelt",
+      "requiredCount": 3
+    }
+  ],
+  "rewardItemIds": [
+    "roadwarden_blade"
+  ],
+  "rewardCurrency": 32
+}

@@ -1,0 +1,11 @@
+{
+  "gem_name": "UiClient",
+  "display_name": "UiClient",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "type": "Code",
+  "summary": "HUD, chat, hotbars, targeting, and all player-facing presentation layers.",
+  "canonical_tags": ["MMO", "UI", "Client"],
+  "dependencies": ["GameCore", "ImGui"]
+}

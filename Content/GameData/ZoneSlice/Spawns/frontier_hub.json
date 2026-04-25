@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/SpawnGroup",
+  "id": "frontier_hub",
+  "spawns": [
+    {
+      "localId": 301,
+      "unitId": "quartermaster_lyra",
+      "position": [4, 2, 0],
+      "facingRadians": 1.57,
+      "respawnVarianceSeconds": 0
+    }
+  ]
+}

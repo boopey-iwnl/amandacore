@@ -1,0 +1,11 @@
+{
+  "gem_name": "MovementPhysics",
+  "display_name": "MovementPhysics",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "type": "Code",
+  "summary": "Character movement, prediction, correction, and physics-facing locomotion adapters.",
+  "canonical_tags": ["MMO", "Movement", "Physics"],
+  "dependencies": ["GameCore", "CombatRules", "PhysX5"]
+}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>amandacore Admin Portal</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; background: #0f141c; color: #edf2f7; margin: 2rem; }
+    section { background: #1d2733; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; max-width: 760px; }
+    input, button { margin: 0.25rem 0.5rem 0.25rem 0; padding: 0.5rem; }
+    button { background: #2d8f6f; color: white; border: none; border-radius: 6px; }
+    pre { background: #081018; padding: 1rem; border-radius: 8px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>amandacore Admin Portal</h1>
+  <section>
+    <h2>Admin Login</h2>
+    <input id="username" value="amanda" />
+    <input id="password" type="password" value="amanda" />
+    <button onclick="login()">Login</button>
+  </section>
+
+  <section>
+    <h2>Account Controls</h2>
+    <button onclick="loadAccounts()">Load Accounts</button><br />
+    <input id="accountId" placeholder="account id" />
+    <button onclick="banAccount(true)">Ban</button>
+    <button onclick="banAccount(false)">Unban</button>
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    <pre id="output"></pre>
+  </section>
+
+  <script>
+    let session = null;
+    const authUrl = "http://localhost:8081";
+    const adminUrl = "http://localhost:8086";
+    const output = (value) => document.getElementById("output").textContent = JSON.stringify(value, null, 2);
+
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const response = await fetch(authUrl + "/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      session = await response.json();
+      output(session);
+    }
+
+    async function loadAccounts() {
+      const response = await fetch(adminUrl + "/v1/admin/accounts", {
+        headers: { "Authorization": "Bearer " + session.accessToken }
+      });
+      output(await response.json());
+    }
+
+    async function banAccount(banned) {
+      const accountId = document.getElementById("accountId").value;
+      const response = await fetch(adminUrl + "/v1/admin/accounts/ban", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + session.accessToken
+        },
+        body: JSON.stringify({ accountId, banned })
+      });
+      output(await response.json());
+    }
+  </script>
+</body>
+</html>

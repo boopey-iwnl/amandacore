@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/SpellDefinition",
+  "id": "steady_strike",
+  "displayName": "Steady Strike",
+  "castTimeSeconds": 0,
+  "cooldownSeconds": 4,
+  "rangeMeters": 5,
+  "resourceStat": "Resource",
+  "resourceCost": 15,
+  "effectIds": [
+    "steady_strike_hit"
+  ]
+}

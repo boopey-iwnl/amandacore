@@ -1,0 +1,9 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/ItemDefinition",
+  "id": "cinder_pelt",
+  "displayName": "Cinder Pelt",
+  "slot": "Trade",
+  "itemLevel": 1,
+  "statModifiers": {},
+  "sellValue": 6
+}

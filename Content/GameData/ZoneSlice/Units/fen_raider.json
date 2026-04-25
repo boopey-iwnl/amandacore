@@ -1,0 +1,25 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/UnitDefinition",
+  "id": "fen_raider",
+  "displayName": "Fen Raider",
+  "level": 3,
+  "baseStats": {
+    "Health": 96,
+    "Resource": 50,
+    "Strength": 11,
+    "Agility": 8,
+    "Intellect": 4,
+    "Spirit": 5,
+    "Stamina": 9,
+    "Armor": 16,
+    "CritChance": 0.04
+  },
+  "moveSpeedMetersPerSecond": 4.2,
+  "meleeSwingSeconds": 2.2,
+  "collisionRadiusMeters": 0.6,
+  "brainId": "raider_skirmisher",
+  "lootTableId": "fen_raider_cache_loot",
+  "spellIds": [
+    "steady_strike"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/EffectDefinition",
+  "id": "brace_guard",
+  "effectType": "TemporaryArmor",
+  "magnitude": 12,
+  "durationSeconds": 6,
+  "school": "Physical"
+}

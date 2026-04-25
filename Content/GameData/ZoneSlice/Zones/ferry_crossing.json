@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/WorldCell",
+  "id": "ferry_crossing",
+  "spawnGroupIds": [
+    "ferry_raiders"
+  ],
+  "questIds": [],
+  "encounterIds": [
+    "bridge_watch"
+  ],
+  "minBounds": [48, -30],
+  "maxBounds": [96, 30]
+}

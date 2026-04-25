@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/NpcBrain",
+  "id": "raider_skirmisher",
+  "threat": {
+    "acquisitionRangeMeters": 20,
+    "leashRangeMeters": 32,
+    "assistRadiusMeters": 14
+  },
+  "patrolRadiusMeters": 10,
+  "respawnSeconds": 35,
+  "abilityIds": [
+    "steady_strike"
+  ]
+}

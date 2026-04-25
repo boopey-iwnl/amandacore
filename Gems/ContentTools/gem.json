@@ -1,0 +1,10 @@
+{
+  "gem_name": "ContentTools",
+  "display_name": "ContentTools",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "summary": "Authoring validators, packaging helpers, and behavior replay comparison tooling.",
+  "canonical_tags": ["MMO", "Tools", "Content"],
+  "dependencies": ["GameCore", "Persistence"]
+}

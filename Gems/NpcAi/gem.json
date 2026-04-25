@@ -1,0 +1,11 @@
+{
+  "gem_name": "NpcAi",
+  "display_name": "NpcAi",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "type": "Code",
+  "summary": "Threat handling, roaming, leash behavior, encounter ownership, and combat AI coordination.",
+  "canonical_tags": ["MMO", "AI", "NPC"],
+  "dependencies": ["GameCore", "CombatRules"]
+}

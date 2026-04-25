@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/ZoneManifest",
+  "id": "sunset_frontier",
+  "displayName": "Sunset Frontier",
+  "cellIds": [
+    "west_approach",
+    "ferry_crossing"
+  ],
+  "hubCellId": "west_approach",
+  "microInstanceCellId": "ferry_crossing",
+  "vendorNpcIds": [
+    "quartermaster_lyra"
+  ]
+}

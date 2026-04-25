@@ -1,0 +1,11 @@
+{
+  "gem_name": "GameCore",
+  "display_name": "GameCore",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "type": "Code",
+  "summary": "Bootstrap, session orchestration, service registration, and top-level game state management.",
+  "canonical_tags": ["MMO", "Core", "Runtime"],
+  "dependencies": ["NetClient"]
+}

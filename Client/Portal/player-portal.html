@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>amandacore Player Portal</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; background: #101820; color: #f6f1e8; margin: 2rem; }
+    section { background: #1a2633; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; max-width: 720px; }
+    input, button, select { margin: 0.25rem 0.5rem 0.25rem 0; padding: 0.5rem; }
+    button { background: #c97b2e; color: #fff; border: none; border-radius: 6px; }
+    pre { background: #0b1218; padding: 1rem; border-radius: 8px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>amandacore Player Portal</h1>
+  <section>
+    <h2>Register / Login</h2>
+    <input id="username" placeholder="username" value="amanda" />
+    <input id="password" type="password" placeholder="password" value="amanda" />
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+  </section>
+
+  <section>
+    <h2>Realm / Character</h2>
+    <button onclick="loadRealms()">Load Realms</button>
+    <select id="realms"></select><br />
+    <button onclick="loadCharacters()">Load Characters</button>
+    <button onclick="createCharacter()">Create Character</button>
+    <input id="characterName" placeholder="new character name" />
+    <input id="archetypeId" placeholder="archetype id" value="wayfarer_warden" />
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    <pre id="output"></pre>
+  </section>
+
+  <script>
+    const config = {
+      auth: "http://localhost:8081",
+      realms: "http://localhost:8083",
+      characters: "http://localhost:8084"
+    };
+    let session = null;
+
+    const output = (value) => document.getElementById("output").textContent = JSON.stringify(value, null, 2);
+
+    async function register() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const response = await fetch(config.auth + "/v1/accounts/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      output(await response.json());
+    }
+
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const response = await fetch(config.auth + "/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      session = await response.json();
+      output(session);
+    }
+
+    async function loadRealms() {
+      const response = await fetch(config.realms + "/v1/realms");
+      const payload = await response.json();
+      const select = document.getElementById("realms");
+      select.innerHTML = "";
+      for (const realm of payload.realms) {
+        const option = document.createElement("option");
+        option.value = realm.id;
+        option.textContent = realm.displayName;
+        select.appendChild(option);
+      }
+      output(payload);
+    }
+
+    async function loadCharacters() {
+      const realmId = document.getElementById("realms").value;
+      const response = await fetch(config.characters + "/v1/characters?realmId=" + encodeURIComponent(realmId), {
+        headers: { "Authorization": "Bearer " + session.accessToken }
+      });
+      output(await response.json());
+    }
+
+    async function createCharacter() {
+      const realmId = document.getElementById("realms").value;
+      const displayName = document.getElementById("characterName").value;
+      const archetypeId = document.getElementById("archetypeId").value;
+      const response = await fetch(config.characters + "/v1/characters", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + session.accessToken
+        },
+        body: JSON.stringify({ realmId, displayName, archetypeId })
+      });
+      output(await response.json());
+    }
+  </script>
+</body>
+</html>

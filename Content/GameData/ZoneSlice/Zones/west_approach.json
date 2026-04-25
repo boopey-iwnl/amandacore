@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/WorldCell",
+  "id": "west_approach",
+  "spawnGroupIds": [
+    "frontier_hub",
+    "west_road_predators"
+  ],
+  "questIds": [
+    "clear_the_road"
+  ],
+  "encounterIds": [],
+  "minBounds": [0, -30],
+  "maxBounds": [48, 30]
+}

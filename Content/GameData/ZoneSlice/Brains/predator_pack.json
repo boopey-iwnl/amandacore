@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/NpcBrain",
+  "id": "predator_pack",
+  "threat": {
+    "acquisitionRangeMeters": 16,
+    "leashRangeMeters": 28,
+    "assistRadiusMeters": 10
+  },
+  "patrolRadiusMeters": 6,
+  "respawnSeconds": 25,
+  "abilityIds": []
+}

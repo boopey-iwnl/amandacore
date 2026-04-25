@@ -1,0 +1,23 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/UnitDefinition",
+  "id": "quartermaster_lyra",
+  "displayName": "Quartermaster Lyra",
+  "level": 5,
+  "baseStats": {
+    "Health": 180,
+    "Resource": 100,
+    "Strength": 12,
+    "Agility": 8,
+    "Intellect": 11,
+    "Spirit": 10,
+    "Stamina": 14,
+    "Armor": 25,
+    "CritChance": 0.02
+  },
+  "moveSpeedMetersPerSecond": 3.7,
+  "meleeSwingSeconds": 2.3,
+  "collisionRadiusMeters": 0.6,
+  "brainId": "town_vendor",
+  "lootTableId": "",
+  "spellIds": []
+}

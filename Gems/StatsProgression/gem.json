@@ -1,0 +1,10 @@
+{
+  "gem_name": "StatsProgression",
+  "display_name": "StatsProgression",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "summary": "Base stats, derived stats, level curves, and progression calculations.",
+  "canonical_tags": ["MMO", "Stats", "Progression"],
+  "dependencies": ["GameCore"]
+}

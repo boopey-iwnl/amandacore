@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/NpcBrain",
+  "id": "town_vendor",
+  "threat": {
+    "acquisitionRangeMeters": 0,
+    "leashRangeMeters": 0,
+    "assistRadiusMeters": 0
+  },
+  "patrolRadiusMeters": 1,
+  "respawnSeconds": 5,
+  "abilityIds": []
+}

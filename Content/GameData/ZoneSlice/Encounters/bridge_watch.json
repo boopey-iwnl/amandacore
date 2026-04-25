@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/EncounterDefinition",
+  "id": "bridge_watch",
+  "displayName": "Bridge Watch",
+  "spawnGroupIds": [
+    "ferry_raiders"
+  ],
+  "successQuestId": "clear_the_road",
+  "createsMicroInstanceHook": true
+}

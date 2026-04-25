@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/platform.schema.json",
+  "$defs": {
+    "RealmDescriptor": {
+      "type": "object",
+      "required": ["id", "displayName", "region", "endpoint", "supportedBuild", "onlinePlayers", "online"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "region": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "supportedBuild": { "type": "string" },
+        "onlinePlayers": { "type": "integer", "minimum": 0 },
+        "online": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "CharacterSummary": {
+      "type": "object",
+      "required": ["id", "accountId", "realmId", "displayName", "raceId", "classId", "archetypeId", "level", "zoneId"],
+      "properties": {
+        "id": { "type": "string" },
+        "accountId": { "type": "string" },
+        "realmId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "raceId": { "type": "string" },
+        "classId": { "type": "string" },
+        "archetypeId": { "type": "string" },
+        "level": { "type": "integer", "minimum": 1 },
+        "zoneId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "BuildManifest": {
+      "type": "object",
+      "required": ["id", "channel", "displayVersion", "requiredServices", "launcherNews", "allowedForLogin", "worldEndpointHint"],
+      "properties": {
+        "id": { "type": "string" },
+        "channel": { "type": "string" },
+        "displayVersion": { "type": "string" },
+        "requiredServices": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "launcherNews": { "type": "string" },
+        "allowedForLogin": { "type": "boolean" },
+        "worldEndpointHint": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

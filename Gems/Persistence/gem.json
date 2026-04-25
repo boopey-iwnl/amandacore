@@ -1,0 +1,10 @@
+{
+  "gem_name": "Persistence",
+  "display_name": "Persistence",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "summary": "Profile persistence, save/load, content version migration, and durable world state seams.",
+  "canonical_tags": ["MMO", "Persistence", "Backend"],
+  "dependencies": ["GameCore"]
+}

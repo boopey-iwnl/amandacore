@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/ItemDefinition",
+  "id": "roadwarden_blade",
+  "displayName": "Roadwarden Blade",
+  "slot": "MainHand",
+  "itemLevel": 3,
+  "statModifiers": {
+    "Strength": 2,
+    "Stamina": 1
+  },
+  "sellValue": 14
+}

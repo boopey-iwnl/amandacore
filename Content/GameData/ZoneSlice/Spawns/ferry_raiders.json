@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/SpawnGroup",
+  "id": "ferry_raiders",
+  "spawns": [
+    {
+      "localId": 201,
+      "unitId": "fen_raider",
+      "position": [64, 10, 0],
+      "facingRadians": 3.14,
+      "respawnVarianceSeconds": 10
+    },
+    {
+      "localId": 202,
+      "unitId": "fen_raider",
+      "position": [67, 6, 0],
+      "facingRadians": 2.9,
+      "respawnVarianceSeconds": 6
+    }
+  ]
+}

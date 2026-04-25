@@ -1,0 +1,10 @@
+{
+  "gem_name": "ZoneStreaming",
+  "display_name": "ZoneStreaming",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "summary": "Outdoor cell streaming, world partitioning, and micro-instance transition seams.",
+  "canonical_tags": ["MMO", "World", "Streaming"],
+  "dependencies": ["GameCore", "NetClient"]
+}

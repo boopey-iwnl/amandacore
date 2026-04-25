@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/SpellDefinition",
+  "id": "brace",
+  "displayName": "Brace",
+  "castTimeSeconds": 0,
+  "cooldownSeconds": 12,
+  "rangeMeters": 0,
+  "resourceStat": "Resource",
+  "resourceCost": 10,
+  "effectIds": [
+    "brace_guard"
+  ]
+}

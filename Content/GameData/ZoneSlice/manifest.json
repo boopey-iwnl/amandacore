@@ -1,0 +1,52 @@
+{
+  "zoneId": "sunset_frontier",
+  "archetypes": [
+    "Characters/wayfarer_warden.json"
+  ],
+  "progression": [
+    "Progression/warden_health_curve.json"
+  ],
+  "effects": [
+    "Effects/steady_strike_hit.json",
+    "Effects/brace_guard.json"
+  ],
+  "spells": [
+    "Spells/steady_strike.json",
+    "Spells/brace.json"
+  ],
+  "brains": [
+    "Brains/predator_pack.json",
+    "Brains/raider_skirmisher.json",
+    "Brains/town_vendor.json"
+  ],
+  "items": [
+    "Items/roadwarden_blade.json",
+    "Items/frontier_ration.json",
+    "Items/cinder_pelt.json"
+  ],
+  "loot": [
+    "Loot/cinderwolf_pelt_loot.json",
+    "Loot/fen_raider_cache_loot.json"
+  ],
+  "units": [
+    "Units/cinderwolf.json",
+    "Units/fen_raider.json",
+    "Units/quartermaster_lyra.json"
+  ],
+  "spawnGroups": [
+    "Spawns/west_road_predators.json",
+    "Spawns/ferry_raiders.json",
+    "Spawns/frontier_hub.json"
+  ],
+  "quests": [
+    "Quests/clear_the_road.json"
+  ],
+  "encounters": [
+    "Encounters/bridge_watch.json"
+  ],
+  "zones": [
+    "Zones/west_approach.json",
+    "Zones/ferry_crossing.json",
+    "Zones/sunset_frontier.json"
+  ]
+}

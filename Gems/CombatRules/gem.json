@@ -1,0 +1,11 @@
+{
+  "gem_name": "CombatRules",
+  "display_name": "CombatRules",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "type": "Code",
+  "summary": "Combat event application, damage resolution, cooldown rules, and combat presentation hooks.",
+  "canonical_tags": ["MMO", "Combat", "Gameplay"],
+  "dependencies": ["GameCore"]
+}

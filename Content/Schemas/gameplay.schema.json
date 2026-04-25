@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/gameplay.schema.json",
+  "$defs": {
+    "statMap": {
+      "type": "object",
+      "properties": {
+        "Health": { "type": "number" },
+        "Resource": { "type": "number" },
+        "Strength": { "type": "number" },
+        "Agility": { "type": "number" },
+        "Intellect": { "type": "number" },
+        "Spirit": { "type": "number" },
+        "Stamina": { "type": "number" },
+        "Armor": { "type": "number" },
+        "CritChance": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "StatCurve": {
+      "type": "object",
+      "required": ["id", "stat", "points"],
+      "properties": {
+        "id": { "type": "string" },
+        "stat": { "type": "string" },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["level", "value"],
+            "properties": {
+              "level": { "type": "integer", "minimum": 1 },
+              "value": { "type": "number" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "CharacterArchetype": {
+      "type": "object",
+      "required": ["id", "displayName", "factionTag", "startingLevel", "starterSpellIds", "baseStats"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "factionTag": { "type": "string" },
+        "startingLevel": { "type": "integer", "minimum": 1 },
+        "starterSpellIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "baseStats": { "$ref": "#/$defs/statMap" }
+      },
+      "additionalProperties": false
+    },
+    "EffectDefinition": {
+      "type": "object",
+      "required": ["id", "effectType", "magnitude", "durationSeconds", "school"],
+      "properties": {
+        "id": { "type": "string" },
+        "effectType": { "type": "string" },
+        "magnitude": { "type": "number" },
+        "durationSeconds": { "type": "number", "minimum": 0 },
+        "school": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SpellDefinition": {
+      "type": "object",
+      "required": ["id", "displayName", "castTimeSeconds", "cooldownSeconds", "rangeMeters", "resourceStat", "resourceCost", "effectIds"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "castTimeSeconds": { "type": "number", "minimum": 0 },
+        "cooldownSeconds": { "type": "number", "minimum": 0 },
+        "rangeMeters": { "type": "number", "minimum": 0 },
+        "resourceStat": { "type": "string" },
+        "resourceCost": { "type": "integer", "minimum": 0 },
+        "effectIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ItemDefinition": {
+      "type": "object",
+      "required": ["id", "displayName", "slot", "itemLevel", "statModifiers", "sellValue"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "slot": { "type": "string" },
+        "itemLevel": { "type": "integer", "minimum": 1 },
+        "statModifiers": { "$ref": "#/$defs/statMap" },
+        "sellValue": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "LootTable": {
+      "type": "object",
+      "required": ["id", "entries"],
+      "properties": {
+        "id": { "type": "string" },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["itemId", "dropChance", "minCount", "maxCount"],
+            "properties": {
+              "itemId": { "type": "string" },
+              "dropChance": { "type": "number", "minimum": 0, "maximum": 1 },
+              "minCount": { "type": "integer", "minimum": 1 },
+              "maxCount": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ObjectiveDefinition": {
+      "type": "object",
+      "required": ["id", "type", "targetId", "requiredCount"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["Kill", "Collect", "Interact", "Talk"]
+        },
+        "targetId": { "type": "string" },
+        "requiredCount": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "QuestDefinition": {
+      "type": "object",
+      "required": ["id", "title", "minLevel", "prerequisiteQuestIds", "objectives", "rewardItemIds", "rewardCurrency"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "minLevel": { "type": "integer", "minimum": 1 },
+        "prerequisiteQuestIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "objectives": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ObjectiveDefinition" }
+        },
+        "rewardItemIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rewardCurrency": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "NpcBrain": {
+      "type": "object",
+      "required": ["id", "threat", "patrolRadiusMeters", "respawnSeconds", "abilityIds"],
+      "properties": {
+        "id": { "type": "string" },
+        "threat": {
+          "type": "object",
+          "required": ["acquisitionRangeMeters", "leashRangeMeters", "assistRadiusMeters"],
+          "properties": {
+            "acquisitionRangeMeters": { "type": "number", "minimum": 0 },
+            "leashRangeMeters": { "type": "number", "minimum": 0 },
+            "assistRadiusMeters": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "patrolRadiusMeters": { "type": "number", "minimum": 0 },
+        "respawnSeconds": { "type": "number", "minimum": 0 },
+        "abilityIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "UnitDefinition": {
+      "type": "object",
+      "required": ["id", "displayName", "level", "baseStats", "moveSpeedMetersPerSecond", "meleeSwingSeconds", "collisionRadiusMeters", "brainId", "lootTableId", "spellIds"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "level": { "type": "integer", "minimum": 1 },
+        "baseStats": { "$ref": "#/$defs/statMap" },
+        "moveSpeedMetersPerSecond": { "type": "number", "minimum": 0 },
+        "meleeSwingSeconds": { "type": "number", "minimum": 0 },
+        "collisionRadiusMeters": { "type": "number", "minimum": 0 },
+        "brainId": { "type": "string" },
+        "lootTableId": { "type": "string" },
+        "spellIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SpawnGroup": {
+      "type": "object",
+      "required": ["id", "spawns"],
+      "properties": {
+        "id": { "type": "string" },
+        "spawns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["localId", "unitId", "position", "facingRadians", "respawnVarianceSeconds"],
+            "properties": {
+              "localId": { "type": "integer", "minimum": 1 },
+              "unitId": { "type": "string" },
+              "position": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": { "type": "number" }
+              },
+              "facingRadians": { "type": "number" },
+              "respawnVarianceSeconds": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "EncounterDefinition": {
+      "type": "object",
+      "required": ["id", "displayName", "spawnGroupIds", "successQuestId", "createsMicroInstanceHook"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "spawnGroupIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "successQuestId": { "type": "string" },
+        "createsMicroInstanceHook": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "WorldCell": {
+      "type": "object",
+      "required": ["id", "spawnGroupIds", "questIds", "encounterIds", "minBounds", "maxBounds"],
+      "properties": {
+        "id": { "type": "string" },
+        "spawnGroupIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "questIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "encounterIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "minBounds": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number" }
+        },
+        "maxBounds": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ZoneManifest": {
+      "type": "object",
+      "required": ["id", "displayName", "cellIds", "hubCellId", "microInstanceCellId", "vendorNpcIds"],
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string" },
+        "cellIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "hubCellId": { "type": "string" },
+        "microInstanceCellId": { "type": "string" },
+        "vendorNpcIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

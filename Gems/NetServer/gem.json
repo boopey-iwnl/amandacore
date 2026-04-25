@@ -1,0 +1,10 @@
+{
+  "gem_name": "NetServer",
+  "display_name": "NetServer",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "summary": "Server authority, replication, interest management, matchmaking seams, and session hosting.",
+  "canonical_tags": ["MMO", "Networking", "Server"],
+  "dependencies": ["GameCore", "Persistence"]
+}

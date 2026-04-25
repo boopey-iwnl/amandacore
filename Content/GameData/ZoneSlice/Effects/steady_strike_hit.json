@@ -1,0 +1,8 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/EffectDefinition",
+  "id": "steady_strike_hit",
+  "effectType": "InstantDamage",
+  "magnitude": 18,
+  "durationSeconds": 0,
+  "school": "Physical"
+}

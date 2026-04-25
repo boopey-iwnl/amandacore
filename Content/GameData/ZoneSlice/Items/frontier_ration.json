@@ -1,0 +1,9 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/ItemDefinition",
+  "id": "frontier_ration",
+  "displayName": "Frontier Ration",
+  "slot": "Consumable",
+  "itemLevel": 1,
+  "statModifiers": {},
+  "sellValue": 3
+}

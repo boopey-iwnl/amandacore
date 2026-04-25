@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../Schemas/gameplay.schema.json#/$defs/SpawnGroup",
+  "id": "west_road_predators",
+  "spawns": [
+    {
+      "localId": 101,
+      "unitId": "cinderwolf",
+      "position": [12, 4, 0],
+      "facingRadians": 0.4,
+      "respawnVarianceSeconds": 4
+    },
+    {
+      "localId": 102,
+      "unitId": "cinderwolf",
+      "position": [18, -3, 0],
+      "facingRadians": 2.8,
+      "respawnVarianceSeconds": 8
+    }
+  ]
+}

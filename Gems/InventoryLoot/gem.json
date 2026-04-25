@@ -1,0 +1,10 @@
+{
+  "gem_name": "InventoryLoot",
+  "display_name": "InventoryLoot",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "origin": "amandacore",
+  "summary": "Inventory containers, equipment, item ownership, loot generation, and vendor flows.",
+  "canonical_tags": ["MMO", "Inventory", "Loot"],
+  "dependencies": ["GameCore", "StatsProgression"]
+}
