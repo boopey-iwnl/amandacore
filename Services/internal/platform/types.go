@@ -28,7 +28,7 @@ const (
 	PermissionManageSupport     Permission = "manage_support"
 	PermissionManageRoles       Permission = "manage_roles"
 
-	InventorySlotCount      = 16
+	InventorySlotCount      = 32
 	HousingStorageSlotCount = 24
 	HousingDecorationLimit  = 8
 	ActionBarSlotCount      = 48
@@ -45,6 +45,7 @@ const (
 
 	AutoAttackAbilityID      = "auto_attack"
 	SteadyStrikeAbilityID    = "steady_strike"
+	DevBasicStrikeAbilityID  = "dev_basic_strike"
 	BraceAbilityID           = "brace"
 	DrivingBlowAbilityID     = "driving_blow"
 	RallyingCallAbilityID    = "rallying_call"
@@ -367,14 +368,24 @@ type Realm struct {
 }
 
 type CharacterQuestProgress struct {
-	QuestID         string `json:"questId"`
-	State           string `json:"state"`
-	CurrentCount    int    `json:"currentCount"`
-	TargetCount     int    `json:"targetCount"`
-	AcceptedAt      int64  `json:"acceptedAt"`
-	CompletedAt     int64  `json:"completedAt"`
-	RewardGrantedAt int64  `json:"rewardGrantedAt"`
-	UpdatedAt       int64  `json:"updatedAt"`
+	QuestID           string                                     `json:"questId"`
+	State             string                                     `json:"state"`
+	CurrentCount      int                                        `json:"currentCount"`
+	TargetCount       int                                        `json:"targetCount"`
+	AcceptedAt        int64                                      `json:"acceptedAt"`
+	CompletedAt       int64                                      `json:"completedAt"`
+	RewardGrantedAt   int64                                      `json:"rewardGrantedAt"`
+	UpdatedAt         int64                                      `json:"updatedAt"`
+	ObjectiveProgress map[string]CharacterQuestObjectiveProgress `json:"objectiveProgress,omitempty"`
+}
+
+type CharacterQuestObjectiveProgress struct {
+	NodeID      string `json:"nodeId"`
+	Current     int    `json:"current"`
+	Target      int    `json:"target"`
+	Completed   bool   `json:"completed"`
+	CompletedAt int64  `json:"completedAt,omitempty"`
+	UpdatedAt   int64  `json:"updatedAt,omitempty"`
 }
 
 type CharacterPvPStats struct {

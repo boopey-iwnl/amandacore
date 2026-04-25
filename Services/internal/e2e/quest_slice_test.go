@@ -8,6 +8,7 @@ import (
 
 	"amandacore/services/internal/authn"
 	"amandacore/services/internal/characters"
+	"amandacore/services/internal/platform"
 	"amandacore/services/internal/realms"
 	"amandacore/services/internal/store"
 	"amandacore/services/internal/worlds"
@@ -381,16 +382,16 @@ func assertStarterInventory(t *testing.T, state map[string]any) {
 	if !ok {
 		t.Fatalf("state response missing inventory payload: %#v", state["inventory"])
 	}
-	if int(inventory["slotCount"].(float64)) != 16 {
-		t.Fatalf("expected 16 inventory slots, got %v", inventory["slotCount"])
+	if int(inventory["slotCount"].(float64)) != platform.InventorySlotCount {
+		t.Fatalf("expected %d inventory slots, got %v", platform.InventorySlotCount, inventory["slotCount"])
 	}
 
 	slots, ok := inventory["slots"].([]any)
 	if !ok {
 		t.Fatalf("state response missing inventory slots: %#v", inventory["slots"])
 	}
-	if len(slots) != 16 {
-		t.Fatalf("expected 16 inventory entries, got %d", len(slots))
+	if len(slots) != platform.InventorySlotCount {
+		t.Fatalf("expected %d inventory entries, got %d", platform.InventorySlotCount, len(slots))
 	}
 
 	slot0 := slots[0].(map[string]any)

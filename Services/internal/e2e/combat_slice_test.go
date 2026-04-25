@@ -36,8 +36,8 @@ func TestCombatSliceHardening(t *testing.T) {
 		fixture := newCombatFixture(t)
 		state := fixture.getWorldState(t)
 		mobs := findHostileMobs(t, state)
-		if len(mobs) != 37 {
-			t.Fatalf("expected 37 Stonewake hostile/training entities, got %d", len(mobs))
+		if len(mobs) != 38 {
+			t.Fatalf("expected 38 Stonewake hostile/training entities, got %d", len(mobs))
 		}
 	})
 
