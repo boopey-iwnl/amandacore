@@ -13,30 +13,30 @@ const (
 	RoleGameMaster    Role = "game_master"
 	RoleAdministrator Role = "administrator"
 
-	PermissionViewAccount      Permission = "view_account"
-	PermissionViewCharacter    Permission = "view_character"
-	PermissionViewInventory    Permission = "view_inventory"
-	PermissionViewEconomy      Permission = "view_economy"
-	PermissionRepairCharacter  Permission = "repair_character"
+	PermissionViewAccount       Permission = "view_account"
+	PermissionViewCharacter     Permission = "view_character"
+	PermissionViewInventory     Permission = "view_inventory"
+	PermissionViewEconomy       Permission = "view_economy"
+	PermissionRepairCharacter   Permission = "repair_character"
 	PermissionTeleportCharacter Permission = "teleport_character"
-	PermissionGrantItem        Permission = "grant_item"
-	PermissionGrantCurrency    Permission = "grant_currency"
-	PermissionModifyQuestState Permission = "modify_quest_state"
-	PermissionModerateChat     Permission = "moderate_chat"
-	PermissionSuspendAccount   Permission = "suspend_account"
-	PermissionViewAuditLog     Permission = "view_audit_log"
-	PermissionManageSupport    Permission = "manage_support"
+	PermissionGrantItem         Permission = "grant_item"
+	PermissionGrantCurrency     Permission = "grant_currency"
+	PermissionModifyQuestState  Permission = "modify_quest_state"
+	PermissionModerateChat      Permission = "moderate_chat"
+	PermissionSuspendAccount    Permission = "suspend_account"
+	PermissionViewAuditLog      Permission = "view_audit_log"
+	PermissionManageSupport     Permission = "manage_support"
 
-	InventorySlotCount     = 16
+	InventorySlotCount      = 16
 	HousingStorageSlotCount = 24
 	HousingDecorationLimit  = 8
-	ActionBarSlotCount     = 48
-	StarterCurrencyCopper  = 125
-	PrimaryProfessionLimit = 2
-	DefaultStarterZoneID   = "stonewake_vale"
-	DefaultStarterSpawnX   = 10.0
-	DefaultStarterSpawnY   = 10.0
-	DefaultStarterSpawnZ   = 0.0
+	ActionBarSlotCount      = 48
+	StarterCurrencyCopper   = 125
+	PrimaryProfessionLimit  = 2
+	DefaultStarterZoneID    = "stonewake_vale"
+	DefaultStarterSpawnX    = 10.0
+	DefaultStarterSpawnY    = 10.0
+	DefaultStarterSpawnZ    = 0.0
 
 	DefaultRaceID             = "human"
 	DefaultClassID            = "warrior"
@@ -90,7 +90,7 @@ type HousingEntitlement struct {
 }
 
 type HousingSpace struct {
-	HousingSpaceID  string  `json:"housingSpaceId"`
+	HousingSpaceID   string  `json:"housingSpaceId"`
 	OwnerCharacterID string  `json:"ownerCharacterId"`
 	OwnerAccountID   string  `json:"ownerAccountId"`
 	TemplateID       string  `json:"templateId"`
@@ -445,11 +445,11 @@ const (
 )
 
 type SupportTicketNote struct {
-	NoteID         string `json:"noteId"`
-	TicketID       string `json:"ticketId"`
+	NoteID          string `json:"noteId"`
+	TicketID        string `json:"ticketId"`
 	AuthorAccountID string `json:"authorAccountId"`
-	Body           string `json:"body"`
-	CreatedAt      int64  `json:"createdAt"`
+	Body            string `json:"body"`
+	CreatedAt       int64  `json:"createdAt"`
 }
 
 type SupportTicket struct {
@@ -471,12 +471,12 @@ type SupportTicket struct {
 }
 
 type MuteRecord struct {
-	CharacterID    string `json:"characterId"`
-	AccountID      string `json:"accountId"`
+	CharacterID      string `json:"characterId"`
+	AccountID        string `json:"accountId"`
 	MutedByAccountID string `json:"mutedByAccountId"`
-	Reason         string `json:"reason"`
-	CreatedAt      int64  `json:"createdAt"`
-	ExpiresAt      int64  `json:"expiresAt"`
+	Reason           string `json:"reason"`
+	CreatedAt        int64  `json:"createdAt"`
+	ExpiresAt        int64  `json:"expiresAt"`
 }
 
 func PermissionsForRoles(roles []Role) []Permission {

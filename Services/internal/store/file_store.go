@@ -38,26 +38,26 @@ var (
 )
 
 type state struct {
-	Accounts         map[string]platform.Account             `json:"accounts"`
-	Realms           map[string]platform.Realm               `json:"realms"`
-	Characters       map[string]platform.Character           `json:"characters"`
-	Sessions         map[string]platform.Session             `json:"sessions"`
-	WorldJoinTickets map[string]platform.WorldJoinTicket     `json:"worldJoinTickets"`
-	PasswordReset    map[string]platform.PasswordResetTicket `json:"passwordReset"`
-	Friends          map[string]platform.FriendRelationship  `json:"friends"`
-	Parties          map[string]platform.Party               `json:"parties"`
-	Guilds           map[string]platform.Guild               `json:"guilds"`
-	GuildInvites     map[string]platform.GuildInvite         `json:"guildInvites"`
-	Auctions         map[string]platform.AuctionListing      `json:"auctions"`
-	Mail             map[string]platform.MailEnvelope        `json:"mail"`
-	AuditEvents      map[string]platform.AuditEvent          `json:"auditEvents"`
-	SupportTickets   map[string]platform.SupportTicket       `json:"supportTickets"`
-	Mutes            map[string]platform.MuteRecord          `json:"mutes"`
-	HousingEntitlements map[string]platform.HousingEntitlement `json:"housingEntitlements"`
-	HousingSpaces       map[string]platform.HousingSpace       `json:"housingSpaces"`
-	HousingStorage      map[string][]platform.HousingStorageSlot `json:"housingStorage"`
+	Accounts            map[string]platform.Account               `json:"accounts"`
+	Realms              map[string]platform.Realm                 `json:"realms"`
+	Characters          map[string]platform.Character             `json:"characters"`
+	Sessions            map[string]platform.Session               `json:"sessions"`
+	WorldJoinTickets    map[string]platform.WorldJoinTicket       `json:"worldJoinTickets"`
+	PasswordReset       map[string]platform.PasswordResetTicket   `json:"passwordReset"`
+	Friends             map[string]platform.FriendRelationship    `json:"friends"`
+	Parties             map[string]platform.Party                 `json:"parties"`
+	Guilds              map[string]platform.Guild                 `json:"guilds"`
+	GuildInvites        map[string]platform.GuildInvite           `json:"guildInvites"`
+	Auctions            map[string]platform.AuctionListing        `json:"auctions"`
+	Mail                map[string]platform.MailEnvelope          `json:"mail"`
+	AuditEvents         map[string]platform.AuditEvent            `json:"auditEvents"`
+	SupportTickets      map[string]platform.SupportTicket         `json:"supportTickets"`
+	Mutes               map[string]platform.MuteRecord            `json:"mutes"`
+	HousingEntitlements map[string]platform.HousingEntitlement    `json:"housingEntitlements"`
+	HousingSpaces       map[string]platform.HousingSpace          `json:"housingSpaces"`
+	HousingStorage      map[string][]platform.HousingStorageSlot  `json:"housingStorage"`
 	HousingDecorations  map[string][]platform.DecorationPlacement `json:"housingDecorations"`
-	BuildManifest    platform.BuildManifest                  `json:"buildManifest"`
+	BuildManifest       platform.BuildManifest                    `json:"buildManifest"`
 }
 
 type FileStore struct {
@@ -73,26 +73,26 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 		path:     path,
 		fileLock: flock.New(path + ".lock"),
 		state: state{
-			Accounts:         map[string]platform.Account{},
-			Realms:           map[string]platform.Realm{},
-			Characters:       map[string]platform.Character{},
-			Sessions:         map[string]platform.Session{},
-			WorldJoinTickets: map[string]platform.WorldJoinTicket{},
-			PasswordReset:    map[string]platform.PasswordResetTicket{},
-			Friends:          map[string]platform.FriendRelationship{},
-			Parties:          map[string]platform.Party{},
-			Guilds:           map[string]platform.Guild{},
-			GuildInvites:     map[string]platform.GuildInvite{},
-			Auctions:         map[string]platform.AuctionListing{},
-			Mail:             map[string]platform.MailEnvelope{},
-			AuditEvents:      map[string]platform.AuditEvent{},
-			SupportTickets:   map[string]platform.SupportTicket{},
-			Mutes:            map[string]platform.MuteRecord{},
+			Accounts:            map[string]platform.Account{},
+			Realms:              map[string]platform.Realm{},
+			Characters:          map[string]platform.Character{},
+			Sessions:            map[string]platform.Session{},
+			WorldJoinTickets:    map[string]platform.WorldJoinTicket{},
+			PasswordReset:       map[string]platform.PasswordResetTicket{},
+			Friends:             map[string]platform.FriendRelationship{},
+			Parties:             map[string]platform.Party{},
+			Guilds:              map[string]platform.Guild{},
+			GuildInvites:        map[string]platform.GuildInvite{},
+			Auctions:            map[string]platform.AuctionListing{},
+			Mail:                map[string]platform.MailEnvelope{},
+			AuditEvents:         map[string]platform.AuditEvent{},
+			SupportTickets:      map[string]platform.SupportTicket{},
+			Mutes:               map[string]platform.MuteRecord{},
 			HousingEntitlements: map[string]platform.HousingEntitlement{},
 			HousingSpaces:       map[string]platform.HousingSpace{},
 			HousingStorage:      map[string][]platform.HousingStorageSlot{},
 			HousingDecorations:  map[string][]platform.DecorationPlacement{},
-			BuildManifest:    buildManifest,
+			BuildManifest:       buildManifest,
 		},
 	}
 

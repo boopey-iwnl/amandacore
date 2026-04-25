@@ -244,6 +244,9 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 
 	s.ensureMobsLocked()
 	s.cleanupStaleSessionsLocked(now)
+	if err := s.advanceDuelsLocked(now); err != nil {
+		return err
+	}
 	if s.lastUpdatedAt.IsZero() {
 		s.lastUpdatedAt = now
 		return nil

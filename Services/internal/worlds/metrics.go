@@ -142,6 +142,7 @@ func (s *worldServer) cleanupStaleSessionsLocked(now time.Time) {
 			continue
 		}
 
+		s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 		delete(s.sessionsByToken, token)
 		if s.sessionTokenByChar[session.CharacterID] == token {
 			delete(s.sessionTokenByChar, session.CharacterID)

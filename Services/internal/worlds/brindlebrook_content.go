@@ -14,6 +14,7 @@ const (
 	npcBBWardenTalikID       = "npc_bb_warden_talik_roe"
 	npcBBScoutNessaID        = "npc_bb_scout_nessa_quill"
 	npcBBTraderKeviID        = "npc_bb_trader_kevi_sorn"
+	objBBHighmereMarketID    = "obj_bb_highmere_market_board"
 	npcBBStonesetterBarnID   = "npc_bb_stonesetter_barn_ald"
 	objBBSignalBrazierID     = "obj_bb_signal_brazier"
 	npcBBWayfinderHelkaID    = "npc_bb_wayfinder_helka_roan"
@@ -283,6 +284,20 @@ var brindlebrookFriendlyNPCs = []friendlyNPCDefinition{
 		Radius:      starterInteractRadius,
 		Services: []npcService{
 			{Type: "vendor", ServiceID: vendorPinebarrowKeviID, Label: "Watch Supplies"},
+		},
+	},
+	{
+		ID:          objBBHighmereMarketID,
+		ZoneID:      secondZoneID,
+		DisplayName: "Highmere Market Board",
+		Kind:        worldObjectNPCKind,
+		X:           154.0,
+		Y:           150.0,
+		Z:           0.0,
+		AIState:     "market_board",
+		Radius:      starterInteractRadius,
+		Services: []npcService{
+			{Type: "auction", ServiceID: auctionHouseServiceID, Label: "Open Market"},
 		},
 	},
 	{

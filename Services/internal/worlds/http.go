@@ -69,6 +69,11 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
 	mux.HandleFunc("POST /v1/world/vendor/buy", server.instrumentEndpointFunc("vendor_buy", server.handleVendorBuy))
 	mux.HandleFunc("POST /v1/world/vendor/sell", server.instrumentEndpointFunc("vendor_sell", server.handleVendorSell))
+	mux.HandleFunc("GET /v1/world/auction/listings", server.instrumentEndpointFunc("auction_browse", server.handleAuctionBrowse))
+	mux.HandleFunc("GET /v1/world/auction/mine", server.instrumentEndpointFunc("auction_mine", server.handleAuctionMine))
+	mux.HandleFunc("POST /v1/world/auction/list", server.instrumentEndpointFunc("auction_list", server.handleAuctionList))
+	mux.HandleFunc("POST /v1/world/auction/buyout", server.instrumentEndpointFunc("auction_buyout", server.handleAuctionBuyout))
+	mux.HandleFunc("POST /v1/world/auction/cancel", server.instrumentEndpointFunc("auction_cancel", server.handleAuctionCancel))
 	mux.HandleFunc("POST /v1/world/attack/auto", server.instrumentEndpointFunc("attack_auto", server.handleAutoAttack))
 	mux.HandleFunc("POST /v1/world/attack/ability", server.instrumentEndpointFunc("attack_ability", server.handleAbility))
 	mux.HandleFunc("POST /v1/world/duel/request", server.instrumentEndpointFunc("duel_request", server.handleDuelRequest))
@@ -144,7 +149,15 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			session.DisplayName = character.DisplayName
 			session.Connected = true
 			session.LastSeenAt = time.Now().Unix()
-			if session.HousingSpaceID != "" {
+			if session.InstanceID != "" && s.dungeonInstanceActiveForSessionLocked(session) {
+				if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
+					instance.PlayersInside[session.CharacterID] = true
+					instance.State = dungeonStateActive
+					instance.LastPlayerLeftAtMs = 0
+				}
+			} else if session.InstanceID != "" {
+				s.recoverExpiredDungeonSessionLocked(session)
+			} else if session.HousingSpaceID != "" {
 				if err := s.returnSessionFromHousingLocked(session, "connect_resume"); err != nil {
 					httpapi.Error(w, http.StatusInternalServerError, "housing_recover_failed", err.Error())
 					return
@@ -247,18 +260,31 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	session.DisplayName = character.DisplayName
 	session.Connected = true
 	session.LastSeenAt = time.Now().Unix()
-	if session.HousingSpaceID != "" {
+	if session.InstanceID != "" && s.dungeonInstanceActiveForSessionLocked(session) {
+		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
+			instance.PlayersInside[session.CharacterID] = true
+			instance.State = dungeonStateActive
+			instance.LastPlayerLeftAtMs = 0
+		}
+	} else if session.InstanceID != "" {
+		s.recoverExpiredDungeonSessionLocked(session)
+	} else if session.HousingSpaceID != "" {
 		session.HousingSpaceID = ""
 		session.HousingInstanceID = ""
 		session.ReturnZoneID = ""
 		session.ReturnX = 0
 		session.ReturnY = 0
 		session.ReturnZ = 0
+		session.ZoneID = character.ZoneID
+		session.X = character.PositionX
+		session.Y = character.PositionY
+		session.Z = character.PositionZ
+	} else {
+		session.ZoneID = character.ZoneID
+		session.X = character.PositionX
+		session.Y = character.PositionY
+		session.Z = character.PositionZ
 	}
-	session.ZoneID = character.ZoneID
-	session.X = character.PositionX
-	session.Y = character.PositionY
-	session.Z = character.PositionZ
 	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 	s.resetSessionCombatStateLocked(session, "reconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
@@ -314,7 +340,7 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
 
-	if session.HousingSpaceID != "" {
+	if session.HousingSpaceID != "" || session.InstanceID != "" {
 		httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 		return
 	}
@@ -380,6 +406,16 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 
 	persistStartedAt := time.Now()
 	persistZoneID, persistX, persistY, persistZ := session.ZoneID, session.X, session.Y, session.Z
+	if session.InstanceID != "" {
+		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
+			delete(instance.PlayersInside, session.CharacterID)
+			s.markDungeonEmptyIfNeededLocked(instance)
+		}
+		persistZoneID, persistX, persistY, persistZ = session.ReturnZoneID, session.ReturnX, session.ReturnY, session.ReturnZ
+		if persistZoneID == "" {
+			persistZoneID, persistX, persistY, persistZ = secondZoneID, 590, 342, 0
+		}
+	}
 	character, err := s.store.UpdateCharacterState(session.CharacterID, persistZoneID, persistX, persistY, persistZ)
 	s.recordPersistenceDuration("character_state_disconnect", persistStartedAt, err)
 	if err != nil {
@@ -1023,17 +1059,21 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		if candidate.InstanceID != session.InstanceID || candidate.HousingSpaceID != session.HousingSpaceID {
 			continue
 		}
+		pvpState, duelOpponent := s.pvpStateForVisiblePlayerLocked(session, candidate)
 
 		entities = append(entities, sessionEntity{
-			ID:          candidate.CharacterID,
-			DisplayName: candidate.DisplayName,
-			Kind:        "player",
-			X:           candidate.X,
-			Y:           candidate.Y,
-			Z:           candidate.Z,
-			Health:      candidate.Health,
-			MaxHealth:   candidate.MaxHealth,
-			Alive:       candidate.Alive,
+			ID:           candidate.CharacterID,
+			DisplayName:  candidate.DisplayName,
+			Kind:         "player",
+			X:            candidate.X,
+			Y:            candidate.Y,
+			Z:            candidate.Z,
+			Health:       candidate.Health,
+			MaxHealth:    candidate.MaxHealth,
+			Alive:        candidate.Alive,
+			Targetable:   true,
+			PvPState:     pvpState,
+			DuelOpponent: duelOpponent,
 		})
 	}
 
@@ -1081,6 +1121,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"housing":              s.buildHousingResponseLocked(session),
+		"pvp":                  s.buildPvPResponseLocked(session),
 		"currentTargetId":      session.CurrentTargetID,
 		"autoAttackActive":     session.AutoAttackActive,
 		"globalCooldownEndsAt": session.GlobalCooldownEnds,

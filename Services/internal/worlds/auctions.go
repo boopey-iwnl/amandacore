@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	auctionHouseServiceID      = "auction_highmere_market"
-	auctionDurationSeconds     = int64((24 * time.Hour).Seconds())
-	auctionDevDurationSeconds  = int64((30 * time.Minute).Seconds())
-	auctionCutPercent          = 5
-	auctionMaxBuyoutCopper     = 1000000000
-	auctionDefaultBrowseLimit  = 50
-	auctionInteractionError    = "right-click the market board first"
+	auctionHouseServiceID     = "auction_highmere_market"
+	auctionDurationSeconds    = int64((24 * time.Hour).Seconds())
+	auctionDevDurationSeconds = int64((30 * time.Minute).Seconds())
+	auctionCutPercent         = 5
+	auctionMaxBuyoutCopper    = 1000000000
+	auctionDefaultBrowseLimit = 50
+	auctionInteractionError   = "right-click the market board first"
 )
 
 type auctionListRequest struct {
