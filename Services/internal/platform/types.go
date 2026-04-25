@@ -1,12 +1,31 @@
 package platform
 
 type Role string
+type Permission string
 
 const (
 	RolePlayer        Role = "player"
+	RoleTester        Role = "tester"
+	RoleSupport       Role = "support"
+	RoleGM            Role = "gm"
+	RoleAdmin         Role = "admin"
 	RoleModerator     Role = "moderator"
 	RoleGameMaster    Role = "game_master"
 	RoleAdministrator Role = "administrator"
+
+	PermissionViewAccount      Permission = "view_account"
+	PermissionViewCharacter    Permission = "view_character"
+	PermissionViewInventory    Permission = "view_inventory"
+	PermissionViewEconomy      Permission = "view_economy"
+	PermissionRepairCharacter  Permission = "repair_character"
+	PermissionTeleportCharacter Permission = "teleport_character"
+	PermissionGrantItem        Permission = "grant_item"
+	PermissionGrantCurrency    Permission = "grant_currency"
+	PermissionModifyQuestState Permission = "modify_quest_state"
+	PermissionModerateChat     Permission = "moderate_chat"
+	PermissionSuspendAccount   Permission = "suspend_account"
+	PermissionViewAuditLog     Permission = "view_audit_log"
+	PermissionManageSupport    Permission = "manage_support"
 
 	InventorySlotCount     = 16
 	ActionBarSlotCount     = 48
@@ -169,13 +188,17 @@ type GuildInvite struct {
 }
 
 type Account struct {
-	ID           string `json:"id"`
-	Username     string `json:"username"`
-	PasswordHash string `json:"passwordHash"`
-	Roles        []Role `json:"roles"`
-	Banned       bool   `json:"banned"`
-	CreatedAt    int64  `json:"createdAt"`
-	UpdatedAt    int64  `json:"updatedAt"`
+	ID               string `json:"id"`
+	Username         string `json:"username"`
+	PasswordHash     string `json:"passwordHash"`
+	Roles            []Role `json:"roles"`
+	Banned           bool   `json:"banned"`
+	SuspendedUntil   int64  `json:"suspendedUntil,omitempty"`
+	SuspensionReason string `json:"suspensionReason,omitempty"`
+	LastLoginAt      int64  `json:"lastLoginAt,omitempty"`
+	LastSessionID    string `json:"lastSessionId,omitempty"`
+	CreatedAt        int64  `json:"createdAt"`
+	UpdatedAt        int64  `json:"updatedAt"`
 }
 
 type Session struct {
@@ -279,6 +302,145 @@ type PasswordResetTicket struct {
 	ID        string `json:"id"`
 	AccountID string `json:"accountId"`
 	ExpiresAt int64  `json:"expiresAt"`
+}
+
+type AuditEvent struct {
+	ID                string         `json:"auditEventId"`
+	Timestamp         int64          `json:"timestamp"`
+	Action            string         `json:"action"`
+	ActorAccountID    string         `json:"actorAccountId"`
+	ActorCharacterID  string         `json:"actorCharacterId,omitempty"`
+	TargetAccountID   string         `json:"targetAccountId,omitempty"`
+	TargetCharacterID string         `json:"targetCharacterId,omitempty"`
+	Reason            string         `json:"reason,omitempty"`
+	BeforeSummary     map[string]any `json:"beforeSummary,omitempty"`
+	AfterSummary      map[string]any `json:"afterSummary,omitempty"`
+	Metadata          map[string]any `json:"metadata,omitempty"`
+}
+
+type SupportTicketStatus string
+
+const (
+	SupportTicketOpen     SupportTicketStatus = "open"
+	SupportTicketInReview SupportTicketStatus = "in_review"
+	SupportTicketResolved SupportTicketStatus = "resolved"
+	SupportTicketClosed   SupportTicketStatus = "closed"
+)
+
+type SupportTicketNote struct {
+	NoteID         string `json:"noteId"`
+	TicketID       string `json:"ticketId"`
+	AuthorAccountID string `json:"authorAccountId"`
+	Body           string `json:"body"`
+	CreatedAt      int64  `json:"createdAt"`
+}
+
+type SupportTicket struct {
+	TicketID              string              `json:"ticketId"`
+	CreatedByCharacterID  string              `json:"createdByCharacterId"`
+	CreatedByAccountID    string              `json:"createdByAccountId"`
+	Category              string              `json:"category"`
+	Subject               string              `json:"subject"`
+	Body                  string              `json:"body"`
+	Status                SupportTicketStatus `json:"status"`
+	AssignedToAdminID     string              `json:"assignedToAdminId,omitempty"`
+	CreatedAt             int64               `json:"createdAt"`
+	UpdatedAt             int64               `json:"updatedAt"`
+	ResolutionNote        string              `json:"resolutionNote,omitempty"`
+	AttachedDiagnosticsID string              `json:"attachedDiagnosticsId,omitempty"`
+	BuildID               string              `json:"buildId,omitempty"`
+	ClientVersion         string              `json:"clientVersion,omitempty"`
+	Notes                 []SupportTicketNote `json:"notes,omitempty"`
+}
+
+type MuteRecord struct {
+	CharacterID    string `json:"characterId"`
+	AccountID      string `json:"accountId"`
+	MutedByAccountID string `json:"mutedByAccountId"`
+	Reason         string `json:"reason"`
+	CreatedAt      int64  `json:"createdAt"`
+	ExpiresAt      int64  `json:"expiresAt"`
+}
+
+func PermissionsForRoles(roles []Role) []Permission {
+	seen := map[Permission]struct{}{}
+	add := func(permission Permission) {
+		if permission == "" {
+			return
+		}
+		seen[permission] = struct{}{}
+	}
+
+	for _, role := range roles {
+		switch role {
+		case RolePlayer:
+		case RoleTester:
+			add(PermissionViewAccount)
+			add(PermissionViewCharacter)
+			add(PermissionViewInventory)
+			add(PermissionViewEconomy)
+		case RoleSupport:
+			add(PermissionViewAccount)
+			add(PermissionViewCharacter)
+			add(PermissionViewInventory)
+			add(PermissionViewEconomy)
+			add(PermissionManageSupport)
+		case RoleModerator:
+			add(PermissionViewAccount)
+			add(PermissionViewCharacter)
+			add(PermissionViewInventory)
+			add(PermissionViewEconomy)
+			add(PermissionManageSupport)
+			add(PermissionModerateChat)
+		case RoleGM, RoleGameMaster:
+			add(PermissionViewAccount)
+			add(PermissionViewCharacter)
+			add(PermissionViewInventory)
+			add(PermissionViewEconomy)
+			add(PermissionManageSupport)
+			add(PermissionRepairCharacter)
+			add(PermissionTeleportCharacter)
+			add(PermissionModifyQuestState)
+			add(PermissionModerateChat)
+		case RoleAdmin, RoleAdministrator:
+			for _, permission := range AllAdminPermissions() {
+				add(permission)
+			}
+		}
+	}
+
+	permissions := make([]Permission, 0, len(seen))
+	for permission := range seen {
+		permissions = append(permissions, permission)
+	}
+	return permissions
+}
+
+func AllAdminPermissions() []Permission {
+	return []Permission{
+		PermissionViewAccount,
+		PermissionViewCharacter,
+		PermissionViewInventory,
+		PermissionViewEconomy,
+		PermissionRepairCharacter,
+		PermissionTeleportCharacter,
+		PermissionGrantItem,
+		PermissionGrantCurrency,
+		PermissionModifyQuestState,
+		PermissionModerateChat,
+		PermissionSuspendAccount,
+		PermissionViewAuditLog,
+		PermissionManageSupport,
+	}
+}
+
+func HasPermission(roles []Role, required Permission) bool {
+	for _, permission := range PermissionsForRoles(roles) {
+		if permission == required {
+			return true
+		}
+	}
+	return false
 }
 
 func DefaultStarterInventory() []CharacterInventorySlot {

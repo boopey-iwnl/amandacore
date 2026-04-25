@@ -91,6 +91,7 @@ func (s *worldServer) applyCharacterProgressionLocked(session *worldSessionState
 	session.ActionBarSlots = platform.NormalizeActionBarSlots(character.ActionBarSlots, session.LearnedAbilityIDs)
 	session.QuestProgress = s.loadQuestProgressFromCharacter(character)
 	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(character.TrackedQuestIDs, session.QuestProgress)
+	session.PvPStats = platform.NormalizeCharacterPvPStats(session.CharacterID, character.PvPStats)
 	s.applyDerivedStatsLocked(session)
 }
 

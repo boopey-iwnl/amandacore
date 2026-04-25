@@ -123,6 +123,17 @@ type abilityRequest struct {
 	AbilityID         string `json:"abilityId"`
 }
 
+type duelRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TargetCharacterID string `json:"targetCharacterId"`
+	TargetName        string `json:"targetName"`
+}
+
+type duelActionRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	DuelID            string `json:"duelId"`
+}
+
 type trainerLearnRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	TrainerID         string `json:"trainerId"`
@@ -230,6 +241,8 @@ type sessionEntity struct {
 	Alive            bool         `json:"alive"`
 	Targetable       bool         `json:"targetable"`
 	AIState          string       `json:"aiState,omitempty"`
+	PvPState         string       `json:"pvpState,omitempty"`
+	DuelOpponent     bool         `json:"duelOpponent,omitempty"`
 	Services         []npcService `json:"npcServices,omitempty"`
 }
 
@@ -451,6 +464,8 @@ type worldSessionState struct {
 	ActionBarSlots     []platform.CharacterActionBarSlot
 	QuestProgress      map[string]platform.CharacterQuestProgress
 	TrackedQuestIDs    []string
+	PvPStats           platform.CharacterPvPStats
+	LastDuelResult     *duelResultState
 }
 
 type mobState struct {
@@ -563,6 +578,9 @@ type worldServer struct {
 	sessionTokenByChar map[string]string
 	mobs               map[string]*mobState
 	mobOrder           []string
+	duels              map[string]*duelState
+	duelByCharacter    map[string]string
+	duelCounter        int64
 	dungeonInstances   map[string]*dungeonInstanceState
 	instanceByParty    map[string]string
 	instanceCounter    int64
@@ -588,6 +606,8 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
+		duels:              map[string]*duelState{},
+		duelByCharacter:    map[string]string{},
 		dungeonInstances:   map[string]*dungeonInstanceState{},
 		instanceByParty:    map[string]string{},
 		quests:             map[string]questDefinition{},

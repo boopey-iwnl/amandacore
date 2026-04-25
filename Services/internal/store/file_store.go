@@ -48,6 +48,9 @@ type state struct {
 	Parties          map[string]platform.Party               `json:"parties"`
 	Guilds           map[string]platform.Guild               `json:"guilds"`
 	GuildInvites     map[string]platform.GuildInvite         `json:"guildInvites"`
+	AuditEvents      map[string]platform.AuditEvent          `json:"auditEvents"`
+	SupportTickets   map[string]platform.SupportTicket       `json:"supportTickets"`
+	Mutes            map[string]platform.MuteRecord          `json:"mutes"`
 	BuildManifest    platform.BuildManifest                  `json:"buildManifest"`
 }
 
@@ -74,6 +77,9 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 			Parties:          map[string]platform.Party{},
 			Guilds:           map[string]platform.Guild{},
 			GuildInvites:     map[string]platform.GuildInvite{},
+			AuditEvents:      map[string]platform.AuditEvent{},
+			SupportTickets:   map[string]platform.SupportTicket{},
+			Mutes:            map[string]platform.MuteRecord{},
 			BuildManifest:    buildManifest,
 		},
 	}
@@ -1069,6 +1075,30 @@ func (s *FileStore) UpdateCharacterTrackedQuests(characterID string, trackedQues
 	character.TrackedQuestIDs = cloneStringIDs(trackedQuestIDs)
 	character = platform.NormalizeCharacter(character)
 	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
+func (s *FileStore) UpdateCharacterPvPStats(characterID string, stats platform.CharacterPvPStats) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	stats = platform.NormalizeCharacterPvPStats(characterID, stats)
+	character.PvPStats = stats
+	character = platform.NormalizeCharacter(character)
 	s.state.Characters[characterID] = character
 
 	if err := s.saveLocked(); err != nil {
