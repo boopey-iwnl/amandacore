@@ -6,6 +6,7 @@ const (
 	itemWornMilitiaBladeID = "worn_militia_blade"
 	itemPaddedYardVestID   = "padded_yard_vest"
 	itemFieldBootsID       = "field_boots"
+	itemTDSSluiceguardHandwrapsID = "tds_sluiceguard_handwraps"
 	itemBentBuckleID       = "bent_buckle"
 	itemCrackedTuskID      = "cracked_tusk"
 	itemCampRationID       = "camp_ration"
@@ -229,6 +230,22 @@ var itemDefinitions = map[string]itemDefinition{
 		RequiredLevel:   1,
 		EquipSlot:       platform.EquipmentSlotFeet,
 		Armor:           1,
+	},
+	itemTDSSluiceguardHandwrapsID: {
+		ItemID:          itemTDSSluiceguardHandwrapsID,
+		DisplayName:     "Sluiceguard Handwraps",
+		Type:            itemTypeArmor,
+		Subtype:         "handwraps",
+		Quality:         itemQualityCommon,
+		Stackable:       false,
+		MaxStack:        1,
+		SellPriceCopper: 14,
+		BuyPriceCopper:  0,
+		RequiredClass:   platform.DefaultClassID,
+		RequiredLevel:   8,
+		EquipSlot:       platform.EquipmentSlotHands,
+		Stamina:         2,
+		Armor:           3,
 	},
 }
 

@@ -69,9 +69,6 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
 	mux.HandleFunc("POST /v1/world/vendor/buy", server.instrumentEndpointFunc("vendor_buy", server.handleVendorBuy))
 	mux.HandleFunc("POST /v1/world/vendor/sell", server.instrumentEndpointFunc("vendor_sell", server.handleVendorSell))
-	mux.HandleFunc("POST /v1/world/dungeon/enter", server.instrumentEndpointFunc("dungeon_enter", server.handleDungeonEnter))
-	mux.HandleFunc("POST /v1/world/dungeon/exit", server.instrumentEndpointFunc("dungeon_exit", server.handleDungeonExit))
-	mux.HandleFunc("POST /v1/world/dungeon/reset", server.instrumentEndpointFunc("dungeon_reset", server.handleDungeonReset))
 	mux.HandleFunc("POST /v1/world/attack/auto", server.instrumentEndpointFunc("attack_auto", server.handleAutoAttack))
 	mux.HandleFunc("POST /v1/world/attack/ability", server.instrumentEndpointFunc("attack_ability", server.handleAbility))
 	mux.HandleFunc("GET /v1/world/social/state", server.instrumentEndpointFunc("social_state", server.handleSocialState))
@@ -140,7 +137,6 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			session.DisplayName = character.DisplayName
 			session.Connected = true
 			session.LastSeenAt = time.Now().Unix()
-			s.recoverExpiredDungeonSessionLocked(session)
 			if session.ZoneID == "" {
 				session.ZoneID = character.ZoneID
 			}
@@ -238,19 +234,10 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	session.DisplayName = character.DisplayName
 	session.Connected = true
 	session.LastSeenAt = time.Now().Unix()
-	if session.InstanceID != "" && s.dungeonInstanceActiveForSessionLocked(session) {
-		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
-			instance.PlayersInside[session.CharacterID] = true
-			instance.State = dungeonStateActive
-			instance.LastPlayerLeftAtMs = 0
-		}
-	} else {
-		s.recoverExpiredDungeonSessionLocked(session)
-		session.ZoneID = character.ZoneID
-		session.X = character.PositionX
-		session.Y = character.PositionY
-		session.Z = character.PositionZ
-	}
+	session.ZoneID = character.ZoneID
+	session.X = character.PositionX
+	session.Y = character.PositionY
+	session.Z = character.PositionZ
 	s.resetSessionCombatStateLocked(session, "reconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
 	if !session.Alive || session.Health <= 0.0 {
@@ -305,24 +292,12 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
 
-	var character *platform.Character
-	if session.InstanceID == "" {
-		persistStartedAt := time.Now()
-		var err error
-		character, err = s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
-		s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
-		if err != nil {
-			httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
-			return
-		}
-	} else {
-		character = &platform.Character{
-			ID:        session.CharacterID,
-			ZoneID:    session.ZoneID,
-			PositionX: session.X,
-			PositionY: session.Y,
-			PositionZ: session.Z,
-		}
+	persistStartedAt := time.Now()
+	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
+	s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
+	if err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
+		return
 	}
 
 	observability.LogEvent("world-service", "world.character_saved", map[string]any{
@@ -364,18 +339,9 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	session.LastSeenAt = time.Now().Unix()
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
-	if session.InstanceID != "" {
-		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
-			delete(instance.PlayersInside, session.CharacterID)
-			s.markDungeonEmptyIfNeededLocked(instance)
-		}
-	}
 
 	persistStartedAt := time.Now()
 	persistZoneID, persistX, persistY, persistZ := session.ZoneID, session.X, session.Y, session.Z
-	if session.InstanceID != "" && session.ReturnZoneID != "" {
-		persistZoneID, persistX, persistY, persistZ = session.ReturnZoneID, session.ReturnX, session.ReturnY, session.ReturnZ
-	}
 	character, err := s.store.UpdateCharacterState(session.CharacterID, persistZoneID, persistX, persistY, persistZ)
 	s.recordPersistenceDuration("character_state_disconnect", persistStartedAt, err)
 	if err != nil {
@@ -937,7 +903,6 @@ func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
 func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 	s.ensureMobsLocked()
 	s.ensureGatheringNodesLocked()
-	s.recoverExpiredDungeonSessionLocked(session)
 	s.touchSessionLocked(session)
 
 	if session.QuestProgress == nil {
@@ -972,9 +937,6 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 
 	nowMs := nowMillis()
 	for _, nodeID := range s.gatheringNodeOrder {
-		if session.InstanceID != "" {
-			break
-		}
 		node := s.gatheringNodes[nodeID]
 		if node == nil {
 			continue
@@ -1013,7 +975,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 	}
 
 	for _, candidate := range s.sessionsByToken {
-		if candidate.Token == session.Token || !candidate.Connected || candidate.ZoneID != session.ZoneID || candidate.InstanceID != session.InstanceID {
+		if candidate.Token == session.Token || !candidate.Connected || candidate.ZoneID != session.ZoneID {
 			continue
 		}
 
@@ -1073,7 +1035,6 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"zoneMap":              s.buildZoneMapResponse(session),
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
-		"instance":             s.buildDungeonInstanceResponse(session),
 		"currentTargetId":      session.CurrentTargetID,
 		"autoAttackActive":     session.AutoAttackActive,
 		"globalCooldownEndsAt": session.GlobalCooldownEnds,
