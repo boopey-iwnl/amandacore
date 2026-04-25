@@ -10,6 +10,7 @@ import (
 	"amandacore/services/internal/httpapi"
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
+	"amandacore/services/internal/simcore"
 	"amandacore/services/internal/store"
 )
 
@@ -35,13 +36,13 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 			return
 		}
 
-		observability.LogEvent("world-service", "character.selected", map[string]any{
+		observability.LogEvent("world-service", observability.EventCharacterSelected, map[string]any{
 			"accountId":   session.AccountID,
 			"sessionId":   session.ID,
 			"characterId": request.CharacterID,
 			"realmId":     request.RealmID,
 		})
-		observability.LogEvent("world-service", "world.join_ticket_issued", map[string]any{
+		observability.LogEvent("world-service", observability.EventWorldJoinTicketIssued, map[string]any{
 			"accountId":   ticket.AccountID,
 			"sessionId":   ticket.SessionID,
 			"ticketId":    ticket.TicketID,
@@ -171,7 +172,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	observability.LogEvent("world-service", "world.join_ticket_consumed", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldJoinTicketConsumed, map[string]any{
 		"ticketId":    ticket.TicketID,
 		"accountId":   ticket.AccountID,
 		"sessionId":   ticket.SessionID,
@@ -215,7 +216,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				s.reviveSessionLocked(session)
 			}
 			s.applyCharacterProgressionLocked(session, character)
-			observability.LogEvent("world-service", "world.player_spawned", map[string]any{
+			observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
 				"worldSessionToken": session.Token,
 				"accountId":         session.AccountID,
 				"characterId":       session.CharacterID,
@@ -256,7 +257,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	s.sessionsByToken[session.Token] = session
 	s.sessionTokenByChar[session.CharacterID] = session.Token
-	observability.LogEvent("world-service", "world.player_spawned", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
@@ -336,7 +337,18 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	}
 	s.applyCharacterProgressionLocked(session, character)
 
-	observability.LogEvent("world-service", "world.reconnected", map[string]any{
+	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+		SessionID: simcore.SessionID(session.Token),
+		ActorID:   simcore.EntityID(session.CharacterID),
+		ZoneID:    simcore.ZoneID(session.ZoneID),
+		Command: simcore.ReconnectIntentCommand{
+			EntityID: simcore.EntityID(session.CharacterID),
+			Reason:   "client_reconnect",
+		},
+	})
+	s.runRuntimeTickLocked(time.Now())
+
+	observability.LogEvent("world-service", observability.EventWorldReconnected, map[string]any{
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
@@ -378,7 +390,21 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	from := simcore.Vector3{X: session.X, Y: session.Y, Z: session.Z}
 	nextX, nextY := s.resolveMovementLocked(session, request.DeltaX, request.DeltaY)
+	to := simcore.Vector3{X: nextX, Y: nextY, Z: session.Z}
+	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+		SessionID: simcore.SessionID(session.Token),
+		ActorID:   simcore.EntityID(session.CharacterID),
+		ZoneID:    simcore.ZoneID(session.ZoneID),
+		Command: simcore.MoveIntentCommand{
+			EntityID: simcore.EntityID(session.CharacterID),
+			From:     from,
+			Delta:    simcore.Vector3{X: request.DeltaX, Y: request.DeltaY},
+			To:       to,
+		},
+	})
+	s.runRuntimeTickLocked(time.Now())
 	session.X = nextX
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
@@ -396,7 +422,7 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	observability.LogEvent("world-service", "world.character_saved", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
 		"reason":            "move",
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
@@ -405,6 +431,11 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		"x":                 character.PositionX,
 		"y":                 character.PositionY,
 		"z":                 character.PositionZ,
+	})
+	observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
+		"aggregateKind": "character",
+		"aggregateId":   character.ID,
+		"reason":        "move",
 	})
 
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
@@ -433,6 +464,16 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 
 	session.Connected = false
 	session.LastSeenAt = time.Now().Unix()
+	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+		SessionID: simcore.SessionID(session.Token),
+		ActorID:   simcore.EntityID(session.CharacterID),
+		ZoneID:    simcore.ZoneID(session.ZoneID),
+		Command: simcore.DisconnectIntentCommand{
+			EntityID: simcore.EntityID(session.CharacterID),
+			Reason:   "client_disconnect",
+		},
+	})
+	s.runRuntimeTickLocked(time.Now())
 	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
@@ -466,7 +507,7 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	observability.LogEvent("world-service", "world.character_saved", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
 		"reason":            "disconnect",
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
@@ -475,6 +516,11 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		"x":                 character.PositionX,
 		"y":                 character.PositionY,
 		"z":                 character.PositionZ,
+	})
+	observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
+		"aggregateKind": "character",
+		"aggregateId":   character.ID,
+		"reason":        "disconnect",
 	})
 
 	s.metrics.recordSessionEvent("disconnect_succeeded")

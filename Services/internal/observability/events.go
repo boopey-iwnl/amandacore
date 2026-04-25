@@ -6,6 +6,63 @@ import (
 	"time"
 )
 
+const (
+	EventAccountRegistered       = "account.registered"
+	EventAuthSessionIssued       = "auth.session_issued"
+	EventCharacterCreated        = "character.created"
+	EventCharacterSelected       = "character.selected"
+	EventWorldJoinTicketIssued   = "world.join_ticket_issued"
+	EventWorldJoinTicketConsumed = "world.join_ticket_consumed"
+	EventWorldPlayerSpawned      = "world.player_spawned"
+	EventWorldCharacterSaved     = "world.character_saved"
+	EventWorldReconnected        = "world.reconnected"
+
+	EventWorldTickStarted         = "world.tick.started"
+	EventWorldTickCompleted       = "world.tick.completed"
+	EventWorldTickSlow            = "world.tick.slow"
+	EventWorldCommandEnqueued     = "world.command.enqueued"
+	EventWorldCommandRejected     = "world.command.rejected"
+	EventWorldZoneLoaded          = "world.zone.loaded"
+	EventWorldZoneUnloaded        = "world.zone.unloaded"
+	EventWorldEntitySpawned       = "world.entity.spawned"
+	EventWorldEntityDespawned     = "world.entity.despawned"
+	EventCombatIntentSubmitted    = "combat.intent_submitted"
+	EventCombatAbilityResolved    = "combat.ability_resolved"
+	EventNPCSpawned               = "npc.spawned"
+	EventAdminActionRequested     = "admin.action_requested"
+	EventAdminActionApplied       = "admin.action_applied"
+	EventPersistenceSnapshotSaved = "persistence.snapshot_saved"
+)
+
+func StableEventNames() []string {
+	return []string{
+		EventAccountRegistered,
+		EventAuthSessionIssued,
+		EventCharacterCreated,
+		EventCharacterSelected,
+		EventWorldJoinTicketIssued,
+		EventWorldJoinTicketConsumed,
+		EventWorldPlayerSpawned,
+		EventWorldCharacterSaved,
+		EventWorldReconnected,
+		EventWorldTickStarted,
+		EventWorldTickCompleted,
+		EventWorldTickSlow,
+		EventWorldCommandEnqueued,
+		EventWorldCommandRejected,
+		EventWorldZoneLoaded,
+		EventWorldZoneUnloaded,
+		EventWorldEntitySpawned,
+		EventWorldEntityDespawned,
+		EventCombatIntentSubmitted,
+		EventCombatAbilityResolved,
+		EventNPCSpawned,
+		EventAdminActionRequested,
+		EventAdminActionApplied,
+		EventPersistenceSnapshotSaved,
+	}
+}
+
 func LogEvent(service string, event string, fields map[string]any) {
 	payload := map[string]any{
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),

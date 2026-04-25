@@ -17,6 +17,16 @@
 - The backend is implemented to be functional in local/dev/staging with a shared file-backed store and secret-driven admin bootstrap, while remaining aligned to a future Postgres/Redis deployment shape.
 - The gameplay and content targets are `3.3.5a`-structured and greybox-equivalent, not exact Blizzard class kits, formulas, maps, or content data.
 
+## Clean-room MMO architecture foundation
+
+- `Docs/CleanRoomReferencePolicy.md` defines the formal guardrail: external emulator projects are read-only architectural references only.
+- `Services/internal/simcore` defines original canonical server commands and domain events.
+- `Services/internal/worlds` includes a lightweight fixed-step runtime, deterministic command queue, and neutral zone/instance ownership skeleton.
+- `Services/internal/observability` exposes stable AmandaCore event names for ticks, command queues, entities, combat, admin actions, and persistence snapshots.
+- `Docs/ContentPipeline.md` documents the AmandaCore-owned future content package path.
+
+Intentionally not implemented yet: full NPC spawn loops, hostile AI, auto-attack/combat resolver expansion, ability/effect execution, kill credit and loot, quest objective tracking, zone content package loading, and Dawnwake Isles zone skeletons from authored maps.
+
 ## Key paths
 
 - `Shared/AmandaCoreShared`

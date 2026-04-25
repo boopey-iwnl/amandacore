@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
 )
@@ -693,6 +694,7 @@ type dungeonInstanceState struct {
 type worldServer struct {
 	store                  *store.FileStore
 	metrics                *worldMetrics
+	runtime                *WorldRuntime
 	mutex                  sync.Mutex
 	sessionsByToken        map[string]*worldSessionState
 	sessionTokenByChar     map[string]string
@@ -724,6 +726,7 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 	server := &worldServer{
 		store:              fileStore,
 		metrics:            newWorldMetrics(),
+		runtime:            NewWorldRuntime(WorldRuntimeConfig{}),
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
@@ -749,6 +752,10 @@ func (s *worldServer) loadStarterContentLocked() {
 	allZones = append(allZones, housingZoneDefinitions...)
 	for _, zone := range allZones {
 		s.zones[zone.ID] = zone
+		observability.LogEvent("world-service", observability.EventWorldZoneLoaded, map[string]any{
+			"zoneId":      zone.ID,
+			"displayName": zone.DisplayName,
+		})
 	}
 
 	allQuests := append([]questDefinition{}, stonewakeQuestDefinitions...)
@@ -831,6 +838,19 @@ func (s *worldServer) ensureMobsLocked() {
 			Targetable:      true,
 			AIState:         mobAIStateIdle,
 		}
+		observability.LogEvent("world-service", observability.EventNPCSpawned, map[string]any{
+			"entityId":    spawn.ID,
+			"archetypeId": spawn.MobTypeID,
+			"zoneId":      zoneID,
+			"x":           spawn.X,
+			"y":           spawn.Y,
+			"z":           spawn.Z,
+		})
+		observability.LogEvent("world-service", observability.EventWorldEntitySpawned, map[string]any{
+			"entityId": spawn.ID,
+			"kind":     hostileMobKind,
+			"zoneId":   zoneID,
+		})
 	}
 }
 

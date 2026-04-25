@@ -256,6 +256,7 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 		s.maybeLogMetricsSnapshotLocked(now)
 	}()
 
+	s.runRuntimeTickLocked(now)
 	s.ensureMobsLocked()
 	s.cleanupStaleSessionsLocked(now)
 	if err := s.advanceDuelsLocked(now); err != nil {
