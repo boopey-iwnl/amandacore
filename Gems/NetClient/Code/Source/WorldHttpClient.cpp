@@ -1309,6 +1309,64 @@ namespace NetClient
         return SocialPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
     }
 
+    bool GuildCreateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& guildName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"guildName\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(guildName).c_str());
+        return SocialPostRequest(worldEndpoint, L"/v1/world/guild/create", requestBody, outResponse, outError);
+    }
+
+    bool GuildNameActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"targetName\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(targetName).c_str());
+        return SocialPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
+    }
+
+    bool GuildInviteActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"inviteId\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(inviteId).c_str());
+        return SocialPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
+    }
+
+    bool GuildMOTDRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& messageOfTheDay,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"messageOfTheDay\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(messageOfTheDay).c_str());
+        return SocialPostRequest(worldEndpoint, L"/v1/world/guild/motd", requestBody, outResponse, outError);
+    }
+
     bool SetTargetRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
