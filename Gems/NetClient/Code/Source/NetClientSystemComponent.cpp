@@ -409,6 +409,16 @@ namespace NetClient
             outError);
     }
 
+    bool NetClientSystemComponent::SelectTalent(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& talentId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SelectTalentRequest(worldEndpoint, worldSessionToken, talentId, outResponse, outError);
+    }
+
     bool NetClientSystemComponent::AssignActionBarSlot(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,

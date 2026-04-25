@@ -298,17 +298,6 @@ namespace NetClient
             return escaped;
         }
 
-        bool ReadDouble(const rapidjson::Value& object, const char* name, double& outValue)
-        {
-            if (!object.HasMember(name) || !object[name].IsNumber())
-            {
-                return false;
-            }
-
-            outValue = object[name].GetDouble();
-            return true;
-        }
-
         void ParseQuestState(const rapidjson::Value& quest, QuestState& outQuest)
         {
             ReadString(quest, "id", outQuest.m_id);
@@ -321,8 +310,12 @@ namespace NetClient
             ReadString(quest, "giverNpcId", outQuest.m_giverNpcId);
             ReadString(quest, "turnInNpcId", outQuest.m_turnInNpcId);
             ReadBool(quest, "tracked", outQuest.m_tracked);
+            ReadBool(quest, "partyShareable", outQuest.m_partyShareable);
+            ReadBool(quest, "groupRecommended", outQuest.m_groupRecommended);
             ReadInt(quest, "currentCount", outQuest.m_currentCount);
             ReadInt(quest, "targetCount", outQuest.m_targetCount);
+            ReadInt(quest, "recommendedPlayers", outQuest.m_recommendedPlayers);
+            ReadDouble(quest, "partyCreditRadius", outQuest.m_partyCreditRadius);
             ReadInt(quest, "rewardXp", outQuest.m_rewardXp);
             ReadInt(quest, "rewardCurrencyCopper", outQuest.m_rewardCurrencyTotalCopper);
             if (quest.HasMember("rewardCurrency") && quest["rewardCurrency"].IsObject())
@@ -399,6 +392,7 @@ namespace NetClient
             outResponse.m_maxHealth = document["maxHealth"].GetDouble();
             outResponse.m_resource = document["resource"].GetDouble();
             outResponse.m_maxResource = document["maxResource"].GetDouble();
+            ReadString(document, "resourceName", outResponse.m_resourceName);
             ReadInt(document, "level", outResponse.m_level);
             ReadInt(document, "experience", outResponse.m_experience);
             ReadInt(document, "currencyCopper", outResponse.m_currency.m_totalCopper);
@@ -436,6 +430,58 @@ namespace NetClient
                     outResponse.m_inventory.m_slotCount = static_cast<int>(outResponse.m_inventory.m_slots.size());
                 }
             }
+            if (document.HasMember("stats") && document["stats"].IsObject())
+            {
+                const rapidjson::Value& stats = document["stats"];
+                ReadInt(stats, "strength", outResponse.m_stats.m_strength);
+                ReadInt(stats, "stamina", outResponse.m_stats.m_stamina);
+                ReadInt(stats, "armor", outResponse.m_stats.m_armor);
+                ReadDouble(stats, "attackPower", outResponse.m_stats.m_attackPower);
+                ReadDouble(stats, "armorReductionPct", outResponse.m_stats.m_armorReductionPct);
+            }
+            outResponse.m_talents = TalentState{};
+            if (document.HasMember("talents") && document["talents"].IsObject())
+            {
+                const rapidjson::Value& talents = document["talents"];
+                ReadBool(talents, "unlocked", outResponse.m_talents.m_unlocked);
+                ReadInt(talents, "unlockLevel", outResponse.m_talents.m_unlockLevel);
+                ReadInt(talents, "pointsGranted", outResponse.m_talents.m_pointsGranted);
+                ReadInt(talents, "pointsSpent", outResponse.m_talents.m_pointsSpent);
+                ReadInt(talents, "pointsAvailable", outResponse.m_talents.m_pointsAvailable);
+                if (talents.HasMember("categories") && talents["categories"].IsArray())
+                {
+                    for (const rapidjson::Value& categoryValue : talents["categories"].GetArray())
+                    {
+                        if (categoryValue.IsString())
+                        {
+                            outResponse.m_talents.m_categories.push_back(categoryValue.GetString());
+                        }
+                    }
+                }
+                if (talents.HasMember("talents") && talents["talents"].IsArray())
+                {
+                    for (const rapidjson::Value& talentValue : talents["talents"].GetArray())
+                    {
+                        if (!talentValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        TalentEntryState talent;
+                        ReadString(talentValue, "id", talent.m_id);
+                        ReadString(talentValue, "displayName", talent.m_displayName);
+                        ReadString(talentValue, "category", talent.m_category);
+                        ReadString(talentValue, "description", talent.m_description);
+                        ReadString(talentValue, "requirementText", talent.m_requirementText);
+                        ReadInt(talentValue, "rank", talent.m_rank);
+                        ReadInt(talentValue, "maxRank", talent.m_maxRank);
+                        ReadInt(talentValue, "minLevel", talent.m_minLevel);
+                        ReadBool(talentValue, "passive", talent.m_passive);
+                        ReadBool(talentValue, "canSelect", talent.m_canSelect);
+                        outResponse.m_talents.m_talents.push_back(AZStd::move(talent));
+                    }
+                }
+            }
             outResponse.m_learnedAbilityIds.clear();
             if (document.HasMember("learnedAbilityIds") && document["learnedAbilityIds"].IsArray())
             {
@@ -461,9 +507,18 @@ namespace NetClient
                     SpellbookEntryState entry;
                     ReadString(spellValue, "id", entry.m_id);
                     ReadString(spellValue, "displayName", entry.m_displayName);
+                    ReadString(spellValue, "classId", entry.m_classId);
                     ReadString(spellValue, "description", entry.m_description);
+                    ReadString(spellValue, "tooltipText", entry.m_tooltipText);
                     ReadString(spellValue, "requirementText", entry.m_requirementText);
+                    ReadString(spellValue, "resourceName", entry.m_resourceName);
                     ReadInt(spellValue, "requiredLevel", entry.m_requiredLevel);
+                    ReadDouble(spellValue, "resourceCost", entry.m_resourceCost);
+                    ReadDouble(spellValue, "resourceGeneration", entry.m_resourceGeneration);
+                    ReadInt64(spellValue, "cooldownMs", entry.m_cooldownMs);
+                    ReadDouble(spellValue, "rangeMeters", entry.m_rangeMeters);
+                    ReadBool(spellValue, "requiresTarget", entry.m_requiresTarget);
+                    ReadBool(spellValue, "triggersGCD", entry.m_triggersGlobalCooldown);
                     ReadBool(spellValue, "learned", entry.m_learned);
                     outResponse.m_spellbookEntries.push_back(AZStd::move(entry));
                 }
@@ -484,7 +539,16 @@ namespace NetClient
                     ReadString(actionValue, "abilityId", slot.m_abilityId);
                     ReadString(actionValue, "displayName", slot.m_displayName);
                     ReadString(actionValue, "buttonLabel", slot.m_buttonLabel);
+                    ReadString(actionValue, "resourceName", slot.m_resourceName);
+                    ReadString(actionValue, "tooltipText", slot.m_tooltipText);
+                    ReadDouble(actionValue, "resourceCost", slot.m_resourceCost);
+                    ReadDouble(actionValue, "resourceGeneration", slot.m_resourceGeneration);
+                    ReadInt64(actionValue, "cooldownMs", slot.m_cooldownMs);
+                    ReadInt64(actionValue, "cooldownEndsAt", slot.m_cooldownEndsAt);
+                    ReadInt64(actionValue, "cooldownRemainingMs", slot.m_cooldownRemainingMs);
+                    ReadDouble(actionValue, "rangeMeters", slot.m_rangeMeters);
                     ReadBool(actionValue, "requiresTarget", slot.m_requiresTarget);
+                    ReadBool(actionValue, "triggersGCD", slot.m_triggersGlobalCooldown);
                     ReadBool(actionValue, "learned", slot.m_learned);
                     outResponse.m_actionBarSlots.push_back(AZStd::move(slot));
                 }
@@ -512,9 +576,15 @@ namespace NetClient
                         ReadString(offerValue, "abilityId", offer.m_abilityId);
                         ReadString(offerValue, "displayName", offer.m_displayName);
                         ReadString(offerValue, "description", offer.m_description);
+                        ReadString(offerValue, "tooltipText", offer.m_tooltipText);
                         ReadString(offerValue, "requirementText", offer.m_requirementText);
+                        ReadString(offerValue, "resourceName", offer.m_resourceName);
                         ReadInt(offerValue, "requiredLevel", offer.m_requiredLevel);
                         ReadInt(offerValue, "costCopper", offer.m_costCopper);
+                        ReadDouble(offerValue, "resourceCost", offer.m_resourceCost);
+                        ReadDouble(offerValue, "resourceGeneration", offer.m_resourceGeneration);
+                        ReadInt64(offerValue, "cooldownMs", offer.m_cooldownMs);
+                        ReadDouble(offerValue, "rangeMeters", offer.m_rangeMeters);
                         ReadBool(offerValue, "learned", offer.m_learned);
                         ReadBool(offerValue, "canLearn", offer.m_canLearn);
                         outResponse.m_trainer.m_offers.push_back(AZStd::move(offer));
@@ -686,6 +756,8 @@ namespace NetClient
                     ReadString(entityValue, "id", entity.m_id);
                     ReadString(entityValue, "displayName", entity.m_displayName);
                     ReadString(entityValue, "kind", entity.m_kind);
+                    ReadString(entityValue, "classification", entity.m_classification);
+                    ReadBool(entityValue, "elite", entity.m_elite);
                     if (entityValue.HasMember("x") && entityValue["x"].IsNumber())
                     {
                         entity.m_x = entityValue["x"].GetDouble();
@@ -1298,6 +1370,33 @@ namespace NetClient
             trainerId.c_str(),
             abilityId.c_str());
         if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/trainer/learn", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool SelectTalentRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& talentId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"talentId\":\"%s\"}",
+            worldSessionToken.c_str(),
+            talentId.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/talent/select", requestBody, responseBody, statusCode, outError))
         {
             return false;
         }

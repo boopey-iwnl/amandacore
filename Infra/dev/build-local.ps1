@@ -19,6 +19,20 @@ function Resolve-Tool($preferredPath, $commandName) {
     throw "Required tool '$commandName' was not found."
 }
 
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code $LASTEXITCODE`: $FilePath $($Arguments -join ' ')"
+    }
+}
+
 $go = Resolve-Tool "C:\Program Files\Go\bin\go.exe" "go"
 
 & $versionManifestScript -OutputPath $versionManifestPath
@@ -36,11 +50,15 @@ $env:AMANDACORE_API_VERSION = [string]$versionManifest.apiVersion
 New-Item -ItemType Directory -Force -Path $serviceOutput | Out-Null
 
 Push-Location $servicesRoot
-& $go test ./...
-foreach ($service in @("auth-service", "account-service", "realm-service", "character-service", "world-service", "admin-service")) {
-    & $go build -o (Join-Path $serviceOutput "$service.exe") "./cmd/$service"
+try {
+    Invoke-Native $go "test" "./..."
+    foreach ($service in @("auth-service", "account-service", "realm-service", "character-service", "world-service", "admin-service")) {
+        Invoke-Native $go "build" "-o" (Join-Path $serviceOutput "$service.exe") "./cmd/$service"
+    }
 }
-Pop-Location
+finally {
+    Pop-Location
+}
 
 & (Join-Path $PSScriptRoot "build-playable-client.ps1")
 

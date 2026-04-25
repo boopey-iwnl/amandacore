@@ -25,6 +25,7 @@ namespace NetClient
         AZStd::string m_id;
         AZStd::string m_displayName;
         AZStd::string m_kind;
+        AZStd::string m_classification;
         double m_x = 0.0;
         double m_y = 0.0;
         double m_z = 0.0;
@@ -32,6 +33,7 @@ namespace NetClient
         double m_maxHealth = 0.0;
         bool m_alive = false;
         bool m_targetable = false;
+        bool m_elite = false;
         AZStd::string m_aiState;
         AZStd::vector<NpcServiceState> m_services;
     };
@@ -52,11 +54,15 @@ namespace NetClient
         AZStd::string m_objectiveAreaKind;
         AZStd::string m_routeHintText;
         bool m_tracked = false;
+        bool m_partyShareable = false;
+        bool m_groupRecommended = false;
         double m_objectiveX = 0.0;
         double m_objectiveY = 0.0;
         double m_objectiveRadius = 0.0;
         int m_currentCount = 0;
         int m_targetCount = 0;
+        int m_recommendedPlayers = 0;
+        double m_partyCreditRadius = 0.0;
         int m_rewardXp = 0;
         int m_rewardCurrencyTotalCopper = 0;
         int m_rewardCurrencySilver = 0;
@@ -152,9 +158,18 @@ namespace NetClient
     {
         AZStd::string m_id;
         AZStd::string m_displayName;
+        AZStd::string m_classId;
         AZStd::string m_description;
+        AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
+        AZStd::string m_resourceName;
         int m_requiredLevel = 1;
+        double m_resourceCost = 0.0;
+        double m_resourceGeneration = 0.0;
+        AZ::s64 m_cooldownMs = 0;
+        double m_rangeMeters = 0.0;
+        bool m_requiresTarget = false;
+        bool m_triggersGlobalCooldown = false;
         bool m_learned = false;
     };
 
@@ -165,7 +180,16 @@ namespace NetClient
         AZStd::string m_abilityId;
         AZStd::string m_displayName;
         AZStd::string m_buttonLabel;
+        AZStd::string m_resourceName;
+        AZStd::string m_tooltipText;
+        double m_resourceCost = 0.0;
+        double m_resourceGeneration = 0.0;
+        AZ::s64 m_cooldownMs = 0;
+        AZ::s64 m_cooldownEndsAt = 0;
+        AZ::s64 m_cooldownRemainingMs = 0;
+        double m_rangeMeters = 0.0;
         bool m_requiresTarget = false;
+        bool m_triggersGlobalCooldown = false;
         bool m_learned = false;
     };
 
@@ -174,9 +198,15 @@ namespace NetClient
         AZStd::string m_abilityId;
         AZStd::string m_displayName;
         AZStd::string m_description;
+        AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
+        AZStd::string m_resourceName;
         int m_requiredLevel = 1;
         int m_costCopper = 0;
+        double m_resourceCost = 0.0;
+        double m_resourceGeneration = 0.0;
+        AZ::s64 m_cooldownMs = 0;
+        double m_rangeMeters = 0.0;
         bool m_learned = false;
         bool m_canLearn = false;
     };
@@ -189,6 +219,40 @@ namespace NetClient
         AZStd::string m_interactionHint;
         bool m_inRange = false;
         AZStd::vector<TrainerOfferState> m_offers;
+    };
+
+    struct StatBlockState
+    {
+        int m_strength = 0;
+        int m_stamina = 0;
+        int m_armor = 0;
+        double m_attackPower = 0.0;
+        double m_armorReductionPct = 0.0;
+    };
+
+    struct TalentEntryState
+    {
+        AZStd::string m_id;
+        AZStd::string m_displayName;
+        AZStd::string m_category;
+        AZStd::string m_description;
+        AZStd::string m_requirementText;
+        int m_rank = 0;
+        int m_maxRank = 0;
+        int m_minLevel = 0;
+        bool m_passive = true;
+        bool m_canSelect = false;
+    };
+
+    struct TalentState
+    {
+        bool m_unlocked = false;
+        int m_unlockLevel = 0;
+        int m_pointsGranted = 0;
+        int m_pointsSpent = 0;
+        int m_pointsAvailable = 0;
+        AZStd::vector<AZStd::string> m_categories;
+        AZStd::vector<TalentEntryState> m_talents;
     };
 
     struct WorldSessionResponse
@@ -204,9 +268,12 @@ namespace NetClient
         double m_maxHealth = 0.0;
         double m_resource = 0.0;
         double m_maxResource = 0.0;
+        AZStd::string m_resourceName;
         int m_experience = 0;
         CurrencyState m_currency;
         InventoryState m_inventory;
+        StatBlockState m_stats;
+        TalentState m_talents;
         AZStd::vector<AZStd::string> m_learnedAbilityIds;
         AZStd::vector<SpellbookEntryState> m_spellbookEntries;
         AZStd::vector<ActionBarSlotState> m_actionBarSlots;
@@ -455,6 +522,13 @@ namespace NetClient
             const AZStd::string& worldSessionToken,
             const AZStd::string& trainerId,
             const AZStd::string& abilityId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool SelectTalent(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& talentId,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 

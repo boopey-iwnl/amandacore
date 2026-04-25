@@ -437,7 +437,7 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 	mob.RespawnAtMs = nowMillis() + mob.RespawnDelayMs
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "target_dead")
-	if err := s.applyQuestKillCreditLocked(session, mob.MobTypeID); err != nil {
+	if err := s.applyQuestKillCreditLocked(session, mob); err != nil {
 		return err
 	}
 	observability.LogEvent("world-service", "world.mob_died", map[string]any{

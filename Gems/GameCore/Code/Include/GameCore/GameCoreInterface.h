@@ -72,6 +72,7 @@ namespace GameCore
         virtual bool SetAutoAttack(bool enabled) = 0;
         virtual bool ActivateAbility(const AZStd::string& abilityId) = 0;
         virtual bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) = 0;
+        virtual bool SelectTalent(const AZStd::string& talentId) = 0;
         virtual bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) = 0;
         virtual bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) = 0;
         virtual bool ClearActionBarSlot(int slotIndex) = 0;

@@ -494,6 +494,76 @@ namespace UiClient
             return FormatCurrency(currency);
         }
 
+        AZStd::string FormatAbilityFacts(
+            const AZStd::string& resourceName,
+            double resourceCost,
+            double resourceGeneration,
+            AZ::s64 cooldownMs,
+            double rangeMeters)
+        {
+            AZStd::string facts;
+            const AZStd::string resolvedResourceName = resourceName.empty() ? "Grit" : resourceName;
+            if (resourceCost > 0.0)
+            {
+                facts += AZStd::string::format("Cost %.0f %s", resourceCost, resolvedResourceName.c_str());
+            }
+            if (resourceGeneration > 0.0)
+            {
+                if (!facts.empty())
+                {
+                    facts += "  |  ";
+                }
+                facts += AZStd::string::format("Generates %.0f %s", resourceGeneration, resolvedResourceName.c_str());
+            }
+            if (cooldownMs > 0)
+            {
+                if (!facts.empty())
+                {
+                    facts += "  |  ";
+                }
+                facts += AZStd::string::format("Cooldown %.1fs", static_cast<double>(cooldownMs) / 1000.0);
+            }
+            if (rangeMeters > 0.0)
+            {
+                if (!facts.empty())
+                {
+                    facts += "  |  ";
+                }
+                facts += AZStd::string::format("Range %.1fm", rangeMeters);
+            }
+            return facts;
+        }
+
+        AZStd::string FormatAbilityFacts(const NetClient::SpellbookEntryState& entry)
+        {
+            return FormatAbilityFacts(
+                entry.m_resourceName,
+                entry.m_resourceCost,
+                entry.m_resourceGeneration,
+                entry.m_cooldownMs,
+                entry.m_rangeMeters);
+        }
+
+        AZStd::string FormatAbilityFacts(const NetClient::ActionBarSlotState& slot)
+        {
+            return FormatAbilityFacts(
+                slot.m_resourceName,
+                slot.m_resourceCost,
+                slot.m_resourceGeneration,
+                slot.m_cooldownMs,
+                slot.m_rangeMeters);
+        }
+
+        AZStd::string FormatAbilityFacts(const NetClient::TrainerOfferState& offer)
+        {
+            return FormatAbilityFacts(
+                offer.m_resourceName,
+                offer.m_resourceCost,
+                offer.m_resourceGeneration,
+                offer.m_cooldownMs,
+                offer.m_rangeMeters);
+        }
+
         void SuppressStockImGuiWindow(const char* windowName)
         {
             if (ImGuiWindow* window = ImGui::FindWindowByName(windowName))
@@ -642,7 +712,12 @@ namespace UiClient
             ImGui::Text("%s  |  Level %d", worldState.m_session.m_displayName.c_str(), worldState.m_session.m_level);
             ImGui::TextUnformatted(nearCommandPoint ? "Near friendly NPC services" : "Stonewake Vale patrol");
             DrawMeter("Vitality", static_cast<float>(worldState.m_session.m_health), static_cast<float>(worldState.m_session.m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
-            DrawMeter("Focus", static_cast<float>(worldState.m_session.m_resource), static_cast<float>(worldState.m_session.m_maxResource), ColorU32(54, 117, 181), ImVec2(160.0f, 16.0f));
+            DrawMeter(
+                worldState.m_session.m_resourceName.empty() ? "Grit" : worldState.m_session.m_resourceName.c_str(),
+                static_cast<float>(worldState.m_session.m_resource),
+                static_cast<float>(worldState.m_session.m_maxResource),
+                ColorU32(54, 117, 181),
+                ImVec2(160.0f, 16.0f));
             ImGui::Text("Friendly NPCs %.1fm", distanceToCommandPoint);
         }
 
@@ -1117,7 +1192,29 @@ namespace UiClient
                 ImGui::PushID(slotIndex);
                 const NetClient::ActionBarSlotState* slotState = FindActionBarSlot(worldState.m_session, slotIndex);
                 const bool hasAbility = slotState && slotState->m_learned && !slotState->m_abilityId.empty();
-                const bool clickable = hasAbility && (!slotState->m_requiresTarget || hasHostileTarget);
+                const AZ::s64 nowMs = NowMs();
+                AZ::s64 abilityCooldownRemainingMs = 0;
+                if (slotState)
+                {
+                    abilityCooldownRemainingMs = slotState->m_cooldownRemainingMs;
+                    if (slotState->m_cooldownEndsAt > nowMs)
+                    {
+                        abilityCooldownRemainingMs = AZ::GetMax(abilityCooldownRemainingMs, slotState->m_cooldownEndsAt - nowMs);
+                    }
+                }
+                const AZ::s64 gcdRemainingMs =
+                    slotState && slotState->m_triggersGlobalCooldown && worldState.m_session.m_globalCooldownEndsAt > nowMs
+                    ? worldState.m_session.m_globalCooldownEndsAt - nowMs
+                    : 0;
+                const AZ::s64 blockedRemainingMs = AZ::GetMax(abilityCooldownRemainingMs, gcdRemainingMs);
+                const bool blockedByCooldown = blockedRemainingMs > 0;
+                const bool blockedByResource = hasAbility &&
+                    slotState->m_resourceCost > 0.0 &&
+                    worldState.m_session.m_resource + 0.01 < slotState->m_resourceCost;
+                const bool clickable = hasAbility &&
+                    (!slotState->m_requiresTarget || hasHostileTarget) &&
+                    !blockedByCooldown &&
+                    !blockedByResource;
                 if (editMode)
                 {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.20f, 0.10f, 1.0f));
@@ -1149,6 +1246,31 @@ namespace UiClient
                 if (!keyLabel.empty() && keyLabel != "Unbound")
                 {
                     drawList->AddText(ImVec2(slotMin.x + 6.0f, slotMin.y + 4.0f), ColorU32(235, 211, 154), keyLabel.c_str());
+                }
+                if (hasAbility && blockedByCooldown)
+                {
+                    const float cooldownRatio = slotState->m_cooldownMs > 0
+                        ? Clamp01(static_cast<float>(blockedRemainingMs) / static_cast<float>(slotState->m_cooldownMs))
+                        : 1.0f;
+                    const float overlayHeight = slotSize.y * cooldownRatio;
+                    drawList->AddRectFilled(
+                        ImVec2(slotMin.x, slotMax.y - overlayHeight),
+                        slotMax,
+                        ColorU32(8, 11, 15, 185),
+                        8.0f);
+                    const AZStd::string cooldownText = AZStd::string::format("%.1f", static_cast<double>(blockedRemainingMs) / 1000.0);
+                    const ImVec2 cooldownTextSize = ImGui::CalcTextSize(cooldownText.c_str());
+                    drawList->AddText(
+                        ImVec2(
+                            slotMin.x + ((slotSize.x - cooldownTextSize.x) * 0.5f),
+                            slotMin.y + ((slotSize.y - cooldownTextSize.y) * 0.5f)),
+                        ColorU32(246, 236, 204),
+                        cooldownText.c_str());
+                }
+                else if (hasAbility && blockedByResource)
+                {
+                    drawList->AddRectFilled(slotMin, slotMax, ColorU32(15, 18, 24, 150), 8.0f);
+                    drawList->AddText(ImVec2(slotMin.x + 34.0f, slotMax.y - 18.0f), ColorU32(112, 154, 214), "G");
                 }
 
                 if (!editMode && pressed && clickable)
@@ -1257,14 +1379,35 @@ namespace UiClient
 
                 if (slotState && !slotState->m_displayName.empty() && ImGui::IsItemHovered())
                 {
+                    AZStd::string tooltip = slotState->m_displayName;
+                    const AZStd::string facts = FormatAbilityFacts(*slotState);
+                    if (!facts.empty())
+                    {
+                        tooltip += "\n";
+                        tooltip += facts;
+                    }
+                    if (!slotState->m_tooltipText.empty())
+                    {
+                        tooltip += "\n";
+                        tooltip += slotState->m_tooltipText;
+                    }
+                    if (blockedByCooldown)
+                    {
+                        tooltip += AZStd::string::format("\nReady in %.1fs.", static_cast<double>(blockedRemainingMs) / 1000.0);
+                    }
+                    if (blockedByResource)
+                    {
+                        tooltip += "\nNot enough Grit.";
+                    }
                     if (editMode)
                     {
-                        ImGui::SetTooltip("%s\nSHIFT-click to arm move, drag to move, or SHIFT-right-click to clear.", slotState->m_displayName.c_str());
+                        tooltip += "\nSHIFT-click to arm move, drag to move, or SHIFT-right-click to clear.";
                     }
                     else
                     {
-                        ImGui::SetTooltip("%s\nBars are locked. Hold SHIFT to move or clear abilities.", slotState->m_displayName.c_str());
+                        tooltip += "\nBars are locked. Hold SHIFT to move or clear abilities.";
                     }
+                    ImGui::SetTooltip("%s", tooltip.c_str());
                 }
                 else if (editMode && ImGui::IsItemHovered())
                 {
@@ -1423,6 +1566,15 @@ namespace UiClient
                 }
                 ImGui::PopStyleColor();
                 ImGui::TextWrapped("%s", entry.m_description.c_str());
+                const AZStd::string learnedFacts = FormatAbilityFacts(entry);
+                if (!learnedFacts.empty())
+                {
+                    ImGui::TextWrapped("%s", learnedFacts.c_str());
+                }
+                if (!entry.m_tooltipText.empty())
+                {
+                    ImGui::TextDisabled("%s", entry.m_tooltipText.c_str());
+                }
                 ImGui::TextDisabled("Known  |  level %d", entry.m_requiredLevel);
                 ImGui::EndGroup();
                 if (editMode && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
@@ -1464,6 +1616,15 @@ namespace UiClient
                 ImGui::Text("%s", entry.m_displayName.c_str());
                 ImGui::PopStyleColor();
                 ImGui::TextWrapped("%s", entry.m_description.c_str());
+                const AZStd::string previewFacts = FormatAbilityFacts(entry);
+                if (!previewFacts.empty())
+                {
+                    ImGui::TextWrapped("%s", previewFacts.c_str());
+                }
+                if (!entry.m_tooltipText.empty())
+                {
+                    ImGui::TextDisabled("%s", entry.m_tooltipText.c_str());
+                }
                 ImGui::TextWrapped("%s", entry.m_requirementText.c_str());
                 ImGui::EndGroup();
                 ImGui::Separator();
@@ -1501,6 +1662,15 @@ namespace UiClient
                 ImGui::PushID(offer.m_abilityId.c_str());
                 ImGui::Text("%s", offer.m_displayName.c_str());
                 ImGui::TextWrapped("%s", offer.m_description.c_str());
+                const AZStd::string offerFacts = FormatAbilityFacts(offer);
+                if (!offerFacts.empty())
+                {
+                    ImGui::TextWrapped("%s", offerFacts.c_str());
+                }
+                if (!offer.m_tooltipText.empty())
+                {
+                    ImGui::TextDisabled("%s", offer.m_tooltipText.c_str());
+                }
                 ImGui::Text("Cost: %s  |  Level %d", FormatTrainerCost(offer.m_costCopper).c_str(), offer.m_requiredLevel);
 
                 if (offer.m_learned)
@@ -1855,11 +2025,84 @@ namespace UiClient
             ImGui::Text("Class: Warrior");
             ImGui::Text("Level: %d", worldState.m_session.m_level);
             ImGui::Text("Currency: %s", FormatCurrency(worldState.m_session.m_currency).c_str());
+            ImGui::Separator();
+            ImGui::Text("Strength: %d", worldState.m_session.m_stats.m_strength);
+            ImGui::Text("Stamina: %d", worldState.m_session.m_stats.m_stamina);
+            ImGui::Text("Armor: %d", worldState.m_session.m_stats.m_armor);
+            ImGui::Text("Attack Power: %.1f", worldState.m_session.m_stats.m_attackPower);
+            ImGui::Text("Armor Reduction: %.1f%%", worldState.m_session.m_stats.m_armorReductionPct * 100.0);
+            ImGui::Separator();
             ImGui::Text(
                 "Position: %.1f, %.1f, %.1f",
                 worldState.m_session.m_position.m_x,
                 worldState.m_session.m_position.m_y,
                 worldState.m_session.m_position.m_z);
+        }
+
+        void DrawTalentWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            const auto& talents = worldState.m_session.m_talents;
+            ImGui::Text("Warrior Talents  |  Points %d / %d", talents.m_pointsAvailable, talents.m_pointsGranted);
+            ImGui::Separator();
+            if (!talents.m_unlocked)
+            {
+                ImGui::Text("Unlocks at level %d", talents.m_unlockLevel);
+                return;
+            }
+
+            ImGui::BeginChild(
+                "##talent_scroll",
+                ImVec2(0.0f, 0.0f),
+                false,
+                ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            for (const auto& category : talents.m_categories)
+            {
+                bool wroteCategory = false;
+                for (const auto& talent : talents.m_talents)
+                {
+                    if (talent.m_category != category)
+                    {
+                        continue;
+                    }
+                    if (!wroteCategory)
+                    {
+                        ImGui::TextUnformatted(category.c_str());
+                        ImGui::Separator();
+                        wroteCategory = true;
+                    }
+
+                    ImGui::PushID(talent.m_id.c_str());
+                    ImGui::Text("%s  %d/%d", talent.m_displayName.c_str(), talent.m_rank, talent.m_maxRank);
+                    ImGui::TextWrapped("%s", talent.m_description.c_str());
+                    if (!talent.m_requirementText.empty())
+                    {
+                        ImGui::TextDisabled("%s", talent.m_requirementText.c_str());
+                    }
+                    if (talent.m_canSelect)
+                    {
+                        if (ImGui::Button("Select", ImVec2(92.0f, 0.0f)) && gameCore)
+                        {
+                            gameCore->SelectTalent(talent.m_id);
+                        }
+                    }
+                    else if (talent.m_rank >= talent.m_maxRank)
+                    {
+                        ImGui::TextDisabled("Max rank");
+                    }
+                    else if (talents.m_pointsAvailable <= 0)
+                    {
+                        ImGui::TextDisabled("No points available");
+                    }
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
+                if (wroteCategory)
+                {
+                    ImGui::Spacing();
+                }
+            }
+            ImGui::EndChild();
         }
 
         const char* QuestBucketLabel(const AZStd::string& statusBucket)
@@ -2170,6 +2413,7 @@ namespace UiClient
 
         void DrawMicroMenuBar(
             bool& characterSheetOpen,
+            bool& talentsOpen,
             bool& questLogOpen,
             bool& mapOpen,
             bool& spellbookOpen,
@@ -2185,6 +2429,7 @@ namespace UiClient
 
             MenuButtonState buttons[] = {
                 {"Character", &characterSheetOpen},
+                {"Talents", &talentsOpen},
                 {"Quest Log", &questLogOpen},
                 {"Map", &mapOpen},
                 {"Spellbook", &spellbookOpen},
@@ -2691,6 +2936,87 @@ namespace UiClient
         return false;
     }
 
+    bool UiClientSystemComponent::SubmitChatInput(GameCore::IGameCoreRequests* gameCore, const AZStd::string& input)
+    {
+        if (!gameCore)
+        {
+            return false;
+        }
+
+        auto trim = [](const AZStd::string& value) -> AZStd::string
+        {
+            const size_t start = value.find_first_not_of(" \t\r\n");
+            if (start == AZStd::string::npos)
+            {
+                return {};
+            }
+            const size_t end = value.find_last_not_of(" \t\r\n");
+            return value.substr(start, end - start + 1);
+        };
+
+        AZStd::string text = trim(input);
+        if (text.empty())
+        {
+            return false;
+        }
+
+        auto splitFirst = [&trim](const AZStd::string& value) -> AZStd::pair<AZStd::string, AZStd::string>
+        {
+            const size_t space = value.find(' ');
+            if (space == AZStd::string::npos)
+            {
+                return {trim(value), {}};
+            }
+            return {trim(value.substr(0, space)), trim(value.substr(space + 1))};
+        };
+
+        if (text[0] != '/')
+        {
+            const AZStd::string target = m_chatChannel == "whisper" ? AZStd::string(m_chatWhisperTargetBuffer) : AZStd::string();
+            return gameCore->SubmitChatMessage(m_chatChannel, target, text);
+        }
+
+        const auto commandAndRest = splitFirst(text.substr(1));
+        const AZStd::string command = commandAndRest.first;
+        const AZStd::string rest = commandAndRest.second;
+        if (command == "say" || command == "s")
+        {
+            return gameCore->SubmitChatMessage("say", {}, rest);
+        }
+        if (command == "party" || command == "p")
+        {
+            return gameCore->SubmitChatMessage("party", {}, rest);
+        }
+        if (command == "whisper" || command == "w")
+        {
+            const auto targetAndMessage = splitFirst(rest);
+            return gameCore->SubmitChatMessage("whisper", targetAndMessage.first, targetAndMessage.second);
+        }
+        if (command == "friend")
+        {
+            const auto actionAndName = splitFirst(rest);
+            if (actionAndName.first == "add")
+            {
+                return gameCore->AddFriend(actionAndName.second);
+            }
+            if (actionAndName.first == "remove")
+            {
+                return gameCore->RemoveFriend(actionAndName.second);
+            }
+        }
+        if (command == "invite")
+        {
+            return gameCore->InviteParty(rest, {});
+        }
+        if (command == "leave")
+        {
+            return gameCore->LeaveParty();
+        }
+
+        AddHudEvent(AZStd::string::format("Unknown command: /%s", command.c_str()));
+        return false;
+    }
+
     bool UiClientSystemComponent::OnInputChannelEventFiltered(const AzFramework::InputChannel& inputChannel)
     {
         const auto& channelId = inputChannel.GetInputChannelId();
@@ -2774,6 +3100,7 @@ namespace UiClient
         if (!worldState.m_worldConnected)
         {
             m_trainerOpen = false;
+            m_talentsOpen = false;
             if (BeginHudPanel(
                     "##world_connect_panel",
                     "World Link",
@@ -2929,7 +3256,7 @@ namespace UiClient
         const ImVec2 actionBarPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
-        const ImVec2 microMenuSize(198.0f, 238.0f);
+        const ImVec2 microMenuSize(198.0f, 270.0f);
         const ImVec2 microMenuPos(actionBarPos.x + actionBarSize.x + 8.0f, actionBarPos.y);
         const ImVec2 minimapSize(250.0f, 260.0f);
         const ImVec2 minimapPos(displaySize.x > 1180.0f ? displaySize.x - 640.0f : 548.0f, 18.0f);
@@ -2941,8 +3268,12 @@ namespace UiClient
         const ImVec2 inventoryPos(18.0f, utilityPos.y - inventorySize.y - 18.0f);
         const ImVec2 settingsSize(680.0f, 520.0f);
         const ImVec2 settingsPos((displaySize.x - settingsSize.x) * 0.5f, (displaySize.y - settingsSize.y) * 0.5f);
-        const ImVec2 characterSize(360.0f, 220.0f);
+        const ImVec2 characterSize(360.0f, 310.0f);
         const ImVec2 characterPos(280.0f, displaySize.y - characterSize.y - 210.0f);
+        const ImVec2 talentsSize(440.0f, 430.0f);
+        const ImVec2 talentsPos(
+            AZ::GetMin(characterPos.x + characterSize.x + 18.0f, displaySize.x - talentsSize.x - 18.0f),
+            displaySize.y - talentsSize.y - 210.0f);
         const ImVec2 questLogSize(400.0f, 280.0f);
         const ImVec2 questLogPos(280.0f, displaySize.y - questLogSize.y - 180.0f);
         const ImVec2 mapSize(640.0f, 470.0f);
@@ -3069,6 +3400,7 @@ namespace UiClient
         {
             DrawMicroMenuBar(
                 m_characterSheetOpen,
+                m_talentsOpen,
                 m_questLogOpen,
                 m_mapOpen,
                 m_spellbookOpen,
@@ -3191,6 +3523,15 @@ namespace UiClient
             DrawCharacterSheetWindow(worldState);
         }
         if (m_characterSheetOpen)
+        {
+            ImGui::End();
+        }
+
+        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize))
+        {
+            DrawTalentWindow(gameCore, worldState);
+        }
+        if (m_talentsOpen)
         {
             ImGui::End();
         }

@@ -77,6 +77,7 @@ namespace UiClient
         bool m_characterSheetOpen = false;
         bool m_questLogOpen = false;
         bool m_mapOpen = false;
+        bool m_talentsOpen = false;
         int m_settingsTab = 0;
         bool m_extraUpperActionBarVisible = false;
         bool m_rightActionBarOneVisible = false;

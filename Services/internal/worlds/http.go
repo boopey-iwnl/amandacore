@@ -927,18 +927,20 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		}
 
 		entities = append(entities, sessionEntity{
-			ID:          mob.ID,
-			DisplayName: mob.DisplayName,
-			Kind:        mob.Kind,
-			MobTypeID:   mob.MobTypeID,
-			X:           mob.X,
-			Y:           mob.Y,
-			Z:           mob.Z,
-			Health:      mob.Health,
-			MaxHealth:   mob.MaxHealth,
-			Alive:       mob.Alive,
-			Targetable:  mob.Targetable,
-			AIState:     mob.AIState,
+			ID:             mob.ID,
+			DisplayName:    mob.DisplayName,
+			Kind:           mob.Kind,
+			MobTypeID:      mob.MobTypeID,
+			Classification: mob.Classification,
+			Elite:          mob.Elite,
+			X:              mob.X,
+			Y:              mob.Y,
+			Z:              mob.Z,
+			Health:         mob.Health,
+			MaxHealth:      mob.MaxHealth,
+			Alive:          mob.Alive,
+			Targetable:     mob.Targetable,
+			AIState:        mob.AIState,
 		})
 	}
 
@@ -1000,7 +1002,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"quest":                s.buildQuestResponse(session),
 		"quests":               s.buildQuestListResponse(session),
 		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
-		"zoneMap":              s.buildZoneMapResponse(),
+		"zoneMap":              s.buildZoneMapResponse(session.ZoneID),
 		"navigationAreas":      s.buildNavigationAreasResponse(),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"currentTargetId":      session.CurrentTargetID,

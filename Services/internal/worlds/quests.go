@@ -1,12 +1,16 @@
 package worlds
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
+	storepkg "amandacore/services/internal/store"
 )
+
+const defaultPartyQuestCreditRadius = 48.0
 
 func (s *worldServer) defaultQuestProgress(quest questDefinition) platform.CharacterQuestProgress {
 	return platform.CharacterQuestProgress{
@@ -321,44 +325,122 @@ func addItemToInventory(inventory *[]platform.CharacterInventorySlot, item itemR
 	return fmt.Errorf("inventory is full")
 }
 
-func (s *worldServer) applyQuestKillCreditLocked(session *worldSessionState, killedMobType string) error {
-	if session == nil {
+func (s *worldServer) applyQuestKillCreditLocked(killer *worldSessionState, killedMob *mobState) error {
+	if killer == nil || killedMob == nil {
 		return nil
 	}
 
-	changed := false
+	changedSessions := map[string]*worldSessionState{}
 	now := time.Now().Unix()
 	for _, questID := range s.questOrder {
 		quest := s.quests[questID]
-		if quest.TargetMobType != killedMobType {
-			continue
-		}
-		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
-		if progress.State != questStateActive || progress.CurrentCount >= progress.TargetCount {
+		if quest.TargetMobType != killedMob.MobTypeID {
 			continue
 		}
 
-		progress.CurrentCount++
-		progress.UpdatedAt = now
-		if progress.CurrentCount >= progress.TargetCount {
-			progress.State = questStateCompleted
-			progress.CompletedAt = now
+		for _, candidate := range s.killCreditCandidatesLocked(killer, quest, killedMob) {
+			progress := s.normalizeQuestProgress(quest, candidate.QuestProgress[quest.ID])
+			if progress.State != questStateActive || progress.CurrentCount >= progress.TargetCount {
+				continue
+			}
+
+			progress.CurrentCount++
+			progress.UpdatedAt = now
+			if progress.CurrentCount >= progress.TargetCount {
+				progress.State = questStateCompleted
+				progress.CompletedAt = now
+			}
+			candidate.QuestProgress[quest.ID] = progress
+			changedSessions[candidate.Token] = candidate
+			observability.LogEvent("world-service", "world.quest_progressed", map[string]any{
+				"worldSessionToken": candidate.Token,
+				"characterId":       candidate.CharacterID,
+				"questId":           quest.ID,
+				"currentCount":      progress.CurrentCount,
+				"targetCount":       progress.TargetCount,
+				"sharedPartyCredit": quest.PartyShareable && candidate.CharacterID != killer.CharacterID,
+				"killedMobId":       killedMob.ID,
+			})
 		}
-		session.QuestProgress[quest.ID] = progress
-		changed = true
-		observability.LogEvent("world-service", "world.quest_progressed", map[string]any{
-			"worldSessionToken": session.Token,
-			"characterId":       session.CharacterID,
-			"questId":           quest.ID,
-			"currentCount":      progress.CurrentCount,
-			"targetCount":       progress.TargetCount,
-		})
 	}
 
-	if changed {
-		return s.persistSessionProgressionLocked(session)
+	for _, session := range changedSessions {
+		if err := s.persistSessionProgressionLocked(session); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func (s *worldServer) killCreditCandidatesLocked(killer *worldSessionState, quest questDefinition, killedMob *mobState) []*worldSessionState {
+	if !quest.PartyShareable {
+		return []*worldSessionState{killer}
+	}
+
+	candidates := make([]*worldSessionState, 0, partySizeLimit)
+	seen := map[string]struct{}{}
+	addIfEligible := func(candidate *worldSessionState) {
+		if candidate == nil {
+			return
+		}
+		if _, exists := seen[candidate.CharacterID]; exists {
+			return
+		}
+		seen[candidate.CharacterID] = struct{}{}
+		if s.partyQuestCreditEligibleLocked(killer, candidate, quest, killedMob) {
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	party, err := s.store.GetPartyForCharacter(killer.CharacterID)
+	if err != nil {
+		if !errors.Is(err, storepkg.ErrPartyMissing) {
+			observability.LogEvent("world-service", "world.party_credit_lookup_failed", map[string]any{
+				"characterId": killer.CharacterID,
+				"questId":     quest.ID,
+				"error":       err.Error(),
+			})
+		}
+		addIfEligible(killer)
+		return candidates
+	}
+
+	for _, memberID := range party.MemberCharacterIDs {
+		addIfEligible(s.findConnectedSessionByCharacterLocked(memberID))
+	}
+	return candidates
+}
+
+func (s *worldServer) partyQuestCreditEligibleLocked(killer *worldSessionState, candidate *worldSessionState, quest questDefinition, killedMob *mobState) bool {
+	if killer == nil || candidate == nil || killedMob == nil {
+		return false
+	}
+	if !candidate.Connected || candidate.RealmID != killer.RealmID || candidate.ZoneID != killedMob.ZoneID {
+		s.logPartyCreditSkipped(candidate, quest, killedMob, "offline_or_wrong_zone")
+		return false
+	}
+	if distance2D(candidate.X, candidate.Y, killedMob.X, killedMob.Y) > questPartyCreditRadius(quest) {
+		s.logPartyCreditSkipped(candidate, quest, killedMob, "out_of_range")
+		return false
+	}
+	progress := s.normalizeQuestProgress(quest, candidate.QuestProgress[quest.ID])
+	if progress.State != questStateActive || progress.CurrentCount >= progress.TargetCount {
+		s.logPartyCreditSkipped(candidate, quest, killedMob, "quest_not_active")
+		return false
+	}
+	return true
+}
+
+func (s *worldServer) logPartyCreditSkipped(candidate *worldSessionState, quest questDefinition, killedMob *mobState, reason string) {
+	if candidate == nil || killedMob == nil || !quest.PartyShareable {
+		return
+	}
+	observability.LogEvent("world-service", "world.party_credit_skipped", map[string]any{
+		"characterId": candidate.CharacterID,
+		"questId":     quest.ID,
+		"mobId":       killedMob.ID,
+		"reason":      reason,
+	})
 }
 
 func (s *worldServer) primaryQuestLocked(session *worldSessionState) questDefinition {
@@ -479,11 +561,15 @@ func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform
 			StackCount:  item.StackCount,
 		})
 	}
+	uiTags := []string{}
+	if quest.GroupRecommended {
+		uiTags = append(uiTags, "Group")
+	}
 
 	return map[string]any{
 		"id":                   quest.ID,
 		"title":                quest.Title,
-		"category":             "Stonewake Vale",
+		"category":             s.questCategory(quest),
 		"statusBucket":         questStatusBucket(progress),
 		"tracked":              tracked,
 		"objectiveType":        quest.ObjectiveType,
@@ -499,7 +585,19 @@ func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform
 		"rewardCurrency":       breakdownCurrency(quest.RewardCopper),
 		"rewardItems":          rewardItems,
 		"objectiveArea":        objectiveArea,
+		"partyShareable":       quest.PartyShareable,
+		"groupRecommended":     quest.GroupRecommended,
+		"recommendedPlayers":   quest.RecommendedPlayers,
+		"partyCreditRadius":    questPartyCreditRadius(quest),
+		"uiTags":               uiTags,
 	}
+}
+
+func (s *worldServer) questCategory(quest questDefinition) string {
+	if zone, ok := s.zones[quest.ZoneID]; ok && zone.DisplayName != "" {
+		return zone.DisplayName
+	}
+	return "Stonewake Vale"
 }
 
 func questStatusBucket(progress platform.CharacterQuestProgress) string {
@@ -554,6 +652,16 @@ func (s *worldServer) findNavigationAreaForQuest(quest questDefinition) (navigat
 		}
 	}
 	return navigationAreaDefinition{}, false
+}
+
+func questPartyCreditRadius(quest questDefinition) float64 {
+	if quest.PartyCreditRadius > 0 {
+		return quest.PartyCreditRadius
+	}
+	if quest.PartyShareable {
+		return defaultPartyQuestCreditRadius
+	}
+	return 0
 }
 
 func breakdownCurrency(totalCopper int) currencyBreakdown {

@@ -2,38 +2,86 @@ package worlds
 
 import "amandacore/services/internal/platform"
 
-func (s *worldServer) buildZoneMapResponse() map[string]any {
-	roads := make([]map[string]any, 0, len(stonewakeZoneMap.Roads))
-	for _, road := range stonewakeZoneMap.Roads {
-		roads = append(roads, map[string]any{
-			"id":          road.ID,
-			"displayName": road.DisplayName,
-			"points":      road.Points,
-		})
+func (s *worldServer) buildZoneMapResponse(zoneID string) map[string]any {
+	if zoneID == "" || zoneID == defaultZoneID {
+		roads := make([]map[string]any, 0, len(stonewakeZoneMap.Roads))
+		for _, road := range stonewakeZoneMap.Roads {
+			roads = append(roads, map[string]any{
+				"id":          road.ID,
+				"displayName": road.DisplayName,
+				"points":      road.Points,
+			})
+		}
+
+		landmarks := make([]map[string]any, 0, len(stonewakeZoneMap.Landmarks))
+		for _, landmark := range stonewakeZoneMap.Landmarks {
+			landmarks = append(landmarks, map[string]any{
+				"id":          landmark.ID,
+				"displayName": landmark.DisplayName,
+				"kind":        landmark.Kind,
+				"x":           landmark.X,
+				"y":           landmark.Y,
+			})
+		}
+
+		return map[string]any{
+			"zoneId":      stonewakeZoneMap.ZoneID,
+			"displayName": stonewakeZoneMap.DisplayName,
+			"bounds": map[string]float64{
+				"minX": stonewakeZoneMap.MinX,
+				"minY": stonewakeZoneMap.MinY,
+				"maxX": stonewakeZoneMap.MaxX,
+				"maxY": stonewakeZoneMap.MaxY,
+			},
+			"roads":     roads,
+			"landmarks": landmarks,
+		}
 	}
 
-	landmarks := make([]map[string]any, 0, len(stonewakeZoneMap.Landmarks))
-	for _, landmark := range stonewakeZoneMap.Landmarks {
-		landmarks = append(landmarks, map[string]any{
-			"id":          landmark.ID,
-			"displayName": landmark.DisplayName,
-			"kind":        landmark.Kind,
-			"x":           landmark.X,
-			"y":           landmark.Y,
-		})
+	if zone, ok := s.zones[zoneID]; ok {
+		roads := make([]map[string]any, 0, len(zone.Roads))
+		for _, road := range zone.Roads {
+			roads = append(roads, map[string]any{
+				"id":          road.ID,
+				"displayName": road.DisplayName,
+				"points":      road.Points,
+			})
+		}
+		landmarks := make([]map[string]any, 0, len(zone.Landmarks)+len(zone.Transitions))
+		for _, landmark := range append(zone.Landmarks, zone.Transitions...) {
+			landmarks = append(landmarks, map[string]any{
+				"id":          landmark.ID,
+				"displayName": landmark.DisplayName,
+				"kind":        landmark.Type,
+				"x":           landmark.X,
+				"y":           landmark.Y,
+			})
+		}
+		return map[string]any{
+			"zoneId":      zone.ID,
+			"displayName": zone.DisplayName,
+			"bounds": map[string]float64{
+				"minX": zone.Bounds.MinX,
+				"minY": zone.Bounds.MinY,
+				"maxX": zone.Bounds.MaxX,
+				"maxY": zone.Bounds.MaxY,
+			},
+			"roads":     roads,
+			"landmarks": landmarks,
+		}
 	}
 
 	return map[string]any{
-		"zoneId":      stonewakeZoneMap.ZoneID,
-		"displayName": stonewakeZoneMap.DisplayName,
+		"zoneId":      defaultZoneID,
+		"displayName": "Stonewake Vale",
 		"bounds": map[string]float64{
 			"minX": stonewakeZoneMap.MinX,
 			"minY": stonewakeZoneMap.MinY,
 			"maxX": stonewakeZoneMap.MaxX,
 			"maxY": stonewakeZoneMap.MaxY,
 		},
-		"roads":     roads,
-		"landmarks": landmarks,
+		"roads":     []map[string]any{},
+		"landmarks": []map[string]any{},
 	}
 }
 
@@ -83,20 +131,33 @@ func (s *worldServer) buildMapMarkersResponse(session *worldSessionState) []map[
 			continue
 		}
 		area, found := s.findNavigationAreaForQuest(quest)
-		if !found {
+		if found {
+			markers = append(markers, map[string]any{
+				"id":            "objective_" + quest.ID,
+				"displayName":   area.DisplayName,
+				"kind":          "tracked_objective",
+				"questId":       quest.ID,
+				"areaId":        area.ID,
+				"x":             area.CenterX,
+				"y":             area.CenterY,
+				"radius":        area.Radius,
+				"routeHintText": area.RouteHintText,
+			})
 			continue
 		}
-		markers = append(markers, map[string]any{
-			"id":            "objective_" + quest.ID,
-			"displayName":   area.DisplayName,
-			"kind":          "tracked_objective",
-			"questId":       quest.ID,
-			"areaId":        area.ID,
-			"x":             area.CenterX,
-			"y":             area.CenterY,
-			"radius":        area.Radius,
-			"routeHintText": area.RouteHintText,
-		})
+		if quest.MarkerX != 0 || quest.MarkerY != 0 {
+			markers = append(markers, map[string]any{
+				"id":            "objective_" + quest.ID,
+				"displayName":   quest.Title,
+				"kind":          "tracked_objective",
+				"questId":       quest.ID,
+				"areaId":        quest.ID + "_marker",
+				"x":             quest.MarkerX,
+				"y":             quest.MarkerY,
+				"radius":        starterInteractRadius,
+				"routeHintText": "Follow the road marker toward the objective.",
+			})
+		}
 	}
 
 	return markers

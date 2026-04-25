@@ -42,6 +42,7 @@ namespace GameCore
         bool SetAutoAttack(bool enabled) override;
         bool ActivateAbility(const AZStd::string& abilityId) override;
         bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) override;
+        bool SelectTalent(const AZStd::string& talentId) override;
         bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) override;
         bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) override;
         bool ClearActionBarSlot(int slotIndex) override;

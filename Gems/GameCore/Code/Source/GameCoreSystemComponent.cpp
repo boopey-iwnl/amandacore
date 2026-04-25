@@ -43,7 +43,7 @@ namespace GameCore
             {
                 "steady_strike",
                 "Steady Strike",
-                "A measured weapon strike that spends Grit for reliable melee damage.",
+                "A measured weapon strike that builds Grit through steady contact.",
                 "Known by default.",
                 1,
                 1,
@@ -65,20 +65,20 @@ namespace GameCore
             {
                 "driving_blow",
                 "Driving Blow",
-                "A harder follow-through strike that will become trainable later in the starter journey.",
-                "Requires level 3 and a Warrior trainer.",
-                3,
+                "A harder follow-through strike trained early in the starter journey.",
+                "Requires level 2 and a Warrior trainer.",
+                2,
                 -1,
                 "",
                 "",
                 true,
             },
             {
-                "war_cry",
-                "War Cry",
-                "A rallying shout that will later become available through Warrior training.",
-                "Requires level 5 and a Warrior trainer.",
-                5,
+                "rallying_call",
+                "Rallying Call",
+                "A short shout that restores Grit before the next exchange.",
+                "Requires level 4 and a Warrior trainer.",
+                4,
                 -1,
                 "",
                 "",
@@ -95,6 +95,28 @@ namespace GameCore
                 "",
                 true,
             },
+            {
+                "guarded_form",
+                "Guarded Form",
+                "Set your feet and recover while under pressure.",
+                "Requires level 8 and a Warrior trainer.",
+                8,
+                -1,
+                "",
+                "",
+                false,
+            },
+            {
+                "overhand_cut",
+                "Overhand Cut",
+                "Spend stored Grit on a heavy weapon attack.",
+                "Requires level 10 and a Warrior trainer.",
+                10,
+                -1,
+                "",
+                "",
+                true,
+            },
         };
 
         AZStd::string NormalizeAbilityId(const AZStd::string& abilityId)
@@ -106,6 +128,10 @@ namespace GameCore
             if (abilityId == "steady_blast")
             {
                 return "brace";
+            }
+            if (abilityId == "war_cry")
+            {
+                return "rallying_call";
             }
             return abilityId;
         }
@@ -490,6 +516,33 @@ namespace GameCore
 
         m_worldState.m_errorMessage.clear();
         ApplyWorldSessionResponse(AZStd::move(response), "trainer_learn");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::SelectTalent(const AZStd::string& talentId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->SelectTalent(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                talentId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "SelectTalent failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "talent_select");
         return true;
     }
 

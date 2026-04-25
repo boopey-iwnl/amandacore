@@ -23,6 +23,20 @@ function Resolve-Tool($preferredPath, $commandName) {
     throw "Required tool '$commandName' was not found."
 }
 
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code $LASTEXITCODE`: $FilePath $($Arguments -join ' ')"
+    }
+}
+
 $dotnet = Resolve-Tool "C:\Program Files\dotnet\dotnet.exe" "dotnet"
 $cmake = Resolve-Tool "C:\Program Files\CMake\bin\cmake.exe" "cmake"
 
@@ -30,12 +44,12 @@ if (!(Test-Path $versionManifestPath)) {
     & $versionManifestScript -OutputPath $versionManifestPath
 }
 
-& $dotnet build $launcherProject
-& $dotnet build $worldClientProject
+Invoke-Native $dotnet "build" $launcherProject
+Invoke-Native $dotnet "build" $worldClientProject
 
 foreach ($o3deBuildRoot in $o3deBuildRoots) {
     if (Test-Path $o3deBuildRoot) {
-        & $cmake --build $o3deBuildRoot --config profile --target amandacore.GameLauncher
+        Invoke-Native $cmake "--build" $o3deBuildRoot "--config" "profile" "--target" "amandacore.GameLauncher"
     }
 }
 

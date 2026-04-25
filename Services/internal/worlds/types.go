@@ -192,6 +192,8 @@ type sessionEntity struct {
 	DisplayName      string       `json:"displayName"`
 	Kind             string       `json:"kind"`
 	MobTypeID        string       `json:"mobTypeId,omitempty"`
+	Classification   string       `json:"classification,omitempty"`
+	Elite            bool         `json:"elite,omitempty"`
 	GatherNodeTypeID string       `json:"gatherNodeTypeId,omitempty"`
 	ProfessionID     string       `json:"professionId,omitempty"`
 	RequiredSkill    int          `json:"requiredSkill,omitempty"`
@@ -241,6 +243,10 @@ type questDefinition struct {
 	LevelBand       string
 	MarkerX         float64
 	MarkerY         float64
+	PartyShareable  bool
+	GroupRecommended bool
+	RecommendedPlayers int
+	PartyCreditRadius float64
 }
 
 type navigationAreaDefinition struct {
@@ -442,6 +448,8 @@ type mobState struct {
 	MoveSpeedPerSec        float64
 	LeashRadius            float64
 	RespawnDelayMs         int64
+	Classification         string
+	Elite                  bool
 	Alive                  bool
 	Targetable             bool
 	AIState                string
@@ -467,6 +475,8 @@ type mobSpawnDefinition struct {
 	MoveSpeedPerSec float64
 	LeashRadius     float64
 	RespawnDelayMs  int64
+	Classification  string
+	Elite           bool
 }
 
 type worldServer struct {
@@ -584,6 +594,8 @@ func (s *worldServer) ensureMobsLocked() {
 			MoveSpeedPerSec: spawn.MoveSpeedPerSec,
 			LeashRadius:     spawn.LeashRadius,
 			RespawnDelayMs:  spawn.RespawnDelayMs,
+			Classification:  spawn.Classification,
+			Elite:           spawn.Elite,
 			Alive:           true,
 			Targetable:      true,
 			AIState:         mobAIStateIdle,
