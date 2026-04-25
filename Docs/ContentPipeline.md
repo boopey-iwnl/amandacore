@@ -2,48 +2,48 @@
 
 AmandaCore content must be authored, validated, compiled, and loaded through original AmandaCore formats. Runtime servers must consume AmandaCore content packages, not TrinityCore or AzerothCore database tables, schemas, IDs, scripts, or data.
 
-## Intended Flow
+## Current Flow
 
-1. O3DE or editor-authored data exports neutral AmandaCore zone metadata.
-2. Static source manifests live in AmandaCore-owned formats.
-3. Validators check IDs, references, bounds, rewards, objectives, and package compatibility.
-4. A future compiler produces versioned runtime content packages.
-5. Runtime services load compiled packages through a controlled content registry.
-6. Package checksums and provenance are recorded for test and release traceability.
+The current flow is:
 
-The initial Go `contentpkg` package is a lightweight skeleton for package manifests only. It is not a content compiler yet.
+1. Author JSON package files under `Content/Packs`.
+2. Validate package manifests, zones, spawn groups, quest providers, and catalogs.
+3. Activate validated content into Go runtime structures.
+4. Exercise packages through unit tests and loadsim scenarios.
 
-## Initial Content Domains
+`dev_foundation` is the strict activation fixture. `dawnwake_isles` is the original multi-zone package for traversal, sharding, streaming, and future O3DE map-trace integration.
 
-- zones and world-region metadata
-- spawn points and authored position markers
-- NPC archetypes
-- ability specs and effect references
-- loot and reward rules
-- quests and objective graphs
-- dialogue and interaction references
+## Authoritative Data Boundary
 
-## Migration Discipline
+The server owns gameplay authority. Content packages may define authored inputs such as zone bounds, NPC archetypes, spawn points, loot references, quests, and traversal gates, but they do not define packet formats or client authority.
 
-Content package versions and persistence schema migrations are separate tracks:
+Package data must remain AmandaCore-owned:
 
-- Persistence migrations change durable service state.
-- Content packages change authored world/gameplay data.
-- Compatibility rules decide whether a runtime can load a package.
-- Checksums make package and migration drift visible.
-- Dry-run validation should run before local, staging, or release deployment.
+- original IDs
+- original JSON shapes
+- original NPC, item, quest, ability, aura, and loot definitions
+- original zone topology
+- original map-coordinate transforms
 
-Do not copy SQL schemas, table names, live-table layouts, content IDs, or content records from external projects. AmandaCore migrations must be derived from AmandaCore-owned aggregates and storage domains.
+## Placeholder Versus Map-accurate Data
+
+Dawnwake package coordinates are placeholder server rectangles until the owner-supplied Dawnwake Isles references are traced into documented normalized coordinates and world-space transforms.
+
+Placeholder package data must be clearly marked with accuracy/source metadata so future map-driven rebuilds can replace it without guessing.
 
 ## Future Compiler Responsibilities
 
-The future compiler should:
+The compiler/tooling layer should eventually:
 
-- validate manifest schema and cross-references
-- reserve IDs in AmandaCore namespaces
-- reject duplicate or missing references
-- emit runtime packages with version, checksum, dependency, and compatibility metadata
-- generate audit-friendly package summaries
-- support deterministic test fixtures for replay and scenario tests
+- validate references across all package catalogs
+- compile normalized map coordinates into server world-space transforms
+- emit compact runtime package artifacts
+- produce package summaries for review
+- generate replay fixtures for scenario tests
+- reject stale or incompatible package versions before activation
 
 Hot reload should be added only where package compatibility can be proven without corrupting live simulation state.
+
+## Clean-room reference boundary
+
+This implementation uses original AmandaCore code and data. TrinityCore and AzerothCore were used only as high-level architectural reference. Dawnwake Isles is AmandaCore-original world content. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, map formats, area tables, zone tables, spawn schemas, coordinates, quest tables, item tables, creature tables, spell tables, aura tables, reward schemas, or database structures were copied or adapted.

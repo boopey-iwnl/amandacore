@@ -1,13 +1,38 @@
 {
   "zone_id": "mistwood_reach",
   "display_name": "Mistwood Reach",
-  "bounds": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 130, "max_y": 140, "max_z": 40},
+  "description": "A provisional forest/highland wilds zone reserved for later denser traversal and encounter work.",
+  "bounds": { "min_x": 200, "min_y": 160, "min_z": -25, "max_x": 420, "max_y": 360, "max_z": 220, "accuracy": "placeholder", "source": "pending_map_trace" },
   "entry_points": [
-    {"entry_id": "default", "position": {"x": 26, "y": 30, "z": 0}},
-    {"entry_id": "from_highroad_pass", "position": {"x": 88, "y": 124, "z": 0}}
+    { "entry_point_id": "mistwood_south_path", "display_name": "South Path from Amberglass", "position": { "x": 306, "y": 166, "z": 0 }, "facing_yaw": 0, "tags": ["transition_arrival"] }
   ],
   "transition_gates": [
-    {"transition_id": "mistwood_to_highroad", "to_zone_id": "highroad_pass", "entry_id_on_arrival": "from_mistwood_reach"}
+    {
+      "transition_id": "mistwood_to_amberglass_south_path",
+      "from_zone_id": "mistwood_reach",
+      "to_zone_id": "amberglass_fields",
+      "kind": "Road",
+      "gate_bounds": { "min_x": 286, "min_y": 160, "min_z": -5, "max_x": 326, "max_y": 166, "max_z": 25, "accuracy": "placeholder", "source": "pending_map_trace" },
+      "entry_point_id_on_arrival": "amberglass_mistwood_path",
+      "tags": ["walk", "wilds"]
+    }
   ],
-  "runtime": {"max_sessions": 75, "max_entities": 170}
+  "spawn_groups": [
+    {
+      "spawn_group_id": "mistwood_road_bandits",
+      "display_name": "Dawnwake Road Bandit Placeholder",
+      "archetype_id": "dawnwake_road_bandit_placeholder",
+      "disposition": "Hostile",
+      "spawn_points": [
+        { "spawn_point_id": "mistwood_road_bandit_01", "position": { "x": 300, "y": 220, "z": 0 }, "tags": ["road"] },
+        { "spawn_point_id": "mistwood_road_bandit_02", "position": { "x": 332, "y": 246, "z": 0 }, "tags": ["road"] }
+      ],
+      "tags": ["placeholder", "hostile"]
+    }
+  ],
+  "quest_providers": [],
+  "runtime_config": { "activation_policy": "activate_with_continent", "hostile_density": "medium", "future_hooks": ["forest_streaming_cell_export", "encounter_marker_export"] },
+  "streaming_hints": { "interest_radius": 80, "adjacent_preload_distance": 44, "priority": "normal", "notes": ["Future forest streaming and encounter test bed."] },
+  "tags": ["forest", "highland", "wilds", "placeholder_bounds"],
+  "metadata": { "accuracy": "placeholder", "source": "pending_map_trace", "todo": "Replace Mistwood path and forest bounds after project-owner map trace." }
 }

@@ -85,3 +85,13 @@ go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizon
 ```
 
 Scale tiers, scenarios, reports, and sharding behavior are documented in `Docs/LoadTesting.md` and `Docs/MultiZoneSharding.md`.
+
+The Dawnwake Isles multi-zone skeleton can be exercised without O3DE:
+
+```powershell
+Push-Location Services
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-traversal-basic --content ../Content/Packs/dawnwake_isles/package.json
+Pop-Location
+```
+
+The scenario loads `dawnwake_isles`, activates its continent runtime, spawns simulated players at the default entry, transfers through the first zone gate, and reports transition and visibility counts.

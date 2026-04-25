@@ -59,6 +59,14 @@ The data model is deliberately wider than the first slice so future work can sca
 
 The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones and catalogs before activation, and activates validated dev content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows.
 
+`Content/Packs/dawnwake_isles` adds the first original multi-zone continent package. The Go content package loader validates the package manifest, continent topology, zone bounds, transition gates, spawn placement, and quest provider placement before activating a `ContinentRuntime`. Runtime ownership is single-zone for now: each character is owned by exactly one `ZoneRuntime`, and transfer gates move ownership between zone runtimes with state diffs and visibility deltas.
+
+Current Dawnwake coordinates are placeholder server-side rectangles pending map tracing from the owner-supplied Dawnwake Isles and Kingsfall Harbor images. O3DE mapping remains a separate transform layer; the server package is the authoritative runtime input.
+
+### Clean-room reference boundary
+
+This implementation uses original AmandaCore code and data. TrinityCore and AzerothCore were used only as high-level architectural reference. Dawnwake Isles is AmandaCore-original world content. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, map formats, area tables, zone tables, spawn schemas, coordinates, quest tables, item tables, creature tables, spell tables, aura tables, reward schemas, or database structures were copied or adapted.
+
 ## Recommended future O3DE wiring
 
 - Build `AmandaCoreShared` as a normal static library and link it into both client and server Gems.

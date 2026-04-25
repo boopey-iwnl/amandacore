@@ -127,31 +127,90 @@ type domainEvent = DomainEvent
 type stateDiff = StateDiff
 
 type DomainEvent struct {
+	EventName    string         `json:"eventName,omitempty"`
 	Type         string         `json:"type"`
 	OccurredAtMs int64          `json:"occurredAtMs"`
+	CharacterID  string         `json:"characterId,omitempty"`
+	EntityID     string         `json:"entityId,omitempty"`
+	ZoneID       string         `json:"zoneId,omitempty"`
 	Fields       map[string]any `json:"fields,omitempty"`
 }
 
 type StateDiff struct {
+	DiffType     string         `json:"diffType,omitempty"`
 	Type         string         `json:"type"`
 	OccurredAtMs int64          `json:"occurredAtMs"`
+	CharacterID  string         `json:"characterId,omitempty"`
 	EntityID     string         `json:"entityId,omitempty"`
+	ZoneID       string         `json:"zoneId,omitempty"`
 	Fields       map[string]any `json:"fields,omitempty"`
 }
 
-func newDomainEvent(eventName string, fields map[string]any) DomainEvent {
+func newDomainEvent(eventName string, args ...any) DomainEvent {
+	fields := map[string]any{}
+	characterID := ""
+	entityID := ""
+	zoneID := ""
+	if len(args) == 1 {
+		if typed, ok := args[0].(map[string]any); ok {
+			fields = typed
+		}
+	}
+	if len(args) == 4 {
+		characterID, _ = args[0].(string)
+		entityID, _ = args[1].(string)
+		zoneID, _ = args[2].(string)
+		if typed, ok := args[3].(map[string]any); ok {
+			fields = typed
+		}
+	}
+	cloned := cloneEventFields(fields)
+	if characterID != "" {
+		cloned["characterId"] = characterID
+	}
+	if entityID != "" {
+		cloned["entityId"] = entityID
+	}
+	if zoneID != "" {
+		cloned["zoneId"] = zoneID
+	}
 	return DomainEvent{
+		EventName:    eventName,
 		Type:         eventName,
 		OccurredAtMs: nowMillis(),
-		Fields:       cloneEventFields(fields),
+		CharacterID:  characterID,
+		EntityID:     entityID,
+		ZoneID:       zoneID,
+		Fields:       cloned,
 	}
 }
 
-func newStateDiff(diffType string, entityID string, fields map[string]any) StateDiff {
+func newStateDiff(diffType string, args ...any) StateDiff {
+	characterID := ""
+	entityID := ""
+	zoneID := ""
+	fields := map[string]any{}
+	if len(args) == 2 {
+		entityID, _ = args[0].(string)
+		if typed, ok := args[1].(map[string]any); ok {
+			fields = typed
+		}
+	}
+	if len(args) == 4 {
+		characterID, _ = args[0].(string)
+		entityID, _ = args[1].(string)
+		zoneID, _ = args[2].(string)
+		if typed, ok := args[3].(map[string]any); ok {
+			fields = typed
+		}
+	}
 	return StateDiff{
+		DiffType:     diffType,
 		Type:         diffType,
 		OccurredAtMs: nowMillis(),
+		CharacterID:  characterID,
 		EntityID:     entityID,
+		ZoneID:       zoneID,
 		Fields:       cloneEventFields(fields),
 	}
 }
@@ -163,6 +222,7 @@ func (s *worldServer) emitWorldEventLocked(eventName string, fields map[string]a
 	nowMs := nowMillis()
 	eventFields := cloneEventFields(fields)
 	s.domainEvents = appendCappedDomainEvent(s.domainEvents, DomainEvent{
+		EventName:    eventName,
 		Type:         eventName,
 		OccurredAtMs: nowMs,
 		Fields:       eventFields,
@@ -170,8 +230,18 @@ func (s *worldServer) emitWorldEventLocked(eventName string, fields map[string]a
 	observability.LogEvent("world-service", eventName, eventFields)
 
 	for _, diff := range diffs {
-		if diff.Type == "" {
+		diffType := diff.Type
+		if diffType == "" {
+			diffType = diff.DiffType
+		}
+		if diffType == "" {
 			continue
+		}
+		if diff.Type == "" {
+			diff.Type = diffType
+		}
+		if diff.DiffType == "" {
+			diff.DiffType = diffType
 		}
 		if diff.OccurredAtMs == 0 {
 			diff.OccurredAtMs = nowMs
@@ -179,10 +249,17 @@ func (s *worldServer) emitWorldEventLocked(eventName string, fields map[string]a
 		diff.Fields = cloneEventFields(diff.Fields)
 		s.stateDiffs = appendCappedStateDiff(s.stateDiffs, diff, maxRecentStateDiffs)
 		diffFields := map[string]any{
-			"diffType": diff.Type,
+			"diffType": diffType,
 			"entityId": diff.EntityID,
 		}
+		if diff.CharacterID != "" {
+			diffFields["characterId"] = diff.CharacterID
+		}
+		if diff.ZoneID != "" {
+			diffFields["zoneId"] = diff.ZoneID
+		}
 		s.domainEvents = appendCappedDomainEvent(s.domainEvents, DomainEvent{
+			EventName:    EventWorldStateDiffEmitted,
 			Type:         EventWorldStateDiffEmitted,
 			OccurredAtMs: nowMs,
 			Fields:       diffFields,
@@ -274,8 +351,12 @@ func cloneDomainEvents(source []DomainEvent) []DomainEvent {
 	cloned := make([]DomainEvent, len(source))
 	for index, event := range source {
 		cloned[index] = DomainEvent{
+			EventName:    event.EventName,
 			Type:         event.Type,
 			OccurredAtMs: event.OccurredAtMs,
+			CharacterID:  event.CharacterID,
+			EntityID:     event.EntityID,
+			ZoneID:       event.ZoneID,
 			Fields:       cloneEventFields(event.Fields),
 		}
 	}
@@ -289,9 +370,12 @@ func cloneStateDiffs(source []StateDiff) []StateDiff {
 	cloned := make([]StateDiff, len(source))
 	for index, diff := range source {
 		cloned[index] = StateDiff{
+			DiffType:     diff.DiffType,
 			Type:         diff.Type,
 			OccurredAtMs: diff.OccurredAtMs,
+			CharacterID:  diff.CharacterID,
 			EntityID:     diff.EntityID,
+			ZoneID:       diff.ZoneID,
 			Fields:       cloneEventFields(diff.Fields),
 		}
 	}

@@ -4,140 +4,62 @@ AmandaCore content packages are server-side JSON manifests owned by AmandaCore. 
 
 ## Clean-room reference boundary
 
-This implementation uses original AmandaCore code and data. TrinityCore/AzerothCore were used only as high-level architectural reference. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, loot tables, quest tables, item IDs, creature IDs, spell IDs, quest text, reward tables, map formats, zone tables, spawn schemas, coordinates, or database structures were copied or adapted.
+This implementation uses original AmandaCore code and data. TrinityCore and AzerothCore were used only as high-level architectural reference. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, map formats, area tables, zone tables, spawn schemas, coordinates, quest tables, item tables, creature tables, spell tables, aura tables, reward schemas, or database structures were copied or adapted.
 
 ## Layout
 
-The first package lives at:
+Packages live under `Content/Packs`.
 
-```text
-Content/Packs/dev_foundation/
-  package.json
-  zones/dev_isle_edge.zone.json
-  npcs/dev_npcs.json
-  items/dev_items.json
-  loot/dev_loot.json
-  quests/dev_quests.json
-  abilities/dev_abilities.json
-  auras/dev_auras.json
-```
+Current packages:
 
-The default local package is `Content/Packs/dev_foundation/package.json`. Override it with:
+- `dev_foundation`: small runtime package used by content-loader tests and the `content-package-basic` loadsim.
+- `dawnwake_isles`: original multi-zone Dawnwake skeleton used by traversal and multizone loadsim coverage.
 
-```powershell
-$env:AMANDACORE_CONTENT_PACKAGE="Content/Packs/dev_foundation/package.json"
-```
-
-Relative paths are resolved from the current working directory first, then by walking up parent directories. This lets service tests run from `Services` while still finding repo-root content.
+The active Go runtime loader is the `Services/internal/content` package. It loads package manifests, zone files, and optional catalogs, then activates validated content into `worldServer` through `Services/internal/worlds/content_activation.go`.
 
 ## Manifest
 
-`package.json` contains:
+The loader accepts an AmandaCore package manifest with:
 
-- `package_id`
-- `display_name`
-- `version`
-- `schema_version`
-- `description`
-- `authorship`
-- `zones`
-- `npc_catalogs`
-- `item_catalogs`
-- `loot_catalogs`
-- `quest_catalogs`
-- `ability_catalogs`
-- `aura_catalogs`
-- `tags`
+- package identity and schema metadata
+- zone file paths
+- optional NPC, item, loot, quest, ability, and aura catalog paths
+- tags and authoring metadata
 
-`schema_version` is currently `1`. Unsupported schema versions are rejected before runtime activation.
+The `dev_foundation` package is the strict loader fixture. The richer Dawnwake package carries additional continent and streaming metadata used by load simulation and future map-tracing work.
 
 ## Zone Format
 
-A zone file defines:
+Zones define:
 
-- `zone_id`, `display_name`, `description`
-- `bounds` with `min_x`, `min_y`, `min_z`, `max_x`, `max_y`, `max_z`
-- `entry_points`
-- `spawn_groups`
-- `quest_providers`
-- `runtime` with `tick_ms`, `max_players`, `max_entities`
+- `zone_id`
+- `display_name`
+- bounds
+- entry points
+- spawn groups
+- quest providers
+- runtime hints
 
-Validation requires valid bounds, positions inside bounds, unique zone IDs, positive runtime limits, and a tick interval from 16ms to 250ms.
-
-## Catalogs
-
-NPC catalogs define archetypes with health, level, disposition, combat ranges, damage, cadence, optional default abilities, and tags.
-
-Item catalogs define item ID, display name, description, kind, quality, max stack, and tags.
-
-Loot catalogs define loot tables with item references, quantity ranges, drop chance percentages, and guaranteed flags.
-
-Quest catalogs define quest metadata, prerequisite quest IDs, objective graph nodes, and item rewards. Objective nodes currently support `kill_npc`, `collect_item`, and `talk_provider`.
-
-Ability catalogs define ability ID, school, target rule, range, timing, cooldown, effects, and tags. Aura catalogs define aura ID, kind, duration, stack behavior, tick rule, modifiers, and tags. Content-loaded abilities and auras are validated and registered, but the current combat runtime still uses the existing hardcoded ability catalog.
-
-## Validation
-
-The loader reports all practical errors without panicking. Error codes include:
-
-- `MissingFile`
-- `MalformedJson`
-- `UnsupportedSchemaVersion`
-- `MissingRequiredField`
-- `DuplicateID`
-- `InvalidID`
-- `InvalidEnum`
-- `InvalidNumberRange`
-- `BrokenReference`
-- `PositionOutOfBounds`
-- `ObjectiveGraphCycle`
-- `RuntimeConfigInvalid`
-
-Package-level validation catches duplicate IDs, missing files, malformed JSON, broken spawn/NPC/loot/item/quest/ability/aura references, invalid numeric ranges, positions outside zone bounds, invalid runtime config, and quest objective dependency cycles.
+The loadsim reader also accepts Dawnwake traversal fields such as `entry_point_id`, `entry_point_id_on_arrival`, disabled transition gates, and placeholder map-trace metadata.
 
 ## Runtime Activation
 
-Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones to current world zone definitions, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers simple quest projections, and merges package items into the current item lookup path.
+Validated package content is additive. The server keeps built-in starter content available, then activates content-package zones, NPC spawns, quest providers, item definitions, loot tables, and quest definitions.
 
-Existing hardcoded Stonewake and Brindlebrook flows remain as fallback. The content package is additive and does not replace the current starter content yet.
-
-Structured events include:
-
-- `content.package.load_started`
-- `content.package.load_completed`
-- `content.package.load_failed`
-- `content.package.validation_started`
-- `content.package.validation_completed`
-- `content.package.validation_failed`
-- `content.package.activated`
-- `content.package.activation_failed`
-- `content.zone.loaded`
-- `content.catalog.loaded`
-- `content.reference.resolved`
-- `content.reference.broken`
-- `content.quest_provider.registered`
-- `world.zone.runtime_created`
-- `loadsim.content.started`
-- `loadsim.content.completed`
+Content packages do not replace authoritative simulation logic. They provide AmandaCore-owned runtime inputs.
 
 ## Loadsim
 
-Run from the Go module root:
+From `Services`:
 
 ```powershell
-cd Services
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
+go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizone-pressure --content ..\Content\Packs\dawnwake_isles\package.json --seed 42
 ```
-
-The `content-package-basic` scenario loads and validates the package, activates zones, counts spawned NPCs, accepts `dev_first_hunt`, resolves a stalker kill, claims deterministic guaranteed loot, grants quest rewards, and reports tick timing.
 
 ## Current Limitations
 
-- Ability and aura package entries are validated and registered, but combat still resolves the existing hardcoded Warrior ability catalog.
-- Runtime quest activation projects the first supported objective into the current single-objective quest shape while retaining the full objective graph in `RuntimeContentRegistry`.
-- Loot claiming in loadsim is deterministic and server-side; public world HTTP loot endpoints are not introduced in this milestone.
-- This is not a content editor, O3DE export pipeline, terrain streamer, or compiled binary content format.
-
-## Next Milestone
-
-Dawnwake Isles zone skeletons and streamed world expansion should add an original Dawnwake package, AmandaCore-owned zone IDs and boundaries, adjacency and transition metadata, loaded zone runtimes, entry and exit transition points, placeholder spawn groups and quest providers, world traversal validation, future O3DE streaming hooks, tests, and loadsim coverage.
+- Dawnwake coordinates are placeholder server rectangles pending map tracing.
+- O3DE world-space transforms are not yet generated from package coordinates.
+- Hot reload is not enabled; content is loaded at runtime initialization.
+- The full Dawnwake package carries richer authoring metadata than the first activation loader consumes.

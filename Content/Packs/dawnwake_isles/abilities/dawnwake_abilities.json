@@ -1,0 +1,5 @@
+{
+  "abilities": [
+    { "ability_id": "dawnwake_signal_flare_placeholder", "display_name": "Signal Flare Placeholder", "kind": "utility_placeholder", "tags": ["placeholder", "future_o3de_hook"] }
+  ]
+}

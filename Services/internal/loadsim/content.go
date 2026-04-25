@@ -51,14 +51,17 @@ type Point struct {
 }
 
 type EntryPoint struct {
-	EntryID  string `json:"entry_id"`
-	Position Point  `json:"position"`
+	EntryID      string `json:"entry_id"`
+	EntryPointID string `json:"entry_point_id"`
+	Position     Point  `json:"position"`
 }
 
 type TransitionGate struct {
-	TransitionID          string `json:"transition_id"`
-	ToZoneID              string `json:"to_zone_id"`
-	EntryPointIDOnArrival string `json:"entry_id_on_arrival"`
+	TransitionID                 string `json:"transition_id"`
+	ToZoneID                     string `json:"to_zone_id"`
+	EntryPointIDOnArrival        string `json:"entry_id_on_arrival"`
+	EntryPointIDOnArrivalVerbose string `json:"entry_point_id_on_arrival"`
+	Disabled                     bool   `json:"disabled"`
 }
 
 type ZoneRuntimeHints struct {
@@ -100,6 +103,7 @@ func LoadContentPackage(manifestPath string) (ContentPackage, error) {
 		if err := json.Unmarshal(zonePayload, &zone); err != nil {
 			return ContentPackage{}, fmt.Errorf("decode zone %s: %w", zonePath, err)
 		}
+		normalizeZoneSpec(&zone)
 		if err := validateZone(zone); err != nil {
 			return ContentPackage{}, fmt.Errorf("validate zone %s: %w", zonePath, err)
 		}
@@ -116,6 +120,22 @@ func LoadContentPackage(manifestPath string) (ContentPackage, error) {
 		return ContentPackage{}, err
 	}
 	return pkg, nil
+}
+
+func normalizeZoneSpec(zone *ZoneSpec) {
+	if zone == nil {
+		return
+	}
+	for index := range zone.EntryPoints {
+		if zone.EntryPoints[index].EntryID == "" {
+			zone.EntryPoints[index].EntryID = zone.EntryPoints[index].EntryPointID
+		}
+	}
+	for index := range zone.TransitionGates {
+		if zone.TransitionGates[index].EntryPointIDOnArrival == "" {
+			zone.TransitionGates[index].EntryPointIDOnArrival = zone.TransitionGates[index].EntryPointIDOnArrivalVerbose
+		}
+	}
 }
 
 func ResolveContentPath(manifestPath string) (string, error) {
@@ -180,6 +200,9 @@ func validateTransitions(pkg ContentPackage) error {
 		zone := pkg.Zones[zoneID]
 		seenTransitions := map[string]struct{}{}
 		for _, gate := range zone.TransitionGates {
+			if gate.Disabled {
+				continue
+			}
 			if gate.TransitionID == "" {
 				return fmt.Errorf("zone %s has transition without transition_id", zoneID)
 			}
@@ -217,6 +240,9 @@ func (zone ZoneSpec) DefaultEntryPoint() EntryPoint {
 
 func (zone ZoneSpec) GateTo(targetZoneID string) (TransitionGate, bool) {
 	for _, gate := range zone.TransitionGates {
+		if gate.Disabled {
+			continue
+		}
 		if gate.ToZoneID == targetZoneID {
 			return gate, true
 		}

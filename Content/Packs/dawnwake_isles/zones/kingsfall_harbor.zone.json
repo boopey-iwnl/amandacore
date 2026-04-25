@@ -1,15 +1,50 @@
 {
   "zone_id": "kingsfall_harbor",
   "display_name": "Kingsfall Harbor",
-  "bounds": {"min_x": 0, "min_y": 0, "min_z": 0, "max_x": 160, "max_y": 110, "max_z": 35},
+  "description": "A distinct capital city zone skeleton for social, vendor, quest, and future city-service hooks.",
+  "bounds": { "min_x": 560, "min_y": 80, "min_z": -25, "max_x": 760, "max_y": 260, "max_z": 180, "accuracy": "placeholder", "source": "pending_map_trace" },
   "entry_points": [
-    {"entry_id": "default", "position": {"x": 30, "y": 48, "z": 0}},
-    {"entry_id": "from_dawnwake_landing", "position": {"x": 12, "y": 48, "z": 0}},
-    {"entry_id": "from_highroad_pass", "position": {"x": 144, "y": 68, "z": 0}}
+    { "entry_point_id": "kingsfall_west_gate", "display_name": "West Gate from Highroad", "position": { "x": 566, "y": 174, "z": 0 }, "facing_yaw": 90, "tags": ["transition_arrival", "city_gate"] },
+    { "entry_point_id": "kingsfall_harbor_quay", "display_name": "Harbor Quay", "position": { "x": 690, "y": 118, "z": 0 }, "facing_yaw": 180, "tags": ["harbor_route_placeholder"] }
   ],
   "transition_gates": [
-    {"transition_id": "harbor_to_landing", "to_zone_id": "dawnwake_landing", "entry_id_on_arrival": "from_kingsfall_harbor"},
-    {"transition_id": "harbor_to_highroad", "to_zone_id": "highroad_pass", "entry_id_on_arrival": "from_kingsfall_harbor"}
+    {
+      "transition_id": "kingsfall_to_highroad_city_gate",
+      "from_zone_id": "kingsfall_harbor",
+      "to_zone_id": "highroad_pass",
+      "kind": "CityGate",
+      "gate_bounds": { "min_x": 560, "min_y": 154, "min_z": -5, "max_x": 566, "max_y": 194, "max_z": 35, "accuracy": "placeholder", "source": "pending_map_trace" },
+      "entry_point_id_on_arrival": "highroad_kingsfall_gate",
+      "tags": ["walk", "city_gate"]
+    },
+    {
+      "transition_id": "kingsfall_harbor_route_placeholder",
+      "from_zone_id": "kingsfall_harbor",
+      "to_zone_id": "dawnwake_landing",
+      "kind": "HarborRoutePlaceholder",
+      "gate_bounds": { "min_x": 684, "min_y": 108, "min_z": -5, "max_x": 704, "max_y": 128, "max_z": 25, "accuracy": "placeholder", "source": "pending_map_trace" },
+      "entry_point_id_on_arrival": "landing_shore",
+      "disabled": true,
+      "tags": ["future_harbor_route"]
+    }
   ],
-  "runtime": {"max_sessions": 140, "max_entities": 260}
+  "spawn_groups": [
+    {
+      "spawn_group_id": "kingsfall_harbor_rats",
+      "display_name": "Dawnwake Harbor Rat",
+      "archetype_id": "dawnwake_harbor_rat",
+      "disposition": "Neutral",
+      "spawn_points": [
+        { "spawn_point_id": "kingsfall_harbor_rat_01", "position": { "x": 642, "y": 126, "z": 0 }, "tags": ["city_low_density"] }
+      ],
+      "tags": ["placeholder", "low_hostile_density"]
+    }
+  ],
+  "quest_providers": [
+    { "provider_id": "kingsfall_harbor_notice_board", "display_name": "Kingsfall Harbor Notice Board", "kind": "notice_board_placeholder", "position": { "x": 598, "y": 178, "z": 0 }, "quest_ids": [], "services": ["quest_placeholder", "city_notice"], "tags": ["city", "social", "quest_provider_placeholder"] }
+  ],
+  "runtime_config": { "activation_policy": "activate_with_continent", "high_player_density_expected": true, "hostile_density": "very_low", "future_hooks": ["city_services_placeholder", "vendor_cluster_placeholder", "social_density_probe", "future_phasing_hook"] },
+  "streaming_hints": { "interest_radius": 96, "adjacent_preload_distance": 50, "priority": "city", "notes": ["Capital city skeleton only; no full city services yet.", "High player density expected; hostile NPC density intentionally low."] },
+  "tags": ["city", "capital", "social", "placeholder_bounds"],
+  "metadata": { "accuracy": "placeholder", "source": "pending_map_trace", "todo": "Replace capital layout, gate, quay, vendor districts, and service clusters with Kingsfall Harbor map trace." }
 }
