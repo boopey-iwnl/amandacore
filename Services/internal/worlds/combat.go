@@ -168,7 +168,7 @@ func (s *worldServer) setMobAIStateLocked(mob *mobState, nextState string, reaso
 }
 
 func (s *worldServer) clearMobAggroForCharacterLocked(characterID string) {
-	for _, mob := range s.hostileMobsLocked() {
+	for _, mob := range s.allHostileMobsLocked() {
 		if mob.CurrentTargetCharacter != characterID {
 			continue
 		}
@@ -190,7 +190,7 @@ func (s *worldServer) setAutoAttackLocked(session *worldSessionState, enabled bo
 			return fmt.Errorf("no target")
 		}
 
-		targetMob := s.findMobByIDLocked(session.CurrentTargetID)
+		targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
 		if targetMob == nil || !targetMob.Alive || !targetMob.Targetable {
 			return fmt.Errorf("target is invalid")
 		}
@@ -231,7 +231,7 @@ func (s *worldServer) activateAbilityLocked(session *worldSessionState, abilityI
 		return fmt.Errorf("ability is not available")
 	}
 
-	targetMob := s.findMobByIDLocked(session.CurrentTargetID)
+	targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
 	return s.applyAbilityEffectLocked(session, targetMob, ability)
 }
 
@@ -244,6 +244,7 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 
 	s.ensureMobsLocked()
 	s.cleanupStaleSessionsLocked(now)
+	s.cleanupDungeonInstancesLocked(now)
 	if s.lastUpdatedAt.IsZero() {
 		s.lastUpdatedAt = now
 		return nil
@@ -269,7 +270,7 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 			continue
 		}
 
-		targetMob := s.findMobByIDLocked(session.CurrentTargetID)
+		targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
 		if targetMob == nil || session.CurrentTargetID == "" {
 			s.stopAutoAttackLocked(session, "target_invalid")
 			continue
@@ -295,7 +296,7 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 		}
 	}
 
-	for _, mob := range s.hostileMobsLocked() {
+	for _, mob := range s.allHostileMobsLocked() {
 		s.advanceMobLocked(mob, deltaSeconds, nowMs)
 	}
 	return nil
@@ -410,7 +411,7 @@ func (s *worldServer) resolveMobTargetLocked(mob *mobState) *worldSessionState {
 	var closest *worldSessionState
 	closestDistance := mob.AggroRadius
 	for _, session := range s.sessionsByToken {
-		if !session.Connected || !session.Alive || session.ZoneID != mob.ZoneID {
+		if !session.Connected || !session.Alive || session.ZoneID != mob.ZoneID || session.InstanceID != mob.InstanceID {
 			continue
 		}
 		distance := distance2D(session.X, session.Y, mob.X, mob.Y)
@@ -487,7 +488,11 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 	mob.RespawnAtMs = nowMillis() + mob.RespawnDelayMs
 	mob.CurrentTargetCharacter = ""
 	s.clearMobTargetFromAllSessionsLocked(mob.ID, "target_dead")
-	if err := s.applyQuestKillCreditLocked(session, mob); err != nil {
+	if mob.InstanceID != "" {
+		if err := s.applyDungeonKillCreditLocked(session, mob); err != nil {
+			return err
+		}
+	} else if err := s.applyQuestKillCreditLocked(session, mob); err != nil {
 		return err
 	}
 	observability.LogEvent("world-service", "world.mob_died", map[string]any{
