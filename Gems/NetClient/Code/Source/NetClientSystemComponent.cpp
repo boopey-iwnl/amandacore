@@ -127,6 +127,19 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool EnterDungeonRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& dungeonId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool ExitDungeonRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool TrackQuestRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -487,6 +500,25 @@ namespace NetClient
         AZStd::string& outError)
     {
         return AcceptQuestRequest(worldEndpoint, worldSessionToken, questId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::EnterDungeon(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& dungeonId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return EnterDungeonRequest(worldEndpoint, worldSessionToken, dungeonId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::ExitDungeon(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return ExitDungeonRequest(worldEndpoint, worldSessionToken, outResponse, outError);
     }
 
     bool NetClientSystemComponent::TrackQuest(
