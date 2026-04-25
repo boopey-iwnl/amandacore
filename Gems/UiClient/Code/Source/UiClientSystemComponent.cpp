@@ -994,11 +994,10 @@ namespace UiClient
                     trackerQuest->m_objectiveText.c_str(),
                     trackerQuest->m_currentCount,
                     trackerQuest->m_targetCount);
-                ImGui::TextWrapped(
-                    "%s",
-                    trackerQuest->m_routeHintText.empty()
-                        ? AZStd::string::format("Follow the Stonewake route markers. Next landmark distance %.1fm.", distanceToEncounter).c_str()
-                        : trackerQuest->m_routeHintText.c_str());
+                const AZStd::string routeHint = trackerQuest->m_routeHintText.empty()
+                    ? AZStd::string::format("Follow the Stonewake route markers. Next landmark distance %.1fm.", distanceToEncounter)
+                    : trackerQuest->m_routeHintText;
+                ImGui::TextWrapped("%s", routeHint.c_str());
                 ImGui::Text(
                     "Reward: %d XP and %dg %ds %dc",
                     trackerQuest->m_rewardXp,
@@ -2707,8 +2706,10 @@ namespace UiClient
         const ImVec2 actionBarPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
-        const ImVec2 microMenuSize(198.0f, 206.0f);
+        const ImVec2 microMenuSize(198.0f, 238.0f);
         const ImVec2 microMenuPos(actionBarPos.x + actionBarSize.x + 8.0f, actionBarPos.y);
+        const ImVec2 minimapSize(250.0f, 260.0f);
+        const ImVec2 minimapPos(displaySize.x > 1180.0f ? displaySize.x - 640.0f : 548.0f, 18.0f);
         const ImVec2 spellbookSize(680.0f, 560.0f);
         const ImVec2 spellbookPos(displaySize.x - spellbookSize.x - 18.0f, displaySize.y - spellbookSize.y - 188.0f);
         const ImVec2 trainerSize(460.0f, 440.0f);
@@ -2721,6 +2722,8 @@ namespace UiClient
         const ImVec2 characterPos(280.0f, displaySize.y - characterSize.y - 210.0f);
         const ImVec2 questLogSize(400.0f, 280.0f);
         const ImVec2 questLogPos(280.0f, displaySize.y - questLogSize.y - 180.0f);
+        const ImVec2 mapSize(640.0f, 470.0f);
+        const ImVec2 mapPos((displaySize.x - mapSize.x) * 0.5f, (displaySize.y - mapSize.y) * 0.5f);
         const ImVec2 upperActionBarSize(744.0f, 92.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 4.0f);
         const ImVec2 rightActionBarSize(86.0f, 740.0f);
@@ -2763,6 +2766,12 @@ namespace UiClient
         }
         ImGui::End();
 
+        if (BeginHudPanel("##stonewake_minimap", "Navigator", minimapPos, minimapSize))
+        {
+            DrawMinimap(worldState, playerX, playerY);
+        }
+        ImGui::End();
+
         if (BeginHudPanel("##action_bar", "Action Bar", actionBarPos, actionBarSize))
         {
             DrawActionBar(
@@ -2795,6 +2804,7 @@ namespace UiClient
             DrawMicroMenuBar(
                 m_characterSheetOpen,
                 m_questLogOpen,
+                m_mapOpen,
                 m_spellbookOpen,
                 m_bagOpen,
                 m_settingsOpen);
@@ -2876,6 +2886,7 @@ namespace UiClient
                     m_bagBinding,
                     m_characterBinding,
                     m_questLogBinding,
+                    m_mapBinding,
                     m_settingsBinding,
                     m_interactBinding,
                     m_targetHostileBinding,
@@ -2913,6 +2924,15 @@ namespace UiClient
             DrawQuestLogWindow(gameCore, worldState);
         }
         if (m_questLogOpen)
+        {
+            ImGui::End();
+        }
+
+        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize))
+        {
+            DrawZoneMapWindow(worldState, playerX, playerY);
+        }
+        if (m_mapOpen)
         {
             ImGui::End();
         }
