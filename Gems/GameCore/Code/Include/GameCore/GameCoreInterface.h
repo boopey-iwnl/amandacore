@@ -88,6 +88,16 @@ namespace GameCore
         virtual bool DeclinePartyInvite(const AZStd::string& inviteId) = 0;
         virtual bool LeaveParty() = 0;
         virtual bool DisbandParty() = 0;
+        virtual bool CreateGuild(const AZStd::string& guildName) = 0;
+        virtual bool InviteGuild(const AZStd::string& targetName) = 0;
+        virtual bool AcceptGuildInvite(const AZStd::string& inviteId) = 0;
+        virtual bool DeclineGuildInvite(const AZStd::string& inviteId) = 0;
+        virtual bool LeaveGuild() = 0;
+        virtual bool DisbandGuild() = 0;
+        virtual bool PromoteGuildMember(const AZStd::string& targetName) = 0;
+        virtual bool DemoteGuildMember(const AZStd::string& targetName) = 0;
+        virtual bool RemoveGuildMember(const AZStd::string& targetName) = 0;
+        virtual bool SetGuildMessageOfTheDay(const AZStd::string& messageOfTheDay) = 0;
         virtual bool DisconnectWorld() = 0;
         virtual bool ReconnectWorld() = 0;
         virtual void SetCameraState(const ClientCameraState& cameraState) = 0;

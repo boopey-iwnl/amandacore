@@ -133,37 +133,6 @@ func init() {
 	}
 }
 
-var tallowdeepZoneMap = zoneMapDefinition{
-	ZoneID:      dungeonZoneID,
-	DisplayName: "Tallowdeep Sluice",
-	MinX:        0,
-	MinY:        0,
-	MaxX:        180,
-	MaxY:        70,
-	Roads: []mapRoadDefinition{
-		{
-			ID:          "tds_main_sluice",
-			DisplayName: "Sluice Route",
-			Points: []mapPointDefinition{
-				{X: 12, Y: 12},
-				{X: 42, Y: 16},
-				{X: 78, Y: 18},
-				{X: 112, Y: 30},
-				{X: 148, Y: 34},
-				{X: 166, Y: 34},
-			},
-		},
-	},
-	Landmarks: []mapLandmarkDefinition{
-		{ID: "tds_entry_shelf", DisplayName: "Entry Shelf", Kind: "start", X: 12, Y: 12},
-		{ID: "tds_first_pack", DisplayName: "Guard Shelf", Kind: "trash", X: 42, Y: 16},
-		{ID: "tds_sluice_tunnel", DisplayName: "Sluice Tunnel", Kind: "trash", X: 78, Y: 18},
-		{ID: "tds_pressure_room", DisplayName: "Pressure Room", Kind: "trash", X: 112, Y: 30},
-		{ID: "tds_boss_platform", DisplayName: "Sluice Warden Platform", Kind: "boss", X: 148, Y: 34},
-		{ID: "tds_exit_winch", DisplayName: "Exit Winch", Kind: "exit", X: 166, Y: 34},
-	},
-}
-
 var dungeonZoneDefinitions = []zoneDefinition{
 	{
 		ID:          dungeonZoneID,
@@ -192,14 +161,6 @@ var dungeonZoneDefinitions = []zoneDefinition{
 			{ID: "tds_exit_winch", DisplayName: "Exit Winch", Type: "dungeon_exit", X: 166, Y: 34},
 		},
 	},
-}
-
-var tallowdeepNavigationAreas = []navigationAreaDefinition{
-	{ID: "tds_entry_shelf", DisplayName: "Entry Shelf", Kind: "start", CenterX: 12, CenterY: 12, Radius: 10, RouteHintText: "Regroup on the entry shelf before pulling the first guard pair.", QuestIDs: []string{dungeonQuestTallowdeepID}},
-	{ID: "tds_guard_shelf", DisplayName: "Guard Shelf", Kind: "trash", CenterX: 42, CenterY: 16, Radius: 12, RouteHintText: "Clear the first guard pair and continue along the sluice route.", QuestIDs: []string{dungeonQuestTallowdeepID}, TargetMobType: mobTDSSluiceGuardTypeID},
-	{ID: "tds_pressure_room", DisplayName: "Pressure Room", Kind: "trash", CenterX: 112, CenterY: 30, Radius: 16, RouteHintText: "Clear the pressure room before engaging the warden.", QuestIDs: []string{dungeonQuestTallowdeepID}, TargetMobType: mobTDSPressureHandTypeID},
-	{ID: "tds_boss_platform", DisplayName: "Sluice Warden Platform", Kind: "boss", CenterX: 148, CenterY: 34, Radius: 18, RouteHintText: "Defeat Vell Ordrin, Sluice Warden.", QuestIDs: []string{dungeonQuestTallowdeepID}, TargetMobType: mobTDSVellOrdrinTypeID},
-	{ID: "tds_exit_winch", DisplayName: "Exit Winch", Kind: "exit", CenterX: 166, CenterY: 34, Radius: 8, RouteHintText: "Use the exit winch to return to the quarry.", TargetEntityID: npcTallowdeepExitID},
 }
 
 func (s *worldServer) handleDungeonEnter(w http.ResponseWriter, r *http.Request) {

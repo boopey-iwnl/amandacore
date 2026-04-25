@@ -83,6 +83,36 @@ namespace NetClient
         SocialStateResponse& outResponse,
         AZStd::string& outError);
 
+    bool GuildCreateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& guildName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool GuildNameActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool GuildInviteActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool GuildMOTDRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& messageOfTheDay,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
     bool SetTargetRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -339,6 +369,104 @@ namespace NetClient
         AZStd::string& outError)
     {
         return PartyActionRequest(worldEndpoint, L"/v1/world/party/disband", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::CreateGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& guildName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildCreateRequest(worldEndpoint, worldSessionToken, guildName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::InviteGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/invite", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::AcceptGuildInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildInviteActionRequest(worldEndpoint, L"/v1/world/guild/accept", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DeclineGuildInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildInviteActionRequest(worldEndpoint, L"/v1/world/guild/decline", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::LeaveGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/guild/leave", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DisbandGuild(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/guild/disband", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::PromoteGuildMember(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/promote", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DemoteGuildMember(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/demote", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::RemoveGuildMember(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildNameActionRequest(worldEndpoint, L"/v1/world/guild/remove", worldSessionToken, targetName, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::SetGuildMessageOfTheDay(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& messageOfTheDay,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return GuildMOTDRequest(worldEndpoint, worldSessionToken, messageOfTheDay, outResponse, outError);
     }
 
     bool NetClientSystemComponent::SetTarget(

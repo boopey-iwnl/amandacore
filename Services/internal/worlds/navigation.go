@@ -218,36 +218,3 @@ func (s *worldServer) markerKindForNPCLocked(session *worldSessionState, npc fri
 	}
 	return "service", ""
 }
-
-func buildZoneMapPayload(zoneMap zoneMapDefinition) map[string]any {
-	roads := make([]map[string]any, 0, len(zoneMap.Roads))
-	for _, road := range zoneMap.Roads {
-		roads = append(roads, map[string]any{
-			"id":          road.ID,
-			"displayName": road.DisplayName,
-			"points":      road.Points,
-		})
-	}
-	landmarks := make([]map[string]any, 0, len(zoneMap.Landmarks))
-	for _, landmark := range zoneMap.Landmarks {
-		landmarks = append(landmarks, map[string]any{
-			"id":          landmark.ID,
-			"displayName": landmark.DisplayName,
-			"kind":        landmark.Kind,
-			"x":           landmark.X,
-			"y":           landmark.Y,
-		})
-	}
-	return map[string]any{
-		"zoneId":      zoneMap.ZoneID,
-		"displayName": zoneMap.DisplayName,
-		"bounds": map[string]float64{
-			"minX": zoneMap.MinX,
-			"minY": zoneMap.MinY,
-			"maxX": zoneMap.MaxX,
-			"maxY": zoneMap.MaxY,
-		},
-		"roads":     roads,
-		"landmarks": landmarks,
-	}
-}

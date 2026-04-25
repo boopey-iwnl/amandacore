@@ -546,7 +546,6 @@ func (s *worldServer) appendChatMessageLocked(message platform.ChatMessage, reci
 		"sender":    message.SenderCharacterID,
 		"target":    message.TargetCharacterID,
 		"partyId":   message.PartyID,
-		"guildId":   message.GuildID,
 	})
 	return message
 }
