@@ -64,7 +64,10 @@ namespace NetClient
         int m_currentCount = 0;
         int m_targetCount = 0;
         int m_recommendedPlayers = 0;
+        int m_partyNearbyCount = 0;
+        int m_partyEligibleCount = 0;
         double m_partyCreditRadius = 0.0;
+        AZStd::string m_partyStatusText;
         int m_rewardXp = 0;
         int m_rewardCurrencyTotalCopper = 0;
         int m_rewardCurrencySilver = 0;
@@ -202,11 +205,26 @@ namespace NetClient
         AZ::s64 m_timeRemainingSeconds = 0;
     };
 
+    struct AuctionSellSlotState
+    {
+        int m_slotIndex = 0;
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        int m_stackCount = 0;
+        AZStd::string m_itemType;
+        AZStd::string m_itemSubtype;
+        int m_sellPriceCopper = 0;
+        int m_depositCopper = 0;
+        bool m_tradeable = false;
+        AZStd::string m_blockedReason;
+    };
+
     struct AuctionStateResponse
     {
         AZ::s64 m_serverTime = 0;
         AZStd::vector<AuctionListingState> m_listings;
         AZStd::vector<AuctionListingState> m_myAuctions;
+        AZStd::vector<AuctionSellSlotState> m_sellSlots;
         AZStd::vector<MailEnvelopeState> m_mail;
         int m_currencyCopper = 0;
     };
@@ -445,6 +463,10 @@ namespace NetClient
         double m_resource = 0.0;
         double m_maxResource = 0.0;
         bool m_disconnected = false;
+        bool m_sameZone = false;
+        double m_distanceToPlayer = 0.0;
+        bool m_groupCreditEligible = false;
+        AZStd::string m_groupCreditStatus;
     };
 
     struct PartyState

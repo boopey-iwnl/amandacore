@@ -315,7 +315,10 @@ namespace NetClient
             ReadInt(quest, "currentCount", outQuest.m_currentCount);
             ReadInt(quest, "targetCount", outQuest.m_targetCount);
             ReadInt(quest, "recommendedPlayers", outQuest.m_recommendedPlayers);
+            ReadInt(quest, "partyNearbyCount", outQuest.m_partyNearbyCount);
+            ReadInt(quest, "partyEligibleCount", outQuest.m_partyEligibleCount);
             ReadDouble(quest, "partyCreditRadius", outQuest.m_partyCreditRadius);
+            ReadString(quest, "partyStatusText", outQuest.m_partyStatusText);
             ReadInt(quest, "rewardXp", outQuest.m_rewardXp);
             ReadInt(quest, "rewardCurrencyCopper", outQuest.m_rewardCurrencyTotalCopper);
             if (quest.HasMember("rewardCurrency") && quest["rewardCurrency"].IsObject())
@@ -970,6 +973,10 @@ namespace NetClient
                         ReadDouble(memberValue, "resource", member.m_resource);
                         ReadDouble(memberValue, "maxResource", member.m_maxResource);
                         ReadBool(memberValue, "disconnected", member.m_disconnected);
+                        ReadBool(memberValue, "sameZone", member.m_sameZone);
+                        ReadDouble(memberValue, "distanceToPlayer", member.m_distanceToPlayer);
+                        ReadBool(memberValue, "groupCreditEligible", member.m_groupCreditEligible);
+                        ReadString(memberValue, "groupCreditStatus", member.m_groupCreditStatus);
                         outResponse.m_party.m_members.push_back(AZStd::move(member));
                     }
                 }
@@ -1113,6 +1120,20 @@ namespace NetClient
             ReadInt64(listingValue, "timeRemainingSeconds", outListing.m_timeRemainingSeconds);
         }
 
+        void ParseAuctionSellSlot(const rapidjson::Value& slotValue, AuctionSellSlotState& outSlot)
+        {
+            ReadInt(slotValue, "slotIndex", outSlot.m_slotIndex);
+            ReadString(slotValue, "itemId", outSlot.m_itemId);
+            ReadString(slotValue, "displayName", outSlot.m_displayName);
+            ReadInt(slotValue, "stackCount", outSlot.m_stackCount);
+            ReadString(slotValue, "itemType", outSlot.m_itemType);
+            ReadString(slotValue, "itemSubtype", outSlot.m_itemSubtype);
+            ReadInt(slotValue, "sellPriceCopper", outSlot.m_sellPriceCopper);
+            ReadInt(slotValue, "depositCopper", outSlot.m_depositCopper);
+            ReadBool(slotValue, "tradeable", outSlot.m_tradeable);
+            ReadString(slotValue, "blockedReason", outSlot.m_blockedReason);
+        }
+
         void ParseMailEnvelope(const rapidjson::Value& mailValue, MailEnvelopeState& outMail)
         {
             ReadString(mailValue, "mailId", outMail.m_mailId);
@@ -1179,6 +1200,19 @@ namespace NetClient
                     AuctionListingState listing;
                     ParseAuctionListing(listingValue, listing);
                     outResponse.m_myAuctions.push_back(AZStd::move(listing));
+                }
+            }
+            if (document.HasMember("sellSlots") && document["sellSlots"].IsArray())
+            {
+                for (const rapidjson::Value& slotValue : document["sellSlots"].GetArray())
+                {
+                    if (!slotValue.IsObject())
+                    {
+                        continue;
+                    }
+                    AuctionSellSlotState slot;
+                    ParseAuctionSellSlot(slotValue, slot);
+                    outResponse.m_sellSlots.push_back(AZStd::move(slot));
                 }
             }
             if (document.HasMember("mail") && document["mail"].IsArray())

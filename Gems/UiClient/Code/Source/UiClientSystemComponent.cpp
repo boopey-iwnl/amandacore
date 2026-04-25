@@ -284,6 +284,39 @@ namespace UiClient
             return AZStd::string::format("[Group] %s", quest.m_title.c_str());
         }
 
+        AZStd::string PartyCreditStatusLabel(const NetClient::PartyMemberState& member)
+        {
+            if (member.m_groupCreditStatus == "you")
+            {
+                return "you";
+            }
+            if (member.m_groupCreditStatus == "eligible")
+            {
+                return "shared credit ready";
+            }
+            if (member.m_groupCreditStatus == "out_of_range")
+            {
+                return "too far for shared credit";
+            }
+            if (member.m_groupCreditStatus == "wrong_zone")
+            {
+                return "wrong zone";
+            }
+            if (member.m_groupCreditStatus == "not_on_group_quest")
+            {
+                return "not on tracked group quest";
+            }
+            if (member.m_groupCreditStatus == "no_group_quest")
+            {
+                return "no active group quest";
+            }
+            if (member.m_groupCreditStatus == "offline")
+            {
+                return "offline";
+            }
+            return member.m_groupCreditStatus.empty() ? AZStd::string("unknown") : member.m_groupCreditStatus;
+        }
+
         AZStd::string FormatCurrency(const NetClient::CurrencyState& currency)
         {
             return AZStd::string::format("%dg %ds %dc", currency.m_gold, currency.m_silver, currency.m_copper);
@@ -1124,6 +1157,14 @@ namespace UiClient
                     ImGui::TextUnformatted("Recommended group");
                 }
                 ImGui::PopStyleColor();
+                if (!trackerQuest->m_partyStatusText.empty())
+                {
+                    ImGui::TextWrapped(
+                        "%s Nearby: %d, eligible: %d.",
+                        trackerQuest->m_partyStatusText.c_str(),
+                        trackerQuest->m_partyNearbyCount,
+                        trackerQuest->m_partyEligibleCount);
+                }
             }
 
             if (trackerQuest->m_state == "not_started")
@@ -1992,6 +2033,20 @@ namespace UiClient
             return nullptr;
         }
 
+        const NetClient::AuctionSellSlotState* FindAuctionSellSlot(
+            const NetClient::AuctionStateResponse& auctionState,
+            int slotIndex)
+        {
+            for (const auto& slot : auctionState.m_sellSlots)
+            {
+                if (slot.m_slotIndex == slotIndex)
+                {
+                    return &slot;
+                }
+            }
+            return nullptr;
+        }
+
         void DrawAuctionListingRow(
             GameCore::IGameCoreRequests* gameCore,
             const NetClient::AuctionListingState& listing,
@@ -2045,13 +2100,18 @@ namespace UiClient
             static int selectedSort = 0;
             const char* sortLabels[] = {"price asc", "price desc"};
             const char* sortValues[] = {"buyout_asc", "buyout_desc"};
+            static int selectedDuration = 1;
+            const char* durationLabels[] = {"30 min", "12 hours", "24 hours"};
+            const AZ::s64 durationSeconds[] = {30 * 60, 12 * 60 * 60, 24 * 60 * 60};
 
             ImGui::Text("Highmere Market");
             ImGui::SameLine();
             ImGui::TextDisabled("Purse %s", FormatCurrency(worldState.m_session.m_currency).c_str());
             if (!worldState.m_errorMessage.empty())
             {
-                ImGui::TextWrapped("Status: %s", worldState.m_errorMessage.c_str());
+                ImGui::TextColored(ImVec4(0.95f, 0.34f, 0.28f, 1.0f), "Status");
+                ImGui::SameLine();
+                ImGui::TextWrapped("%s", worldState.m_errorMessage.c_str());
             }
             ImGui::Separator();
 
@@ -2138,11 +2198,20 @@ namespace UiClient
                     if (selectedSellSlot >= 0)
                     {
                         const auto* selectedSlot = FindInventorySlot(worldState.m_session.m_inventory, selectedSellSlot);
+                        const auto* sellSlot = FindAuctionSellSlot(worldState.m_auction, selectedSellSlot);
                         ImGui::Text(
                             "Slot %02d: %s x%d",
                             selectedSellSlot + 1,
                             selectedSlot ? selectedSlot->m_displayName.c_str() : "empty",
                             selectedSlot ? selectedSlot->m_stackCount : 0);
+                        if (sellSlot && !sellSlot->m_tradeable)
+                        {
+                            ImGui::SameLine();
+                            ImGui::TextColored(
+                                ImVec4(0.95f, 0.34f, 0.28f, 1.0f),
+                                "%s",
+                                sellSlot->m_blockedReason.empty() ? "not tradeable" : sellSlot->m_blockedReason.c_str());
+                        }
                     }
                     else
                     {
@@ -2156,11 +2225,14 @@ namespace UiClient
                         {
                             continue;
                         }
+                        const auto* sellSlot = FindAuctionSellSlot(worldState.m_auction, slot.m_slotIndex);
                         ImGui::PushID(slot.m_slotIndex);
                         const bool selected = selectedSellSlot == slot.m_slotIndex;
-                        if (ImGui::Selectable(
-                                AZStd::string::format("%02d  %s x%d", slot.m_slotIndex + 1, slot.m_displayName.c_str(), slot.m_stackCount).c_str(),
-                                selected))
+                        const bool disabled = sellSlot && !sellSlot->m_tradeable;
+                        const AZStd::string label = disabled
+                            ? AZStd::string::format("%02d  %s x%d (blocked)", slot.m_slotIndex + 1, slot.m_displayName.c_str(), slot.m_stackCount)
+                            : AZStd::string::format("%02d  %s x%d", slot.m_slotIndex + 1, slot.m_displayName.c_str(), slot.m_stackCount);
+                        if (ImGui::Selectable(label.c_str(), selected) && !disabled)
                         {
                             selectedSellSlot = slot.m_slotIndex;
                             if (stackCount < 1)
@@ -2170,6 +2242,13 @@ namespace UiClient
                             if (stackCount > slot.m_stackCount)
                             {
                                 stackCount = slot.m_stackCount;
+                            }
+                        }
+                        if (disabled)
+                        {
+                            if (ImGui::IsItemHovered())
+                            {
+                                ImGui::SetTooltip("%s", sellSlot->m_blockedReason.empty() ? "This item cannot be auctioned." : sellSlot->m_blockedReason.c_str());
                             }
                         }
                         ImGui::PopID();
@@ -2185,11 +2264,36 @@ namespace UiClient
                     }
                     ImGui::SetNextItemWidth(150.0f);
                     ImGui::InputText("Buyout copper", buyoutBuffer, buyoutBufferLength, ImGuiInputTextFlags_CharsDecimal);
-                    ImGui::TextDisabled("Deposit: minimum 1c; server validates final fee.");
+                    ImGui::SetNextItemWidth(150.0f);
+                    ImGui::Combo("Duration", &selectedDuration, durationLabels, AZ_ARRAY_SIZE(durationLabels));
+                    const auto* sellSlot = FindAuctionSellSlot(worldState.m_auction, selectedSellSlot);
+                    if (sellSlot)
+                    {
+                        const int clampedStack = stackCount > 0
+                            ? (stackCount < sellSlot->m_stackCount ? stackCount : sellSlot->m_stackCount)
+                            : 1;
+                        int previewDeposit = sellSlot->m_sellPriceCopper * clampedStack / 20;
+                        if (previewDeposit <= 0)
+                        {
+                            previewDeposit = 1;
+                        }
+                        ImGui::TextDisabled("Deposit %s", FormatCopperAmount(previewDeposit).c_str());
+                        if (!sellSlot->m_tradeable)
+                        {
+                            ImGui::TextColored(
+                                ImVec4(0.95f, 0.34f, 0.28f, 1.0f),
+                                "%s",
+                                sellSlot->m_blockedReason.empty() ? "This item cannot be auctioned." : sellSlot->m_blockedReason.c_str());
+                        }
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Deposit appears after selecting an item.");
+                    }
                     if (ImGui::Button("Create Listing", ImVec2(150.0f, 0.0f)) && gameCore)
                     {
                         const int buyoutCopper = atoi(buyoutBuffer);
-                        if (gameCore->ListAuctionItem(selectedSellSlot, stackCount, buyoutCopper, 24 * 60 * 60))
+                        if (gameCore->ListAuctionItem(selectedSellSlot, stackCount, buyoutCopper, durationSeconds[selectedDuration]))
                         {
                             selectedSellSlot = -1;
                             stackCount = 1;
@@ -2507,6 +2611,14 @@ namespace UiClient
                         ImGui::SameLine();
                         ImGui::TextDisabled("Recommended Group");
                     }
+                    if (!quest.m_partyStatusText.empty())
+                    {
+                        ImGui::TextWrapped(
+                            "Party credit: %s Nearby %d, eligible %d.",
+                            quest.m_partyStatusText.c_str(),
+                            quest.m_partyNearbyCount,
+                            quest.m_partyEligibleCount);
+                    }
                     ImGui::TextWrapped("%s", quest.m_objectiveText.c_str());
                     ImGui::Text(
                         "Progress: %d / %d  |  Reward: %d XP and %dg %ds %dc",
@@ -2679,6 +2791,18 @@ namespace UiClient
                 {
                     DrawMeter("Health", static_cast<float>(member.m_health), static_cast<float>(member.m_maxHealth), ColorU32(173, 52, 44), ImVec2(204.0f, 14.0f));
                     DrawMeter("Grit", static_cast<float>(member.m_resource), static_cast<float>(member.m_maxResource), ColorU32(54, 117, 181), ImVec2(204.0f, 14.0f));
+                    const AZStd::string creditStatus = PartyCreditStatusLabel(member);
+                    if (member.m_sameZone && member.m_distanceToPlayer > 0.0)
+                    {
+                        ImGui::Text(
+                            "%s  |  %.0fm",
+                            creditStatus.c_str(),
+                            member.m_distanceToPlayer);
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted(creditStatus.c_str());
+                    }
                 }
             }
         }

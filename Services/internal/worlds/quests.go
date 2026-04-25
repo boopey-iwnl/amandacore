@@ -348,6 +348,7 @@ func (s *worldServer) applyQuestKillCreditLocked(killer *worldSessionState, kill
 	}
 
 	changedSessions := map[string]*worldSessionState{}
+	creditRecipients := map[string]map[string]struct{}{}
 	now := time.Now().Unix()
 	for _, questID := range s.questOrder {
 		quest := s.quests[questID]
@@ -369,6 +370,13 @@ func (s *worldServer) applyQuestKillCreditLocked(killer *worldSessionState, kill
 			}
 			candidate.QuestProgress[quest.ID] = progress
 			changedSessions[candidate.Token] = candidate
+			if quest.PartyShareable {
+				if creditRecipients[quest.ID] == nil {
+					creditRecipients[quest.ID] = map[string]struct{}{}
+				}
+				creditRecipients[quest.ID][candidate.CharacterID] = struct{}{}
+				s.sendGroupQuestCreditMessageLocked(candidate, quest, progress, candidate.CharacterID != killer.CharacterID)
+			}
 			observability.LogEvent("world-service", "world.quest_progressed", map[string]any{
 				"worldSessionToken": candidate.Token,
 				"characterId":       candidate.CharacterID,
@@ -386,7 +394,64 @@ func (s *worldServer) applyQuestKillCreditLocked(killer *worldSessionState, kill
 			return err
 		}
 	}
+	s.sendSkippedGroupQuestCreditMessagesLocked(killer, killedMob, creditRecipients)
 	return nil
+}
+
+func (s *worldServer) sendGroupQuestCreditMessageLocked(session *worldSessionState, quest questDefinition, progress platform.CharacterQuestProgress, shared bool) {
+	if session == nil || !quest.PartyShareable {
+		return
+	}
+	prefix := "Group quest credit"
+	if shared {
+		prefix = "Shared group quest credit"
+	}
+	message := fmt.Sprintf("%s: %s (%d/%d).", prefix, quest.Title, progress.CurrentCount, progress.TargetCount)
+	if progress.State == questStateCompleted {
+		message = fmt.Sprintf("%s: %s complete. Return for your reward.", prefix, quest.Title)
+	}
+	s.sendSystemMessageLocked(message, recipientSet(session.CharacterID))
+}
+
+func (s *worldServer) sendSkippedGroupQuestCreditMessagesLocked(killer *worldSessionState, killedMob *mobState, credited map[string]map[string]struct{}) {
+	if s.store == nil || killer == nil || killedMob == nil {
+		return
+	}
+	party, err := s.store.GetPartyForCharacter(killer.CharacterID)
+	if err != nil || party == nil {
+		return
+	}
+	for _, questID := range s.questOrder {
+		quest := s.quests[questID]
+		if !quest.PartyShareable || quest.TargetMobType != killedMob.MobTypeID {
+			continue
+		}
+		for _, memberID := range party.MemberCharacterIDs {
+			if memberID == killer.CharacterID {
+				continue
+			}
+			if _, wasCredited := credited[quest.ID][memberID]; wasCredited {
+				continue
+			}
+			member := s.findConnectedSessionByCharacterLocked(memberID)
+			if member == nil {
+				continue
+			}
+			progress := s.normalizeQuestProgress(quest, member.QuestProgress[quest.ID])
+			if progress.State != questStateActive || progress.CurrentCount >= progress.TargetCount {
+				continue
+			}
+			reason := "not eligible"
+			if member.ZoneID != killedMob.ZoneID || member.InstanceID != killedMob.InstanceID {
+				reason = "wrong zone"
+			} else if distance2D(member.X, member.Y, killedMob.X, killedMob.Y) > questPartyCreditRadius(quest) {
+				reason = "too far away"
+			}
+			s.sendSystemMessageLocked(
+				fmt.Sprintf("No shared credit for %s: %s.", quest.Title, reason),
+				recipientSet(member.CharacterID))
+		}
+	}
 }
 
 func (s *worldServer) killCreditCandidatesLocked(killer *worldSessionState, quest questDefinition, killedMob *mobState) []*worldSessionState {
@@ -557,7 +622,7 @@ func (s *worldServer) prerequisitesMetLocked(session *worldSessionState, quest q
 func (s *worldServer) buildQuestResponse(session *worldSessionState) map[string]any {
 	quest := s.primaryQuestLocked(session)
 	progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
-	return s.buildQuestSummary(quest, progress, s.questTrackedLocked(session, quest.ID))
+	return s.buildQuestSummary(session, quest, progress, s.questTrackedLocked(session, quest.ID))
 }
 
 func (s *worldServer) buildQuestListResponse(session *worldSessionState) []map[string]any {
@@ -568,12 +633,12 @@ func (s *worldServer) buildQuestListResponse(session *worldSessionState) []map[s
 		if progress.State == questStateNotStarted && !s.prerequisitesMetLocked(session, quest) {
 			continue
 		}
-		quests = append(quests, s.buildQuestSummary(quest, progress, s.questTrackedLocked(session, quest.ID)))
+		quests = append(quests, s.buildQuestSummary(session, quest, progress, s.questTrackedLocked(session, quest.ID)))
 	}
 	return quests
 }
 
-func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform.CharacterQuestProgress, tracked bool) map[string]any {
+func (s *worldServer) buildQuestSummary(session *worldSessionState, quest questDefinition, progress platform.CharacterQuestProgress, tracked bool) map[string]any {
 	objectiveArea := s.objectiveAreaForQuest(quest)
 	rewardItems := make([]itemRewardResponse, 0, len(quest.RewardItems))
 	for _, item := range quest.RewardItems {
@@ -587,6 +652,7 @@ func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform
 	if quest.GroupRecommended {
 		uiTags = append(uiTags, "Group")
 	}
+	partyNearbyCount, partyEligibleCount, partyStatusText := s.groupQuestPartySummaryLocked(session, quest, progress)
 
 	return map[string]any{
 		"id":                   quest.ID,
@@ -611,8 +677,43 @@ func (s *worldServer) buildQuestSummary(quest questDefinition, progress platform
 		"groupRecommended":     quest.GroupRecommended,
 		"recommendedPlayers":   quest.RecommendedPlayers,
 		"partyCreditRadius":    questPartyCreditRadius(quest),
+		"partyNearbyCount":     partyNearbyCount,
+		"partyEligibleCount":   partyEligibleCount,
+		"partyStatusText":      partyStatusText,
 		"uiTags":               uiTags,
 	}
+}
+
+func (s *worldServer) groupQuestPartySummaryLocked(session *worldSessionState, quest questDefinition, progress platform.CharacterQuestProgress) (int, int, string) {
+	if session == nil || !quest.PartyShareable || progress.State != questStateActive {
+		return 0, 0, ""
+	}
+	nearby := 0
+	eligible := 0
+	if s.store == nil {
+		return 1, 1, "You are eligible for shared credit."
+	}
+	party, err := s.store.GetPartyForCharacter(session.CharacterID)
+	if err != nil || party == nil {
+		return 1, 1, "You are eligible for shared credit."
+	}
+	for _, memberID := range party.MemberCharacterIDs {
+		member := s.findConnectedSessionByCharacterLocked(memberID)
+		if member == nil || !member.Connected || member.ZoneID != session.ZoneID || member.InstanceID != session.InstanceID {
+			continue
+		}
+		if distance2D(session.X, session.Y, member.X, member.Y) <= questPartyCreditRadius(quest) {
+			nearby++
+			memberProgress := s.normalizeQuestProgress(quest, member.QuestProgress[quest.ID])
+			if memberProgress.State == questStateActive && memberProgress.CurrentCount < memberProgress.TargetCount {
+				eligible++
+			}
+		}
+	}
+	if eligible <= 1 {
+		return nearby, eligible, "No nearby eligible party members."
+	}
+	return nearby, eligible, fmt.Sprintf("%d nearby party members eligible for shared credit.", eligible)
 }
 
 func (s *worldServer) questCategory(quest questDefinition) string {

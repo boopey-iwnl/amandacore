@@ -2,6 +2,7 @@ package worlds
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,6 +68,43 @@ func TestShareableGroupQuestGrantsNearbyPartyCreditAndPersists(t *testing.T) {
 	}
 }
 
+func TestGroupQuestSummaryReportsNearbyEligiblePartyMembers(t *testing.T) {
+	server, _, alice, bob, _ := newGroupCreditTestServer(t)
+	createTestParty(t, server.store, alice.CharacterID, bob.CharacterID)
+	activateTestQuest(t, server, alice, "bb_korrin_at_the_ford")
+	activateTestQuest(t, server, bob, "bb_korrin_at_the_ford")
+
+	summary := findQuestSummary(t, server.buildQuestListResponse(alice), "bb_korrin_at_the_ford")
+	if summary["partyNearbyCount"] != 2 || summary["partyEligibleCount"] != 2 {
+		t.Fatalf("expected both party members to be nearby and eligible, got %#v", summary)
+	}
+	if status, _ := summary["partyStatusText"].(string); !strings.Contains(status, "eligible") {
+		t.Fatalf("expected party status text to mention eligibility, got %#v", summary["partyStatusText"])
+	}
+}
+
+func TestPartyFramesExposeGroupCreditStatus(t *testing.T) {
+	server, _, alice, bob, cara := newGroupCreditTestServer(t)
+	createTestParty(t, server.store, alice.CharacterID, bob.CharacterID, cara.CharacterID)
+	activateTestQuest(t, server, alice, "bb_korrin_at_the_ford")
+	activateTestQuest(t, server, bob, "bb_korrin_at_the_ford")
+	activateTestQuest(t, server, cara, "bb_korrin_at_the_ford")
+	cara.X = alice.X + 80.0
+
+	party := server.buildSocialStateLocked(alice, "").Party
+	if party == nil {
+		t.Fatalf("expected party response")
+	}
+	bobMember := findPartyMember(t, party, bob.CharacterID)
+	if !bobMember.GroupCreditEligible || bobMember.GroupCreditStatus != "eligible" {
+		t.Fatalf("expected Bob to be eligible for shared credit, got %#v", bobMember)
+	}
+	caraMember := findPartyMember(t, party, cara.CharacterID)
+	if caraMember.GroupCreditEligible || caraMember.GroupCreditStatus != "out_of_range" {
+		t.Fatalf("expected Cara to be out of range, got %#v", caraMember)
+	}
+}
+
 func TestShareableGroupQuestSkipsOutOfRangePartyMember(t *testing.T) {
 	server, _, alice, bob, _ := newGroupCreditTestServer(t)
 	createTestParty(t, server.store, alice.CharacterID, bob.CharacterID)
@@ -81,6 +119,7 @@ func TestShareableGroupQuestSkipsOutOfRangePartyMember(t *testing.T) {
 
 	assertQuestState(t, alice, "bb_korrin_at_the_ford", questStateCompleted)
 	assertQuestCount(t, bob, "bb_korrin_at_the_ford", 0)
+	assertSystemMessageContains(t, server, bob, "No shared credit for Korrin at the Ford: too far away.")
 }
 
 func TestShareableGroupQuestSkipsDisconnectedPartyMember(t *testing.T) {
@@ -270,9 +309,10 @@ func sessionFromCharacter(character platform.Character, token string) *worldSess
 	}
 }
 
-func createTestParty(t *testing.T, fileStore *store.FileStore, leaderCharacterID string, memberCharacterID string) {
+func createTestParty(t *testing.T, fileStore *store.FileStore, leaderCharacterID string, memberCharacterIDs ...string) {
 	t.Helper()
-	if _, err := fileStore.CreateParty(leaderCharacterID, []string{leaderCharacterID, memberCharacterID}); err != nil {
+	members := append([]string{leaderCharacterID}, memberCharacterIDs...)
+	if _, err := fileStore.CreateParty(leaderCharacterID, members); err != nil {
 		t.Fatalf("failed to create party: %v", err)
 	}
 }
@@ -348,4 +388,37 @@ func assertQuestState(t *testing.T, session *worldSessionState, questID string, 
 	if progress.State != expected {
 		t.Fatalf("expected %s state %s for %s, got %#v", questID, expected, session.CharacterID, progress)
 	}
+}
+
+func findQuestSummary(t *testing.T, summaries []map[string]any, questID string) map[string]any {
+	t.Helper()
+	for _, summary := range summaries {
+		if summary["id"] == questID {
+			return summary
+		}
+	}
+	t.Fatalf("quest summary %s not found", questID)
+	return nil
+}
+
+func findPartyMember(t *testing.T, party *partyResponse, characterID string) partyMemberResponse {
+	t.Helper()
+	for _, member := range party.Members {
+		if member.CharacterID == characterID {
+			return member
+		}
+	}
+	t.Fatalf("party member %s not found in %#v", characterID, party.Members)
+	return partyMemberResponse{}
+}
+
+func assertSystemMessageContains(t *testing.T, server *worldServer, session *worldSessionState, expected string) {
+	t.Helper()
+	state := server.buildSocialStateLocked(session, "")
+	for _, message := range state.ChatMessages {
+		if message.Channel == chatChannelSystem && strings.Contains(message.MessageText, expected) {
+			return
+		}
+	}
+	t.Fatalf("expected system message containing %q, got %#v", expected, state.ChatMessages)
 }

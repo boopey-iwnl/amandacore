@@ -124,18 +124,22 @@ type partyResponse struct {
 }
 
 type partyMemberResponse struct {
-	CharacterID  string  `json:"characterId"`
-	DisplayName  string  `json:"displayName"`
-	Level        int     `json:"level"`
-	ClassID      string  `json:"classId"`
-	ZoneID       string  `json:"zoneId"`
-	Online       bool    `json:"online"`
-	Leader       bool    `json:"leader"`
-	Health       float64 `json:"health"`
-	MaxHealth    float64 `json:"maxHealth"`
-	Resource     float64 `json:"resource"`
-	MaxResource  float64 `json:"maxResource"`
-	Disconnected bool    `json:"disconnected"`
+	CharacterID         string  `json:"characterId"`
+	DisplayName         string  `json:"displayName"`
+	Level               int     `json:"level"`
+	ClassID             string  `json:"classId"`
+	ZoneID              string  `json:"zoneId"`
+	Online              bool    `json:"online"`
+	Leader              bool    `json:"leader"`
+	Health              float64 `json:"health"`
+	MaxHealth           float64 `json:"maxHealth"`
+	Resource            float64 `json:"resource"`
+	MaxResource         float64 `json:"maxResource"`
+	Disconnected        bool    `json:"disconnected"`
+	SameZone            bool    `json:"sameZone"`
+	DistanceToPlayer    float64 `json:"distanceToPlayer"`
+	GroupCreditEligible bool    `json:"groupCreditEligible"`
+	GroupCreditStatus   string  `json:"groupCreditStatus"`
 }
 
 type partyInviteResponse struct {
@@ -657,7 +661,7 @@ func (s *worldServer) buildSocialStateLocked(session *worldSessionState, afterMe
 	return socialStateResponse{
 		ChatMessages: s.visibleChatMessagesLocked(session.CharacterID, afterMessageID),
 		Friends:      s.buildFriendResponsesLocked(session),
-		Party:        s.buildPartyResponseLocked(session.CharacterID),
+		Party:        s.buildPartyResponseLocked(session),
 		PartyInvites: s.buildPartyInviteResponsesLocked(session.CharacterID),
 		Guild:        s.buildGuildResponseLocked(session.CharacterID),
 		GuildInvites: s.buildGuildInviteResponsesLocked(session.CharacterID),
@@ -717,16 +721,17 @@ func (s *worldServer) buildFriendResponsesLocked(session *worldSessionState) []f
 	return friends
 }
 
-func (s *worldServer) buildPartyResponseLocked(characterID string) *partyResponse {
-	if s.store == nil {
+func (s *worldServer) buildPartyResponseLocked(session *worldSessionState) *partyResponse {
+	if s.store == nil || session == nil {
 		return nil
 	}
 
-	party, err := s.store.GetPartyForCharacter(characterID)
+	party, err := s.store.GetPartyForCharacter(session.CharacterID)
 	if err != nil {
 		return nil
 	}
 
+	groupQuest, hasGroupQuest := s.activeGroupQuestForPartyHintLocked(session)
 	response := &partyResponse{
 		PartyID:           party.ID,
 		LeaderCharacterID: party.LeaderCharacterID,
@@ -738,13 +743,14 @@ func (s *worldServer) buildPartyResponseLocked(characterID string) *partyRespons
 			continue
 		}
 		member := partyMemberResponse{
-			CharacterID:  character.ID,
-			DisplayName:  character.DisplayName,
-			Level:        character.Level,
-			ClassID:      character.ClassID,
-			ZoneID:       character.ZoneID,
-			Leader:       character.ID == party.LeaderCharacterID,
-			Disconnected: true,
+			CharacterID:       character.ID,
+			DisplayName:       character.DisplayName,
+			Level:             character.Level,
+			ClassID:           character.ClassID,
+			ZoneID:            character.ZoneID,
+			Leader:            character.ID == party.LeaderCharacterID,
+			Disconnected:      true,
+			GroupCreditStatus: "offline",
 		}
 		if memberSession := s.findConnectedSessionByCharacterLocked(character.ID); memberSession != nil {
 			member.Online = true
@@ -756,10 +762,68 @@ func (s *worldServer) buildPartyResponseLocked(characterID string) *partyRespons
 			member.MaxHealth = memberSession.MaxHealth
 			member.Resource = memberSession.Resource
 			member.MaxResource = memberSession.MaxResource
+			member.SameZone = memberSession.ZoneID == session.ZoneID && memberSession.InstanceID == session.InstanceID
+			if member.SameZone {
+				member.DistanceToPlayer = distance2D(session.X, session.Y, memberSession.X, memberSession.Y)
+			}
+			member.GroupCreditStatus, member.GroupCreditEligible = s.partyMemberCreditHintLocked(session, memberSession, groupQuest, hasGroupQuest)
 		}
 		response.Members = append(response.Members, member)
 	}
 	return response
+}
+
+func (s *worldServer) activeGroupQuestForPartyHintLocked(session *worldSessionState) (questDefinition, bool) {
+	if session == nil {
+		return questDefinition{}, false
+	}
+	for _, questID := range session.TrackedQuestIDs {
+		quest, found := s.quests[questID]
+		if !found || !quest.PartyShareable {
+			continue
+		}
+		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+		if progress.State == questStateActive {
+			return quest, true
+		}
+	}
+	for _, questID := range s.questOrder {
+		quest := s.quests[questID]
+		if !quest.PartyShareable {
+			continue
+		}
+		progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+		if progress.State == questStateActive {
+			return quest, true
+		}
+	}
+	return questDefinition{}, false
+}
+
+func (s *worldServer) partyMemberCreditHintLocked(viewer *worldSessionState, member *worldSessionState, quest questDefinition, hasGroupQuest bool) (string, bool) {
+	if viewer == nil || member == nil {
+		return "offline", false
+	}
+	if member.CharacterID == viewer.CharacterID {
+		return "you", true
+	}
+	if !hasGroupQuest {
+		return "no_group_quest", false
+	}
+	if !member.Connected {
+		return "offline", false
+	}
+	if member.ZoneID != viewer.ZoneID || member.InstanceID != viewer.InstanceID {
+		return "wrong_zone", false
+	}
+	if distance2D(viewer.X, viewer.Y, member.X, member.Y) > questPartyCreditRadius(quest) {
+		return "out_of_range", false
+	}
+	progress := s.normalizeQuestProgress(quest, member.QuestProgress[quest.ID])
+	if progress.State != questStateActive || progress.CurrentCount >= progress.TargetCount {
+		return "not_on_group_quest", false
+	}
+	return "eligible", true
 }
 
 func (s *worldServer) buildPartyInviteResponsesLocked(characterID string) []partyInviteResponse {
