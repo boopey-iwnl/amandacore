@@ -204,7 +204,7 @@ namespace CombatRules
 
         bool IsClickableTargetKind(const AZStd::string& kind)
         {
-            return kind == HostileMobKind || kind == TrainerNpcKind || kind == QuestGiverNpcKind;
+            return kind == HostileMobKind || kind == TrainerNpcKind || kind == QuestGiverNpcKind || kind == "player";
         }
 
         bool HasNpcService(const NetClient::VisibleEntity& entity)

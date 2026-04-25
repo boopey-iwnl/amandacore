@@ -757,15 +757,13 @@ namespace UiClient
             float playerX,
             float playerY)
         {
-            (void)gameCore;
-            (void)worldState;
             const ImVec2 origin = ImGui::GetCursorScreenPos();
             if (!targetEntity)
             {
                 DrawPortraitBadge("?", ImVec2(origin.x + 34.0f, origin.y + 42.0f), ColorU32(72, 74, 78));
                 ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y + 10.0f));
                 ImGui::TextUnformatted("No target selected");
-                ImGui::TextUnformatted("Left-click NPCs or hostiles");
+                ImGui::TextUnformatted("Left-click NPCs, players, or hostiles");
                 ImGui::TextUnformatted("Tab cycles hostile targets");
                 return;
             }
@@ -790,6 +788,44 @@ namespace UiClient
                 else
                 {
                     ImGui::TextUnformatted("Move closer, then right-click the NPC model.");
+                }
+                return;
+            }
+
+            if (targetEntity->m_kind == "player")
+            {
+                DrawPortraitBadge("P", ImVec2(origin.x + 34.0f, origin.y + 42.0f), targetEntity->m_duelOpponent ? ColorU32(181, 70, 62) : ColorU32(68, 103, 159));
+                ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
+                ImGui::TextUnformatted(targetEntity->m_displayName.c_str());
+                ImGui::Text("%s  |  %s", targetEntity->m_duelOpponent ? "Duel opponent" : "Player", targetEntity->m_alive ? "available" : "down");
+                DrawMeter("Vitality", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
+                ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
+                if (worldState.m_session.m_pvp.m_safeZone.m_noDuel)
+                {
+                    ImGui::TextUnformatted("Safe zone: duels unavailable");
+                    return;
+                }
+                if (!worldState.m_session.m_pvp.m_duelId.empty())
+                {
+                    if (worldState.m_session.m_pvp.m_duelState == "active" && targetEntity->m_duelOpponent)
+                    {
+                        if (ImGui::Button("Surrender", ImVec2(104.0f, 24.0f)) && gameCore)
+                        {
+                            gameCore->SurrenderDuel(worldState.m_session.m_pvp.m_duelId);
+                        }
+                    }
+                    else if (worldState.m_session.m_pvp.m_outgoingDuel)
+                    {
+                        if (ImGui::Button("Cancel Duel", ImVec2(112.0f, 24.0f)) && gameCore)
+                        {
+                            gameCore->CancelDuel(worldState.m_session.m_pvp.m_duelId);
+                        }
+                    }
+                    return;
+                }
+                if (ImGui::Button("Request Duel", ImVec2(116.0f, 24.0f)) && gameCore)
+                {
+                    gameCore->RequestDuel(targetEntity->m_id, {});
                 }
                 return;
             }
@@ -1912,6 +1948,272 @@ namespace UiClient
             }
         }
 
+        AZStd::string FormatCopperAmount(int totalCopper)
+        {
+            const NetClient::CurrencyState currency{
+                totalCopper,
+                totalCopper % 100,
+                (totalCopper % 10000) / 100,
+                totalCopper / 10000,
+            };
+            return FormatCurrency(currency);
+        }
+
+        AZStd::string FormatAuctionRemaining(AZ::s64 remainingSeconds)
+        {
+            if (remainingSeconds <= 0)
+            {
+                return "expired";
+            }
+            const AZ::s64 hours = remainingSeconds / 3600;
+            const AZ::s64 minutes = (remainingSeconds % 3600) / 60;
+            if (hours > 0)
+            {
+                return AZStd::string::format("%lldh %lldm", static_cast<long long>(hours), static_cast<long long>(minutes));
+            }
+            if (minutes < 1)
+            {
+                minutes = 1;
+            }
+            return AZStd::string::format("%lldm", static_cast<long long>(minutes));
+        }
+
+        const NetClient::InventorySlotState* FindInventorySlot(
+            const NetClient::InventoryState& inventory,
+            int slotIndex)
+        {
+            for (const auto& slot : inventory.m_slots)
+            {
+                if (slot.m_slotIndex == slotIndex)
+                {
+                    return &slot;
+                }
+            }
+            return nullptr;
+        }
+
+        void DrawAuctionListingRow(
+            GameCore::IGameCoreRequests* gameCore,
+            const NetClient::AuctionListingState& listing,
+            int rowIndex,
+            bool canBuy,
+            int& pendingBuyoutIndex)
+        {
+            ImGui::PushID(listing.m_auctionId.c_str());
+            ImGui::Text("%s x%d", listing.m_itemDisplayName.c_str(), listing.m_stackCount);
+            ImGui::TextDisabled("%s / %s", listing.m_itemType.c_str(), listing.m_itemSubtype.c_str());
+            ImGui::SameLine(210.0f);
+            ImGui::Text("%s", listing.m_sellerDisplayName.c_str());
+            ImGui::SameLine(360.0f);
+            ImGui::Text("%s", FormatCopperAmount(listing.m_buyoutCopper).c_str());
+            ImGui::SameLine(490.0f);
+            ImGui::Text("%s", FormatAuctionRemaining(listing.m_timeRemainingSeconds).c_str());
+            if (canBuy)
+            {
+                ImGui::SameLine(590.0f);
+                if (ImGui::Button("Buyout", ImVec2(78.0f, 0.0f)))
+                {
+                    pendingBuyoutIndex = rowIndex;
+                    ImGui::OpenPopup("Confirm Buyout");
+                }
+            }
+            else if (listing.m_state == "active")
+            {
+                ImGui::SameLine(590.0f);
+                if (ImGui::Button("Cancel", ImVec2(78.0f, 0.0f)) && gameCore)
+                {
+                    gameCore->CancelAuction(listing.m_auctionId);
+                }
+            }
+            ImGui::Separator();
+            ImGui::PopID();
+        }
+
+        void DrawAuctionWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            char* searchBuffer,
+            size_t searchBufferLength,
+            char* buyoutBuffer,
+            size_t buyoutBufferLength,
+            int& selectedSellSlot,
+            int& stackCount,
+            int& pendingBuyoutIndex)
+        {
+            const char* itemTypes[] = {"", "weapon", "armor", "consumable", "material", "junk"};
+            static int selectedItemType = 0;
+            static int selectedSort = 0;
+            const char* sortLabels[] = {"price asc", "price desc"};
+            const char* sortValues[] = {"buyout_asc", "buyout_desc"};
+
+            ImGui::Text("Highmere Market");
+            ImGui::SameLine();
+            ImGui::TextDisabled("Purse %s", FormatCurrency(worldState.m_session.m_currency).c_str());
+            if (!worldState.m_errorMessage.empty())
+            {
+                ImGui::TextWrapped("Status: %s", worldState.m_errorMessage.c_str());
+            }
+            ImGui::Separator();
+
+            if (ImGui::BeginTabBar("##auction_tabs"))
+            {
+                if (ImGui::BeginTabItem("Browse"))
+                {
+                    ImGui::SetNextItemWidth(220.0f);
+                    ImGui::InputText("Search", searchBuffer, searchBufferLength);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(130.0f);
+                    ImGui::Combo("Type", &selectedItemType, itemTypes, AZ_ARRAY_SIZE(itemTypes));
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::Combo("Sort", &selectedSort, sortLabels, AZ_ARRAY_SIZE(sortLabels));
+                    ImGui::SameLine();
+                    if (ImGui::Button("Refresh", ImVec2(82.0f, 0.0f)) && gameCore)
+                    {
+                        gameCore->BrowseAuctions(searchBuffer, itemTypes[selectedItemType], sortValues[selectedSort]);
+                    }
+
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Item");
+                    ImGui::SameLine(210.0f);
+                    ImGui::TextDisabled("Seller");
+                    ImGui::SameLine(360.0f);
+                    ImGui::TextDisabled("Buyout");
+                    ImGui::SameLine(490.0f);
+                    ImGui::TextDisabled("Time");
+                    ImGui::Separator();
+                    ImGui::BeginChild("##auction_listing_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (int index = 0; index < static_cast<int>(worldState.m_auction.m_listings.size()); ++index)
+                    {
+                        DrawAuctionListingRow(gameCore, worldState.m_auction.m_listings[index], index, true, pendingBuyoutIndex);
+                    }
+                    ImGui::EndChild();
+
+                    if (ImGui::BeginPopupModal("Confirm Buyout", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                    {
+                        if (pendingBuyoutIndex >= 0 &&
+                            pendingBuyoutIndex < static_cast<int>(worldState.m_auction.m_listings.size()))
+                        {
+                            const auto& listing = worldState.m_auction.m_listings[pendingBuyoutIndex];
+                            ImGui::TextWrapped(
+                                "Buy %s x%d for %s?",
+                                listing.m_itemDisplayName.c_str(),
+                                listing.m_stackCount,
+                                FormatCopperAmount(listing.m_buyoutCopper).c_str());
+                            if (ImGui::Button("Confirm", ImVec2(96.0f, 0.0f)) && gameCore)
+                            {
+                                gameCore->BuyoutAuction(listing.m_auctionId);
+                                pendingBuyoutIndex = -1;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                        }
+                        if (ImGui::Button("Cancel", ImVec2(96.0f, 0.0f)))
+                        {
+                            pendingBuyoutIndex = -1;
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Sell"))
+                {
+                    ImGui::TextUnformatted("Select an inventory slot or drag an item here.");
+                    ImGui::Button("Drop Item", ImVec2(140.0f, 34.0f));
+                    if (ImGui::BeginDragDropTarget())
+                    {
+                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(InventorySlotPayloadType))
+                        {
+                            const auto* drag = static_cast<const InventorySlotDragPayload*>(payload->Data);
+                            if (drag && drag->m_sourceSlotIndex >= 0)
+                            {
+                                selectedSellSlot = drag->m_sourceSlotIndex;
+                            }
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+                    ImGui::SameLine();
+                    if (selectedSellSlot >= 0)
+                    {
+                        const auto* selectedSlot = FindInventorySlot(worldState.m_session.m_inventory, selectedSellSlot);
+                        ImGui::Text(
+                            "Slot %02d: %s x%d",
+                            selectedSellSlot + 1,
+                            selectedSlot ? selectedSlot->m_displayName.c_str() : "empty",
+                            selectedSlot ? selectedSlot->m_stackCount : 0);
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted("No item selected");
+                    }
+
+                    ImGui::BeginChild("##auction_sell_inventory", ImVec2(250.0f, 220.0f), true);
+                    for (const auto& slot : worldState.m_session.m_inventory.m_slots)
+                    {
+                        if (slot.m_itemId.empty() || slot.m_stackCount <= 0)
+                        {
+                            continue;
+                        }
+                        ImGui::PushID(slot.m_slotIndex);
+                        const bool selected = selectedSellSlot == slot.m_slotIndex;
+                        if (ImGui::Selectable(
+                                AZStd::string::format("%02d  %s x%d", slot.m_slotIndex + 1, slot.m_displayName.c_str(), slot.m_stackCount).c_str(),
+                                selected))
+                        {
+                            selectedSellSlot = slot.m_slotIndex;
+                            if (stackCount < 1)
+                            {
+                                stackCount = 1;
+                            }
+                            if (stackCount > slot.m_stackCount)
+                            {
+                                stackCount = slot.m_stackCount;
+                            }
+                        }
+                        ImGui::PopID();
+                    }
+                    ImGui::EndChild();
+                    ImGui::SameLine();
+                    ImGui::BeginGroup();
+                    ImGui::SetNextItemWidth(120.0f);
+                    ImGui::InputInt("Stack", &stackCount);
+                    if (stackCount < 1)
+                    {
+                        stackCount = 1;
+                    }
+                    ImGui::SetNextItemWidth(150.0f);
+                    ImGui::InputText("Buyout copper", buyoutBuffer, buyoutBufferLength, ImGuiInputTextFlags_CharsDecimal);
+                    ImGui::TextDisabled("Deposit: minimum 1c; server validates final fee.");
+                    if (ImGui::Button("Create Listing", ImVec2(150.0f, 0.0f)) && gameCore)
+                    {
+                        const int buyoutCopper = atoi(buyoutBuffer);
+                        if (gameCore->ListAuctionItem(selectedSellSlot, stackCount, buyoutCopper, 24 * 60 * 60))
+                        {
+                            selectedSellSlot = -1;
+                            stackCount = 1;
+                            buyoutBuffer[0] = '\0';
+                        }
+                    }
+                    ImGui::EndGroup();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("My Auctions"))
+                {
+                    ImGui::BeginChild("##auction_mine_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (int index = 0; index < static_cast<int>(worldState.m_auction.m_myAuctions.size()); ++index)
+                    {
+                        DrawAuctionListingRow(gameCore, worldState.m_auction.m_myAuctions[index], index, false, pendingBuyoutIndex);
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+        }
+
         bool DrawKeyBindingRow(
             const char* label,
             const char* actionId,
@@ -2401,6 +2703,66 @@ namespace UiClient
             }
         }
 
+        void DrawDuelPrompt(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            if (!gameCore)
+            {
+                return;
+            }
+
+            const auto& pvp = worldState.m_session.m_pvp;
+            if (pvp.m_incomingDuel)
+            {
+                ImGui::Text("%s challenged you to a duel.", pvp.m_opponentDisplayName.c_str());
+                if (ImGui::Button("Accept", ImVec2(104.0f, 28.0f)))
+                {
+                    gameCore->AcceptDuel(pvp.m_duelId);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Decline", ImVec2(104.0f, 28.0f)))
+                {
+                    gameCore->DeclineDuel(pvp.m_duelId);
+                }
+                return;
+            }
+
+            if (pvp.m_duelState == "countdown")
+            {
+                AZ::s64 remainingMs = pvp.m_countdownEndsAt - NowMs();
+                if (remainingMs < 0)
+                {
+                    remainingMs = 0;
+                }
+                ImGui::Text("Duel starts in %.1fs", static_cast<double>(remainingMs) / 1000.0);
+                ImGui::Text("%s", pvp.m_opponentDisplayName.c_str());
+                if (ImGui::Button("Cancel", ImVec2(104.0f, 28.0f)))
+                {
+                    gameCore->CancelDuel(pvp.m_duelId);
+                }
+                return;
+            }
+
+            if (pvp.m_duelState == "active")
+            {
+                ImGui::Text("Dueling %s", pvp.m_opponentDisplayName.c_str());
+                ImGui::Text("Wins %d  Losses %d  Honor %d", pvp.m_stats.m_duelsWon, pvp.m_stats.m_duelsLost, pvp.m_stats.m_honorPoints);
+                if (ImGui::Button("Surrender", ImVec2(112.0f, 28.0f)))
+                {
+                    gameCore->SurrenderDuel(pvp.m_duelId);
+                }
+                return;
+            }
+
+            if (!pvp.m_lastResult.m_duelId.empty())
+            {
+                ImGui::Text(
+                    "Last duel: %s vs %s",
+                    pvp.m_lastResult.m_result.c_str(),
+                    pvp.m_lastResult.m_opponentDisplayName.c_str());
+                ImGui::Text("Wins %d  Losses %d  Honor %d", pvp.m_stats.m_duelsWon, pvp.m_stats.m_duelsLost, pvp.m_stats.m_honorPoints);
+            }
+        }
+
         bool HasGuildPermission(const NetClient::GuildState& guild, const char* permission)
         {
             return AZStd::find(
@@ -2710,6 +3072,7 @@ namespace UiClient
         m_questToastExpiresAt = 0;
         m_lastHandledInteractionSequence = 0;
         m_questGossipOpen = false;
+        m_auctionOpen = false;
         m_lastNearCommandPoint = false;
         m_lastWorldConnected = false;
         m_loggedActionBarVisible = false;
@@ -2718,6 +3081,11 @@ namespace UiClient
         m_pendingActionAssignmentAbilityId.clear();
         m_pendingActionMoveSlot = -1;
         m_pendingInventoryMoveSlot = -1;
+        m_pendingAuctionSellSlot = -1;
+        m_pendingAuctionBuyoutIndex = -1;
+        m_auctionStackCount = 1;
+        m_auctionSearchBuffer[0] = '\0';
+        m_auctionBuyoutBuffer[0] = '\0';
         LoadDefaultKeybindings();
         LoadUiSettings();
     }
@@ -3112,6 +3480,7 @@ namespace UiClient
             {
                 m_questGossipOpen = false;
                 m_trainerOpen = false;
+                m_auctionOpen = false;
                 AddHudEvent(AZStd::string::format("Entering %s", entity.m_displayName.c_str()));
                 return true;
             }
@@ -3126,6 +3495,7 @@ namespace UiClient
             {
                 m_questGossipOpen = false;
                 m_trainerOpen = false;
+                m_auctionOpen = false;
                 AddHudEvent("Leaving dungeon");
                 return true;
             }
@@ -3134,10 +3504,31 @@ namespace UiClient
             return false;
         }
 
+        if (EntityHasService(entity, "auction"))
+        {
+            if (gameCore->BrowseAuctions(m_auctionSearchBuffer, {}, "buyout_asc"))
+            {
+                m_auctionOpen = true;
+                m_questGossipOpen = false;
+                m_trainerOpen = false;
+                AZ_Printf(
+                    "amandacore",
+                    "client.auction_visible open=true source=%s targetId=%s",
+                    source,
+                    entity.m_id.c_str());
+                AddHudEvent(AZStd::string::format("Viewing %s", entity.m_displayName.c_str()));
+                return true;
+            }
+            const auto& latestState = gameCore->GetClientWorldState();
+            AddHudEvent(latestState.m_errorMessage.empty() ? "Unable to open market" : latestState.m_errorMessage);
+            return false;
+        }
+
         if (ShouldOpenQuestForEntity(worldState, entity))
         {
             m_questGossipOpen = true;
             m_trainerOpen = false;
+            m_auctionOpen = false;
             AZ_Printf(
                 "amandacore",
                 "client.quest_gossip_visible open=true source=%s targetId=%s",
@@ -3151,6 +3542,7 @@ namespace UiClient
         {
             m_trainerOpen = true;
             m_questGossipOpen = false;
+            m_auctionOpen = false;
             AZ_Printf(
                 "amandacore",
                 "client.trainer_visible open=true source=%s targetId=%s",
@@ -3164,6 +3556,7 @@ namespace UiClient
         {
             m_questGossipOpen = true;
             m_trainerOpen = false;
+            m_auctionOpen = false;
             AZ_Printf(
                 "amandacore",
                 "client.quest_gossip_visible open=true source=%s targetId=%s",
@@ -3558,9 +3951,13 @@ namespace UiClient
         const ImVec2 chatPos(18.0f, AZ::GetMax(158.0f, utilityPos.y - chatSize.y - 18.0f));
         const ImVec2 socialSize(430.0f, 430.0f);
         const ImVec2 socialPos(displaySize.x - socialSize.x - 18.0f, displaySize.y - socialSize.y - 188.0f);
+        const ImVec2 auctionSize(720.0f, 520.0f);
+        const ImVec2 auctionPos((displaySize.x - auctionSize.x) * 0.5f, (displaySize.y - auctionSize.y) * 0.5f);
         const ImVec2 invitePromptSize(360.0f, 92.0f);
         const ImVec2 invitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 170.0f);
         const ImVec2 guildInvitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 270.0f);
+        const ImVec2 duelPromptSize(380.0f, 108.0f);
+        const ImVec2 duelPromptPos((displaySize.x - duelPromptSize.x) * 0.5f, 370.0f);
 
         if (m_trainerOpen &&
             (worldState.m_session.m_trainer.m_id.empty() ||
@@ -3572,6 +3969,10 @@ namespace UiClient
         if (m_questGossipOpen && (!targetEntity || !IsQuestGiverNpc(*targetEntity)))
         {
             m_questGossipOpen = false;
+        }
+        if (m_auctionOpen && (!targetEntity || !EntityHasService(*targetEntity, "auction")))
+        {
+            m_auctionOpen = false;
         }
 
         if (BeginHudPanel("##player_frame", "Player", playerFramePos, playerFrameSize))
@@ -3626,6 +4027,19 @@ namespace UiClient
             DrawGuildInvitePrompt(gameCore, worldState);
         }
         if (!worldState.m_social.m_guildInvites.empty())
+        {
+            ImGui::End();
+        }
+
+        const bool duelPanelVisible = worldState.m_session.m_pvp.m_incomingDuel ||
+            worldState.m_session.m_pvp.m_duelState == "countdown" ||
+            worldState.m_session.m_pvp.m_duelState == "active" ||
+            !worldState.m_session.m_pvp.m_lastResult.m_duelId.empty();
+        if (duelPanelVisible && BeginHudPanel("##duel_prompt", "Duel", duelPromptPos, duelPromptSize))
+        {
+            DrawDuelPrompt(gameCore, worldState);
+        }
+        if (duelPanelVisible)
         {
             ImGui::End();
         }
@@ -3837,6 +4251,24 @@ namespace UiClient
             DrawZoneMapWindow(worldState, playerX, playerY);
         }
         if (m_mapOpen)
+        {
+            ImGui::End();
+        }
+
+        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize))
+        {
+            DrawAuctionWindow(
+                gameCore,
+                worldState,
+                m_auctionSearchBuffer,
+                AZ_ARRAY_SIZE(m_auctionSearchBuffer),
+                m_auctionBuyoutBuffer,
+                AZ_ARRAY_SIZE(m_auctionBuyoutBuffer),
+                m_pendingAuctionSellSlot,
+                m_auctionStackCount,
+                m_pendingAuctionBuyoutIndex);
+        }
+        if (m_auctionOpen)
         {
             ImGui::End();
         }

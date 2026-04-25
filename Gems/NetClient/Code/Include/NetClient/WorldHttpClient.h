@@ -34,7 +34,9 @@ namespace NetClient
         bool m_alive = false;
         bool m_targetable = false;
         bool m_elite = false;
+        bool m_duelOpponent = false;
         AZStd::string m_aiState;
+        AZStd::string m_pvpState;
         AZStd::vector<NpcServiceState> m_services;
     };
 
@@ -154,6 +156,61 @@ namespace NetClient
         AZStd::vector<InventorySlotState> m_slots;
     };
 
+    struct MailItemAttachmentState
+    {
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        int m_stackCount = 0;
+    };
+
+    struct MailEnvelopeState
+    {
+        AZStd::string m_mailId;
+        AZStd::string m_auctionId;
+        AZStd::string m_senderDisplayName;
+        AZStd::string m_recipientCharacterId;
+        AZStd::string m_subject;
+        AZStd::string m_body;
+        AZStd::vector<MailItemAttachmentState> m_itemAttachments;
+        int m_currencyCopper = 0;
+        AZ::s64 m_createdAt = 0;
+        AZ::s64 m_deliveredAt = 0;
+    };
+
+    struct AuctionListingState
+    {
+        AZStd::string m_auctionId;
+        AZStd::string m_sellerCharacterId;
+        AZStd::string m_sellerDisplayName;
+        AZStd::string m_buyerCharacterId;
+        AZStd::string m_itemId;
+        AZStd::string m_itemDisplayName;
+        AZStd::string m_itemQuality;
+        AZStd::string m_itemType;
+        AZStd::string m_itemSubtype;
+        AZStd::string m_state;
+        int m_stackCount = 0;
+        int m_buyoutCopper = 0;
+        int m_depositCopper = 0;
+        int m_cutCopper = 0;
+        int m_cutPercent = 0;
+        int m_version = 0;
+        AZ::s64 m_createdAt = 0;
+        AZ::s64 m_expiresAt = 0;
+        AZ::s64 m_soldAt = 0;
+        AZ::s64 m_canceledAt = 0;
+        AZ::s64 m_timeRemainingSeconds = 0;
+    };
+
+    struct AuctionStateResponse
+    {
+        AZ::s64 m_serverTime = 0;
+        AZStd::vector<AuctionListingState> m_listings;
+        AZStd::vector<AuctionListingState> m_myAuctions;
+        AZStd::vector<MailEnvelopeState> m_mail;
+        int m_currencyCopper = 0;
+    };
+
     struct SpellbookEntryState
     {
         AZStd::string m_id;
@@ -255,6 +312,54 @@ namespace NetClient
         AZStd::vector<TalentEntryState> m_talents;
     };
 
+    struct PvPStatsState
+    {
+        AZStd::string m_characterId;
+        int m_duelsWon = 0;
+        int m_duelsLost = 0;
+        int m_honorPoints = 0;
+        AZ::s64 m_lastDuelWonAt = 0;
+        AZ::s64 m_updatedAt = 0;
+    };
+
+    struct PvPSafeZoneState
+    {
+        bool m_noDuel = false;
+        bool m_noHostileAction = false;
+        bool m_sanctuary = false;
+    };
+
+    struct DuelResultState
+    {
+        AZStd::string m_duelId;
+        AZStd::string m_result;
+        AZStd::string m_reason;
+        AZStd::string m_opponentCharacterId;
+        AZStd::string m_opponentDisplayName;
+        AZStd::string m_winnerCharacterId;
+        AZ::s64 m_endedAt = 0;
+    };
+
+    struct PvPState
+    {
+        bool m_duelsEnabled = false;
+        bool m_incomingDuel = false;
+        bool m_outgoingDuel = false;
+        AZStd::string m_duelId;
+        AZStd::string m_duelState;
+        AZStd::string m_opponentCharacterId;
+        AZStd::string m_opponentDisplayName;
+        AZ::s64 m_countdownEndsAt = 0;
+        AZ::s64 m_startedAt = 0;
+        AZ::s64 m_timeoutAt = 0;
+        double m_boundaryCenterX = 0.0;
+        double m_boundaryCenterY = 0.0;
+        double m_boundaryMaxDistance = 0.0;
+        PvPStatsState m_stats;
+        PvPSafeZoneState m_safeZone;
+        DuelResultState m_lastResult;
+    };
+
     struct WorldSessionResponse
     {
         AZStd::string m_worldSessionToken;
@@ -285,6 +390,7 @@ namespace NetClient
         ZoneMapState m_zoneMap;
         AZStd::vector<NavigationAreaState> m_navigationAreas;
         AZStd::vector<MapMarkerState> m_mapMarkers;
+        PvPState m_pvp;
         AZStd::string m_currentTargetId;
         bool m_autoAttackActive = false;
         AZ::s64 m_globalCooldownEndsAt = 0;
@@ -649,6 +755,42 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 
+        virtual bool RequestDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetCharacterId,
+            const AZStd::string& targetName,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool AcceptDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool DeclineDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool CancelDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool SurrenderDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
         virtual bool LearnTrainerAbility(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
@@ -693,6 +835,39 @@ namespace NetClient
             int fromSlotIndex,
             int toSlotIndex,
             WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool BrowseAuctions(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& search,
+            const AZStd::string& itemType,
+            const AZStd::string& sort,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool ListAuctionItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            int slotIndex,
+            int stackCount,
+            int buyoutCopper,
+            AZ::s64 durationSeconds,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool BuyoutAuction(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& auctionId,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool CancelAuction(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& auctionId,
+            AuctionStateResponse& outResponse,
             AZStd::string& outError) = 0;
 
         virtual bool Reconnect(

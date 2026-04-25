@@ -138,6 +138,8 @@ var brindlebrookFriendlyNPCs = []friendlyNPCDefinition{
 			{Type: "quest", ServiceID: "bb_road_to_highmere", Label: "Roadlands Orders"},
 			{Type: "quest", ServiceID: "bb_clear_south_verge", Label: "Road Patrol"},
 			{Type: "quest", ServiceID: "bb_northspur_orders", Label: "Northspur Orders"},
+			{Type: bindMasterServiceType, ServiceID: bindHighmereCrossingID, Label: "Set Return Signal"},
+			{Type: routeMasterServiceType, ServiceID: travelHighmereCrossingID, Label: "Highmere Routes"},
 		},
 	},
 	{
@@ -254,6 +256,7 @@ var brindlebrookFriendlyNPCs = []friendlyNPCDefinition{
 			{Type: "quest", ServiceID: "bb_watch_needs_eyes", Label: "Watch Orders"},
 			{Type: "quest", ServiceID: "bb_redcord_tags", Label: "Redcord Tags"},
 			{Type: "quest", ServiceID: "bb_renna_vask", Label: "Roadblock"},
+			{Type: routeMasterServiceType, ServiceID: travelPinebarrowWatchID, Label: "Pinebarrow Routes"},
 		},
 	},
 	{

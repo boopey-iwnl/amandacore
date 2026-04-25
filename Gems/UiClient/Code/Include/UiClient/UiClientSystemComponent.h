@@ -74,6 +74,7 @@ namespace UiClient
         bool m_bagOpen = false;
         bool m_settingsOpen = false;
         bool m_socialOpen = false;
+        bool m_auctionOpen = false;
         bool m_characterSheetOpen = false;
         bool m_questLogOpen = false;
         bool m_mapOpen = false;
@@ -104,6 +105,12 @@ namespace UiClient
         char m_socialNameBuffer[65]{};
         char m_guildNameBuffer[65]{};
         char m_guildMotdBuffer[161]{};
+        char m_auctionSearchBuffer[65]{};
+        char m_auctionBuyoutBuffer[33]{};
+        int m_auctionTab = 0;
+        int m_pendingAuctionSellSlot = -1;
+        int m_pendingAuctionBuyoutIndex = -1;
+        int m_auctionStackCount = 1;
         int m_pendingActionMoveSlot = -1;
         int m_pendingInventoryMoveSlot = -1;
     };

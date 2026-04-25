@@ -544,6 +544,142 @@ namespace GameCore
         return true;
     }
 
+    bool GameCoreSystemComponent::RequestDuel(const AZStd::string& targetCharacterId, const AZStd::string& targetName)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->RequestDuel(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                targetCharacterId,
+                targetName,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "RequestDuel failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "duel_request");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::AcceptDuel(const AZStd::string& duelId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->AcceptDuel(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                duelId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "AcceptDuel failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "duel_accept");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::DeclineDuel(const AZStd::string& duelId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->DeclineDuel(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                duelId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "DeclineDuel failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "duel_decline");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::CancelDuel(const AZStd::string& duelId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->CancelDuel(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                duelId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "CancelDuel failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "duel_cancel");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::SurrenderDuel(const AZStd::string& duelId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->SurrenderDuel(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                duelId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "SurrenderDuel failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "duel_surrender");
+        return true;
+    }
+
     bool GameCoreSystemComponent::LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId)
     {
         if (!m_worldState.m_worldConnected)
@@ -707,6 +843,125 @@ namespace GameCore
 
         m_worldState.m_errorMessage.clear();
         ApplyWorldSessionResponse(AZStd::move(response), "inventory_move");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::BrowseAuctions(
+        const AZStd::string& search,
+        const AZStd::string& itemType,
+        const AZStd::string& sort)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::AuctionStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->BrowseAuctions(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                search,
+                itemType,
+                sort,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "BrowseAuctions failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyAuctionStateResponse(AZStd::move(response), "auction_browse");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::ListAuctionItem(int slotIndex, int stackCount, int buyoutCopper, AZ::s64 durationSeconds)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::AuctionStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->ListAuctionItem(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                slotIndex,
+                stackCount,
+                buyoutCopper,
+                durationSeconds,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "ListAuctionItem failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyAuctionStateResponse(AZStd::move(response), "auction_list");
+        (void)PollWorldState();
+        return true;
+    }
+
+    bool GameCoreSystemComponent::BuyoutAuction(const AZStd::string& auctionId)
+    {
+        if (!m_worldState.m_worldConnected || auctionId.empty())
+        {
+            return false;
+        }
+
+        NetClient::AuctionStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->BuyoutAuction(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                auctionId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "BuyoutAuction failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyAuctionStateResponse(AZStd::move(response), "auction_buyout");
+        (void)PollWorldState();
+        return true;
+    }
+
+    bool GameCoreSystemComponent::CancelAuction(const AZStd::string& auctionId)
+    {
+        if (!m_worldState.m_worldConnected || auctionId.empty())
+        {
+            return false;
+        }
+
+        NetClient::AuctionStateResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->CancelAuction(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                auctionId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "CancelAuction failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyAuctionStateResponse(AZStd::move(response), "auction_cancel");
+        (void)PollWorldState();
         return true;
     }
 
@@ -1448,6 +1703,19 @@ namespace GameCore
             m_worldState.m_social.m_partyInvites.size(),
             m_worldState.m_social.m_hasGuild ? "true" : "false",
             m_worldState.m_social.m_guildInvites.size());
+        return true;
+    }
+
+    bool GameCoreSystemComponent::ApplyAuctionStateResponse(NetClient::AuctionStateResponse&& response, const char* source)
+    {
+        m_worldState.m_auction = AZStd::move(response);
+        AZ_Printf(
+            "amandacore",
+            "client.auction_state_applied source=%s listings=%zu mine=%zu mail=%zu",
+            source,
+            m_worldState.m_auction.m_listings.size(),
+            m_worldState.m_auction.m_myAuctions.size(),
+            m_worldState.m_auction.m_mail.size());
         return true;
     }
 

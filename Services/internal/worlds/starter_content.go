@@ -40,6 +40,8 @@ var stonewakeFriendlyNPCs = []friendlyNPCDefinition{
 		Radius:      starterInteractRadius,
 		Services: []npcService{
 			{Type: "quest", ServiceID: starterQuestID, Label: "Hearthwatch Orders"},
+			{Type: bindMasterServiceType, ServiceID: bindHearthwatchYardID, Label: "Set Return Signal"},
+			{Type: routeMasterServiceType, ServiceID: travelHearthwatchYardID, Label: "Hearthwatch Routes"},
 		},
 	},
 	{

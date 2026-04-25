@@ -43,12 +43,24 @@ namespace GameCore
         bool TrackQuest(const AZStd::string& questId, bool tracked) override;
         bool SetAutoAttack(bool enabled) override;
         bool ActivateAbility(const AZStd::string& abilityId) override;
+        bool RequestDuel(const AZStd::string& targetCharacterId, const AZStd::string& targetName) override;
+        bool AcceptDuel(const AZStd::string& duelId) override;
+        bool DeclineDuel(const AZStd::string& duelId) override;
+        bool CancelDuel(const AZStd::string& duelId) override;
+        bool SurrenderDuel(const AZStd::string& duelId) override;
         bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) override;
         bool SelectTalent(const AZStd::string& talentId) override;
         bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) override;
         bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) override;
         bool ClearActionBarSlot(int slotIndex) override;
         bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) override;
+        bool BrowseAuctions(
+            const AZStd::string& search,
+            const AZStd::string& itemType,
+            const AZStd::string& sort) override;
+        bool ListAuctionItem(int slotIndex, int stackCount, int buyoutCopper, AZ::s64 durationSeconds) override;
+        bool BuyoutAuction(const AZStd::string& auctionId) override;
+        bool CancelAuction(const AZStd::string& auctionId) override;
         bool SubmitChatMessage(
             const AZStd::string& channel,
             const AZStd::string& targetName,
@@ -80,6 +92,7 @@ namespace GameCore
         void AttemptInitialWorldConnect();
         bool ApplyWorldSessionResponse(NetClient::WorldSessionResponse&& response, const char* source);
         bool ApplySocialStateResponse(NetClient::SocialStateResponse&& response, const char* source);
+        bool ApplyAuctionStateResponse(NetClient::AuctionStateResponse&& response, const char* source);
         void EnsureAbilityPresentationDefaults(NetClient::WorldSessionResponse& session, const char* source);
         bool PollWorldState();
         bool PollSocialState();

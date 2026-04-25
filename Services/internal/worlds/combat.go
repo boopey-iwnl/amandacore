@@ -191,11 +191,24 @@ func (s *worldServer) setAutoAttackLocked(session *worldSessionState, enabled bo
 		}
 
 		targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
-		if targetMob == nil || !targetMob.Alive || !targetMob.Targetable {
-			return fmt.Errorf("target is invalid")
-		}
-		if distance2D(session.X, session.Y, targetMob.X, targetMob.Y) > playerAutoAttackRange {
-			return fmt.Errorf("target is out of range")
+		if targetMob != nil {
+			if !targetMob.Alive || !targetMob.Targetable {
+				return fmt.Errorf("target is invalid")
+			}
+			if distance2D(session.X, session.Y, targetMob.X, targetMob.Y) > playerAutoAttackRange {
+				return fmt.Errorf("target is out of range")
+			}
+		} else {
+			targetPlayer := s.findPlayerTargetForSessionLocked(session, session.CurrentTargetID)
+			if targetPlayer == nil {
+				return fmt.Errorf("target is invalid")
+			}
+			if err := s.validatePvPDamageLocked(session, targetPlayer); err != nil {
+				return err
+			}
+			if distance2D(session.X, session.Y, targetPlayer.X, targetPlayer.Y) > playerAutoAttackRange {
+				return fmt.Errorf("target is out of range")
+			}
 		}
 
 		session.AutoAttackActive = true
@@ -232,7 +245,8 @@ func (s *worldServer) activateAbilityLocked(session *worldSessionState, abilityI
 	}
 
 	targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
-	return s.applyAbilityEffectLocked(session, targetMob, ability)
+	targetPlayer := s.findPlayerTargetForSessionLocked(session, session.CurrentTargetID)
+	return s.applyAbilityEffectLocked(session, targetMob, targetPlayer, ability)
 }
 
 func (s *worldServer) advanceWorldLocked(now time.Time) error {
@@ -273,26 +287,46 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 		}
 
 		targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
-		if targetMob == nil || session.CurrentTargetID == "" {
+		targetPlayer := s.findPlayerTargetForSessionLocked(session, session.CurrentTargetID)
+		if targetMob == nil && targetPlayer == nil || session.CurrentTargetID == "" {
 			s.stopAutoAttackLocked(session, "target_invalid")
 			continue
 		}
-		if !targetMob.Alive {
-			s.clearTargetLocked(session, "target_dead")
+		if targetMob != nil {
+			if !targetMob.Alive {
+				s.clearTargetLocked(session, "target_dead")
+				continue
+			}
+			if !targetMob.Targetable {
+				s.clearTargetLocked(session, "target_invalid")
+				continue
+			}
+			if distance2D(session.X, session.Y, targetMob.X, targetMob.Y) > playerAutoAttackRange {
+				s.stopAutoAttackLocked(session, "out_of_range")
+				continue
+			}
+			if nowMs-session.LastAutoAttackAtMs >= playerAutoAttackCadenceMs {
+				session.LastAutoAttackAtMs = nowMs
+				session.Resource = minFloat(session.MaxResource, session.Resource+playerAutoAttackGrit)
+				if err := s.applyDamageToMobLocked(session, targetMob, s.autoAttackDamage(session), "auto_attack"); err != nil {
+					return err
+				}
+			}
 			continue
 		}
-		if !targetMob.Targetable {
-			s.clearTargetLocked(session, "target_invalid")
+
+		if err := s.validatePvPDamageLocked(session, targetPlayer); err != nil {
+			s.stopAutoAttackLocked(session, "pvp_invalid")
 			continue
 		}
-		if distance2D(session.X, session.Y, targetMob.X, targetMob.Y) > playerAutoAttackRange {
+		if distance2D(session.X, session.Y, targetPlayer.X, targetPlayer.Y) > playerAutoAttackRange {
 			s.stopAutoAttackLocked(session, "out_of_range")
 			continue
 		}
 		if nowMs-session.LastAutoAttackAtMs >= playerAutoAttackCadenceMs {
 			session.LastAutoAttackAtMs = nowMs
 			session.Resource = minFloat(session.MaxResource, session.Resource+playerAutoAttackGrit)
-			if err := s.applyDamageToMobLocked(session, targetMob, s.autoAttackDamage(session), "auto_attack"); err != nil {
+			if err := s.applyDamageToPlayerLocked(session, targetPlayer, s.autoAttackDamage(session), "auto_attack"); err != nil {
 				return err
 			}
 		}
@@ -378,6 +412,7 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 	damage := mob.AttackDamage * (1.0 - armorReduction(calculatePlayerStats(targetSession.Level, targetSession.Equipment, targetSession.Talents).Armor, mob.Level))
 	damage = maxFloat(1.0, damage)
 	targetSession.Health = maxFloat(0.0, targetSession.Health-damage)
+	s.forceDismountLocked(targetSession, "damage")
 	observability.LogEvent("world-service", "world.damage_applied", map[string]any{
 		"source":            mob.ID,
 		"targetCharacterId": targetSession.CharacterID,

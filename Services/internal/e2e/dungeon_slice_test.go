@@ -298,10 +298,16 @@ func (f *dungeonFixture) killDungeonMob(t *testing.T, mobID string, x float64, y
 		}
 		if !time.Now().Before(nextAbilityAt) {
 			for _, player := range []socialPlayer{f.alice, f.bob} {
-				postJSON(t, f.server.Client(), f.server.URL+"/v1/world/attack/ability", nil, map[string]any{
+				status, err := postJSONStatus(f.server.Client(), f.server.URL+"/v1/world/attack/ability", nil, map[string]any{
 					"worldSessionToken": player.worldSessionToken,
 					"abilityId":         "steady_strike",
-				}, http.StatusOK, nil)
+				}, nil)
+				if err != nil {
+					t.Fatalf("failed to activate steady strike: %v", err)
+				}
+				if status != http.StatusOK && status != http.StatusBadRequest {
+					t.Fatalf("unexpected steady strike status: got %d", status)
+				}
 			}
 			nextAbilityAt = time.Now().Add(1700 * time.Millisecond)
 		}

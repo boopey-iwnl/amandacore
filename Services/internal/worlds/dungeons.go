@@ -377,6 +377,7 @@ func (s *worldServer) placeSessionInDungeonLocked(session *worldSessionState, in
 	instance.State = dungeonStateActive
 	instance.LastPlayerLeftAtMs = 0
 
+	s.forceDismountLocked(session, "dungeon_enter")
 	session.InstanceID = instance.InstanceID
 	session.ReturnZoneID = returnPosition.ZoneID
 	session.ReturnX = returnPosition.X
@@ -395,15 +396,18 @@ func (s *worldServer) exitDungeonLocked(session *worldSessionState, reason strin
 	}
 	instance := s.dungeonInstances[session.InstanceID]
 	returnPosition := worldPosition{ZoneID: session.ReturnZoneID, X: session.ReturnX, Y: session.ReturnY, Z: session.ReturnZ}
-	if stored, ok := instance.ReturnPositions[session.CharacterID]; ok {
-		returnPosition = stored
+	if instance != nil {
+		if stored, ok := instance.ReturnPositions[session.CharacterID]; ok {
+			returnPosition = stored
+		}
 	}
-	if returnPosition.ZoneID == "" {
+	if returnPosition.ZoneID == "" && instance != nil {
 		if definition, ok := dungeonDefinitions[instance.DungeonID]; ok {
 			returnPosition = definition.ReturnPosition
-		} else {
-			returnPosition = worldPosition{ZoneID: secondZoneID, X: secondZoneEntryX, Y: secondZoneEntryY, Z: 0}
 		}
+	}
+	if returnPosition.ZoneID == "" {
+		returnPosition = worldPosition{ZoneID: secondZoneID, X: secondZoneEntryX, Y: secondZoneEntryY, Z: 0}
 	}
 
 	s.resetSessionCombatStateLocked(session, reason)

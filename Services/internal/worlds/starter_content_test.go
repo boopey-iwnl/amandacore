@@ -25,8 +25,8 @@ func TestStonewakeStarterContentLoads(t *testing.T) {
 			stonewakeFriendlyCount++
 		}
 	}
-	if stonewakeFriendlyCount != 8 {
-		t.Fatalf("expected 8 Stonewake friendly NPC/object entities, got %d", stonewakeFriendlyCount)
+	if stonewakeFriendlyCount != 9 {
+		t.Fatalf("expected 9 Stonewake friendly NPC/object entities, got %d", stonewakeFriendlyCount)
 	}
 
 	stonewakeMobCount := 0

@@ -14,8 +14,8 @@ import (
 
 const (
 	auctionHouseServiceID     = "auction_highmere_market"
-	auctionDurationSeconds    = int64((24 * time.Hour).Seconds())
-	auctionDevDurationSeconds = int64((30 * time.Minute).Seconds())
+	auctionDurationSeconds    = int64(24 * 60 * 60)
+	auctionDevDurationSeconds = int64(30 * 60)
 	auctionCutPercent         = 5
 	auctionMaxBuyoutCopper    = 1000000000
 	auctionDefaultBrowseLimit = 50

@@ -57,6 +57,7 @@ type state struct {
 	HousingSpaces       map[string]platform.HousingSpace          `json:"housingSpaces"`
 	HousingStorage      map[string][]platform.HousingStorageSlot  `json:"housingStorage"`
 	HousingDecorations  map[string][]platform.DecorationPlacement `json:"housingDecorations"`
+	AccountProgress     map[string]platform.AccountProgressState  `json:"accountProgress"`
 	BuildManifest       platform.BuildManifest                    `json:"buildManifest"`
 }
 
@@ -92,6 +93,7 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 			HousingSpaces:       map[string]platform.HousingSpace{},
 			HousingStorage:      map[string][]platform.HousingStorageSlot{},
 			HousingDecorations:  map[string][]platform.DecorationPlacement{},
+			AccountProgress:     map[string]platform.AccountProgressState{},
 			BuildManifest:       buildManifest,
 		},
 	}
@@ -377,6 +379,37 @@ func (s *FileStore) GetAccountByID(accountID string) (*platform.Account, error) 
 
 	copy := account
 	return &copy, nil
+}
+
+func (s *FileStore) GetAccountProgress(accountID string) (platform.AccountProgressState, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.AccountProgressState{}, err
+	}
+	defer s.unlockState()
+
+	if _, ok := s.state.Accounts[accountID]; !ok {
+		return platform.AccountProgressState{}, ErrInvalidCredentials
+	}
+	progress := platform.NormalizeAccountProgress(accountID, s.state.AccountProgress[accountID])
+	return cloneAccountProgress(progress), nil
+}
+
+func (s *FileStore) SaveAccountProgress(progress platform.AccountProgressState) (platform.AccountProgressState, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.AccountProgressState{}, err
+	}
+	defer s.unlockState()
+
+	if _, ok := s.state.Accounts[progress.AccountID]; !ok {
+		return platform.AccountProgressState{}, ErrInvalidCredentials
+	}
+	progress = platform.NormalizeAccountProgress(progress.AccountID, progress)
+	progress.UpdatedAt = time.Now().Unix()
+	if s.state.AccountProgress == nil {
+		s.state.AccountProgress = map[string]platform.AccountProgressState{}
+	}
+	s.state.AccountProgress[progress.AccountID] = progress
+	return cloneAccountProgress(progress), s.saveLocked()
 }
 
 func (s *FileStore) ListAccounts() ([]platform.Account, error) {
@@ -1230,6 +1263,50 @@ func (s *FileStore) UpdateCharacterState(characterID string, zoneID string, x fl
 	return &copy, nil
 }
 
+func (s *FileStore) UpdateCharacterTravelState(
+	characterID string,
+	bindPoint platform.CharacterBindPoint,
+	travelState platform.CharacterTravelState,
+	mountState platform.CharacterMountState,
+	currencyCopper int,
+	zoneID string,
+	x float64,
+	y float64,
+	z float64,
+) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	if currencyCopper < 0 {
+		currencyCopper = 0
+	}
+	character.BindPoint = platform.NormalizeCharacterBindPoint(characterID, bindPoint)
+	character.TravelState = platform.NormalizeCharacterTravelState(travelState)
+	character.MountState = platform.NormalizeCharacterMountState(mountState)
+	character.CurrencyCopper = currencyCopper
+	character.ZoneID = zoneID
+	character.PositionX = x
+	character.PositionY = y
+	character.PositionZ = z
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
 func (s *FileStore) UpdateCharacterProgression(
 	characterID string,
 	experience int,
@@ -1543,6 +1620,12 @@ func (s *FileStore) load() error {
 		}
 		s.state.HousingDecorations = loaded.HousingDecorations
 	}
+	if loaded.AccountProgress != nil {
+		for accountID, progress := range loaded.AccountProgress {
+			loaded.AccountProgress[accountID] = platform.NormalizeAccountProgress(accountID, progress)
+		}
+		s.state.AccountProgress = loaded.AccountProgress
+	}
 	if loaded.BuildManifest.ID != "" {
 		s.state.BuildManifest = loaded.BuildManifest
 	}
@@ -1632,6 +1715,13 @@ func (s *FileStore) reloadLocked() error {
 	} else {
 		for housingSpaceID, placements := range loaded.HousingDecorations {
 			loaded.HousingDecorations[housingSpaceID] = platform.NormalizeDecorationPlacements(placements)
+		}
+	}
+	if loaded.AccountProgress == nil {
+		loaded.AccountProgress = map[string]platform.AccountProgressState{}
+	} else {
+		for accountID, progress := range loaded.AccountProgress {
+			loaded.AccountProgress[accountID] = platform.NormalizeAccountProgress(accountID, progress)
 		}
 	}
 	if loaded.BuildManifest.ID == "" {
@@ -1885,6 +1975,28 @@ func cloneStringIDs(source []string) []string {
 	return platform.NormalizeStringIDs(source)
 }
 
+func cloneAccountProgress(source platform.AccountProgressState) platform.AccountProgressState {
+	source = platform.NormalizeAccountProgress(source.AccountID, source)
+	progress := platform.AccountProgressState{
+		AccountID:                  source.AccountID,
+		AchievementProgress:        map[string]platform.AchievementProgress{},
+		UnlockedTitleIDs:           cloneStringIDs(source.UnlockedTitleIDs),
+		SelectedTitleByCharacterID: map[string]string{},
+		CollectionUnlocks:          map[string]platform.CollectionUnlock{},
+		UpdatedAt:                  source.UpdatedAt,
+	}
+	for achievementID, achievementProgress := range source.AchievementProgress {
+		progress.AchievementProgress[achievementID] = achievementProgress
+	}
+	for characterID, titleID := range source.SelectedTitleByCharacterID {
+		progress.SelectedTitleByCharacterID[characterID] = titleID
+	}
+	for unlockID, unlock := range source.CollectionUnlocks {
+		progress.CollectionUnlocks[unlockID] = unlock
+	}
+	return progress
+}
+
 func normalizedCharacterCopy(source platform.Character) platform.Character {
 	normalized := platform.NormalizeCharacter(source)
 	normalized.Inventory = cloneInventorySlots(normalized.Inventory)
@@ -1894,6 +2006,11 @@ func normalizedCharacterCopy(source platform.Character) platform.Character {
 	normalized.ActionBarSlots = cloneActionBarSlots(normalized.ActionBarSlots, normalized.LearnedAbilityIDs)
 	normalized.Quests = cloneQuestProgressMap(normalized.Quests)
 	normalized.TrackedQuestIDs = cloneStringIDs(normalized.TrackedQuestIDs)
+	normalized.BindPoint = platform.NormalizeCharacterBindPoint(normalized.ID, normalized.BindPoint)
+	normalized.TravelState = platform.NormalizeCharacterTravelState(normalized.TravelState)
+	normalized.TravelState.DiscoveredTravelPointIDs = cloneStringIDs(normalized.TravelState.DiscoveredTravelPointIDs)
+	normalized.MountState = platform.NormalizeCharacterMountState(normalized.MountState)
+	normalized.MountState.UnlockedMountIDs = cloneStringIDs(normalized.MountState.UnlockedMountIDs)
 	return normalized
 }
 

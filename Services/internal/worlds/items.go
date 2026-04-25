@@ -3,13 +3,13 @@ package worlds
 import "amandacore/services/internal/platform"
 
 const (
-	itemWornMilitiaBladeID = "worn_militia_blade"
-	itemPaddedYardVestID   = "padded_yard_vest"
-	itemFieldBootsID       = "field_boots"
+	itemWornMilitiaBladeID        = "worn_militia_blade"
+	itemPaddedYardVestID          = "padded_yard_vest"
+	itemFieldBootsID              = "field_boots"
 	itemTDSSluiceguardHandwrapsID = "tds_sluiceguard_handwraps"
-	itemBentBuckleID       = "bent_buckle"
-	itemCrackedTuskID      = "cracked_tusk"
-	itemCampRationID       = "camp_ration"
+	itemBentBuckleID              = "bent_buckle"
+	itemCrackedTuskID             = "cracked_tusk"
+	itemCampRationID              = "camp_ration"
 
 	itemTypeWeapon     = "weapon"
 	itemTypeArmor      = "armor"

@@ -55,8 +55,22 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/move", server.instrumentEndpointFunc("move", server.handleMove))
 	mux.HandleFunc("POST /v1/world/disconnect", server.instrumentEndpointFunc("disconnect", server.handleDisconnect))
 	mux.HandleFunc("POST /v1/world/target", server.instrumentEndpointFunc("target", server.handleTarget))
+	mux.HandleFunc("GET /v1/world/travel/state", server.instrumentEndpointFunc("travel_state", server.handleTravelState))
+	mux.HandleFunc("POST /v1/world/bind/set", server.instrumentEndpointFunc("bind_set", server.handleSetBindPoint))
+	mux.HandleFunc("POST /v1/world/recall/use", server.instrumentEndpointFunc("recall_use", server.handleUseRecall))
+	mux.HandleFunc("POST /v1/world/travel/discover", server.instrumentEndpointFunc("travel_discover", server.handleDiscoverTravelPoint))
+	mux.HandleFunc("GET /v1/world/travel/destinations", server.instrumentEndpointFunc("travel_destinations", server.handleTravelDestinations))
+	mux.HandleFunc("POST /v1/world/travel/route", server.instrumentEndpointFunc("travel_route", server.handleTravelRoute))
+	mux.HandleFunc("GET /v1/world/mounts", server.instrumentEndpointFunc("mount_collection", server.handleMountCollection))
+	mux.HandleFunc("POST /v1/world/mount/unlock", server.instrumentEndpointFunc("mount_unlock", server.handleUnlockMount))
+	mux.HandleFunc("POST /v1/world/mount/select", server.instrumentEndpointFunc("mount_select", server.handleSelectMount))
+	mux.HandleFunc("POST /v1/world/mount/summon", server.instrumentEndpointFunc("mount_summon", server.handleSummonMount))
+	mux.HandleFunc("POST /v1/world/mount/dismiss", server.instrumentEndpointFunc("mount_dismiss", server.handleDismissMount))
 	mux.HandleFunc("POST /v1/world/quest/accept", server.instrumentEndpointFunc("quest_accept", server.handleQuestAccept))
 	mux.HandleFunc("POST /v1/world/quest/track", server.instrumentEndpointFunc("quest_track", server.handleQuestTrack))
+	mux.HandleFunc("POST /v1/world/dungeon/enter", server.instrumentEndpointFunc("dungeon_enter", server.handleDungeonEnter))
+	mux.HandleFunc("POST /v1/world/dungeon/exit", server.instrumentEndpointFunc("dungeon_exit", server.handleDungeonExit))
+	mux.HandleFunc("POST /v1/world/dungeon/reset", server.instrumentEndpointFunc("dungeon_reset", server.handleDungeonReset))
 	mux.HandleFunc("POST /v1/world/trainer/learn", server.instrumentEndpointFunc("trainer_learn", server.handleTrainerLearn))
 	mux.HandleFunc("POST /v1/world/profession/learn", server.instrumentEndpointFunc("profession_learn", server.handleProfessionLearn))
 	mux.HandleFunc("POST /v1/world/gather", server.instrumentEndpointFunc("gather", server.handleGather))
@@ -67,6 +81,16 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/action-bar/clear", server.instrumentEndpointFunc("action_bar_clear", server.handleActionBarClear))
 	mux.HandleFunc("POST /v1/world/inventory/move", server.instrumentEndpointFunc("inventory_move", server.handleInventoryMove))
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
+	mux.HandleFunc("GET /v1/world/housing/status", server.instrumentEndpointFunc("housing_status", server.handleHousingStatus))
+	mux.HandleFunc("POST /v1/world/housing/enter", server.instrumentEndpointFunc("housing_enter", server.handleHousingEnter))
+	mux.HandleFunc("POST /v1/world/housing/leave", server.instrumentEndpointFunc("housing_leave", server.handleHousingLeave))
+	mux.HandleFunc("GET /v1/world/housing/storage", server.instrumentEndpointFunc("housing_storage", server.handleHousingStorageList))
+	mux.HandleFunc("POST /v1/world/housing/storage/deposit", server.instrumentEndpointFunc("housing_storage_deposit", server.handleHousingStorageDeposit))
+	mux.HandleFunc("POST /v1/world/housing/storage/withdraw", server.instrumentEndpointFunc("housing_storage_withdraw", server.handleHousingStorageWithdraw))
+	mux.HandleFunc("POST /v1/world/housing/storage/move", server.instrumentEndpointFunc("housing_storage_move", server.handleHousingStorageMove))
+	mux.HandleFunc("GET /v1/world/housing/decorations", server.instrumentEndpointFunc("housing_decorations", server.handleHousingDecorationsList))
+	mux.HandleFunc("POST /v1/world/housing/decorations/place", server.instrumentEndpointFunc("housing_decoration_place", server.handleHousingDecorationPlace))
+	mux.HandleFunc("POST /v1/world/housing/decorations/remove", server.instrumentEndpointFunc("housing_decoration_remove", server.handleHousingDecorationRemove))
 	mux.HandleFunc("POST /v1/world/vendor/buy", server.instrumentEndpointFunc("vendor_buy", server.handleVendorBuy))
 	mux.HandleFunc("POST /v1/world/vendor/sell", server.instrumentEndpointFunc("vendor_sell", server.handleVendorSell))
 	mux.HandleFunc("GET /v1/world/auction/listings", server.instrumentEndpointFunc("auction_browse", server.handleAuctionBrowse))
@@ -87,6 +111,16 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/chat/send", server.instrumentEndpointFunc("chat_send", server.handleChatSend))
 	mux.HandleFunc("POST /v1/world/friends/add", server.instrumentEndpointFunc("friends_add", server.handleFriendAdd))
 	mux.HandleFunc("POST /v1/world/friends/remove", server.instrumentEndpointFunc("friends_remove", server.handleFriendRemove))
+	mux.HandleFunc("POST /v1/world/guild/create", server.instrumentEndpointFunc("guild_create", server.handleGuildCreate))
+	mux.HandleFunc("POST /v1/world/guild/invite", server.instrumentEndpointFunc("guild_invite", server.handleGuildInvite))
+	mux.HandleFunc("POST /v1/world/guild/accept", server.instrumentEndpointFunc("guild_accept", server.handleGuildAccept))
+	mux.HandleFunc("POST /v1/world/guild/decline", server.instrumentEndpointFunc("guild_decline", server.handleGuildDecline))
+	mux.HandleFunc("POST /v1/world/guild/leave", server.instrumentEndpointFunc("guild_leave", server.handleGuildLeave))
+	mux.HandleFunc("POST /v1/world/guild/disband", server.instrumentEndpointFunc("guild_disband", server.handleGuildDisband))
+	mux.HandleFunc("POST /v1/world/guild/promote", server.instrumentEndpointFunc("guild_promote", server.handleGuildPromote))
+	mux.HandleFunc("POST /v1/world/guild/demote", server.instrumentEndpointFunc("guild_demote", server.handleGuildDemote))
+	mux.HandleFunc("POST /v1/world/guild/remove", server.instrumentEndpointFunc("guild_remove", server.handleGuildRemove))
+	mux.HandleFunc("POST /v1/world/guild/motd", server.instrumentEndpointFunc("guild_motd", server.handleGuildMOTD))
 	mux.HandleFunc("POST /v1/world/party/invite", server.instrumentEndpointFunc("party_invite", server.handlePartyInvite))
 	mux.HandleFunc("POST /v1/world/party/accept", server.instrumentEndpointFunc("party_accept", server.handlePartyAccept))
 	mux.HandleFunc("POST /v1/world/party/decline", server.instrumentEndpointFunc("party_decline", server.handlePartyDecline))
@@ -94,6 +128,13 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/party/disband", server.instrumentEndpointFunc("party_disband", server.handlePartyDisband))
 	mux.HandleFunc("GET /v1/world/state", server.instrumentEndpointFunc("state", server.handleState))
 	mux.HandleFunc("GET /v1/world/metrics", server.instrumentEndpointFunc("metrics", server.handleMetrics))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/teleport", server.instrumentEndpoint("admin_teleport", httpapi.RequirePermission(fileStore, platform.PermissionTeleportCharacter, server.handleAdminTeleport)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/repair", server.instrumentEndpoint("admin_repair", httpapi.RequirePermission(fileStore, platform.PermissionRepairCharacter, server.handleAdminRepair)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/session/invalidate", server.instrumentEndpoint("admin_session_invalidate", httpapi.RequirePermission(fileStore, platform.PermissionRepairCharacter, server.handleAdminSessionInvalidate)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/items/grant", server.instrumentEndpoint("admin_item_grant", httpapi.RequirePermission(fileStore, platform.PermissionGrantItem, server.handleAdminItemGrant)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/items/remove", server.instrumentEndpoint("admin_item_remove", httpapi.RequirePermission(fileStore, platform.PermissionGrantItem, server.handleAdminItemRemove)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/currency/grant", server.instrumentEndpoint("admin_currency_grant", httpapi.RequirePermission(fileStore, platform.PermissionGrantCurrency, server.handleAdminCurrencyGrant)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/currency/remove", server.instrumentEndpoint("admin_currency_remove", httpapi.RequirePermission(fileStore, platform.PermissionGrantCurrency, server.handleAdminCurrencyRemove)))
 	mux.HandleFunc("GET /v1/world/bootstrap", server.instrumentEndpointFunc("bootstrap", func(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, http.StatusOK, map[string]any{
 			"zoneId":   "sunset_frontier",
@@ -149,15 +190,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			session.DisplayName = character.DisplayName
 			session.Connected = true
 			session.LastSeenAt = time.Now().Unix()
-			if session.InstanceID != "" && s.dungeonInstanceActiveForSessionLocked(session) {
-				if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
-					instance.PlayersInside[session.CharacterID] = true
-					instance.State = dungeonStateActive
-					instance.LastPlayerLeftAtMs = 0
-				}
-			} else if session.InstanceID != "" {
-				s.recoverExpiredDungeonSessionLocked(session)
-			} else if session.HousingSpaceID != "" {
+			if session.HousingSpaceID != "" {
 				if err := s.returnSessionFromHousingLocked(session, "connect_resume"); err != nil {
 					httpapi.Error(w, http.StatusInternalServerError, "housing_recover_failed", err.Error())
 					return
@@ -1121,6 +1154,9 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"housing":              s.buildHousingResponseLocked(session),
+		"instance":             s.buildDungeonInstanceResponse(session),
+		"travel":               s.buildTravelStateResponseLocked(session),
+		"mounts":               s.buildMountCollectionResponseLocked(session),
 		"pvp":                  s.buildPvPResponseLocked(session),
 		"currentTargetId":      session.CurrentTargetID,
 		"autoAttackActive":     session.AutoAttackActive,

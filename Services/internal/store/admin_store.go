@@ -317,12 +317,12 @@ func (s *FileStore) SetCharacterMute(characterID string, actorAccountID string, 
 	}
 	now := time.Now().Unix()
 	record := platform.MuteRecord{
-		CharacterID:       characterID,
-		AccountID:         character.AccountID,
-		MutedByAccountID:  actorAccountID,
-		Reason:            strings.TrimSpace(reason),
-		CreatedAt:         now,
-		ExpiresAt:         now + durationSeconds,
+		CharacterID:      characterID,
+		AccountID:        character.AccountID,
+		MutedByAccountID: actorAccountID,
+		Reason:           strings.TrimSpace(reason),
+		CreatedAt:        now,
+		ExpiresAt:        now + durationSeconds,
 	}
 	if s.state.Mutes == nil {
 		s.state.Mutes = map[string]platform.MuteRecord{}
@@ -359,6 +359,25 @@ func (s *FileStore) ActiveMuteForCharacter(characterID string) (*platform.MuteRe
 	}
 	copy := record
 	return &copy, nil
+}
+
+func (s *FileStore) GetHousingForCharacter(characterID string) (*platform.HousingEntitlement, *platform.HousingSpace, []platform.HousingStorageSlot, []platform.DecorationPlacement, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	defer s.unlockState()
+
+	entitlement, ok := s.state.HousingEntitlements[characterID]
+	if !ok {
+		return nil, nil, []platform.HousingStorageSlot{}, []platform.DecorationPlacement{}, nil
+	}
+	space, ok := s.state.HousingSpaces[entitlement.HousingSpaceID]
+	if !ok {
+		return &entitlement, nil, []platform.HousingStorageSlot{}, []platform.DecorationPlacement{}, nil
+	}
+	storage := cloneHousingStorageSlots(s.state.HousingStorage[space.HousingSpaceID])
+	decorations := cloneDecorationPlacements(s.state.HousingDecorations[space.HousingSpaceID])
+	return &entitlement, &space, storage, decorations, nil
 }
 
 func (s *FileStore) GrantCharacterItem(characterID string, itemID string, displayName string, quantity int, maxStack int, stackable bool) (platform.Character, platform.Character, error) {

@@ -56,6 +56,33 @@ const (
 	ProfessionOrekeepingID = "orekeeping"
 	ProfessionForgecraftID = "forgecraft"
 	ProfessionFieldAidID   = "field_aid"
+
+	DefaultBindLocationID  = "bind_hearthwatch_yard"
+	DefaultBindDisplayName = "Hearthwatch Yard"
+	DefaultTravelPointID   = "travel_hearthwatch_yard"
+	DefaultBindZoneID      = DefaultStarterZoneID
+	DefaultBindPositionX   = 13.0
+	DefaultBindPositionY   = 10.0
+	DefaultBindPositionZ   = 0.0
+
+	AchievementScopeAccount   = "account"
+	AchievementScopeCharacter = "character"
+
+	CriteriaCompleteQuest     = "complete_quest"
+	CriteriaReachLevel        = "reach_level"
+	CriteriaDefeatMobType     = "defeat_mob_type"
+	CriteriaDefeatNamedEnemy  = "defeat_named_enemy"
+	CriteriaLearnProfession   = "learn_profession"
+	CriteriaCraftItem         = "craft_item"
+	CriteriaJoinParty         = "join_party"
+	CriteriaJoinGuild         = "join_guild"
+	CriteriaCompleteDungeon   = "complete_dungeon"
+	CriteriaWinDuel           = "win_duel"
+	CriteriaVendorBuy         = "vendor_buy"
+	CriteriaVendorSell        = "vendor_sell"
+	CriteriaEnterHousing      = "enter_housing"
+	CriteriaPlaceDecoration   = "place_decoration"
+	CriteriaCurrencyThreshold = "currency_threshold"
 )
 
 var EquipmentSlots = []string{
@@ -358,6 +385,101 @@ type CharacterPvPStats struct {
 	UpdatedAt     int64  `json:"updatedAt"`
 }
 
+type CharacterBindPoint struct {
+	CharacterID    string  `json:"characterId"`
+	ZoneID         string  `json:"zoneId"`
+	X              float64 `json:"x"`
+	Y              float64 `json:"y"`
+	Z              float64 `json:"z"`
+	BindLocationID string  `json:"bindLocationId"`
+	DisplayName    string  `json:"displayName"`
+	SetAt          int64   `json:"setAt"`
+}
+
+type CharacterTravelState struct {
+	DiscoveredTravelPointIDs []string `json:"discoveredTravelPointIds"`
+	LastTravelPointID        string   `json:"lastTravelPointId,omitempty"`
+	RecallReadyAt            int64    `json:"recallReadyAt,omitempty"`
+}
+
+type CharacterMountState struct {
+	UnlockedMountIDs     []string `json:"unlockedMountIds"`
+	SelectedMountID      string   `json:"selectedMountId,omitempty"`
+	CurrentlyMounted     bool     `json:"currentlyMounted"`
+	MountedSince         int64    `json:"mountedSince,omitempty"`
+	CurrentSpeedModifier float64  `json:"currentSpeedModifier"`
+}
+
+type AchievementCriteria struct {
+	Type         string `json:"type"`
+	QuestID      string `json:"questId,omitempty"`
+	Level        int    `json:"level,omitempty"`
+	MobTypeID    string `json:"mobTypeId,omitempty"`
+	MobID        string `json:"mobId,omitempty"`
+	ProfessionID string `json:"professionId,omitempty"`
+	RecipeID     string `json:"recipeId,omitempty"`
+	ItemID       string `json:"itemId,omitempty"`
+	DungeonID    string `json:"dungeonId,omitempty"`
+	TargetValue  int    `json:"targetValue,omitempty"`
+}
+
+type AchievementDefinition struct {
+	AchievementID            string                `json:"achievementId"`
+	DisplayName              string                `json:"displayName"`
+	Description              string                `json:"description"`
+	Category                 string                `json:"category"`
+	Scope                    string                `json:"scope"`
+	Criteria                 []AchievementCriteria `json:"criteria"`
+	Points                   int                   `json:"points,omitempty"`
+	RewardTitleID            string                `json:"rewardTitleId,omitempty"`
+	RewardCollectionUnlockID string                `json:"rewardCollectionUnlockId,omitempty"`
+	Hidden                   bool                  `json:"hidden,omitempty"`
+	FactionRequirementID     string                `json:"factionRequirementId,omitempty"`
+	ClassRequirementID       string                `json:"classRequirementId,omitempty"`
+	RaceRequirementID        string                `json:"raceRequirementId,omitempty"`
+	Version                  int                   `json:"version,omitempty"`
+	CreatedAt                int64                 `json:"createdAt,omitempty"`
+}
+
+type AchievementProgress struct {
+	AccountID               string `json:"accountId"`
+	CharacterID             string `json:"characterId,omitempty"`
+	AchievementID           string `json:"achievementId"`
+	CurrentValue            int    `json:"currentValue"`
+	TargetValue             int    `json:"targetValue"`
+	Completed               bool   `json:"completed"`
+	CompletedAt             int64  `json:"completedAt,omitempty"`
+	ContributingCharacterID string `json:"contributingCharacterId,omitempty"`
+	UpdatedAt               int64  `json:"updatedAt"`
+}
+
+type TitleDefinition struct {
+	TitleID             string `json:"titleId"`
+	DisplayName         string `json:"displayName"`
+	Prefix              string `json:"prefix,omitempty"`
+	Suffix              string `json:"suffix,omitempty"`
+	SourceAchievementID string `json:"sourceAchievementId,omitempty"`
+	AccountWide         bool   `json:"accountWide"`
+	Hidden              bool   `json:"hidden,omitempty"`
+}
+
+type CollectionUnlock struct {
+	UnlockID            string `json:"unlockId"`
+	Category            string `json:"category"`
+	DisplayName         string `json:"displayName"`
+	SourceAchievementID string `json:"sourceAchievementId,omitempty"`
+	UnlockedAt          int64  `json:"unlockedAt"`
+}
+
+type AccountProgressState struct {
+	AccountID                  string                         `json:"accountId"`
+	AchievementProgress        map[string]AchievementProgress `json:"achievementProgress"`
+	UnlockedTitleIDs           []string                       `json:"unlockedTitleIds"`
+	SelectedTitleByCharacterID map[string]string              `json:"selectedTitleByCharacterId"`
+	CollectionUnlocks          map[string]CollectionUnlock    `json:"collectionUnlocks"`
+	UpdatedAt                  int64                          `json:"updatedAt"`
+}
+
 type Character struct {
 	ID                string                            `json:"id"`
 	AccountID         string                            `json:"accountId"`
@@ -382,6 +504,9 @@ type Character struct {
 	Quests            map[string]CharacterQuestProgress `json:"quests"`
 	TrackedQuestIDs   []string                          `json:"trackedQuestIds"`
 	PvPStats          CharacterPvPStats                 `json:"pvpStats"`
+	BindPoint         CharacterBindPoint                `json:"bindPoint"`
+	TravelState       CharacterTravelState              `json:"travelState"`
+	MountState        CharacterMountState               `json:"mountState"`
 	LastSeenAt        int64                             `json:"lastSeenAt"`
 }
 
@@ -630,6 +755,9 @@ func NormalizeCharacter(character Character) Character {
 	}
 	character.TrackedQuestIDs = NormalizeStringIDs(character.TrackedQuestIDs)
 	character.PvPStats = NormalizeCharacterPvPStats(character.ID, character.PvPStats)
+	character.BindPoint = NormalizeCharacterBindPoint(character.ID, character.BindPoint)
+	character.TravelState = NormalizeCharacterTravelState(character.TravelState)
+	character.MountState = NormalizeCharacterMountState(character.MountState)
 	hasStarterQuestProgress := false
 	for questID := range character.Quests {
 		if len(questID) >= 3 && questID[:3] == "sv_" {
@@ -666,6 +794,111 @@ func NormalizeCharacterPvPStats(characterID string, stats CharacterPvPStats) Cha
 		stats.HonorPoints = 0
 	}
 	return stats
+}
+
+func NormalizeCharacterBindPoint(characterID string, bindPoint CharacterBindPoint) CharacterBindPoint {
+	if bindPoint.CharacterID == "" {
+		bindPoint.CharacterID = characterID
+	}
+	if bindPoint.ZoneID == "" {
+		bindPoint.ZoneID = DefaultBindZoneID
+	}
+	if bindPoint.BindLocationID == "" {
+		bindPoint.BindLocationID = DefaultBindLocationID
+	}
+	if bindPoint.DisplayName == "" {
+		bindPoint.DisplayName = DefaultBindDisplayName
+	}
+	if bindPoint.X == 0 && bindPoint.Y == 0 && bindPoint.Z == 0 {
+		bindPoint.X = DefaultBindPositionX
+		bindPoint.Y = DefaultBindPositionY
+		bindPoint.Z = DefaultBindPositionZ
+	}
+	return bindPoint
+}
+
+func NormalizeCharacterTravelState(travelState CharacterTravelState) CharacterTravelState {
+	travelState.DiscoveredTravelPointIDs = NormalizeStringIDs(travelState.DiscoveredTravelPointIDs)
+	if !containsStringID(travelState.DiscoveredTravelPointIDs, DefaultTravelPointID) {
+		travelState.DiscoveredTravelPointIDs = append([]string{DefaultTravelPointID}, travelState.DiscoveredTravelPointIDs...)
+	}
+	if travelState.LastTravelPointID == "" {
+		travelState.LastTravelPointID = DefaultTravelPointID
+	}
+	if travelState.RecallReadyAt < 0 {
+		travelState.RecallReadyAt = 0
+	}
+	return travelState
+}
+
+func NormalizeCharacterMountState(mountState CharacterMountState) CharacterMountState {
+	mountState.UnlockedMountIDs = NormalizeStringIDs(mountState.UnlockedMountIDs)
+	if mountState.SelectedMountID != "" && !containsStringID(mountState.UnlockedMountIDs, mountState.SelectedMountID) {
+		mountState.SelectedMountID = ""
+	}
+	mountState.CurrentlyMounted = false
+	mountState.MountedSince = 0
+	mountState.CurrentSpeedModifier = 1.0
+	return mountState
+}
+
+func containsStringID(ids []string, target string) bool {
+	for _, id := range ids {
+		if id == target {
+			return true
+		}
+	}
+	return false
+}
+
+func NormalizeAccountProgress(accountID string, progress AccountProgressState) AccountProgressState {
+	if progress.AccountID == "" {
+		progress.AccountID = accountID
+	}
+	if progress.AchievementProgress == nil {
+		progress.AchievementProgress = map[string]AchievementProgress{}
+	}
+	for achievementID, achievementProgress := range progress.AchievementProgress {
+		if achievementProgress.AchievementID == "" {
+			achievementProgress.AchievementID = achievementID
+		}
+		if achievementProgress.AccountID == "" {
+			achievementProgress.AccountID = progress.AccountID
+		}
+		if achievementProgress.TargetValue <= 0 {
+			achievementProgress.TargetValue = 1
+		}
+		if achievementProgress.CurrentValue < 0 {
+			achievementProgress.CurrentValue = 0
+		}
+		if achievementProgress.Completed && achievementProgress.CurrentValue < achievementProgress.TargetValue {
+			achievementProgress.CurrentValue = achievementProgress.TargetValue
+		}
+		progress.AchievementProgress[achievementID] = achievementProgress
+	}
+	progress.UnlockedTitleIDs = NormalizeStringIDs(progress.UnlockedTitleIDs)
+	if progress.SelectedTitleByCharacterID == nil {
+		progress.SelectedTitleByCharacterID = map[string]string{}
+	}
+	for characterID, titleID := range progress.SelectedTitleByCharacterID {
+		if characterID == "" || titleID == "" {
+			delete(progress.SelectedTitleByCharacterID, characterID)
+		}
+	}
+	if progress.CollectionUnlocks == nil {
+		progress.CollectionUnlocks = map[string]CollectionUnlock{}
+	}
+	for unlockID, unlock := range progress.CollectionUnlocks {
+		if unlock.UnlockID == "" {
+			unlock.UnlockID = unlockID
+		}
+		if unlock.UnlockID == "" || unlock.Category == "" {
+			delete(progress.CollectionUnlocks, unlockID)
+			continue
+		}
+		progress.CollectionUnlocks[unlockID] = unlock
+	}
+	return progress
 }
 
 func DefaultGuildRanks() []GuildRank {

@@ -14,6 +14,36 @@ func (s *worldServer) setTargetLocked(session *worldSessionState, targetID strin
 
 	targetMob := s.findMobForSessionLocked(session, targetID)
 	if targetMob == nil {
+		if playerTarget := s.findPlayerTargetForSessionLocked(session, targetID); playerTarget != nil {
+			if !playerTarget.Alive {
+				observability.LogEvent("world-service", "world.target_rejected", map[string]any{
+					"worldSessionToken": session.Token,
+					"characterId":       session.CharacterID,
+					"targetId":          targetID,
+					"reason":            "player_dead",
+				})
+				return fmt.Errorf("target is not targetable")
+			}
+			if distance2D(session.X, session.Y, playerTarget.X, playerTarget.Y) > playerTargetRange {
+				observability.LogEvent("world-service", "world.target_rejected", map[string]any{
+					"worldSessionToken": session.Token,
+					"characterId":       session.CharacterID,
+					"targetId":          targetID,
+					"reason":            "player_out_of_range",
+				})
+				return fmt.Errorf("target is out of range")
+			}
+
+			session.CurrentTargetID = targetID
+			observability.LogEvent("world-service", "world.player_target_validated", map[string]any{
+				"worldSessionToken": session.Token,
+				"accountId":         session.AccountID,
+				"characterId":       session.CharacterID,
+				"targetId":          targetID,
+			})
+			return nil
+		}
+
 		if friendly, ok := s.findFriendlyNPCDefinition(targetID); ok && friendly.ZoneID == session.ZoneID {
 			if distance2D(session.X, session.Y, friendly.X, friendly.Y) > playerTargetRange {
 				observability.LogEvent("world-service", "world.target_rejected", map[string]any{
@@ -32,6 +62,27 @@ func (s *worldServer) setTargetLocked(session *worldSessionState, targetID strin
 				"characterId":       session.CharacterID,
 				"targetId":          targetID,
 				"kind":              friendly.Kind,
+			})
+			return nil
+		}
+		if housingEntity, ok := s.findHousingEntityLocked(session, targetID); ok {
+			if distance2D(session.X, session.Y, housingEntity.X, housingEntity.Y) > playerTargetRange {
+				observability.LogEvent("world-service", "world.target_rejected", map[string]any{
+					"worldSessionToken": session.Token,
+					"characterId":       session.CharacterID,
+					"targetId":          targetID,
+					"reason":            "housing_entity_out_of_range",
+				})
+				return fmt.Errorf("target is out of range")
+			}
+
+			session.CurrentTargetID = targetID
+			observability.LogEvent("world-service", "world.housing_target_validated", map[string]any{
+				"worldSessionToken": session.Token,
+				"accountId":         session.AccountID,
+				"characterId":       session.CharacterID,
+				"targetId":          targetID,
+				"kind":              housingEntity.Kind,
 			})
 			return nil
 		}

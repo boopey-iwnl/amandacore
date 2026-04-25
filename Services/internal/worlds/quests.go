@@ -92,6 +92,22 @@ func (s *worldServer) applyCharacterProgressionLocked(session *worldSessionState
 	session.QuestProgress = s.loadQuestProgressFromCharacter(character)
 	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(character.TrackedQuestIDs, session.QuestProgress)
 	session.PvPStats = platform.NormalizeCharacterPvPStats(session.CharacterID, character.PvPStats)
+	session.BindPoint = platform.NormalizeCharacterBindPoint(session.CharacterID, character.BindPoint)
+	session.TravelState = platform.NormalizeCharacterTravelState(character.TravelState)
+	if !session.MountState.CurrentlyMounted {
+		session.MountState = platform.NormalizeCharacterMountState(character.MountState)
+	} else {
+		persistedMount := platform.NormalizeCharacterMountState(character.MountState)
+		session.MountState.UnlockedMountIDs = persistedMount.UnlockedMountIDs
+		if persistedMount.SelectedMountID != "" {
+			session.MountState.SelectedMountID = persistedMount.SelectedMountID
+		}
+		if session.MountState.SelectedMountID == "" || !containsString(session.MountState.UnlockedMountIDs, session.MountState.SelectedMountID) {
+			session.MountState.CurrentlyMounted = false
+			session.MountState.MountedSince = 0
+			session.MountState.CurrentSpeedModifier = 1.0
+		}
+	}
 	s.applyDerivedStatsLocked(session)
 }
 
@@ -669,6 +685,15 @@ func questPartyCreditRadius(quest questDefinition) float64 {
 		return defaultPartyQuestCreditRadius
 	}
 	return 0
+}
+
+func stringIDSetContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func breakdownCurrency(totalCopper int) currencyBreakdown {

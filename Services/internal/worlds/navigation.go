@@ -130,6 +130,37 @@ func (s *worldServer) buildMapMarkersResponse(session *worldSessionState) []map[
 		})
 	}
 
+	if session != nil {
+		bindPoint := platform.NormalizeCharacterBindPoint(session.CharacterID, session.BindPoint)
+		if bindPoint.ZoneID == session.ZoneID {
+			markers = append(markers, map[string]any{
+				"id":             "bind_" + bindPoint.BindLocationID,
+				"displayName":    bindPoint.DisplayName,
+				"kind":           "bind_point",
+				"bindLocationId": bindPoint.BindLocationID,
+				"x":              bindPoint.X,
+				"y":              bindPoint.Y,
+			})
+		}
+		discovered := map[string]bool{}
+		for _, pointID := range platform.NormalizeCharacterTravelState(session.TravelState).DiscoveredTravelPointIDs {
+			discovered[pointID] = true
+		}
+		for _, point := range travelPointDefinitions {
+			if point.ZoneID != session.ZoneID || !discovered[point.ID] {
+				continue
+			}
+			markers = append(markers, map[string]any{
+				"id":            "travel_" + point.ID,
+				"displayName":   point.DisplayName,
+				"kind":          "travel_point",
+				"travelPointId": point.ID,
+				"x":             point.X,
+				"y":             point.Y,
+			})
+		}
+	}
+
 	for _, questID := range session.TrackedQuestIDs {
 		quest, found := s.quests[questID]
 		if !found {

@@ -93,6 +93,45 @@ type disconnectRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 }
 
+type bindSetRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	BindLocationID    string `json:"bindLocationId"`
+}
+
+type recallUseRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type travelDiscoverRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TravelPointID     string `json:"travelPointId"`
+}
+
+type travelRouteRequest struct {
+	WorldSessionToken  string `json:"worldSessionToken"`
+	SourcePointID      string `json:"sourcePointId"`
+	DestinationPointID string `json:"destinationPointId"`
+}
+
+type mountUnlockRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	MountID           string `json:"mountId"`
+}
+
+type mountSelectRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	MountID           string `json:"mountId"`
+}
+
+type mountSummonRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	MountID           string `json:"mountId,omitempty"`
+}
+
+type mountDismissRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
 type moveRequest struct {
 	WorldSessionToken string  `json:"worldSessionToken"`
 	DeltaX            float64 `json:"deltaX"`
@@ -259,6 +298,15 @@ type questTrackRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	QuestID           string `json:"questId"`
 	Tracked           bool   `json:"tracked"`
+}
+
+type titleSelectRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	TitleID           string `json:"titleId"`
+}
+
+type titleClearRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
 }
 
 type npcService struct {
@@ -469,6 +517,12 @@ type zoneDefinition struct {
 	Transitions []zonePointDefinition `json:"transitions"`
 }
 
+type achievementNotification struct {
+	AchievementID string `json:"achievementId"`
+	DisplayName   string `json:"displayName"`
+	CompletedAt   int64  `json:"completedAt"`
+}
+
 type worldSessionState struct {
 	Token              string
 	AccountID          string
@@ -514,6 +568,12 @@ type worldSessionState struct {
 	QuestProgress      map[string]platform.CharacterQuestProgress
 	TrackedQuestIDs    []string
 	PvPStats           platform.CharacterPvPStats
+	LastDuelResult     *duelResultState
+	AccountProgress    platform.AccountProgressState
+	BindPoint          platform.CharacterBindPoint
+	TravelState        platform.CharacterTravelState
+	MountState         platform.CharacterMountState
+	CurrentlyTraveling bool
 }
 
 type mobState struct {
@@ -626,6 +686,9 @@ type worldServer struct {
 	sessionTokenByChar     map[string]string
 	mobs                   map[string]*mobState
 	mobOrder               []string
+	duels                  map[string]*duelState
+	duelByCharacter        map[string]string
+	duelCounter            int64
 	dungeonInstances       map[string]*dungeonInstanceState
 	instanceByParty        map[string]string
 	instanceCounter        int64
@@ -652,6 +715,8 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
+		duels:              map[string]*duelState{},
+		duelByCharacter:    map[string]string{},
 		dungeonInstances:   map[string]*dungeonInstanceState{},
 		instanceByParty:    map[string]string{},
 		quests:             map[string]questDefinition{},

@@ -2,73 +2,427 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>amandacore Admin Portal</title>
+  <title>amandacore Local Admin</title>
   <style>
-    body { font-family: Segoe UI, sans-serif; background: #0f141c; color: #edf2f7; margin: 2rem; }
-    section { background: #1d2733; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; max-width: 760px; }
-    input, button { margin: 0.25rem 0.5rem 0.25rem 0; padding: 0.5rem; }
-    button { background: #2d8f6f; color: white; border: none; border-radius: 6px; }
-    pre { background: #081018; padding: 1rem; border-radius: 8px; white-space: pre-wrap; }
+    :root {
+      color-scheme: dark;
+      --bg: #10151b;
+      --panel: #18212b;
+      --panel-2: #202b37;
+      --text: #edf2f7;
+      --muted: #9fb0c3;
+      --border: #334252;
+      --accent: #2f8f6f;
+      --danger: #b94f4f;
+      --warn: #c4923d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Segoe UI, Arial, sans-serif;
+      font-size: 14px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: #131a22;
+    }
+    h1 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+    main {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: calc(100vh - 58px);
+    }
+    aside {
+      border-right: 1px solid var(--border);
+      padding: 1rem;
+      background: var(--panel);
+    }
+    section {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    label {
+      display: block;
+      margin-top: 0.65rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+    }
+    input, select, textarea {
+      width: 100%;
+      margin-top: 0.25rem;
+      padding: 0.48rem 0.55rem;
+      color: var(--text);
+      background: #0d131a;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font: inherit;
+    }
+    textarea { min-height: 74px; resize: vertical; }
+    button {
+      min-height: 32px;
+      padding: 0.45rem 0.7rem;
+      color: white;
+      background: var(--accent);
+      border: 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font: inherit;
+    }
+    button.secondary { background: #425166; }
+    button.warn { background: var(--warn); }
+    button.danger { background: var(--danger); }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.7rem;
+    }
+    .row > * { flex: 1 1 auto; }
+    .status {
+      color: var(--muted);
+      font-size: 0.86rem;
+      white-space: nowrap;
+    }
+    .result-list {
+      margin-top: 0.75rem;
+      display: grid;
+      gap: 0.4rem;
+    }
+    .result-list button {
+      text-align: left;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+    }
+    .details {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    pre {
+      overflow: auto;
+      min-height: 160px;
+      max-height: 460px;
+      margin: 0;
+      padding: 0.8rem;
+      background: #0b1118;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    h2 {
+      margin: 0 0 0.4rem;
+      font-size: 0.95rem;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--border); }
+      .details { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <h1>amandacore Admin Portal</h1>
-  <section>
-    <h2>Admin Login</h2>
-    <input id="username" value="amanda" />
-    <input id="password" type="password" value="amanda" />
-    <button onclick="login()">Login</button>
-  </section>
+  <header>
+    <h1>amandacore Local Admin</h1>
+    <div id="status" class="status">Not signed in</div>
+  </header>
 
-  <section>
-    <h2>Account Controls</h2>
-    <button onclick="loadAccounts()">Load Accounts</button><br />
-    <input id="accountId" placeholder="account id" />
-    <button onclick="banAccount(true)">Ban</button>
-    <button onclick="banAccount(false)">Unban</button>
-  </section>
+  <main>
+    <aside>
+      <section>
+        <h2>Session</h2>
+        <label for="authUrl">Auth URL</label>
+        <input id="authUrl" value="http://localhost:8081" />
+        <label for="adminUrl">Admin URL</label>
+        <input id="adminUrl" value="http://localhost:8086" />
+        <label for="worldUrl">World URL</label>
+        <input id="worldUrl" value="http://localhost:8085" />
+        <label for="username">Username</label>
+        <input id="username" autocomplete="username" />
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" />
+        <div class="row">
+          <button onclick="login()">Login</button>
+          <button class="secondary" onclick="loadAuthz()">Check Permissions</button>
+        </div>
+      </section>
 
-  <section>
-    <h2>Output</h2>
-    <pre id="output"></pre>
-  </section>
+      <section>
+        <h2>Lookup</h2>
+        <label for="characterQuery">Character Name or ID</label>
+        <input id="characterQuery" />
+        <div class="row">
+          <button onclick="searchCharacters()">Search Characters</button>
+          <button class="secondary" onclick="loadAccounts()">Accounts</button>
+        </div>
+        <div id="results" class="result-list"></div>
+      </section>
+
+      <section>
+        <h2>Reason</h2>
+        <textarea id="reason" placeholder="Required for every mutation"></textarea>
+      </section>
+    </aside>
+
+    <div>
+      <section>
+        <h2>Character Tools</h2>
+        <label for="characterId">Character ID</label>
+        <input id="characterId" />
+        <div class="row">
+          <button onclick="loadCharacter()">Load Character</button>
+          <button class="warn" onclick="teleport('stonewake_spawn')">Stonewake</button>
+          <button class="warn" onclick="teleport('current_zone_safe')">Current Safe</button>
+          <button class="danger" onclick="repair()">Repair</button>
+          <button class="danger" onclick="kick()">Kick</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Economy</h2>
+        <div class="details">
+          <div>
+            <label for="itemId">Item ID</label>
+            <input id="itemId" value="camp_ration" />
+            <label for="itemQuantity">Quantity</label>
+            <input id="itemQuantity" type="number" min="1" value="1" />
+            <div class="row">
+              <button onclick="itemChange('grant')">Grant Item</button>
+              <button class="danger" onclick="itemChange('remove')">Remove Item</button>
+            </div>
+          </div>
+          <div>
+            <label for="currencyCopper">Copper</label>
+            <input id="currencyCopper" type="number" min="1" value="1" />
+            <div class="row">
+              <button onclick="currencyChange('grant')">Grant Currency</button>
+              <button class="danger" onclick="currencyChange('remove')">Remove Currency</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Quest And Moderation</h2>
+        <div class="details">
+          <div>
+            <label for="questId">Quest ID</label>
+            <input id="questId" value="sv_first_muster" />
+            <div class="row">
+              <button class="warn" onclick="questChange('reset')">Reset Quest</button>
+              <button class="warn" onclick="questChange('complete-objective')">Complete Objective</button>
+            </div>
+          </div>
+          <div>
+            <label for="accountId">Account ID</label>
+            <input id="accountId" />
+            <label for="muteSeconds">Mute/Suspend Seconds</label>
+            <input id="muteSeconds" type="number" min="1" value="300" />
+            <div class="row">
+              <button class="warn" onclick="mute()">Mute</button>
+              <button class="secondary" onclick="unmute()">Unmute</button>
+              <button class="danger" onclick="suspend(true)">Suspend</button>
+              <button class="secondary" onclick="suspend(false)">Unsuspend</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Support And Audit</h2>
+        <div class="row">
+          <button onclick="loadTickets()">Tickets</button>
+          <button onclick="loadAudit()">Audit</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Output</h2>
+        <pre id="output"></pre>
+      </section>
+    </div>
+  </main>
 
   <script>
     let session = null;
-    const authUrl = "http://localhost:8081";
-    const adminUrl = "http://localhost:8086";
-    const output = (value) => document.getElementById("output").textContent = JSON.stringify(value, null, 2);
+    const $ = (id) => document.getElementById(id);
+    const output = (value) => $("output").textContent = JSON.stringify(value, null, 2);
+    const status = (text) => $("status").textContent = text;
+    const authUrl = () => $("authUrl").value.replace(/\/$/, "");
+    const adminUrl = () => $("adminUrl").value.replace(/\/$/, "");
+    const worldUrl = () => $("worldUrl").value.replace(/\/$/, "");
+    const headers = () => ({
+      "Authorization": "Bearer " + session.accessToken,
+      "Content-Type": "application/json"
+    });
+
+    async function requestJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      const payload = text ? JSON.parse(text) : {};
+      if (!response.ok) throw payload;
+      return payload;
+    }
 
     async function login() {
-      const username = document.getElementById("username").value;
-      const password = document.getElementById("password").value;
-      const response = await fetch(authUrl + "/v1/auth/login", {
+      session = await requestJson(authUrl() + "/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username: $("username").value, password: $("password").value })
       });
-      session = await response.json();
+      status("Signed in: " + session.accountId);
       output(session);
     }
 
-    async function loadAccounts() {
-      const response = await fetch(adminUrl + "/v1/admin/accounts", {
-        headers: { "Authorization": "Bearer " + session.accessToken }
-      });
-      output(await response.json());
+    async function loadAuthz() {
+      output(await requestJson(adminUrl() + "/v1/admin/authz/me", { headers: headers() }));
     }
 
-    async function banAccount(banned) {
-      const accountId = document.getElementById("accountId").value;
-      const response = await fetch(adminUrl + "/v1/admin/accounts/ban", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + session.accessToken
-        },
-        body: JSON.stringify({ accountId, banned })
-      });
-      output(await response.json());
+    async function loadAccounts() {
+      output(await requestJson(adminUrl() + "/v1/admin/accounts", { headers: headers() }));
+    }
+
+    async function searchCharacters() {
+      const query = encodeURIComponent($("characterQuery").value);
+      const data = await requestJson(adminUrl() + "/v1/admin/characters?query=" + query, { headers: headers() });
+      $("results").innerHTML = "";
+      for (const character of data.characters || []) {
+        const button = document.createElement("button");
+        button.textContent = character.displayName + " - " + character.id;
+        button.onclick = () => {
+          $("characterId").value = character.id;
+          $("accountId").value = character.accountId;
+          loadCharacter();
+        };
+        $("results").appendChild(button);
+      }
+      output(data);
+    }
+
+    async function loadCharacter() {
+      const id = $("characterId").value;
+      const data = await requestJson(adminUrl() + "/v1/admin/characters/" + encodeURIComponent(id), { headers: headers() });
+      if (data.character) $("accountId").value = data.character.accountId || $("accountId").value;
+      output(data);
+    }
+
+    function mutationPayload(extra = {}) {
+      const reason = $("reason").value.trim();
+      if (!reason) throw { error: "reason_required", message: "Enter a reason before mutating state." };
+      if (!confirm("Apply audited admin action?")) throw { error: "cancelled" };
+      return { ...extra, reason, confirm: true };
+    }
+
+    async function teleport(destination) {
+      try {
+        const id = $("characterId").value;
+        output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/teleport", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ destination }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function repair() {
+      try {
+        const id = $("characterId").value;
+        output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/repair", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ normalize: true, restoreStarterAbilities: true, rebuildActionBar: true, revive: true }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function itemChange(kind) {
+      try {
+        const id = $("characterId").value;
+        output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/items/" + kind, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ itemId: $("itemId").value, quantity: Number($("itemQuantity").value) }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function currencyChange(kind) {
+      try {
+        const id = $("characterId").value;
+        output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/currency/" + kind, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ copper: Number($("currencyCopper").value) }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function questChange(kind) {
+      try {
+        const id = $("characterId").value;
+        output(await requestJson(adminUrl() + "/v1/admin/characters/" + encodeURIComponent(id) + "/quests/" + kind, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ questId: $("questId").value }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function mute() {
+      try {
+        output(await requestJson(adminUrl() + "/v1/admin/moderation/mute", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ characterId: $("characterId").value, durationSeconds: Number($("muteSeconds").value) }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function unmute() {
+      try {
+        output(await requestJson(adminUrl() + "/v1/admin/moderation/unmute", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ characterId: $("characterId").value }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function suspend(enabled) {
+      try {
+        output(await requestJson(adminUrl() + "/v1/admin/moderation/" + (enabled ? "suspend" : "unsuspend"), {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload({ accountId: $("accountId").value, durationSeconds: enabled ? Number($("muteSeconds").value) : 0 }))
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function kick() {
+      try {
+        output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent($("characterId").value) + "/session/invalidate", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(mutationPayload())
+        }));
+      } catch (err) { output(err); }
+    }
+
+    async function loadTickets() {
+      output(await requestJson(adminUrl() + "/v1/admin/support/tickets", { headers: headers() }));
+    }
+
+    async function loadAudit() {
+      const id = encodeURIComponent($("characterId").value);
+      output(await requestJson(adminUrl() + "/v1/admin/audit?targetCharacterId=" + id, { headers: headers() }));
     }
   </script>
 </body>

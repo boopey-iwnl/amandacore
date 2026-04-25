@@ -525,6 +525,15 @@ func (s *worldServer) sendChatMessageLocked(session *worldSessionState, request 
 	if len(messageText) > maxChatMessageLength {
 		return fmt.Errorf("message cannot exceed %d characters", maxChatMessageLength)
 	}
+	if s.store != nil {
+		mute, err := s.store.ActiveMuteForCharacter(session.CharacterID)
+		if err != nil {
+			return fmt.Errorf("moderation state is unavailable")
+		}
+		if mute != nil {
+			return fmt.Errorf("chat is muted until %d", mute.ExpiresAt)
+		}
+	}
 
 	switch channel {
 	case "", chatChannelSay:
@@ -650,6 +659,8 @@ func (s *worldServer) buildSocialStateLocked(session *worldSessionState, afterMe
 		Friends:      s.buildFriendResponsesLocked(session),
 		Party:        s.buildPartyResponseLocked(session.CharacterID),
 		PartyInvites: s.buildPartyInviteResponsesLocked(session.CharacterID),
+		Guild:        s.buildGuildResponseLocked(session.CharacterID),
+		GuildInvites: s.buildGuildInviteResponsesLocked(session.CharacterID),
 	}
 }
 

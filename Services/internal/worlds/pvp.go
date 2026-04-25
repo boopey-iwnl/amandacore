@@ -496,6 +496,7 @@ func (s *worldServer) applyDamageToPlayerLocked(attacker *worldSessionState, tar
 
 	damage := maxFloat(1.0, amount*pvpDamageScale)
 	target.Health -= damage
+	s.forceDismountLocked(target, "pvp_damage")
 	if target.Health <= duelDefeatHealth {
 		target.Health = duelDefeatHealth
 		target.Alive = true

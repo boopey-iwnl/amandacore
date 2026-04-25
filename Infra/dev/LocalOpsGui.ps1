@@ -14,6 +14,7 @@ $buildClientScript = Join-Path $PSScriptRoot "build-playable-client.ps1"
 $diagnosticsScript = Join-Path $repoRoot "Infra\qa\Collect-Diagnostics.ps1"
 $resetStateScript = Join-Path $repoRoot "Infra\qa\Reset-LocalTestState.ps1"
 $qaDocsRoot = Join-Path $repoRoot "Docs\QA"
+$adminPortalPath = Join-Path $repoRoot "Client\Portal\admin-portal.html"
 $diagnosticsOutputRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) "amandacore\diagnostics"
 $processManifest = Join-Path $PSScriptRoot "local-processes.json"
 $versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
@@ -323,6 +324,7 @@ function Refresh-Status {
         "Local state store: $stateStore",
         "Diagnostic bundles: $diagnosticsOutputRoot",
         "QA docs: $qaDocsRoot",
+        "Admin portal: $adminPortalPath",
         "Process manifest: $processManifest",
         "Version manifest: $versionManifestPath",
         "Desktop shortcut: $desktopShortcut",
@@ -406,6 +408,12 @@ $resetStateButton.Text = "Reset Test State"
 $resetStateButton.Location = New-Object System.Drawing.Point(336, 134)
 $resetStateButton.Size = New-Object System.Drawing.Size(132, 34)
 $form.Controls.Add($resetStateButton)
+
+$adminPortalButton = New-Object System.Windows.Forms.Button
+$adminPortalButton.Text = "Admin Panel"
+$adminPortalButton.Location = New-Object System.Drawing.Point(480, 134)
+$adminPortalButton.Size = New-Object System.Drawing.Size(132, 34)
+$form.Controls.Add($adminPortalButton)
 
 $statusLabel = New-Object System.Windows.Forms.Label
 $statusLabel.Text = "Ready."
@@ -637,6 +645,16 @@ $resetStateButton.Add_Click({
         Set-StatusMessage -Message "Reset failed with exit code $exitCode. Stop services first or use the script manually with -Force." -Color ([System.Drawing.Color]::Firebrick)
     }
     Refresh-Status
+})
+
+$adminPortalButton.Add_Click({
+    if (Test-Path $adminPortalPath) {
+        Start-Process -FilePath $adminPortalPath | Out-Null
+        Set-StatusMessage -Message "Opened local admin panel." -Color ([System.Drawing.Color]::ForestGreen)
+    }
+    else {
+        Set-StatusMessage -Message "Admin portal not found at $adminPortalPath" -Color ([System.Drawing.Color]::Firebrick)
+    }
 })
 
 $refreshButton.Add_Click({

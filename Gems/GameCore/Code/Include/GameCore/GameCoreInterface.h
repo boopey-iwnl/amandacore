@@ -28,6 +28,7 @@ namespace GameCore
         NetClient::WorldBootstrapResponse m_bootstrap;
         NetClient::WorldSessionResponse m_session;
         NetClient::SocialStateResponse m_social;
+        NetClient::AuctionStateResponse m_auction;
         AZStd::string m_pendingInteractionEntityId;
         AZ::u64 m_pendingInteractionSequence = 0;
     };
@@ -73,12 +74,24 @@ namespace GameCore
         virtual bool TrackQuest(const AZStd::string& questId, bool tracked) = 0;
         virtual bool SetAutoAttack(bool enabled) = 0;
         virtual bool ActivateAbility(const AZStd::string& abilityId) = 0;
+        virtual bool RequestDuel(const AZStd::string& targetCharacterId, const AZStd::string& targetName) = 0;
+        virtual bool AcceptDuel(const AZStd::string& duelId) = 0;
+        virtual bool DeclineDuel(const AZStd::string& duelId) = 0;
+        virtual bool CancelDuel(const AZStd::string& duelId) = 0;
+        virtual bool SurrenderDuel(const AZStd::string& duelId) = 0;
         virtual bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) = 0;
         virtual bool SelectTalent(const AZStd::string& talentId) = 0;
         virtual bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) = 0;
         virtual bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) = 0;
         virtual bool ClearActionBarSlot(int slotIndex) = 0;
         virtual bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) = 0;
+        virtual bool BrowseAuctions(
+            const AZStd::string& search,
+            const AZStd::string& itemType,
+            const AZStd::string& sort) = 0;
+        virtual bool ListAuctionItem(int slotIndex, int stackCount, int buyoutCopper, AZ::s64 durationSeconds) = 0;
+        virtual bool BuyoutAuction(const AZStd::string& auctionId) = 0;
+        virtual bool CancelAuction(const AZStd::string& auctionId) = 0;
         virtual bool SubmitChatMessage(
             const AZStd::string& channel,
             const AZStd::string& targetName,

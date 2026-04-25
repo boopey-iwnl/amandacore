@@ -235,6 +235,42 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool RequestDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& targetCharacterId,
+            const AZStd::string& targetName,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool AcceptDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool DeclineDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool CancelDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SurrenderDuel(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& duelId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool LearnTrainerAbility(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
@@ -279,6 +315,39 @@ namespace NetClient
             int fromSlotIndex,
             int toSlotIndex,
             WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool BrowseAuctions(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& search,
+            const AZStd::string& itemType,
+            const AZStd::string& sort,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool ListAuctionItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            int slotIndex,
+            int stackCount,
+            int buyoutCopper,
+            AZ::s64 durationSeconds,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool BuyoutAuction(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& auctionId,
+            AuctionStateResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool CancelAuction(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& auctionId,
+            AuctionStateResponse& outResponse,
             AZStd::string& outError) override;
 
         bool Reconnect(

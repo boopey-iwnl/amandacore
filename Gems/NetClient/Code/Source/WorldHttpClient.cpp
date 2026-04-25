@@ -591,6 +591,56 @@ namespace NetClient
                     }
                 }
             }
+            outResponse.m_pvp = PvPState{};
+            if (document.HasMember("pvp") && document["pvp"].IsObject())
+            {
+                const rapidjson::Value& pvp = document["pvp"];
+                ReadBool(pvp, "duelsEnabled", outResponse.m_pvp.m_duelsEnabled);
+                ReadBool(pvp, "incomingDuel", outResponse.m_pvp.m_incomingDuel);
+                ReadBool(pvp, "outgoingDuel", outResponse.m_pvp.m_outgoingDuel);
+                ReadString(pvp, "duelId", outResponse.m_pvp.m_duelId);
+                ReadString(pvp, "duelState", outResponse.m_pvp.m_duelState);
+                ReadString(pvp, "opponentCharacterId", outResponse.m_pvp.m_opponentCharacterId);
+                ReadString(pvp, "opponentDisplayName", outResponse.m_pvp.m_opponentDisplayName);
+                ReadInt64(pvp, "countdownEndsAt", outResponse.m_pvp.m_countdownEndsAt);
+                ReadInt64(pvp, "startedAt", outResponse.m_pvp.m_startedAt);
+                ReadInt64(pvp, "timeoutAt", outResponse.m_pvp.m_timeoutAt);
+                if (pvp.HasMember("boundary") && pvp["boundary"].IsObject())
+                {
+                    const rapidjson::Value& boundary = pvp["boundary"];
+                    ReadDouble(boundary, "centerX", outResponse.m_pvp.m_boundaryCenterX);
+                    ReadDouble(boundary, "centerY", outResponse.m_pvp.m_boundaryCenterY);
+                    ReadDouble(boundary, "maxDistance", outResponse.m_pvp.m_boundaryMaxDistance);
+                }
+                if (pvp.HasMember("stats") && pvp["stats"].IsObject())
+                {
+                    const rapidjson::Value& stats = pvp["stats"];
+                    ReadString(stats, "characterId", outResponse.m_pvp.m_stats.m_characterId);
+                    ReadInt(stats, "duelsWon", outResponse.m_pvp.m_stats.m_duelsWon);
+                    ReadInt(stats, "duelsLost", outResponse.m_pvp.m_stats.m_duelsLost);
+                    ReadInt(stats, "honorPoints", outResponse.m_pvp.m_stats.m_honorPoints);
+                    ReadInt64(stats, "lastDuelWonAt", outResponse.m_pvp.m_stats.m_lastDuelWonAt);
+                    ReadInt64(stats, "updatedAt", outResponse.m_pvp.m_stats.m_updatedAt);
+                }
+                if (pvp.HasMember("safeZone") && pvp["safeZone"].IsObject())
+                {
+                    const rapidjson::Value& safeZone = pvp["safeZone"];
+                    ReadBool(safeZone, "noDuel", outResponse.m_pvp.m_safeZone.m_noDuel);
+                    ReadBool(safeZone, "noHostileAction", outResponse.m_pvp.m_safeZone.m_noHostileAction);
+                    ReadBool(safeZone, "sanctuary", outResponse.m_pvp.m_safeZone.m_sanctuary);
+                }
+                if (pvp.HasMember("lastResult") && pvp["lastResult"].IsObject())
+                {
+                    const rapidjson::Value& result = pvp["lastResult"];
+                    ReadString(result, "duelId", outResponse.m_pvp.m_lastResult.m_duelId);
+                    ReadString(result, "result", outResponse.m_pvp.m_lastResult.m_result);
+                    ReadString(result, "reason", outResponse.m_pvp.m_lastResult.m_reason);
+                    ReadString(result, "opponentCharacterId", outResponse.m_pvp.m_lastResult.m_opponentCharacterId);
+                    ReadString(result, "opponentDisplayName", outResponse.m_pvp.m_lastResult.m_opponentDisplayName);
+                    ReadString(result, "winnerCharacterId", outResponse.m_pvp.m_lastResult.m_winnerCharacterId);
+                    ReadInt64(result, "endedAt", outResponse.m_pvp.m_lastResult.m_endedAt);
+                }
+            }
             ReadString(document, "currentTargetId", outResponse.m_currentTargetId);
             ReadBool(document, "autoAttackActive", outResponse.m_autoAttackActive);
             ReadInt64(document, "globalCooldownEndsAt", outResponse.m_globalCooldownEndsAt);
@@ -786,7 +836,9 @@ namespace NetClient
                     {
                         entity.m_targetable = entityValue["targetable"].GetBool();
                     }
+                    ReadBool(entityValue, "duelOpponent", entity.m_duelOpponent);
                     ReadString(entityValue, "aiState", entity.m_aiState);
+                    ReadString(entityValue, "pvpState", entity.m_pvpState);
                     entity.m_services.clear();
                     if (entityValue.HasMember("npcServices") && entityValue["npcServices"].IsArray())
                     {
@@ -1036,6 +1088,115 @@ namespace NetClient
             return true;
         }
 
+        void ParseAuctionListing(const rapidjson::Value& listingValue, AuctionListingState& outListing)
+        {
+            ReadString(listingValue, "auctionId", outListing.m_auctionId);
+            ReadString(listingValue, "sellerCharacterId", outListing.m_sellerCharacterId);
+            ReadString(listingValue, "sellerDisplayName", outListing.m_sellerDisplayName);
+            ReadString(listingValue, "buyerCharacterId", outListing.m_buyerCharacterId);
+            ReadString(listingValue, "itemId", outListing.m_itemId);
+            ReadString(listingValue, "itemDisplayName", outListing.m_itemDisplayName);
+            ReadString(listingValue, "itemQuality", outListing.m_itemQuality);
+            ReadString(listingValue, "itemType", outListing.m_itemType);
+            ReadString(listingValue, "itemSubtype", outListing.m_itemSubtype);
+            ReadString(listingValue, "state", outListing.m_state);
+            ReadInt(listingValue, "stackCount", outListing.m_stackCount);
+            ReadInt(listingValue, "buyoutCopper", outListing.m_buyoutCopper);
+            ReadInt(listingValue, "depositCopper", outListing.m_depositCopper);
+            ReadInt(listingValue, "cutCopper", outListing.m_cutCopper);
+            ReadInt(listingValue, "cutPercent", outListing.m_cutPercent);
+            ReadInt(listingValue, "version", outListing.m_version);
+            ReadInt64(listingValue, "createdAt", outListing.m_createdAt);
+            ReadInt64(listingValue, "expiresAt", outListing.m_expiresAt);
+            ReadInt64(listingValue, "soldAt", outListing.m_soldAt);
+            ReadInt64(listingValue, "canceledAt", outListing.m_canceledAt);
+            ReadInt64(listingValue, "timeRemainingSeconds", outListing.m_timeRemainingSeconds);
+        }
+
+        void ParseMailEnvelope(const rapidjson::Value& mailValue, MailEnvelopeState& outMail)
+        {
+            ReadString(mailValue, "mailId", outMail.m_mailId);
+            ReadString(mailValue, "auctionId", outMail.m_auctionId);
+            ReadString(mailValue, "senderDisplayName", outMail.m_senderDisplayName);
+            ReadString(mailValue, "recipientCharacterId", outMail.m_recipientCharacterId);
+            ReadString(mailValue, "subject", outMail.m_subject);
+            ReadString(mailValue, "body", outMail.m_body);
+            ReadInt(mailValue, "currencyCopper", outMail.m_currencyCopper);
+            ReadInt64(mailValue, "createdAt", outMail.m_createdAt);
+            ReadInt64(mailValue, "deliveredAt", outMail.m_deliveredAt);
+            if (mailValue.HasMember("itemAttachments") && mailValue["itemAttachments"].IsArray())
+            {
+                for (const rapidjson::Value& attachmentValue : mailValue["itemAttachments"].GetArray())
+                {
+                    if (!attachmentValue.IsObject())
+                    {
+                        continue;
+                    }
+                    MailItemAttachmentState attachment;
+                    ReadString(attachmentValue, "itemId", attachment.m_itemId);
+                    ReadString(attachmentValue, "displayName", attachment.m_displayName);
+                    ReadInt(attachmentValue, "stackCount", attachment.m_stackCount);
+                    outMail.m_itemAttachments.push_back(AZStd::move(attachment));
+                }
+            }
+        }
+
+        bool ParseAuctionStateJson(const AZStd::string& payload, AuctionStateResponse& outResponse, AZStd::string& outError)
+        {
+            outResponse = AuctionStateResponse{};
+
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Auction state response was not valid JSON.";
+                return false;
+            }
+
+            ReadInt64(document, "serverTime", outResponse.m_serverTime);
+            ReadInt(document, "currencyCopper", outResponse.m_currencyCopper);
+            if (document.HasMember("listings") && document["listings"].IsArray())
+            {
+                for (const rapidjson::Value& listingValue : document["listings"].GetArray())
+                {
+                    if (!listingValue.IsObject())
+                    {
+                        continue;
+                    }
+                    AuctionListingState listing;
+                    ParseAuctionListing(listingValue, listing);
+                    outResponse.m_listings.push_back(AZStd::move(listing));
+                }
+            }
+            if (document.HasMember("myAuctions") && document["myAuctions"].IsArray())
+            {
+                for (const rapidjson::Value& listingValue : document["myAuctions"].GetArray())
+                {
+                    if (!listingValue.IsObject())
+                    {
+                        continue;
+                    }
+                    AuctionListingState listing;
+                    ParseAuctionListing(listingValue, listing);
+                    outResponse.m_myAuctions.push_back(AZStd::move(listing));
+                }
+            }
+            if (document.HasMember("mail") && document["mail"].IsArray())
+            {
+                for (const rapidjson::Value& mailValue : document["mail"].GetArray())
+                {
+                    if (!mailValue.IsObject())
+                    {
+                        continue;
+                    }
+                    MailEnvelopeState mail;
+                    ParseMailEnvelope(mailValue, mail);
+                    outResponse.m_mail.push_back(AZStd::move(mail));
+                }
+            }
+            return true;
+        }
+
         AZStd::string ExtractErrorMessage(const AZStd::string& payload)
         {
             if (payload.empty())
@@ -1230,6 +1391,105 @@ namespace NetClient
         }
 
         return ParseSocialStateJson(responseBody, outResponse, outError);
+    }
+
+    bool AuctionStateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& search,
+        const AZStd::string& itemType,
+        const AZStd::string& sort,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        AZStd::string path = AZStd::string::format(
+            "/v1/world/auction/listings?worldSessionToken=%s",
+            JsonEscape(worldSessionToken).c_str());
+        if (!search.empty())
+        {
+            path += AZStd::string::format("&search=%s", JsonEscape(search).c_str());
+        }
+        if (!itemType.empty())
+        {
+            path += AZStd::string::format("&itemType=%s", JsonEscape(itemType).c_str());
+        }
+        if (!sort.empty())
+        {
+            path += AZStd::string::format("&sort=%s", JsonEscape(sort).c_str());
+        }
+
+        if (!PerformRequest(worldEndpoint, L"GET", ToWideString(path), {}, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseAuctionStateJson(responseBody, outResponse, outError);
+    }
+
+    bool AuctionPostRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& requestBody,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        if (!PerformRequest(worldEndpoint, L"POST", path, requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseAuctionStateJson(responseBody, outResponse, outError);
+    }
+
+    bool ListAuctionItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        int stackCount,
+        int buyoutCopper,
+        AZ::s64 durationSeconds,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"slotIndex\":%d,\"stackCount\":%d,\"buyoutCopper\":%d,\"durationSeconds\":%lld}",
+            JsonEscape(worldSessionToken).c_str(),
+            slotIndex,
+            stackCount,
+            buyoutCopper,
+            static_cast<long long>(durationSeconds));
+        return AuctionPostRequest(worldEndpoint, L"/v1/world/auction/list", requestBody, outResponse, outError);
+    }
+
+    bool AuctionIdActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& auctionId,
+        AuctionStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"auctionId\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(auctionId).c_str());
+        return AuctionPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
     }
 
     bool SendChatRequest(
@@ -1527,6 +1787,60 @@ namespace NetClient
         }
 
         return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool DuelPostRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& requestBody,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        if (!PerformRequest(worldEndpoint, L"POST", path, requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool RequestDuelRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetCharacterId,
+        const AZStd::string& targetName,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"targetCharacterId\":\"%s\",\"targetName\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(targetCharacterId).c_str(),
+            JsonEscape(targetName).c_str());
+        return DuelPostRequest(worldEndpoint, L"/v1/world/duel/request", requestBody, outResponse, outError);
+    }
+
+    bool DuelActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& duelId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"duelId\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(duelId).c_str());
+        return DuelPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
     }
 
     bool ActivateAbilityRequest(

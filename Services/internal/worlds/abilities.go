@@ -472,7 +472,7 @@ func (s *worldServer) sessionKnowsAbilityLocked(session *worldSessionState, abil
 	return known
 }
 
-func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targetMob *mobState, ability abilityDefinition) error {
+func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targetMob *mobState, targetPlayer *worldSessionState, ability abilityDefinition) error {
 	nowMs := nowMillis()
 	if session.Resource < ability.ResourceCost {
 		return fmt.Errorf("not enough resource")
@@ -485,11 +485,23 @@ func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targe
 		if session.CurrentTargetID == "" {
 			return fmt.Errorf("no target")
 		}
-		if targetMob == nil || !targetMob.Alive || !targetMob.Targetable {
+		if targetMob == nil && targetPlayer == nil {
 			return fmt.Errorf("target is invalid")
 		}
-		if distance2D(session.X, session.Y, targetMob.X, targetMob.Y) > ability.RangeMeters {
-			return fmt.Errorf("target is out of range")
+		if targetMob != nil {
+			if !targetMob.Alive || !targetMob.Targetable {
+				return fmt.Errorf("target is invalid")
+			}
+			if distance2D(session.X, session.Y, targetMob.X, targetMob.Y) > ability.RangeMeters {
+				return fmt.Errorf("target is out of range")
+			}
+		} else {
+			if err := s.validatePvPDamageLocked(session, targetPlayer); err != nil {
+				return err
+			}
+			if distance2D(session.X, session.Y, targetPlayer.X, targetPlayer.Y) > ability.RangeMeters {
+				return fmt.Errorf("target is out of range")
+			}
 		}
 	}
 
@@ -518,6 +530,12 @@ func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targe
 	if ability.Damage > 0 && targetMob != nil {
 		damage := s.abilityDamage(session, ability)
 		if err := s.applyDamageToMobLocked(session, targetMob, damage, ability.ID); err != nil {
+			return err
+		}
+	}
+	if ability.Damage > 0 && targetPlayer != nil {
+		damage := s.abilityDamage(session, ability)
+		if err := s.applyDamageToPlayerLocked(session, targetPlayer, damage, ability.ID); err != nil {
 			return err
 		}
 	}
