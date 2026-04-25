@@ -240,16 +240,33 @@ internal sealed class LauncherForm : Form
 
         if (!string.IsNullOrWhiteSpace(_config.ClientExecutablePath) && File.Exists(_config.ClientExecutablePath))
         {
-            var arguments = $"--join-ticket {ticket.TicketId} --world-endpoint {ticket.WorldEndpoint}";
             Log($"Launch command: {_config.ClientExecutablePath} {FormatLaunchArgumentsForLog(ticket.TicketId, ticket.WorldEndpoint)}");
             try
             {
-                var process = Process.Start(new ProcessStartInfo
+                var startInfo = new ProcessStartInfo
                 {
                     FileName = _config.ClientExecutablePath,
-                    Arguments = arguments,
-                    UseShellExecute = true
-                });
+                    UseShellExecute = false
+                };
+
+                var workingDirectory = ResolveClientWorkingDirectory();
+                if (!string.IsNullOrWhiteSpace(workingDirectory))
+                {
+                    startInfo.WorkingDirectory = workingDirectory;
+                }
+
+                if (ShouldPassProjectPath())
+                {
+                    startInfo.ArgumentList.Add("--project-path");
+                    startInfo.ArgumentList.Add(_config.Resolution.RepoRoot);
+                }
+
+                startInfo.ArgumentList.Add("--join-ticket");
+                startInfo.ArgumentList.Add(ticket.TicketId);
+                startInfo.ArgumentList.Add("--world-endpoint");
+                startInfo.ArgumentList.Add(ticket.WorldEndpoint);
+
+                var process = Process.Start(startInfo);
                 if (process == null)
                 {
                     throw new InvalidOperationException("Process.Start returned null.");
@@ -300,6 +317,30 @@ internal sealed class LauncherForm : Form
         {
             ToggleButtons(true);
         }
+    }
+
+    private string ResolveClientWorkingDirectory()
+    {
+        if (!string.IsNullOrWhiteSpace(_config.Resolution.RepoRoot) && Directory.Exists(_config.Resolution.RepoRoot))
+        {
+            return _config.Resolution.RepoRoot;
+        }
+
+        var executableDirectory = Path.GetDirectoryName(_config.ClientExecutablePath);
+        return !string.IsNullOrWhiteSpace(executableDirectory) && Directory.Exists(executableDirectory)
+            ? executableDirectory
+            : string.Empty;
+    }
+
+    private bool ShouldPassProjectPath()
+    {
+        if (string.IsNullOrWhiteSpace(_config.Resolution.RepoRoot) || !Directory.Exists(_config.Resolution.RepoRoot))
+        {
+            return false;
+        }
+
+        var fileName = Path.GetFileName(_config.ClientExecutablePath);
+        return fileName.Contains("GameLauncher", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ToggleButtons(bool enabled)
@@ -434,13 +475,21 @@ internal sealed class LauncherForm : Form
         }
     }
 
-    private static string FormatLaunchArgumentsForLog(string ticketId, string worldEndpoint)
+    private string FormatLaunchArgumentsForLog(string ticketId, string worldEndpoint)
     {
         var maskedTicket = ticketId.Length <= 8
             ? ticketId
             : $"{ticketId[..4]}...{ticketId[^4..]}";
 
         var builder = new StringBuilder();
+        if (!string.IsNullOrWhiteSpace(_config.Resolution.RepoRoot) &&
+            Path.GetFileName(_config.ClientExecutablePath).Contains("GameLauncher", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Append("--project-path ");
+            builder.Append(_config.Resolution.RepoRoot);
+            builder.Append(' ');
+        }
+
         builder.Append("--join-ticket ");
         builder.Append(maskedTicket);
         builder.Append(" --world-endpoint ");

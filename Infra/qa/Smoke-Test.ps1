@@ -1,6 +1,7 @@
 param(
     [string]$PackageRoot = "",
     [switch]$RequireServices,
+    [switch]$RunO3deLevelSmoke,
     [switch]$SelfTest
 )
 
@@ -109,6 +110,140 @@ function Test-PackageDoesNotContain {
     Add-Result -Name $Name -Passed ($violations.Count -eq 0) -Detail $(if ($violations.Count -eq 0) { $PackageRoot } else { ($violations | Select-Object -First 20) -join "; " })
 }
 
+function Test-BinaryFileContainsAscii {
+    param(
+        [string]$Name,
+        [string]$Path,
+        [string]$Needle
+    )
+
+    if (-not (Test-Path $Path)) {
+        Add-Result -Name $Name -Passed $false -Detail "$Path is missing."
+        return
+    }
+
+    $haystack = [System.IO.File]::ReadAllBytes($Path)
+    $needleBytes = [System.Text.Encoding]::ASCII.GetBytes($Needle)
+    $found = $false
+    for ($i = 0; $i -le $haystack.Length - $needleBytes.Length; $i++) {
+        $matches = $true
+        for ($j = 0; $j -lt $needleBytes.Length; $j++) {
+            if ($haystack[$i + $j] -ne $needleBytes[$j]) {
+                $matches = $false
+                break
+            }
+        }
+
+        if ($matches) {
+            $found = $true
+            break
+        }
+    }
+
+    Add-Result -Name $Name -Passed $found -Detail $(if ($found) { $Path } else { "$Needle was not found in $Path" })
+}
+
+function Stop-PackageRuntimeProcess {
+    param(
+        [System.Diagnostics.Process]$Process,
+        [datetime]$StartedAt
+    )
+
+    if ($Process -and -not $Process.HasExited) {
+        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    foreach ($name in @("amandacore.GameLauncher", "GameLauncher", "AssetProcessor", "AssetProcessorBatch")) {
+        Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                if ($_.StartTime -ge $StartedAt.AddSeconds(-2)) {
+                    Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+                }
+            }
+            catch {
+            }
+        }
+    }
+}
+
+function Invoke-PackageO3deLevelSmoke {
+    param([string]$PackageRoot)
+
+    $launcherCandidates = @(
+        Join-Path $PackageRoot "build\o3de-windows\bin\profile\amandacore.GameLauncher.exe",
+        Join-Path $PackageRoot "build\windows\bin\profile\amandacore.GameLauncher.exe"
+    )
+    $gameLauncherPath = $launcherCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $gameLauncherPath) {
+        Add-Result -Name "package O3DE GameLauncher exists" -Passed $false -Detail ($launcherCandidates -join "; ")
+        return
+    }
+
+    Add-Result -Name "package O3DE GameLauncher exists" -Passed $true -Detail $gameLauncherPath
+
+    $userRoot = Join-Path $PackageRoot "user"
+    Remove-Item -Path $userRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $gameLog = Join-Path $userRoot "log\Game.log"
+    $startTime = Get-Date
+    $process = $null
+    $failurePattern = "(?i)(Requested level not found|Bootstrap zone mapping did not match|missing AssetCatalog|AssetCatalog.*missing|project path not found)"
+    $failureMatch = ""
+    $levelReady = $false
+
+    try {
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $startInfo.FileName = $gameLauncherPath
+        $startInfo.WorkingDirectory = $PackageRoot
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.ArgumentList.Add("--project-path")
+        $startInfo.ArgumentList.Add($PackageRoot)
+        $process = [System.Diagnostics.Process]::Start($startInfo)
+
+        $deadline = (Get-Date).AddSeconds(90)
+        while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 500
+            if (Test-Path $gameLog) {
+                $content = Get-Content -Path $gameLog -Raw -ErrorAction SilentlyContinue
+                if ($content -match $failurePattern) {
+                    $failureMatch = $Matches[1]
+                    break
+                }
+
+                if ($content -match "client\.level_ready") {
+                    $levelReady = $true
+                    break
+                }
+            }
+
+            if ($process.HasExited -and -not (Test-Path $gameLog)) {
+                break
+            }
+        }
+    }
+    catch {
+        Add-Result -Name "package O3DE runtime level smoke" -Passed $false -Detail $_.Exception.Message
+        return
+    }
+    finally {
+        Stop-PackageRuntimeProcess -Process $process -StartedAt $startTime
+    }
+
+    $detail = if (Test-Path $gameLog) {
+        if ($failureMatch) {
+            "$failureMatch in $gameLog"
+        }
+        else {
+            $gameLog
+        }
+    }
+    else {
+        "Game.log was not created at $gameLog"
+    }
+
+    Add-Result -Name "package O3DE runtime level smoke" -Passed ($levelReady -and [string]::IsNullOrWhiteSpace($failureMatch)) -Detail $detail
+}
+
 function Test-ServiceHealth {
     param(
         [string]$Name,
@@ -189,17 +324,26 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
     Test-JsonFile -Name "package version manifest" -Path (Join-Path $PackageRoot "Infra\dev\version-manifest.json")
     Test-JsonFile -Name "package release manifest" -Path (Join-Path $PackageRoot "release-package-manifest.json")
     Test-TextFileDoesNotMatch -Name "package manifest has no local absolute paths" -Path (Join-Path $PackageRoot "Infra\dev\version-manifest.json") -Pattern "[A-Za-z]:\\" -FailureDetail "version-manifest.json contains a local absolute Windows path."
+    Test-PathRequired -Name "package testzone01 spawnable" -Path (Join-Path $PackageRoot "Cache\pc\levels\testzone01\testzone01.spawnable")
+    Test-BinaryFileContainsAscii -Name "package asset catalog references testzone01" -Path (Join-Path $PackageRoot "Cache\pc\assetcatalog.xml") -Needle "levels/testzone01/testzone01.spawnable"
     Test-PackageDoesNotContain -Name "package excludes local/secrets/build junk" -PackageRoot $PackageRoot -RelativePatterns @(
         '(^|/)\.git(/|$)',
         '(^|/)\.secrets(/|$)',
         '(^|/)\.vs(/|$)',
         '^Client/Portal/',
+        '^Cache/pc/(client|dist|infra)/',
         '^Infra/dev/logs/',
         '^user/',
         '(^|/)local-processes\.json$',
         '(^|/)platform-state\.json$',
+        '(?i)(^|/)(m2_|milestone2_|milestone3_)[^/]*',
+        '(?i)(^|/)milestone.*_runtime_ticket\.txt$',
         '(?i)\.(log|tmp|png|jpg|jpeg)$'
     )
+
+    if ($RunO3deLevelSmoke) {
+        Invoke-PackageO3deLevelSmoke -PackageRoot $PackageRoot
+    }
 }
 
 $failed = @($results | Where-Object { -not $_.passed -and $_.severity -eq "error" })

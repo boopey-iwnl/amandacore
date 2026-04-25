@@ -90,10 +90,12 @@ function Test-ExcludedPackagePath {
 
     if ($path -match '(^|/)(\.git|\.secrets|\.vs|logs|user)(/|$)') { return $true }
     if ($path -match '(^|/)(Cache|cache)(/|$)' -and $path -notmatch '^Cache($|/pc($|/))') { return $true }
+    if ($path -match '^Cache/pc/(client|dist|infra)(/|$)') { return $true }
     if ($path -match '^Client/Portal/') { return $true }
     if ($path -match '^Infra/dev/(local-processes\.json|platform-state\.json|logs/)') { return $true }
-    if ($path -match '^dist/') { return $true }
+    if ($path -match '(^|/)dist(/|$)') { return $true }
     if ($fileName -match '(?i)\.(log|tmp|png|jpg|jpeg|pdb|ilk|lock)$') { return $true }
+    if ($fileName -match '(?i)^(m2_|milestone2_|milestone3_)') { return $true }
     if ($fileName -match '(?i)(^required-go-test-output\.txt$|^combat-test-output\.txt$|^worlds-compile-output.*\.txt$|^e2e-.*\.(txt|json|log)$|^milestone.*_runtime_ticket\.txt$|^imgui\.ini$)') { return $true }
 
     return $false
@@ -295,13 +297,6 @@ $packageManifest | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $scrip
 
 Assert-PackageSafety -PackageRoot $script:stagingRoot
 
-if (-not $SkipSmoke) {
-    & $smokeScript -PackageRoot $script:stagingRoot
-    if ($LASTEXITCODE -ne 0) {
-        throw "Package smoke test failed."
-    }
-}
-
 $archivePath = Join-Path $OutputRoot "$PackageName.zip"
 $hashPath = "$archivePath.sha256"
 if (-not $SkipArchive) {
@@ -311,6 +306,33 @@ if (-not $SkipArchive) {
     Compress-Archive -Path (Join-Path $script:stagingRoot "*") -DestinationPath $archivePath -Force
     $hash = Get-FileHash -Path $archivePath -Algorithm SHA256
     "{0}  {1}" -f $hash.Hash.ToLowerInvariant(), (Split-Path -Leaf $archivePath) | Set-Content -Path $hashPath -Encoding ASCII
+}
+
+if (-not $SkipSmoke) {
+    $smokePackageRoot = $script:stagingRoot
+    $smokeExtractRoot = ""
+    if (-not $SkipArchive) {
+        $smokeExtractRoot = Join-Path $OutputRoot "$PackageName-smoke-extract"
+        Assert-ChildPath -Parent $OutputRoot -Child $smokeExtractRoot
+        Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $smokeExtractRoot | Out-Null
+        Expand-Archive -Path $archivePath -DestinationPath $smokeExtractRoot -Force
+        $smokePackageRoot = $smokeExtractRoot
+    }
+
+    $smokeSucceeded = $false
+    try {
+        & $smokeScript -PackageRoot $smokePackageRoot -RunO3deLevelSmoke
+        if ($LASTEXITCODE -ne 0) {
+            throw "Package smoke test failed."
+        }
+        $smokeSucceeded = $true
+    }
+    finally {
+        if ($smokeSucceeded -and -not [string]::IsNullOrWhiteSpace($smokeExtractRoot)) {
+            Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 [pscustomobject]@{

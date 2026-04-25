@@ -14,6 +14,7 @@ namespace GameCore
     {
         constexpr float WorldStatePollIntervalSeconds = 0.10f;
         constexpr float SocialStatePollIntervalSeconds = 0.50f;
+        constexpr const char* StartupLevelAssetPath = "levels/testzone01/testzone01.spawnable";
 
         struct AbilityPresentationDefinition
         {
@@ -228,7 +229,9 @@ namespace GameCore
         }
         else if (auto* console = AZ::Interface<AZ::IConsole>::Get())
         {
-            const auto result = console->PerformCommand("LoadLevel testzone01");
+            AZStd::string loadCommand = "LoadLevel ";
+            loadCommand += StartupLevelAssetPath;
+            const auto result = console->PerformCommand(loadCommand.c_str());
             if (!result.IsSuccess())
             {
                 AZ_Warning("amandacore", false, "Unable to request startup level load: %s", result.GetError().c_str());
