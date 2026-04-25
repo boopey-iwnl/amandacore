@@ -1585,6 +1585,96 @@ func normalizedCharacterCopy(source platform.Character) platform.Character {
 	return normalized
 }
 
+func buildGuildMember(character platform.Character, rankID string, joinedAt int64) platform.GuildMember {
+	character = platform.NormalizeCharacter(character)
+	return platform.GuildMember{
+		CharacterID:  character.ID,
+		DisplayName:  character.DisplayName,
+		RaceID:       character.RaceID,
+		ClassID:      character.ClassID,
+		Level:        character.Level,
+		RankID:       rankID,
+		JoinedAt:     joinedAt,
+		LastOnlineAt: character.LastSeenAt,
+	}
+}
+
+func cloneGuild(source platform.Guild) platform.Guild {
+	source.Ranks = append([]platform.GuildRank(nil), source.Ranks...)
+	for index := range source.Ranks {
+		source.Ranks[index].Permissions = append([]string(nil), source.Ranks[index].Permissions...)
+	}
+	source.Members = append([]platform.GuildMember(nil), source.Members...)
+	return source
+}
+
+func normalizeGuildRanks(source []platform.GuildRank) []platform.GuildRank {
+	if len(source) == 0 {
+		return platform.DefaultGuildRanks()
+	}
+
+	seen := map[string]struct{}{}
+	normalized := make([]platform.GuildRank, 0, len(source))
+	for _, rank := range source {
+		rank.RankID = strings.TrimSpace(rank.RankID)
+		if rank.RankID == "" {
+			continue
+		}
+		if _, exists := seen[rank.RankID]; exists {
+			continue
+		}
+		seen[rank.RankID] = struct{}{}
+		rank.DisplayName = strings.TrimSpace(rank.DisplayName)
+		if rank.DisplayName == "" {
+			rank.DisplayName = rank.RankID
+		}
+		rank.Permissions = cloneStringIDs(rank.Permissions)
+		normalized = append(normalized, rank)
+	}
+	if len(normalized) == 0 {
+		return platform.DefaultGuildRanks()
+	}
+	return normalized
+}
+
+func normalizeGuildMembers(source []platform.GuildMember) []platform.GuildMember {
+	seen := map[string]struct{}{}
+	normalized := make([]platform.GuildMember, 0, len(source))
+	for _, member := range source {
+		member.CharacterID = strings.TrimSpace(member.CharacterID)
+		if member.CharacterID == "" {
+			continue
+		}
+		if _, exists := seen[member.CharacterID]; exists {
+			continue
+		}
+		seen[member.CharacterID] = struct{}{}
+		if member.RankID == "" {
+			member.RankID = platform.GuildRankRecruit
+		}
+		normalized = append(normalized, member)
+	}
+	return normalized
+}
+
+func findGuildForCharacterLocked(guilds map[string]platform.Guild, characterID string) (platform.Guild, bool) {
+	for _, guild := range guilds {
+		if guildContainsMember(guild, characterID) {
+			return guild, true
+		}
+	}
+	return platform.Guild{}, false
+}
+
+func guildContainsMember(guild platform.Guild, characterID string) bool {
+	for _, member := range guild.Members {
+		if member.CharacterID == characterID {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *FileStore) lockState(reload bool) error {
 	s.mutex.Lock()
 
