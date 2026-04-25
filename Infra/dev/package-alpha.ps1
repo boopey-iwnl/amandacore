@@ -17,7 +17,7 @@ $versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
 $smokeScript = Join-Path $repoRoot "Infra\qa\Smoke-Test.ps1"
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $repoRoot "dist\alpha-0.1"
+    $OutputRoot = Join-Path ([System.IO.Path]::GetTempPath()) "AmandaCore\alpha-0.1"
 }
 
 function Invoke-Native {
