@@ -26,6 +26,8 @@ const (
 	professionTrainerNPCKind = "profession_trainer_npc"
 	questGiverNPCKind        = "quest_giver_npc"
 	worldObjectNPCKind       = "quest_object"
+	dungeonEntranceKind      = "dungeon_entrance"
+	dungeonExitKind          = "dungeon_exit"
 
 	mobAIStateIdle       = "idle"
 	mobAIStatePatrolling = "patrolling"
@@ -39,6 +41,7 @@ const (
 
 	defaultZoneID       = "stonewake_vale"
 	secondZoneID        = "brindlebrook_roadlands"
+	dungeonZoneID       = "dun_tallowdeep_sluice"
 	nextZoneID          = secondZoneID
 	worldTickMaxSeconds = 0.25
 
@@ -89,6 +92,20 @@ type moveRequest struct {
 	WorldSessionToken string  `json:"worldSessionToken"`
 	DeltaX            float64 `json:"deltaX"`
 	DeltaY            float64 `json:"deltaY"`
+}
+
+type dungeonEnterRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	DungeonID         string `json:"dungeonId"`
+}
+
+type dungeonExitRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type dungeonResetRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	DungeonID         string `json:"dungeonId"`
 }
 
 type targetRequest struct {
@@ -229,29 +246,29 @@ type itemRewardResponse struct {
 }
 
 type questDefinition struct {
-	ID              string
-	ZoneID          string
-	Title           string
-	ObjectiveType   string
-	ObjectiveText   string
-	GiverNPCID      string
-	TurnInNPCID     string
-	TargetEntityID  string
-	TargetMobType   string
-	TargetItemID    string
-	TargetItemName  string
-	TargetCount     int
-	RewardXP        int
-	RewardCopper    int
-	RewardItems     []itemRewardDefinition
-	PrerequisiteIDs []string
-	LevelBand       string
-	MarkerX         float64
-	MarkerY         float64
-	PartyShareable  bool
-	GroupRecommended bool
+	ID                 string
+	ZoneID             string
+	Title              string
+	ObjectiveType      string
+	ObjectiveText      string
+	GiverNPCID         string
+	TurnInNPCID        string
+	TargetEntityID     string
+	TargetMobType      string
+	TargetItemID       string
+	TargetItemName     string
+	TargetCount        int
+	RewardXP           int
+	RewardCopper       int
+	RewardItems        []itemRewardDefinition
+	PrerequisiteIDs    []string
+	LevelBand          string
+	MarkerX            float64
+	MarkerY            float64
+	PartyShareable     bool
+	GroupRecommended   bool
 	RecommendedPlayers int
-	PartyCreditRadius float64
+	PartyCreditRadius  float64
 }
 
 type navigationAreaDefinition struct {
@@ -401,6 +418,11 @@ type worldSessionState struct {
 	Level              int
 	RealmID            string
 	ZoneID             string
+	InstanceID         string
+	ReturnZoneID       string
+	ReturnX            float64
+	ReturnY            float64
+	ReturnZ            float64
 	X                  float64
 	Y                  float64
 	Z                  float64
@@ -433,6 +455,7 @@ type worldSessionState struct {
 
 type mobState struct {
 	ID                     string
+	InstanceID             string
 	MobTypeID              string
 	DisplayName            string
 	Kind                   string
@@ -484,6 +507,54 @@ type mobSpawnDefinition struct {
 	Elite           bool
 }
 
+type worldPosition struct {
+	ZoneID string
+	X      float64
+	Y      float64
+	Z      float64
+}
+
+type dungeonDefinition struct {
+	ID               string
+	DisplayName      string
+	LevelBand        string
+	InstanceZoneID   string
+	EntranceZoneID   string
+	EntranceEntityID string
+	ExitEntityID     string
+	StartPositions   []worldPosition
+	ExitPosition     worldPosition
+	ReturnPosition   worldPosition
+	MobSpawns        []mobSpawnDefinition
+	BossMobTypeID    string
+	QuestID          string
+	EmptyExpiryMs    int64
+	HardExpiryMs     int64
+}
+
+type dungeonObjectiveState struct {
+	BossDefeated bool  `json:"bossDefeated"`
+	UpdatedAtMs  int64 `json:"updatedAt"`
+}
+
+type dungeonInstanceState struct {
+	InstanceID         string
+	DungeonID          string
+	PartyID            string
+	ZoneID             string
+	CreatedAtMs        int64
+	ExpiresAtMs        int64
+	State              string
+	MemberCharacterIDs []string
+	PlayersInside      map[string]bool
+	ReturnPositions    map[string]worldPosition
+	Mobs               map[string]*mobState
+	MobOrder           []string
+	Objective          dungeonObjectiveState
+	BossRewardGranted  map[string]bool
+	LastPlayerLeftAtMs int64
+}
+
 type worldServer struct {
 	store              *store.FileStore
 	metrics            *worldMetrics
@@ -492,6 +563,9 @@ type worldServer struct {
 	sessionTokenByChar map[string]string
 	mobs               map[string]*mobState
 	mobOrder           []string
+	dungeonInstances   map[string]*dungeonInstanceState
+	instanceByParty    map[string]string
+	instanceCounter    int64
 	quests             map[string]questDefinition
 	questOrder         []string
 	quest              questDefinition
@@ -514,6 +588,8 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
+		dungeonInstances:   map[string]*dungeonInstanceState{},
+		instanceByParty:    map[string]string{},
 		quests:             map[string]questDefinition{},
 		friendlyNPCs:       map[string]friendlyNPCDefinition{},
 		gatheringNodes:     map[string]*gatheringNodeState{},
@@ -533,6 +609,7 @@ func (s *worldServer) loadStarterContentLocked() {
 
 	allQuests := append([]questDefinition{}, stonewakeQuestDefinitions...)
 	allQuests = append(allQuests, brindlebrookQuestDefinitions...)
+	allQuests = append(allQuests, dungeonQuestDefinitions...)
 	s.questOrder = make([]string, 0, len(allQuests))
 	for _, quest := range allQuests {
 		if quest.ZoneID == "" {
@@ -550,6 +627,7 @@ func (s *worldServer) loadStarterContentLocked() {
 
 	allFriendlyNPCs := append([]friendlyNPCDefinition{}, stonewakeFriendlyNPCs...)
 	allFriendlyNPCs = append(allFriendlyNPCs, brindlebrookFriendlyNPCs...)
+	allFriendlyNPCs = append(allFriendlyNPCs, dungeonFriendlyNPCs...)
 	s.friendlyNPCOrder = make([]string, 0, len(allFriendlyNPCs))
 	for _, npc := range allFriendlyNPCs {
 		if npc.ZoneID == "" {
@@ -579,6 +657,7 @@ func (s *worldServer) ensureMobsLocked() {
 		s.mobOrder = append(s.mobOrder, spawn.ID)
 		s.mobs[spawn.ID] = &mobState{
 			ID:              spawn.ID,
+			InstanceID:      "",
 			MobTypeID:       spawn.MobTypeID,
 			DisplayName:     spawn.DisplayName,
 			Kind:            hostileMobKind,

@@ -29,3 +29,11 @@ This build is for closed-alpha readiness of the existing playable slice. It does
 ## Reporting
 
 For every `FAIL` or `BLOCKED` checklist item, attach a diagnostic bundle and complete `bug-report-template.md`.
+
+## Local QA Tools
+
+- `Infra\qa\Collect-Diagnostics.ps1` creates a redacted diagnostic bundle.
+- `Infra\qa\Smoke-Test.ps1` validates docs, manifests, QA scripts, and optional service health.
+- `Infra\qa\Seed-TestAccount.ps1` creates or reuses a local tester account and Human Warrior through local APIs.
+- `Infra\qa\Reset-LocalTestState.ps1` backs up and resets local state while preserving logs.
+- `Infra\dev\Launch-LocalOpsGui.cmd` exposes diagnostics, QA docs, and guarded state reset actions.

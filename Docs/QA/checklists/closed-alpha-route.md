@@ -14,6 +14,8 @@ Use `PASS`, `FAIL`, `BLOCKED`, or `N/A`. Every `FAIL` or `BLOCKED` needs a bug r
 - [ ] Start Local Stack reaches all services healthy:
 - [ ] Open Launcher works:
 - [ ] Known issues and release notes are available:
+- [ ] Smoke test can be run by the build owner:
+- [ ] Diagnostic collection button is visible in Local Ops:
 
 ## 2. Account and Character
 
@@ -78,6 +80,7 @@ Use `PASS`, `FAIL`, `BLOCKED`, or `N/A`. Every `FAIL` or `BLOCKED` needs a bug r
 - [ ] Full local stack restart keeps character state:
 - [ ] Rewards are not duplicated after restart:
 - [ ] Diagnostic bundle can be collected:
+- [ ] Diagnostic bundle includes tester docs and QA scripts:
 - [ ] Reset instructions can be followed if assigned:
 - [ ] Clean rerun works after reset:
 
