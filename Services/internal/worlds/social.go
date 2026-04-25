@@ -650,8 +650,6 @@ func (s *worldServer) buildSocialStateLocked(session *worldSessionState, afterMe
 		Friends:      s.buildFriendResponsesLocked(session),
 		Party:        s.buildPartyResponseLocked(session.CharacterID),
 		PartyInvites: s.buildPartyInviteResponsesLocked(session.CharacterID),
-		Guild:        s.buildGuildResponseLocked(session.CharacterID),
-		GuildInvites: s.buildGuildInviteResponsesLocked(session.CharacterID),
 	}
 }
 

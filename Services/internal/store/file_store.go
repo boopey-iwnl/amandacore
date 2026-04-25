@@ -610,6 +610,187 @@ func (s *FileStore) GetCharacterByID(characterID string) (*platform.Character, e
 	return &copy, nil
 }
 
+func (s *FileStore) GetOrCreateHousingForCharacter(characterID string, templateID string) (platform.HousingEntitlement, platform.HousingSpace, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.HousingEntitlement{}, platform.HousingSpace{}, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return platform.HousingEntitlement{}, platform.HousingSpace{}, fmt.Errorf("character not found")
+	}
+	if strings.TrimSpace(templateID) == "" {
+		return platform.HousingEntitlement{}, platform.HousingSpace{}, fmt.Errorf("housing template is required")
+	}
+
+	if entitlement, ok := s.state.HousingEntitlements[characterID]; ok {
+		if entitlement.TemplateID == "" {
+			entitlement.TemplateID = templateID
+		}
+		entitlement.Unlocked = true
+		space, found := s.state.HousingSpaces[entitlement.HousingSpaceID]
+		if !found {
+			now := time.Now().Unix()
+			space = platform.HousingSpace{
+				HousingSpaceID:   entitlement.HousingSpaceID,
+				OwnerCharacterID: character.ID,
+				OwnerAccountID:   character.AccountID,
+				TemplateID:       entitlement.TemplateID,
+				CreatedAt:        now,
+			}
+			s.state.HousingSpaces[space.HousingSpaceID] = space
+		}
+		if space.TemplateID == "" {
+			space.TemplateID = entitlement.TemplateID
+		}
+		if space.OwnerCharacterID == "" {
+			space.OwnerCharacterID = character.ID
+		}
+		if space.OwnerAccountID == "" {
+			space.OwnerAccountID = character.AccountID
+		}
+		s.state.HousingEntitlements[characterID] = entitlement
+		s.state.HousingSpaces[space.HousingSpaceID] = space
+		if _, ok := s.state.HousingStorage[space.HousingSpaceID]; !ok {
+			s.state.HousingStorage[space.HousingSpaceID] = platform.NormalizeHousingStorageSlots(nil)
+		}
+		if _, ok := s.state.HousingDecorations[space.HousingSpaceID]; !ok {
+			s.state.HousingDecorations[space.HousingSpaceID] = []platform.DecorationPlacement{}
+		}
+		return entitlement, space, s.saveLocked()
+	}
+
+	now := time.Now().Unix()
+	spaceID := randomID("house")
+	entitlement := platform.HousingEntitlement{
+		CharacterID:    character.ID,
+		HousingSpaceID: spaceID,
+		TemplateID:     templateID,
+		Unlocked:       true,
+		CreatedAt:      now,
+	}
+	space := platform.HousingSpace{
+		HousingSpaceID:   spaceID,
+		OwnerCharacterID: character.ID,
+		OwnerAccountID:   character.AccountID,
+		TemplateID:       templateID,
+		CreatedAt:        now,
+	}
+	s.state.HousingEntitlements[character.ID] = entitlement
+	s.state.HousingSpaces[spaceID] = space
+	s.state.HousingStorage[spaceID] = platform.NormalizeHousingStorageSlots(nil)
+	s.state.HousingDecorations[spaceID] = []platform.DecorationPlacement{}
+	return entitlement, space, s.saveLocked()
+}
+
+func (s *FileStore) UpdateHousingVisit(housingSpaceID string, returnZoneID string, returnX float64, returnY float64, returnZ float64) (platform.HousingSpace, error) {
+	if err := s.lockState(true); err != nil {
+		return platform.HousingSpace{}, err
+	}
+	defer s.unlockState()
+
+	space, ok := s.state.HousingSpaces[housingSpaceID]
+	if !ok {
+		return platform.HousingSpace{}, fmt.Errorf("housing space not found")
+	}
+	if returnZoneID != "" {
+		space.ReturnZoneID = returnZoneID
+		space.ReturnX = returnX
+		space.ReturnY = returnY
+		space.ReturnZ = returnZ
+	}
+	space.LastVisitedAt = time.Now().Unix()
+	s.state.HousingSpaces[housingSpaceID] = space
+	return space, s.saveLocked()
+}
+
+func (s *FileStore) ListHousingStorage(housingSpaceID string) ([]platform.HousingStorageSlot, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	if _, ok := s.state.HousingSpaces[housingSpaceID]; !ok {
+		return nil, fmt.Errorf("housing space not found")
+	}
+	return cloneHousingStorageSlots(s.state.HousingStorage[housingSpaceID]), nil
+}
+
+func (s *FileStore) UpdateCharacterInventoryAndHousingStorage(
+	characterID string,
+	housingSpaceID string,
+	inventory []platform.CharacterInventorySlot,
+	storage []platform.HousingStorageSlot,
+) (*platform.Character, []platform.HousingStorageSlot, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, nil, fmt.Errorf("character not found")
+	}
+	if err := s.validateHousingOwnerLocked(characterID, housingSpaceID); err != nil {
+		return nil, nil, err
+	}
+
+	character.Inventory = cloneInventorySlots(inventory)
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	normalizedStorage := cloneHousingStorageSlots(storage)
+
+	s.state.Characters[characterID] = character
+	s.state.HousingStorage[housingSpaceID] = normalizedStorage
+	if err := s.saveLocked(); err != nil {
+		return nil, nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, cloneHousingStorageSlots(normalizedStorage), nil
+}
+
+func (s *FileStore) UpdateHousingStorage(characterID string, housingSpaceID string, storage []platform.HousingStorageSlot) ([]platform.HousingStorageSlot, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	if err := s.validateHousingOwnerLocked(characterID, housingSpaceID); err != nil {
+		return nil, err
+	}
+	normalized := cloneHousingStorageSlots(storage)
+	s.state.HousingStorage[housingSpaceID] = normalized
+	return cloneHousingStorageSlots(normalized), s.saveLocked()
+}
+
+func (s *FileStore) ListHousingDecorations(housingSpaceID string) ([]platform.DecorationPlacement, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	if _, ok := s.state.HousingSpaces[housingSpaceID]; !ok {
+		return nil, fmt.Errorf("housing space not found")
+	}
+	return cloneDecorationPlacements(s.state.HousingDecorations[housingSpaceID]), nil
+}
+
+func (s *FileStore) SaveHousingDecorations(characterID string, housingSpaceID string, placements []platform.DecorationPlacement) ([]platform.DecorationPlacement, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	if err := s.validateHousingOwnerLocked(characterID, housingSpaceID); err != nil {
+		return nil, err
+	}
+	normalized := cloneDecorationPlacements(placements)
+	s.state.HousingDecorations[housingSpaceID] = normalized
+	return cloneDecorationPlacements(normalized), s.saveLocked()
+}
+
 func (s *FileStore) GetCharacterByName(realmID string, displayName string) (*platform.Character, error) {
 	if err := s.lockState(true); err != nil {
 		return nil, err
@@ -1329,6 +1510,12 @@ func (s *FileStore) load() error {
 	if loaded.GuildInvites != nil {
 		s.state.GuildInvites = loaded.GuildInvites
 	}
+	if loaded.Auctions != nil {
+		s.state.Auctions = loaded.Auctions
+	}
+	if loaded.Mail != nil {
+		s.state.Mail = loaded.Mail
+	}
 	if loaded.AuditEvents != nil {
 		s.state.AuditEvents = loaded.AuditEvents
 	}
@@ -1337,6 +1524,24 @@ func (s *FileStore) load() error {
 	}
 	if loaded.Mutes != nil {
 		s.state.Mutes = loaded.Mutes
+	}
+	if loaded.HousingEntitlements != nil {
+		s.state.HousingEntitlements = loaded.HousingEntitlements
+	}
+	if loaded.HousingSpaces != nil {
+		s.state.HousingSpaces = loaded.HousingSpaces
+	}
+	if loaded.HousingStorage != nil {
+		for housingSpaceID, slots := range loaded.HousingStorage {
+			loaded.HousingStorage[housingSpaceID] = platform.NormalizeHousingStorageSlots(slots)
+		}
+		s.state.HousingStorage = loaded.HousingStorage
+	}
+	if loaded.HousingDecorations != nil {
+		for housingSpaceID, placements := range loaded.HousingDecorations {
+			loaded.HousingDecorations[housingSpaceID] = platform.NormalizeDecorationPlacements(placements)
+		}
+		s.state.HousingDecorations = loaded.HousingDecorations
 	}
 	if loaded.BuildManifest.ID != "" {
 		s.state.BuildManifest = loaded.BuildManifest
@@ -1394,6 +1599,12 @@ func (s *FileStore) reloadLocked() error {
 	if loaded.GuildInvites == nil {
 		loaded.GuildInvites = map[string]platform.GuildInvite{}
 	}
+	if loaded.Auctions == nil {
+		loaded.Auctions = map[string]platform.AuctionListing{}
+	}
+	if loaded.Mail == nil {
+		loaded.Mail = map[string]platform.MailEnvelope{}
+	}
 	if loaded.AuditEvents == nil {
 		loaded.AuditEvents = map[string]platform.AuditEvent{}
 	}
@@ -1402,6 +1613,26 @@ func (s *FileStore) reloadLocked() error {
 	}
 	if loaded.Mutes == nil {
 		loaded.Mutes = map[string]platform.MuteRecord{}
+	}
+	if loaded.HousingEntitlements == nil {
+		loaded.HousingEntitlements = map[string]platform.HousingEntitlement{}
+	}
+	if loaded.HousingSpaces == nil {
+		loaded.HousingSpaces = map[string]platform.HousingSpace{}
+	}
+	if loaded.HousingStorage == nil {
+		loaded.HousingStorage = map[string][]platform.HousingStorageSlot{}
+	} else {
+		for housingSpaceID, slots := range loaded.HousingStorage {
+			loaded.HousingStorage[housingSpaceID] = platform.NormalizeHousingStorageSlots(slots)
+		}
+	}
+	if loaded.HousingDecorations == nil {
+		loaded.HousingDecorations = map[string][]platform.DecorationPlacement{}
+	} else {
+		for housingSpaceID, placements := range loaded.HousingDecorations {
+			loaded.HousingDecorations[housingSpaceID] = platform.NormalizeDecorationPlacements(placements)
+		}
 	}
 	if loaded.BuildManifest.ID == "" {
 		loaded.BuildManifest = s.state.BuildManifest
