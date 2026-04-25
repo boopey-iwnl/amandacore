@@ -3182,6 +3182,10 @@ namespace UiClient
         {
             return gameCore->SubmitChatMessage("party", {}, rest);
         }
+        if (command == "guild" || command == "g")
+        {
+            return gameCore->SubmitChatMessage("guild", {}, rest);
+        }
         if (command == "whisper" || command == "w")
         {
             const auto targetAndMessage = splitFirst(rest);
@@ -3206,6 +3210,30 @@ namespace UiClient
         if (command == "leave")
         {
             return gameCore->LeaveParty();
+        }
+        if (command == "gcreate")
+        {
+            return gameCore->CreateGuild(rest);
+        }
+        if (command == "ginvite")
+        {
+            return gameCore->InviteGuild(rest);
+        }
+        if (command == "gleave")
+        {
+            return gameCore->LeaveGuild();
+        }
+        if (command == "gkick")
+        {
+            return gameCore->RemoveGuildMember(rest);
+        }
+        if (command == "gpromote")
+        {
+            return gameCore->PromoteGuildMember(rest);
+        }
+        if (command == "gdemote")
+        {
+            return gameCore->DemoteGuildMember(rest);
         }
 
         AddHudEvent(AZStd::string::format("Unknown command: /%s", command.c_str()));
@@ -3486,6 +3514,7 @@ namespace UiClient
         const ImVec2 socialPos(displaySize.x - socialSize.x - 18.0f, displaySize.y - socialSize.y - 188.0f);
         const ImVec2 invitePromptSize(360.0f, 92.0f);
         const ImVec2 invitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 170.0f);
+        const ImVec2 guildInvitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 270.0f);
 
         if (m_trainerOpen &&
             (worldState.m_session.m_trainer.m_id.empty() ||
@@ -3542,6 +3571,15 @@ namespace UiClient
             DrawPartyInvitePrompt(gameCore, worldState);
         }
         if (!worldState.m_social.m_partyInvites.empty())
+        {
+            ImGui::End();
+        }
+
+        if (!worldState.m_social.m_guildInvites.empty() && BeginHudPanel("##guild_invite_prompt", "Guild Invite", guildInvitePromptPos, invitePromptSize))
+        {
+            DrawGuildInvitePrompt(gameCore, worldState);
+        }
+        if (!worldState.m_social.m_guildInvites.empty())
         {
             ImGui::End();
         }
