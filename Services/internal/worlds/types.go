@@ -28,6 +28,10 @@ const (
 	worldObjectNPCKind       = "quest_object"
 	dungeonEntranceKind      = "dungeon_entrance"
 	dungeonExitKind          = "dungeon_exit"
+	housingEntranceKind      = "housing_entrance"
+	housingExitKind          = "housing_exit"
+	housingStorageKind       = "housing_storage"
+	housingDecorationKind    = "housing_decoration"
 
 	mobAIStateIdle       = "idle"
 	mobAIStatePatrolling = "patrolling"
@@ -42,6 +46,7 @@ const (
 	defaultZoneID       = "stonewake_vale"
 	secondZoneID        = "brindlebrook_roadlands"
 	dungeonZoneID       = "dun_tallowdeep_sluice"
+	housingZoneID       = "house_personal_room"
 	nextZoneID          = secondZoneID
 	worldTickMaxSeconds = 0.25
 
@@ -106,6 +111,48 @@ type dungeonExitRequest struct {
 type dungeonResetRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	DungeonID         string `json:"dungeonId"`
+}
+
+type housingEnterRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type housingLeaveRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+}
+
+type housingStorageDepositRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	InventorySlotIndex int   `json:"inventorySlotIndex"`
+	StorageSlotIndex   *int  `json:"storageSlotIndex,omitempty"`
+	StackCount         int   `json:"stackCount"`
+}
+
+type housingStorageWithdrawRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	StorageSlotIndex   int   `json:"storageSlotIndex"`
+	InventorySlotIndex *int  `json:"inventorySlotIndex,omitempty"`
+	StackCount         int   `json:"stackCount"`
+}
+
+type housingStorageMoveRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	FromSlotIndex     int    `json:"fromSlotIndex"`
+	ToSlotIndex       int    `json:"toSlotIndex"`
+}
+
+type decorationPlaceRequest struct {
+	WorldSessionToken string  `json:"worldSessionToken"`
+	DecorationID       string  `json:"decorationId"`
+	X                  float64 `json:"x"`
+	Y                  float64 `json:"y"`
+	Z                  float64 `json:"z"`
+	RotationYaw        float64 `json:"rotationYaw"`
+}
+
+type decorationRemoveRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	PlacementID        string `json:"placementId"`
 }
 
 type targetRequest struct {
@@ -432,6 +479,8 @@ type worldSessionState struct {
 	RealmID            string
 	ZoneID             string
 	InstanceID         string
+	HousingSpaceID     string
+	HousingInstanceID  string
 	ReturnZoneID       string
 	ReturnX            float64
 	ReturnY            float64
@@ -580,6 +629,7 @@ type worldServer struct {
 	dungeonInstances   map[string]*dungeonInstanceState
 	instanceByParty    map[string]string
 	instanceCounter    int64
+	housingInstanceCounter int64
 	quests             map[string]questDefinition
 	questOrder         []string
 	quest              questDefinition
@@ -619,6 +669,7 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 func (s *worldServer) loadStarterContentLocked() {
 	allZones := append([]zoneDefinition{}, zoneDefinitions...)
 	allZones = append(allZones, dungeonZoneDefinitions...)
+	allZones = append(allZones, housingZoneDefinitions...)
 	for _, zone := range allZones {
 		s.zones[zone.ID] = zone
 	}
@@ -644,6 +695,7 @@ func (s *worldServer) loadStarterContentLocked() {
 	allFriendlyNPCs := append([]friendlyNPCDefinition{}, stonewakeFriendlyNPCs...)
 	allFriendlyNPCs = append(allFriendlyNPCs, brindlebrookFriendlyNPCs...)
 	allFriendlyNPCs = append(allFriendlyNPCs, dungeonFriendlyNPCs...)
+	allFriendlyNPCs = append(allFriendlyNPCs, housingFriendlyNPCs...)
 	s.friendlyNPCOrder = make([]string, 0, len(allFriendlyNPCs))
 	for _, npc := range allFriendlyNPCs {
 		if npc.ZoneID == "" {

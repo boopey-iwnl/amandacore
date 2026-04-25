@@ -1857,6 +1857,14 @@ func cloneInventorySlots(source []platform.CharacterInventorySlot) []platform.Ch
 	return platform.NormalizeInventorySlots(source)
 }
 
+func cloneHousingStorageSlots(source []platform.HousingStorageSlot) []platform.HousingStorageSlot {
+	return platform.NormalizeHousingStorageSlots(source)
+}
+
+func cloneDecorationPlacements(source []platform.DecorationPlacement) []platform.DecorationPlacement {
+	return platform.NormalizeDecorationPlacements(source)
+}
+
 func cloneEquipmentSlots(source []platform.CharacterEquipmentSlot) []platform.CharacterEquipmentSlot {
 	return platform.NormalizeEquipmentSlots(source)
 }
@@ -1887,6 +1895,23 @@ func normalizedCharacterCopy(source platform.Character) platform.Character {
 	normalized.Quests = cloneQuestProgressMap(normalized.Quests)
 	normalized.TrackedQuestIDs = cloneStringIDs(normalized.TrackedQuestIDs)
 	return normalized
+}
+
+func (s *FileStore) validateHousingOwnerLocked(characterID string, housingSpaceID string) error {
+	if characterID == "" || housingSpaceID == "" {
+		return fmt.Errorf("housing ownership is required")
+	}
+	if _, ok := s.state.Characters[characterID]; !ok {
+		return fmt.Errorf("character not found")
+	}
+	space, ok := s.state.HousingSpaces[housingSpaceID]
+	if !ok {
+		return fmt.Errorf("housing space not found")
+	}
+	if space.OwnerCharacterID != characterID {
+		return fmt.Errorf("character does not own this housing space")
+	}
+	return nil
 }
 
 func buildGuildMember(character platform.Character, rankID string, joinedAt int64) platform.GuildMember {
