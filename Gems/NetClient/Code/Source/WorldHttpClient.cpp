@@ -1016,6 +1016,135 @@ namespace NetClient
         return ParseWorldSessionJson(responseBody, outResponse, outError);
     }
 
+    bool SocialStateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& afterMessageId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        AZStd::string path = AZStd::string::format("/v1/world/social/state?worldSessionToken=%s", worldSessionToken.c_str());
+        if (!afterMessageId.empty())
+        {
+            path += AZStd::string::format("&afterMessageId=%s", afterMessageId.c_str());
+        }
+
+        if (!PerformRequest(worldEndpoint, L"GET", ToWideString(path), {}, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseSocialStateJson(responseBody, outResponse, outError);
+    }
+
+    bool SocialPostRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& requestBody,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        if (!PerformRequest(worldEndpoint, L"POST", path, requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseSocialStateJson(responseBody, outResponse, outError);
+    }
+
+    bool SendChatRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& channel,
+        const AZStd::string& targetName,
+        const AZStd::string& messageText,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"channel\":\"%s\",\"targetName\":\"%s\",\"messageText\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(channel).c_str(),
+            JsonEscape(targetName).c_str(),
+            JsonEscape(messageText).c_str());
+        return SocialPostRequest(worldEndpoint, L"/v1/world/chat/send", requestBody, outResponse, outError);
+    }
+
+    bool FriendRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& name,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"name\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(name).c_str());
+        return SocialPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
+    }
+
+    bool InvitePartyRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        const AZStd::string& targetCharacterId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"targetName\":\"%s\",\"targetCharacterId\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(targetName).c_str(),
+            JsonEscape(targetCharacterId).c_str());
+        return SocialPostRequest(worldEndpoint, L"/v1/world/party/invite", requestBody, outResponse, outError);
+    }
+
+    bool PartyInviteActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"inviteId\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(inviteId).c_str());
+        return SocialPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
+    }
+
+    bool PartyActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\"}",
+            JsonEscape(worldSessionToken).c_str());
+        return SocialPostRequest(worldEndpoint, path, requestBody, outResponse, outError);
+    }
+
     bool SetTargetRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,

@@ -36,6 +36,53 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool SocialStateRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& afterMessageId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool SendChatRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& channel,
+        const AZStd::string& targetName,
+        const AZStd::string& messageText,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool FriendRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& name,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool InvitePartyRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        const AZStd::string& targetCharacterId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool PartyInviteActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
+    bool PartyActionRequest(
+        const AZStd::string& worldEndpoint,
+        const wchar_t* path,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError);
+
     bool SetTargetRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
