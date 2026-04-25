@@ -186,6 +186,13 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool SelectTalentRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& talentId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool AssignActionBarSlotRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,

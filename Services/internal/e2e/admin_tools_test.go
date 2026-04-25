@@ -11,6 +11,7 @@ import (
 	"amandacore/services/internal/admin"
 	"amandacore/services/internal/authn"
 	"amandacore/services/internal/characters"
+	"amandacore/services/internal/platform"
 	"amandacore/services/internal/realms"
 	"amandacore/services/internal/store"
 	"amandacore/services/internal/worlds"
@@ -34,10 +35,60 @@ func TestAdminToolsMilestoneSlice(t *testing.T) {
 	realmID := realmResponse["realms"][0]["id"].(string)
 
 	player := createAndConnectSocialPlayer(t, server, realmID, "admin_target", "target_pass", "AdminTarget")
+	createRoleAccount(t, fileStore, "support_user", "support_pass", platform.RoleSupport)
+	createRoleAccount(t, fileStore, "gm_user", "gm_pass", platform.RoleGM)
 	adminToken := loginForAdminTest(t, server, "admin_user", "admin_pass")
+	supportToken := loginForAdminTest(t, server, "support_user", "support_pass")
+	gmToken := loginForAdminTest(t, server, "gm_user", "gm_pass")
 
 	var forbidden map[string]any
 	getJSON(t, server.Client(), server.URL+"/v1/admin/characters?query=AdminTarget", bearer(player.accessToken), http.StatusForbidden, &forbidden)
+	var supportSearchResponse map[string]any
+	getJSON(t, server.Client(), server.URL+"/v1/admin/characters?query=AdminTarget", bearer(supportToken), http.StatusOK, &supportSearchResponse)
+	postJSON(t, server.Client(), server.URL+"/v1/world/admin/characters/"+player.characterID+"/teleport", bearer(supportToken), map[string]any{
+		"destination": "stonewake_spawn",
+		"reason":      "support cannot teleport",
+		"confirm":     true,
+	}, http.StatusForbidden, nil)
+	postJSON(t, server.Client(), server.URL+"/v1/world/admin/characters/"+player.characterID+"/items/grant", bearer(gmToken), map[string]any{
+		"itemId":   "camp_ration",
+		"quantity": 1,
+		"reason":   "gm cannot grant items",
+		"confirm":  true,
+	}, http.StatusForbidden, nil)
+	postJSON(t, server.Client(), server.URL+"/v1/admin/accounts/role", bearer(gmToken), map[string]any{
+		"accountId": playerAccountIDFromCharacter(t, fileStore, player.characterID),
+		"role":      "support",
+		"reason":    "gm cannot change roles",
+		"confirm":   true,
+	}, http.StatusForbidden, nil)
+	postJSON(t, server.Client(), server.URL+"/v1/admin/accounts/role", bearer(adminToken), map[string]any{
+		"accountId": playerAccountIDFromCharacter(t, fileStore, player.characterID),
+		"role":      "tester",
+		"reason":    "missing confirmation should fail",
+	}, http.StatusBadRequest, nil)
+	postJSON(t, server.Client(), server.URL+"/v1/admin/accounts/role", bearer(adminToken), map[string]any{
+		"accountId": playerAccountIDFromCharacter(t, fileStore, player.characterID),
+		"role":      "not_a_real_role",
+		"reason":    "invalid role should fail",
+		"confirm":   true,
+	}, http.StatusBadRequest, nil)
+	postJSON(t, server.Client(), server.URL+"/v1/admin/accounts/role", bearer(adminToken), map[string]any{
+		"accountId": playerAccountIDFromCharacter(t, fileStore, player.characterID),
+		"role":      "tester",
+		"reason":    "admin role change validation",
+		"confirm":   true,
+	}, http.StatusOK, nil)
+
+	disabledWorldMux := http.NewServeMux()
+	worlds.RegisterRoutesWithAdmin(disabledWorldMux, fileStore, false)
+	disabledWorldServer := httptest.NewServer(disabledWorldMux)
+	defer disabledWorldServer.Close()
+	postJSON(t, disabledWorldServer.Client(), disabledWorldServer.URL+"/v1/world/admin/characters/"+player.characterID+"/teleport", bearer(adminToken), map[string]any{
+		"destination": "stonewake_spawn",
+		"reason":      "disabled admin route validation",
+		"confirm":     true,
+	}, http.StatusNotFound, nil)
 
 	var searchResponse map[string]any
 	getJSON(t, server.Client(), server.URL+"/v1/admin/characters?query=AdminTarget", bearer(adminToken), http.StatusOK, &searchResponse)
@@ -114,6 +165,18 @@ func TestAdminToolsMilestoneSlice(t *testing.T) {
 		"body":        "Character needed unstuck during e2e.",
 		"buildId":     "test-build",
 	}, http.StatusCreated, &ticketResponse)
+	ticket := ticketResponse["ticket"].(map[string]any)
+	ticketID := ticket["ticketId"].(string)
+	postJSON(t, server.Client(), server.URL+"/v1/admin/support/tickets/"+ticketID+"/update", bearer(supportToken), map[string]any{
+		"status": "in_review",
+		"reason": "missing confirmation should fail",
+	}, http.StatusBadRequest, nil)
+	postJSON(t, server.Client(), server.URL+"/v1/admin/support/tickets/"+ticketID+"/update", bearer(supportToken), map[string]any{
+		"status":  "in_review",
+		"note":    "Support is reviewing this ticket.",
+		"reason":  "support update validation",
+		"confirm": true,
+	}, http.StatusOK, nil)
 	reopenedStore, err := store.NewFileStore(storePath, "test-build", "http://world.local")
 	if err != nil {
 		t.Fatalf("failed to reopen store: %v", err)
@@ -189,6 +252,18 @@ func loginForAdminTest(t *testing.T, server *httptest.Server, username string, p
 		"password": password,
 	}, http.StatusOK, &loginResponse)
 	return loginResponse["accessToken"].(string)
+}
+
+func createRoleAccount(t *testing.T, fileStore *store.FileStore, username string, password string, role platform.Role) {
+	t.Helper()
+
+	account, err := fileStore.RegisterAccount(username, password)
+	if err != nil {
+		t.Fatalf("failed to create %s account: %v", role, err)
+	}
+	if err := fileStore.SetAccountRole(account.ID, role); err != nil {
+		t.Fatalf("failed to assign %s role: %v", role, err)
+	}
 }
 
 func assertNoSensitiveAdminFields(t *testing.T, payload any) {

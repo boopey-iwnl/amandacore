@@ -36,11 +36,25 @@ type auctionIDRequest struct {
 }
 
 type auctionStateResponse struct {
-	ServerTime     int64                    `json:"serverTime"`
-	Listings       []auctionListingResponse `json:"listings"`
-	MyAuctions     []auctionListingResponse `json:"myAuctions"`
-	Mail           []platform.MailEnvelope  `json:"mail"`
-	CurrencyCopper int                      `json:"currencyCopper"`
+	ServerTime     int64                     `json:"serverTime"`
+	Listings       []auctionListingResponse  `json:"listings"`
+	MyAuctions     []auctionListingResponse  `json:"myAuctions"`
+	SellSlots      []auctionSellSlotResponse `json:"sellSlots"`
+	Mail           []platform.MailEnvelope   `json:"mail"`
+	CurrencyCopper int                       `json:"currencyCopper"`
+}
+
+type auctionSellSlotResponse struct {
+	SlotIndex       int    `json:"slotIndex"`
+	ItemID          string `json:"itemId"`
+	DisplayName     string `json:"displayName"`
+	StackCount      int    `json:"stackCount"`
+	ItemType        string `json:"itemType"`
+	ItemSubtype     string `json:"itemSubtype"`
+	SellPriceCopper int    `json:"sellPriceCopper"`
+	DepositCopper   int    `json:"depositCopper"`
+	Tradeable       bool   `json:"tradeable"`
+	BlockedReason   string `json:"blockedReason,omitempty"`
 }
 
 type auctionListingResponse struct {
@@ -372,6 +386,7 @@ func (s *worldServer) buildAuctionStateResponseLocked(
 		ServerTime:     now,
 		Listings:       buildAuctionListingResponses(listings, now),
 		MyAuctions:     buildAuctionListingResponses(myAuctions, now),
+		SellSlots:      buildAuctionSellSlotResponses(session),
 		Mail:           mail,
 		CurrencyCopper: session.CurrencyCopper,
 	}, nil
@@ -471,6 +486,42 @@ func buildAuctionListingResponses(listings []platform.AuctionListing, now int64)
 			TimeRemainingSecond: remaining,
 			Version:             listing.Version,
 		})
+	}
+	return responses
+}
+
+func buildAuctionSellSlotResponses(session *worldSessionState) []auctionSellSlotResponse {
+	if session == nil {
+		return []auctionSellSlotResponse{}
+	}
+	inventory := platform.NormalizeInventorySlots(session.Inventory)
+	responses := make([]auctionSellSlotResponse, 0, len(inventory))
+	for _, slot := range inventory {
+		if slot.ItemID == "" || slot.StackCount <= 0 {
+			continue
+		}
+		response := auctionSellSlotResponse{
+			SlotIndex:   slot.SlotIndex,
+			ItemID:      slot.ItemID,
+			DisplayName: slot.DisplayName,
+			StackCount:  slot.StackCount,
+		}
+		item, found := findItemDefinition(slot.ItemID)
+		if !found {
+			response.Tradeable = false
+			response.BlockedReason = "item is not defined"
+			responses = append(responses, response)
+			continue
+		}
+		response.ItemType = item.Type
+		response.ItemSubtype = item.Subtype
+		response.SellPriceCopper = item.SellPriceCopper
+		response.DepositCopper = auctionDepositCopper(item, slot.StackCount)
+		response.Tradeable = itemAuctionTradeable(item)
+		if !response.Tradeable {
+			response.BlockedReason = "item is not tradeable"
+		}
+		responses = append(responses, response)
 	}
 	return responses
 }

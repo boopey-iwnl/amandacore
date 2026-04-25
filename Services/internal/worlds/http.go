@@ -14,6 +14,10 @@ import (
 )
 
 func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
+	RegisterRoutesWithAdmin(mux, fileStore, true)
+}
+
+func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adminEnabled bool) {
 	server := newWorldServer(fileStore)
 
 	joinTicketHandler := httpapi.RequireSession(fileStore, func(w http.ResponseWriter, r *http.Request, session *platform.Session) {
@@ -128,13 +132,9 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/party/disband", server.instrumentEndpointFunc("party_disband", server.handlePartyDisband))
 	mux.HandleFunc("GET /v1/world/state", server.instrumentEndpointFunc("state", server.handleState))
 	mux.HandleFunc("GET /v1/world/metrics", server.instrumentEndpointFunc("metrics", server.handleMetrics))
-	mux.Handle("POST /v1/world/admin/characters/{characterId}/teleport", server.instrumentEndpoint("admin_teleport", httpapi.RequirePermission(fileStore, platform.PermissionTeleportCharacter, server.handleAdminTeleport)))
-	mux.Handle("POST /v1/world/admin/characters/{characterId}/repair", server.instrumentEndpoint("admin_repair", httpapi.RequirePermission(fileStore, platform.PermissionRepairCharacter, server.handleAdminRepair)))
-	mux.Handle("POST /v1/world/admin/characters/{characterId}/session/invalidate", server.instrumentEndpoint("admin_session_invalidate", httpapi.RequirePermission(fileStore, platform.PermissionRepairCharacter, server.handleAdminSessionInvalidate)))
-	mux.Handle("POST /v1/world/admin/characters/{characterId}/items/grant", server.instrumentEndpoint("admin_item_grant", httpapi.RequirePermission(fileStore, platform.PermissionGrantItem, server.handleAdminItemGrant)))
-	mux.Handle("POST /v1/world/admin/characters/{characterId}/items/remove", server.instrumentEndpoint("admin_item_remove", httpapi.RequirePermission(fileStore, platform.PermissionGrantItem, server.handleAdminItemRemove)))
-	mux.Handle("POST /v1/world/admin/characters/{characterId}/currency/grant", server.instrumentEndpoint("admin_currency_grant", httpapi.RequirePermission(fileStore, platform.PermissionGrantCurrency, server.handleAdminCurrencyGrant)))
-	mux.Handle("POST /v1/world/admin/characters/{characterId}/currency/remove", server.instrumentEndpoint("admin_currency_remove", httpapi.RequirePermission(fileStore, platform.PermissionGrantCurrency, server.handleAdminCurrencyRemove)))
+	if adminEnabled {
+		registerAdminRoutes(mux, server, fileStore)
+	}
 	mux.HandleFunc("GET /v1/world/bootstrap", server.instrumentEndpointFunc("bootstrap", func(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, http.StatusOK, map[string]any{
 			"zoneId":   "sunset_frontier",
@@ -143,6 +143,16 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			"revision": "0.6.0-stonewake-starter-zone",
 		})
 	}))
+}
+
+func registerAdminRoutes(mux *http.ServeMux, server *worldServer, fileStore *store.FileStore) {
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/teleport", server.instrumentEndpoint("admin_teleport", httpapi.RequirePermission(fileStore, platform.PermissionTeleportCharacter, server.handleAdminTeleport)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/repair", server.instrumentEndpoint("admin_repair", httpapi.RequirePermission(fileStore, platform.PermissionRepairCharacter, server.handleAdminRepair)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/session/invalidate", server.instrumentEndpoint("admin_session_invalidate", httpapi.RequirePermission(fileStore, platform.PermissionRepairCharacter, server.handleAdminSessionInvalidate)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/items/grant", server.instrumentEndpoint("admin_item_grant", httpapi.RequirePermission(fileStore, platform.PermissionGrantItem, server.handleAdminItemGrant)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/items/remove", server.instrumentEndpoint("admin_item_remove", httpapi.RequirePermission(fileStore, platform.PermissionGrantItem, server.handleAdminItemRemove)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/currency/grant", server.instrumentEndpoint("admin_currency_grant", httpapi.RequirePermission(fileStore, platform.PermissionGrantCurrency, server.handleAdminCurrencyGrant)))
+	mux.Handle("POST /v1/world/admin/characters/{characterId}/currency/remove", server.instrumentEndpoint("admin_currency_remove", httpapi.RequirePermission(fileStore, platform.PermissionGrantCurrency, server.handleAdminCurrencyRemove)))
 }
 
 func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {

@@ -79,6 +79,10 @@
     button.secondary { background: #425166; }
     button.warn { background: var(--warn); }
     button.danger { background: var(--danger); }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
     .row {
       display: flex;
       flex-wrap: wrap;
@@ -160,8 +164,8 @@
         <label for="characterQuery">Character Name or ID</label>
         <input id="characterQuery" />
         <div class="row">
-          <button onclick="searchCharacters()">Search Characters</button>
-          <button class="secondary" onclick="loadAccounts()">Accounts</button>
+          <button data-permission="view_character" onclick="searchCharacters()">Search Characters</button>
+          <button data-permission="view_account" class="secondary" onclick="loadAccounts()">Accounts</button>
         </div>
         <div id="results" class="result-list"></div>
       </section>
@@ -178,11 +182,11 @@
         <label for="characterId">Character ID</label>
         <input id="characterId" />
         <div class="row">
-          <button onclick="loadCharacter()">Load Character</button>
-          <button class="warn" onclick="teleport('stonewake_spawn')">Stonewake</button>
-          <button class="warn" onclick="teleport('current_zone_safe')">Current Safe</button>
-          <button class="danger" onclick="repair()">Repair</button>
-          <button class="danger" onclick="kick()">Kick</button>
+          <button data-permission="view_character" onclick="loadCharacter()">Load Character</button>
+          <button data-permission="teleport_character" class="warn" onclick="teleport('stonewake_spawn')">Stonewake</button>
+          <button data-permission="teleport_character" class="warn" onclick="teleport('current_zone_safe')">Current Safe</button>
+          <button data-permission="repair_character" class="danger" onclick="repair()">Repair</button>
+          <button data-permission="repair_character" class="danger" onclick="kick()">Kick</button>
         </div>
       </section>
 
@@ -195,16 +199,16 @@
             <label for="itemQuantity">Quantity</label>
             <input id="itemQuantity" type="number" min="1" value="1" />
             <div class="row">
-              <button onclick="itemChange('grant')">Grant Item</button>
-              <button class="danger" onclick="itemChange('remove')">Remove Item</button>
+              <button data-permission="grant_item" onclick="itemChange('grant')">Grant Item</button>
+              <button data-permission="grant_item" class="danger" onclick="itemChange('remove')">Remove Item</button>
             </div>
           </div>
           <div>
             <label for="currencyCopper">Copper</label>
             <input id="currencyCopper" type="number" min="1" value="1" />
             <div class="row">
-              <button onclick="currencyChange('grant')">Grant Currency</button>
-              <button class="danger" onclick="currencyChange('remove')">Remove Currency</button>
+              <button data-permission="grant_currency" onclick="currencyChange('grant')">Grant Currency</button>
+              <button data-permission="grant_currency" class="danger" onclick="currencyChange('remove')">Remove Currency</button>
             </div>
           </div>
         </div>
@@ -217,8 +221,8 @@
             <label for="questId">Quest ID</label>
             <input id="questId" value="sv_first_muster" />
             <div class="row">
-              <button class="warn" onclick="questChange('reset')">Reset Quest</button>
-              <button class="warn" onclick="questChange('complete-objective')">Complete Objective</button>
+              <button data-permission="modify_quest_state" class="warn" onclick="questChange('reset')">Reset Quest</button>
+              <button data-permission="modify_quest_state" class="warn" onclick="questChange('complete-objective')">Complete Objective</button>
             </div>
           </div>
           <div>
@@ -227,10 +231,10 @@
             <label for="muteSeconds">Mute/Suspend Seconds</label>
             <input id="muteSeconds" type="number" min="1" value="300" />
             <div class="row">
-              <button class="warn" onclick="mute()">Mute</button>
-              <button class="secondary" onclick="unmute()">Unmute</button>
-              <button class="danger" onclick="suspend(true)">Suspend</button>
-              <button class="secondary" onclick="suspend(false)">Unsuspend</button>
+              <button data-permission="moderate_chat" class="warn" onclick="mute()">Mute</button>
+              <button data-permission="moderate_chat" class="secondary" onclick="unmute()">Unmute</button>
+              <button data-permission="suspend_account" class="danger" onclick="suspend(true)">Suspend</button>
+              <button data-permission="suspend_account" class="secondary" onclick="suspend(false)">Unsuspend</button>
             </div>
           </div>
         </div>
@@ -239,8 +243,8 @@
       <section>
         <h2>Support And Audit</h2>
         <div class="row">
-          <button onclick="loadTickets()">Tickets</button>
-          <button onclick="loadAudit()">Audit</button>
+          <button data-permission="manage_support" onclick="loadTickets()">Tickets</button>
+          <button data-permission="view_audit_log" onclick="loadAudit()">Audit</button>
         </div>
       </section>
 
@@ -253,6 +257,7 @@
 
   <script>
     let session = null;
+    let permissions = new Set();
     const $ = (id) => document.getElementById(id);
     const output = (value) => $("output").textContent = JSON.stringify(value, null, 2);
     const status = (text) => $("status").textContent = text;
@@ -279,11 +284,21 @@
         body: JSON.stringify({ username: $("username").value, password: $("password").value })
       });
       status("Signed in: " + session.accountId);
-      output(session);
+      output({ accountId: session.accountId, expiresAt: session.expiresAt });
+      await loadAuthz();
     }
 
     async function loadAuthz() {
-      output(await requestJson(adminUrl() + "/v1/admin/authz/me", { headers: headers() }));
+      const data = await requestJson(adminUrl() + "/v1/admin/authz/me", { headers: headers() });
+      permissions = new Set(data.permissions || []);
+      applyPermissions();
+      output(data);
+    }
+
+    function applyPermissions() {
+      document.querySelectorAll("[data-permission]").forEach((button) => {
+        button.disabled = !permissions.has(button.dataset.permission);
+      });
     }
 
     async function loadAccounts() {
@@ -314,10 +329,11 @@
       output(data);
     }
 
-    function mutationPayload(extra = {}) {
+    function mutationPayload(action, target, extra = {}) {
       const reason = $("reason").value.trim();
       if (!reason) throw { error: "reason_required", message: "Enter a reason before mutating state." };
-      if (!confirm("Apply audited admin action?")) throw { error: "cancelled" };
+      const message = "Apply audited admin action?\n\nAction: " + action + "\nTarget: " + target + "\nReason: " + reason;
+      if (!confirm(message)) throw { error: "cancelled" };
       return { ...extra, reason, confirm: true };
     }
 
@@ -327,7 +343,7 @@
         output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/teleport", {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ destination }))
+          body: JSON.stringify(mutationPayload("teleport " + destination, id, { destination }))
         }));
       } catch (err) { output(err); }
     }
@@ -338,7 +354,7 @@
         output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/repair", {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ normalize: true, restoreStarterAbilities: true, rebuildActionBar: true, revive: true }))
+          body: JSON.stringify(mutationPayload("repair character", id, { normalize: true, restoreStarterAbilities: true, rebuildActionBar: true, revive: true }))
         }));
       } catch (err) { output(err); }
     }
@@ -349,7 +365,7 @@
         output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/items/" + kind, {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ itemId: $("itemId").value, quantity: Number($("itemQuantity").value) }))
+          body: JSON.stringify(mutationPayload(kind + " item", id + " / " + $("itemId").value, { itemId: $("itemId").value, quantity: Number($("itemQuantity").value) }))
         }));
       } catch (err) { output(err); }
     }
@@ -360,7 +376,7 @@
         output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent(id) + "/currency/" + kind, {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ copper: Number($("currencyCopper").value) }))
+          body: JSON.stringify(mutationPayload(kind + " currency", id, { copper: Number($("currencyCopper").value) }))
         }));
       } catch (err) { output(err); }
     }
@@ -371,7 +387,7 @@
         output(await requestJson(adminUrl() + "/v1/admin/characters/" + encodeURIComponent(id) + "/quests/" + kind, {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ questId: $("questId").value }))
+          body: JSON.stringify(mutationPayload(kind + " quest", id + " / " + $("questId").value, { questId: $("questId").value }))
         }));
       } catch (err) { output(err); }
     }
@@ -381,7 +397,7 @@
         output(await requestJson(adminUrl() + "/v1/admin/moderation/mute", {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ characterId: $("characterId").value, durationSeconds: Number($("muteSeconds").value) }))
+          body: JSON.stringify(mutationPayload("mute character", $("characterId").value, { characterId: $("characterId").value, durationSeconds: Number($("muteSeconds").value) }))
         }));
       } catch (err) { output(err); }
     }
@@ -391,7 +407,7 @@
         output(await requestJson(adminUrl() + "/v1/admin/moderation/unmute", {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ characterId: $("characterId").value }))
+          body: JSON.stringify(mutationPayload("unmute character", $("characterId").value, { characterId: $("characterId").value }))
         }));
       } catch (err) { output(err); }
     }
@@ -401,7 +417,7 @@
         output(await requestJson(adminUrl() + "/v1/admin/moderation/" + (enabled ? "suspend" : "unsuspend"), {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload({ accountId: $("accountId").value, durationSeconds: enabled ? Number($("muteSeconds").value) : 0 }))
+          body: JSON.stringify(mutationPayload(enabled ? "suspend account" : "unsuspend account", $("accountId").value, { accountId: $("accountId").value, durationSeconds: enabled ? Number($("muteSeconds").value) : 0 }))
         }));
       } catch (err) { output(err); }
     }
@@ -411,7 +427,7 @@
         output(await requestJson(worldUrl() + "/v1/world/admin/characters/" + encodeURIComponent($("characterId").value) + "/session/invalidate", {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify(mutationPayload())
+          body: JSON.stringify(mutationPayload("kick character", $("characterId").value))
         }));
       } catch (err) { output(err); }
     }
@@ -424,6 +440,8 @@
       const id = encodeURIComponent($("characterId").value);
       output(await requestJson(adminUrl() + "/v1/admin/audit?targetCharacterId=" + id, { headers: headers() }));
     }
+
+    document.addEventListener("DOMContentLoaded", applyPermissions);
   </script>
 </body>
 </html>

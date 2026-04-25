@@ -17,12 +17,14 @@ type banRequest struct {
 	AccountID string `json:"accountId"`
 	Banned    bool   `json:"banned"`
 	Reason    string `json:"reason"`
+	Confirm   bool   `json:"confirm"`
 }
 
 type roleRequest struct {
 	AccountID string        `json:"accountId"`
 	Role      platform.Role `json:"role"`
 	Reason    string        `json:"reason"`
+	Confirm   bool          `json:"confirm"`
 }
 
 type supportTicketCreateRequest struct {
@@ -41,6 +43,7 @@ type supportTicketUpdateRequest struct {
 	ResolutionNote    string                       `json:"resolutionNote"`
 	Note              string                       `json:"note"`
 	Reason            string                       `json:"reason"`
+	Confirm           bool                         `json:"confirm"`
 }
 
 type teleportRequest struct {
@@ -159,7 +162,11 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
 			return
 		}
-		before, after, err := fileStore.SetAccountSuspension(request.AccountID, request.Banned, request.Reason, 0)
+		reason, ok := requiredMutationReason(w, request.Reason, request.Confirm)
+		if !ok {
+			return
+		}
+		before, after, err := fileStore.SetAccountSuspension(request.AccountID, request.Banned, reason, 0)
 		if err != nil {
 			httpapi.Error(w, http.StatusBadRequest, "ban_failed", err.Error())
 			return
@@ -169,17 +176,25 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			action = "moderation.suspension_applied"
 			_ = fileStore.RevokeAccountSessions(request.AccountID)
 		}
-		if err := audit(fileStore, *actor, action, request.AccountID, "", request.Reason, accountModerationSummary(before), accountModerationSummary(after), nil); err != nil {
+		if err := audit(fileStore, *actor, action, request.AccountID, "", reason, accountModerationSummary(before), accountModerationSummary(after), nil); err != nil {
 			httpapi.Error(w, http.StatusInternalServerError, "audit_failed", err.Error())
 			return
 		}
 		httpapi.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "account": sanitizeAccount(after)})
 	}))
 
-	mux.Handle("POST /v1/admin/accounts/role", httpapi.RequirePermission(fileStore, platform.PermissionSuspendAccount, func(w http.ResponseWriter, r *http.Request, session *platform.Session, actor *platform.Account) {
+	mux.Handle("POST /v1/admin/accounts/role", httpapi.RequirePermission(fileStore, platform.PermissionManageRoles, func(w http.ResponseWriter, r *http.Request, session *platform.Session, actor *platform.Account) {
 		var request roleRequest
 		if err := httpapi.DecodeJSON(r, &request); err != nil {
 			httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+			return
+		}
+		reason, ok := requiredMutationReason(w, request.Reason, request.Confirm)
+		if !ok {
+			return
+		}
+		if !validAdminAssignableRole(request.Role) {
+			httpapi.Error(w, http.StatusBadRequest, "invalid_role", "Role is not assignable.")
 			return
 		}
 		before, _ := fileStore.GetAccountByID(request.AccountID)
@@ -188,7 +203,7 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			return
 		}
 		after, _ := fileStore.GetAccountByID(request.AccountID)
-		if err := audit(fileStore, *actor, "admin.account_role_updated", request.AccountID, "", request.Reason, roleSummary(before), roleSummary(after), map[string]any{"role": request.Role}); err != nil {
+		if err := audit(fileStore, *actor, "admin.account_role_updated", request.AccountID, "", reason, roleSummary(before), roleSummary(after), map[string]any{"role": request.Role}); err != nil {
 			httpapi.Error(w, http.StatusInternalServerError, "audit_failed", err.Error())
 			return
 		}
@@ -442,12 +457,19 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
 			return
 		}
+		reason, ok := requiredMutationReason(w, request.Reason, request.Confirm)
+		if !ok {
+			return
+		}
 		ticket, err := fileStore.UpdateSupportTicket(r.PathValue("ticketId"), actor.ID, request.Status, request.AssignedToAdminID, request.ResolutionNote, request.Note)
 		if err != nil {
 			httpapi.Error(w, http.StatusBadRequest, "ticket_update_failed", err.Error())
 			return
 		}
-		_ = audit(fileStore, *actor, "support.ticket_updated", ticket.CreatedByAccountID, ticket.CreatedByCharacterID, request.Reason, nil, map[string]any{"status": ticket.Status}, map[string]any{"ticketId": ticket.TicketID})
+		if err := audit(fileStore, *actor, "support.ticket_updated", ticket.CreatedByAccountID, ticket.CreatedByCharacterID, reason, nil, map[string]any{"status": ticket.Status}, map[string]any{"ticketId": ticket.TicketID}); err != nil {
+			httpapi.Error(w, http.StatusInternalServerError, "audit_failed", err.Error())
+			return
+		}
 		httpapi.WriteJSON(w, http.StatusOK, map[string]any{"ticket": ticket})
 	}))
 
@@ -748,6 +770,22 @@ func requiredMutationReason(w http.ResponseWriter, reason string, confirmed bool
 		return "", false
 	}
 	return reason, true
+}
+
+func validAdminAssignableRole(role platform.Role) bool {
+	switch role {
+	case platform.RolePlayer,
+		platform.RoleTester,
+		platform.RoleSupport,
+		platform.RoleGM,
+		platform.RoleAdmin,
+		platform.RoleModerator,
+		platform.RoleGameMaster,
+		platform.RoleAdministrator:
+		return true
+	default:
+		return false
+	}
 }
 
 func teleportDestination(destination string, currentZoneID string) worlds.AdminSafePosition {

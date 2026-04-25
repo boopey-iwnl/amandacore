@@ -26,6 +26,7 @@ const (
 	PermissionSuspendAccount    Permission = "suspend_account"
 	PermissionViewAuditLog      Permission = "view_audit_log"
 	PermissionManageSupport     Permission = "manage_support"
+	PermissionManageRoles       Permission = "manage_roles"
 
 	InventorySlotCount      = 16
 	HousingStorageSlotCount = 24
@@ -673,6 +674,7 @@ func AllAdminPermissions() []Permission {
 		PermissionSuspendAccount,
 		PermissionViewAuditLog,
 		PermissionManageSupport,
+		PermissionManageRoles,
 	}
 }
 

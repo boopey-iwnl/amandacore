@@ -2007,7 +2007,7 @@ namespace UiClient
                 return "expired";
             }
             const AZ::s64 hours = remainingSeconds / 3600;
-            const AZ::s64 minutes = (remainingSeconds % 3600) / 60;
+            AZ::s64 minutes = (remainingSeconds % 3600) / 60;
             if (hours > 0)
             {
                 return AZStd::string::format("%lldh %lldm", static_cast<long long>(hours), static_cast<long long>(minutes));
