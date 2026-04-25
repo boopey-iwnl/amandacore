@@ -2952,6 +2952,14 @@ namespace UiClient
         const ImVec2 rightActionBarSize(86.0f, 740.0f);
         const ImVec2 rightActionBarOnePos(displaySize.x - rightActionBarSize.x - 18.0f, 370.0f);
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 3.0f, 370.0f);
+        const ImVec2 partyFramesSize(250.0f, 250.0f);
+        const ImVec2 partyFramesPos(18.0f, 158.0f);
+        const ImVec2 chatSize(460.0f, 250.0f);
+        const ImVec2 chatPos(18.0f, AZ::GetMax(158.0f, utilityPos.y - chatSize.y - 18.0f));
+        const ImVec2 socialSize(430.0f, 430.0f);
+        const ImVec2 socialPos(displaySize.x - socialSize.x - 18.0f, displaySize.y - socialSize.y - 188.0f);
+        const ImVec2 invitePromptSize(360.0f, 92.0f);
+        const ImVec2 invitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 170.0f);
 
         if (m_trainerOpen &&
             (worldState.m_session.m_trainer.m_id.empty() ||
@@ -2976,6 +2984,41 @@ namespace UiClient
             DrawTargetFrame(gameCore, targetEntity, worldState, playerX, playerY);
         }
         ImGui::End();
+
+        if (worldState.m_social.m_hasParty && BeginHudPanel("##party_frames", "Party", partyFramesPos, partyFramesSize))
+        {
+            DrawPartyFrames(worldState);
+        }
+        if (worldState.m_social.m_hasParty)
+        {
+            ImGui::End();
+        }
+
+        if (BeginHudPanel("##chat_window", "Chat", chatPos, chatSize))
+        {
+            AZStd::string submittedInput;
+            if (DrawChatWindow(
+                    worldState,
+                    m_chatChannel,
+                    m_chatInputBuffer,
+                    AZ_ARRAY_SIZE(m_chatInputBuffer),
+                    m_chatWhisperTargetBuffer,
+                    AZ_ARRAY_SIZE(m_chatWhisperTargetBuffer),
+                    submittedInput))
+            {
+                SubmitChatInput(gameCore, submittedInput);
+            }
+        }
+        ImGui::End();
+
+        if (!worldState.m_social.m_partyInvites.empty() && BeginHudPanel("##party_invite_prompt", "Party Invite", invitePromptPos, invitePromptSize))
+        {
+            DrawPartyInvitePrompt(gameCore, worldState);
+        }
+        if (!worldState.m_social.m_partyInvites.empty())
+        {
+            ImGui::End();
+        }
 
         if (BeginHudPanel("##utility_footer", "Inventory", utilityPos, utilitySize))
         {
@@ -3030,7 +3073,8 @@ namespace UiClient
                 m_mapOpen,
                 m_spellbookOpen,
                 m_bagOpen,
-                m_settingsOpen);
+                m_settingsOpen,
+                m_socialOpen);
         }
         ImGui::End();
 
@@ -3093,6 +3137,15 @@ namespace UiClient
             DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot);
         }
         if (m_bagOpen)
+        {
+            ImGui::End();
+        }
+
+        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize))
+        {
+            DrawSocialWindow(gameCore, worldState, m_socialNameBuffer, AZ_ARRAY_SIZE(m_socialNameBuffer));
+        }
+        if (m_socialOpen)
         {
             ImGui::End();
         }
