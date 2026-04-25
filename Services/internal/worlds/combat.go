@@ -71,6 +71,24 @@ func (s *worldServer) findMobByIDLocked(mobID string) *mobState {
 	return s.mobs[mobID]
 }
 
+func (s *worldServer) findMobForSessionLocked(session *worldSessionState, mobID string) *mobState {
+	if session == nil || mobID == "" {
+		return nil
+	}
+	if session.InstanceID == "" {
+		mob := s.findMobByIDLocked(mobID)
+		if mob != nil && mob.InstanceID == "" {
+			return mob
+		}
+		return nil
+	}
+	instance := s.dungeonInstances[session.InstanceID]
+	if instance == nil {
+		return nil
+	}
+	return instance.Mobs[mobID]
+}
+
 func (s *worldServer) hostileMobsLocked() []*mobState {
 	if len(s.mobOrder) == 0 {
 		return nil
@@ -83,6 +101,38 @@ func (s *worldServer) hostileMobsLocked() []*mobState {
 		}
 	}
 
+	return mobs
+}
+
+func (s *worldServer) allHostileMobsLocked() []*mobState {
+	mobs := s.hostileMobsLocked()
+	for _, instance := range s.dungeonInstances {
+		if instance == nil {
+			continue
+		}
+		for _, mobID := range instance.MobOrder {
+			if mob := instance.Mobs[mobID]; mob != nil {
+				mobs = append(mobs, mob)
+			}
+		}
+	}
+	return mobs
+}
+
+func (s *worldServer) hostileMobsForSessionLocked(session *worldSessionState) []*mobState {
+	if session == nil || session.InstanceID == "" {
+		return s.hostileMobsLocked()
+	}
+	instance := s.dungeonInstances[session.InstanceID]
+	if instance == nil {
+		return nil
+	}
+	mobs := make([]*mobState, 0, len(instance.MobOrder))
+	for _, mobID := range instance.MobOrder {
+		if mob := instance.Mobs[mobID]; mob != nil {
+			mobs = append(mobs, mob)
+		}
+	}
 	return mobs
 }
 

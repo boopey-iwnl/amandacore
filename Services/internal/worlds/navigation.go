@@ -2,39 +2,6 @@ package worlds
 
 import "amandacore/services/internal/platform"
 
-var tallowdeepZoneMap = zoneMapDefinition{
-	ZoneID:      dungeonZoneID,
-	DisplayName: "Tallowdeep Sluice",
-	MinX:        0,
-	MinY:        0,
-	MaxX:        180,
-	MaxY:        60,
-	Roads: []mapRoadDefinition{
-		{
-			ID:          "tallowdeep_main_run",
-			DisplayName: "Sluice Run",
-			Points: []mapPointDefinition{
-				{X: 12, Y: 12},
-				{X: 40, Y: 15},
-				{X: 82, Y: 20},
-				{X: 116, Y: 33},
-				{X: 148, Y: 34},
-				{X: 166, Y: 34},
-			},
-		},
-	},
-	Landmarks: []mapLandmarkDefinition{
-		{ID: "tallowdeep_entry", DisplayName: "Entry Channel", Kind: "dungeon_entry", X: 12, Y: 12},
-		{ID: "tallowdeep_pressure_walk", DisplayName: "Pressure Walk", Kind: "route", X: 116, Y: 33},
-		{ID: "tallowdeep_exit", DisplayName: "Exit Winch", Kind: "dungeon_exit", X: 166, Y: 34},
-	},
-}
-
-var tallowdeepNavigationAreas = []navigationAreaDefinition{
-	{ID: "tallowdeep_entry_channel", DisplayName: "Entry Channel", Kind: "dungeon_route", CenterX: 40, CenterY: 15, Radius: 18, RouteHintText: "Advance along the sluice run."},
-	{ID: "tallowdeep_pressure_walk", DisplayName: "Pressure Walk", Kind: "dungeon_route", CenterX: 116, CenterY: 33, Radius: 18, RouteHintText: "Follow the pressure walk toward the warden."},
-}
-
 func (s *worldServer) buildZoneMapResponse(session *worldSessionState) map[string]any {
 	zoneID := ""
 	if session != nil {
@@ -91,41 +58,6 @@ func (s *worldServer) buildZoneMapResponse(session *worldSessionState) map[strin
 		},
 		"roads":     []map[string]any{},
 		"landmarks": []map[string]any{},
-	}
-}
-
-func buildZoneMapPayload(zone zoneMapDefinition) map[string]any {
-	roads := make([]map[string]any, 0, len(zone.Roads))
-	for _, road := range zone.Roads {
-		roads = append(roads, map[string]any{
-			"id":          road.ID,
-			"displayName": road.DisplayName,
-			"points":      road.Points,
-		})
-	}
-
-	landmarks := make([]map[string]any, 0, len(zone.Landmarks))
-	for _, landmark := range zone.Landmarks {
-		landmarks = append(landmarks, map[string]any{
-			"id":          landmark.ID,
-			"displayName": landmark.DisplayName,
-			"kind":        landmark.Kind,
-			"x":           landmark.X,
-			"y":           landmark.Y,
-		})
-	}
-
-	return map[string]any{
-		"zoneId":      zone.ZoneID,
-		"displayName": zone.DisplayName,
-		"bounds": map[string]float64{
-			"minX": zone.MinX,
-			"minY": zone.MinY,
-			"maxX": zone.MaxX,
-			"maxY": zone.MaxY,
-		},
-		"roads":     roads,
-		"landmarks": landmarks,
 	}
 }
 
