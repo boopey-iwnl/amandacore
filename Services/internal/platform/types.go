@@ -209,6 +209,15 @@ type CharacterQuestProgress struct {
 	UpdatedAt       int64  `json:"updatedAt"`
 }
 
+type CharacterPvPStats struct {
+	CharacterID   string `json:"characterId"`
+	DuelsWon      int    `json:"duelsWon"`
+	DuelsLost     int    `json:"duelsLost"`
+	HonorPoints   int    `json:"honorPoints"`
+	LastDuelWonAt int64  `json:"lastDuelWonAt"`
+	UpdatedAt     int64  `json:"updatedAt"`
+}
+
 type Character struct {
 	ID                string                            `json:"id"`
 	AccountID         string                            `json:"accountId"`
@@ -232,6 +241,7 @@ type Character struct {
 	Talents           map[string]int                    `json:"talents"`
 	Quests            map[string]CharacterQuestProgress `json:"quests"`
 	TrackedQuestIDs   []string                          `json:"trackedQuestIds"`
+	PvPStats          CharacterPvPStats                 `json:"pvpStats"`
 	LastSeenAt        int64                             `json:"lastSeenAt"`
 }
 
@@ -340,6 +350,7 @@ func NormalizeCharacter(character Character) Character {
 		character.Quests = map[string]CharacterQuestProgress{}
 	}
 	character.TrackedQuestIDs = NormalizeStringIDs(character.TrackedQuestIDs)
+	character.PvPStats = NormalizeCharacterPvPStats(character.ID, character.PvPStats)
 	hasStarterQuestProgress := false
 	for questID := range character.Quests {
 		if len(questID) >= 3 && questID[:3] == "sv_" {
@@ -360,6 +371,22 @@ func NormalizeCharacter(character Character) Character {
 		character.PositionZ = DefaultStarterSpawnZ
 	}
 	return character
+}
+
+func NormalizeCharacterPvPStats(characterID string, stats CharacterPvPStats) CharacterPvPStats {
+	if stats.CharacterID == "" {
+		stats.CharacterID = characterID
+	}
+	if stats.DuelsWon < 0 {
+		stats.DuelsWon = 0
+	}
+	if stats.DuelsLost < 0 {
+		stats.DuelsLost = 0
+	}
+	if stats.HonorPoints < 0 {
+		stats.HonorPoints = 0
+	}
+	return stats
 }
 
 func DefaultGuildRanks() []GuildRank {
