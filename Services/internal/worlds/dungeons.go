@@ -162,6 +162,36 @@ var tallowdeepZoneMap = zoneMapDefinition{
 	},
 }
 
+var dungeonZoneDefinitions = []zoneDefinition{
+	{
+		ID:          dungeonZoneID,
+		DisplayName: "Tallowdeep Sluice",
+		LevelBand:   "8-12",
+		Bounds:      zoneBoundsDefinition{MinX: 0, MinY: 0, MaxX: 180, MaxY: 70},
+		Roads: []zoneRoadDefinition{
+			{
+				ID:          "tds_main_sluice",
+				DisplayName: "Sluice Route",
+				Points: []zonePointDefinition{
+					{ID: "tds_entry", DisplayName: "Entry Shelf", Type: "start", X: 12, Y: 12},
+					{ID: "tds_guard_shelf", DisplayName: "Guard Shelf", Type: "trash", X: 42, Y: 16},
+					{ID: "tds_pressure_room", DisplayName: "Pressure Room", Type: "trash", X: 112, Y: 30},
+					{ID: "tds_boss_platform", DisplayName: "Sluice Warden Platform", Type: "boss", X: 148, Y: 34},
+					{ID: "tds_exit_winch", DisplayName: "Exit Winch", Type: "exit", X: 166, Y: 34},
+				},
+			},
+		},
+		Landmarks: []zonePointDefinition{
+			{ID: "tds_entry_shelf", DisplayName: "Entry Shelf", Type: "start", X: 12, Y: 12},
+			{ID: "tds_pressure_room", DisplayName: "Pressure Room", Type: "trash", X: 112, Y: 30},
+			{ID: "tds_boss_platform", DisplayName: "Sluice Warden Platform", Type: "boss", X: 148, Y: 34},
+		},
+		Transitions: []zonePointDefinition{
+			{ID: "tds_exit_winch", DisplayName: "Exit Winch", Type: "dungeon_exit", X: 166, Y: 34},
+		},
+	},
+}
+
 var tallowdeepNavigationAreas = []navigationAreaDefinition{
 	{ID: "tds_entry_shelf", DisplayName: "Entry Shelf", Kind: "start", CenterX: 12, CenterY: 12, Radius: 10, RouteHintText: "Regroup on the entry shelf before pulling the first guard pair.", QuestIDs: []string{dungeonQuestTallowdeepID}},
 	{ID: "tds_guard_shelf", DisplayName: "Guard Shelf", Kind: "trash", CenterX: 42, CenterY: 16, Radius: 12, RouteHintText: "Clear the first guard pair and continue along the sluice route.", QuestIDs: []string{dungeonQuestTallowdeepID}, TargetMobType: mobTDSSluiceGuardTypeID},
