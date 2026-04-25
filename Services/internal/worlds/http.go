@@ -69,6 +69,9 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
 	mux.HandleFunc("POST /v1/world/vendor/buy", server.instrumentEndpointFunc("vendor_buy", server.handleVendorBuy))
 	mux.HandleFunc("POST /v1/world/vendor/sell", server.instrumentEndpointFunc("vendor_sell", server.handleVendorSell))
+	mux.HandleFunc("POST /v1/world/dungeon/enter", server.instrumentEndpointFunc("dungeon_enter", server.handleDungeonEnter))
+	mux.HandleFunc("POST /v1/world/dungeon/exit", server.instrumentEndpointFunc("dungeon_exit", server.handleDungeonExit))
+	mux.HandleFunc("POST /v1/world/dungeon/reset", server.instrumentEndpointFunc("dungeon_reset", server.handleDungeonReset))
 	mux.HandleFunc("POST /v1/world/attack/auto", server.instrumentEndpointFunc("attack_auto", server.handleAutoAttack))
 	mux.HandleFunc("POST /v1/world/attack/ability", server.instrumentEndpointFunc("attack_ability", server.handleAbility))
 	mux.HandleFunc("GET /v1/world/social/state", server.instrumentEndpointFunc("social_state", server.handleSocialState))
@@ -234,10 +237,19 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	session.DisplayName = character.DisplayName
 	session.Connected = true
 	session.LastSeenAt = time.Now().Unix()
-	session.ZoneID = character.ZoneID
-	session.X = character.PositionX
-	session.Y = character.PositionY
-	session.Z = character.PositionZ
+	if session.InstanceID != "" && s.dungeonInstanceActiveForSessionLocked(session) {
+		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
+			instance.PlayersInside[session.CharacterID] = true
+			instance.State = dungeonStateActive
+			instance.LastPlayerLeftAtMs = 0
+		}
+	} else {
+		s.recoverExpiredDungeonSessionLocked(session)
+		session.ZoneID = character.ZoneID
+		session.X = character.PositionX
+		session.Y = character.PositionY
+		session.Z = character.PositionZ
+	}
 	s.resetSessionCombatStateLocked(session, "reconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
 	if !session.Alive || session.Health <= 0.0 {
