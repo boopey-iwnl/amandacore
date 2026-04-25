@@ -2,9 +2,10 @@
 
 Release tag: `alpha-0.1`
 Package asset: `AmandaCore-Alpha-0.1-Windows-x64.zip`
-Package SHA256: `5F09D4224EE51D4C56114B162B1171821992E4625264E3972E9F1F98DF008660`
-Package size: `562,503,909` bytes
-Build label: `amandacore-local-0.1.0+codex-alpha-0-1-all-branch-integration.44c73130765e.20260425085118`
+Package SHA256: verify against the GitHub release asset digest and the final release report.
+Package size: verify against the GitHub release asset metadata.
+Source commit: `ab1308811c5e1c7479019748a2a3ac593b42cb8a`
+Build label: recorded in packaged `Infra\dev\version-manifest.json`
 Package manifest: `release-package-manifest.json`
 
 ## Scope
