@@ -27,6 +27,7 @@ namespace GameCore
         AZStd::string m_errorMessage;
         NetClient::WorldBootstrapResponse m_bootstrap;
         NetClient::WorldSessionResponse m_session;
+        NetClient::SocialStateResponse m_social;
         AZStd::string m_pendingInteractionEntityId;
         AZ::u64 m_pendingInteractionSequence = 0;
     };
@@ -75,6 +76,17 @@ namespace GameCore
         virtual bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) = 0;
         virtual bool ClearActionBarSlot(int slotIndex) = 0;
         virtual bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) = 0;
+        virtual bool SubmitChatMessage(
+            const AZStd::string& channel,
+            const AZStd::string& targetName,
+            const AZStd::string& messageText) = 0;
+        virtual bool AddFriend(const AZStd::string& name) = 0;
+        virtual bool RemoveFriend(const AZStd::string& name) = 0;
+        virtual bool InviteParty(const AZStd::string& targetName, const AZStd::string& targetCharacterId) = 0;
+        virtual bool AcceptPartyInvite(const AZStd::string& inviteId) = 0;
+        virtual bool DeclinePartyInvite(const AZStd::string& inviteId) = 0;
+        virtual bool LeaveParty() = 0;
+        virtual bool DisbandParty() = 0;
         virtual bool DisconnectWorld() = 0;
         virtual bool ReconnectWorld() = 0;
         virtual void SetCameraState(const ClientCameraState& cameraState) = 0;

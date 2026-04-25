@@ -250,6 +250,97 @@ namespace NetClient
         return StateRequest(worldEndpoint, worldSessionToken, outResponse, outError);
     }
 
+    bool NetClientSystemComponent::SocialState(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& afterMessageId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SocialStateRequest(worldEndpoint, worldSessionToken, afterMessageId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::SendChat(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& channel,
+        const AZStd::string& targetName,
+        const AZStd::string& messageText,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SendChatRequest(worldEndpoint, worldSessionToken, channel, targetName, messageText, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::AddFriend(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& name,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return FriendRequest(worldEndpoint, L"/v1/world/friends/add", worldSessionToken, name, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::RemoveFriend(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& name,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return FriendRequest(worldEndpoint, L"/v1/world/friends/remove", worldSessionToken, name, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::InviteParty(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& targetName,
+        const AZStd::string& targetCharacterId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return InvitePartyRequest(worldEndpoint, worldSessionToken, targetName, targetCharacterId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::AcceptPartyInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyInviteActionRequest(worldEndpoint, L"/v1/world/party/accept", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DeclinePartyInvite(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& inviteId,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyInviteActionRequest(worldEndpoint, L"/v1/world/party/decline", worldSessionToken, inviteId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::LeaveParty(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/party/leave", worldSessionToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::DisbandParty(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        SocialStateResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return PartyActionRequest(worldEndpoint, L"/v1/world/party/disband", worldSessionToken, outResponse, outError);
+    }
+
     bool NetClientSystemComponent::SetTarget(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
