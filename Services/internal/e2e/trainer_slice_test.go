@@ -28,13 +28,13 @@ func TestWarriorTrainerSlice(t *testing.T) {
 		if _, ok := offers["driving_blow"]; !ok {
 			t.Fatalf("expected driving_blow trainer offer, got %#v", offers)
 		}
-		if _, ok := offers["war_cry"]; !ok {
-			t.Fatalf("expected war_cry trainer offer, got %#v", offers)
+		if _, ok := offers[platform.RallyingCallAbilityID]; !ok {
+			t.Fatalf("expected rallying_call trainer offer, got %#v", offers)
 		}
 	})
 
 	t.Run("successful learn of driving blow updates spellbook without auto-placing onto bars", func(t *testing.T) {
-		fixture := newTrainerFixture(t, trainerFixtureOptions{startingCopper: 25})
+		fixture := newTrainerFixture(t, trainerFixtureOptions{startingExperience: 100, startingCopper: 25})
 		fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
 
 		var response map[string]any
@@ -67,7 +67,7 @@ func TestWarriorTrainerSlice(t *testing.T) {
 	})
 
 	t.Run("trainer learn rejects insufficient funds", func(t *testing.T) {
-		fixture := newTrainerFixture(t, trainerFixtureOptions{startingCopper: 5})
+		fixture := newTrainerFixture(t, trainerFixtureOptions{startingExperience: 100, startingCopper: 5})
 		fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
 
 		postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/trainer/learn", nil, map[string]any{
@@ -78,7 +78,7 @@ func TestWarriorTrainerSlice(t *testing.T) {
 	})
 
 	t.Run("trainer learn rejects missing trainer target context", func(t *testing.T) {
-		fixture := newTrainerFixture(t, trainerFixtureOptions{startingCopper: 25})
+		fixture := newTrainerFixture(t, trainerFixtureOptions{startingExperience: 100, startingCopper: 25})
 
 		postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/trainer/learn", nil, map[string]any{
 			"worldSessionToken": fixture.worldSessionToken,
@@ -88,7 +88,7 @@ func TestWarriorTrainerSlice(t *testing.T) {
 	})
 
 	t.Run("trainer learn rejects already learned abilities", func(t *testing.T) {
-		fixture := newTrainerFixture(t, trainerFixtureOptions{startingCopper: 25})
+		fixture := newTrainerFixture(t, trainerFixtureOptions{startingExperience: 100, startingCopper: 25})
 		fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
 
 		var response map[string]any
@@ -117,7 +117,7 @@ func TestWarriorTrainerSlice(t *testing.T) {
 	})
 
 	t.Run("learned trainer abilities persist across reconnect and restart", func(t *testing.T) {
-		fixture := newTrainerFixture(t, trainerFixtureOptions{startingCopper: 25})
+		fixture := newTrainerFixture(t, trainerFixtureOptions{startingExperience: 100, startingCopper: 25})
 		fixture.targetFriendlyByID(t, "trainer_armsmaster_corin_vale")
 
 		var response map[string]any
@@ -173,9 +173,10 @@ func TestWarriorTrainerSlice(t *testing.T) {
 }
 
 type trainerFixtureOptions struct {
-	classID        string
-	archetypeID    string
-	startingCopper int
+	classID            string
+	archetypeID        string
+	startingExperience int
+	startingCopper     int
 }
 
 func newTrainerFixture(t *testing.T, options trainerFixtureOptions) *combatFixture {
@@ -234,7 +235,7 @@ func newTrainerFixture(t *testing.T, options trainerFixtureOptions) *combatFixtu
 	}, http.StatusCreated, &characterResponse)
 	characterID := characterResponse["id"].(string)
 
-	if options.startingCopper > 0 {
+	if options.startingCopper > 0 || options.startingExperience > 0 {
 		character, err := fileStore.GetCharacterByID(characterID)
 		if err != nil {
 			t.Fatalf("failed to reload created character: %v", err)
