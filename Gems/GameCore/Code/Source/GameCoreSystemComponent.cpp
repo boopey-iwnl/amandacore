@@ -1,5 +1,6 @@
 #include <GameCore/GameCoreSystemComponent.h>
 
+#include <AzCore/Asset/AssetManagerBus.h>
 #include <AzCore/Console/IConsole.h>
 #include <AzCore/Debug/Trace.h>
 #include <AzCore/Serialization/SerializeContext.h>
@@ -14,7 +15,36 @@ namespace GameCore
     {
         constexpr float WorldStatePollIntervalSeconds = 0.10f;
         constexpr float SocialStatePollIntervalSeconds = 0.50f;
+        constexpr float StartupLevelLoadRetrySeconds = 0.50f;
         constexpr const char* StartupLevelAssetPath = "levels/testzone01/testzone01.spawnable";
+        constexpr const char* StartupLevelTitleCaseAssetPath = "Levels/testzone01/testzone01.spawnable";
+        constexpr const char* StartupLevelSourceCaseAssetPath = "Levels/TestZone01/TestZone01.spawnable";
+
+        const char* ResolveRegisteredStartupLevelPath()
+        {
+            const char* candidates[] = {
+                StartupLevelAssetPath,
+                StartupLevelTitleCaseAssetPath,
+                StartupLevelSourceCaseAssetPath,
+            };
+
+            for (const char* candidate : candidates)
+            {
+                AZ::Data::AssetId rootSpawnableAssetId;
+                AZ::Data::AssetCatalogRequestBus::BroadcastResult(
+                    rootSpawnableAssetId,
+                    &AZ::Data::AssetCatalogRequestBus::Events::GetAssetIdByPath,
+                    candidate,
+                    AZ::Data::AssetType{},
+                    false);
+                if (rootSpawnableAssetId.IsValid())
+                {
+                    return candidate;
+                }
+            }
+
+            return nullptr;
+        }
 
         struct AbilityPresentationDefinition
         {
@@ -227,15 +257,10 @@ namespace GameCore
         {
             MarkLevelReady(levelLifecycle->GetCurrentLevelName());
         }
-        else if (auto* console = AZ::Interface<AZ::IConsole>::Get())
+        else
         {
-            AZStd::string loadCommand = "LoadLevel ";
-            loadCommand += StartupLevelAssetPath;
-            const auto result = console->PerformCommand(loadCommand.c_str());
-            if (!result.IsSuccess())
-            {
-                AZ_Warning("amandacore", false, "Unable to request startup level load: %s", result.GetError().c_str());
-            }
+            m_startupLevelLoadPending = true;
+            m_startupLevelLoadRetryAccumulator = StartupLevelLoadRetrySeconds;
         }
     }
 
@@ -256,6 +281,20 @@ namespace GameCore
 
     void GameCoreSystemComponent::OnTick(float deltaTime, AZ::ScriptTimePoint)
     {
+        if (m_startupLevelLoadPending && !m_levelReady)
+        {
+            m_startupLevelLoadRetryAccumulator += deltaTime;
+            if (m_startupLevelLoadRetryAccumulator >= StartupLevelLoadRetrySeconds)
+            {
+                m_startupLevelLoadRetryAccumulator = 0.0f;
+                m_startupLevelLoadAttempts++;
+                if (RequestStartupLevelLoad())
+                {
+                    m_startupLevelLoadPending = false;
+                }
+            }
+        }
+
         if (!m_worldState.m_worldConnected)
         {
             return;
@@ -282,6 +321,47 @@ namespace GameCore
             m_socialPollAccumulator = 0.0f;
             PollSocialState();
         }
+    }
+
+    bool GameCoreSystemComponent::RequestStartupLevelLoad()
+    {
+        if (const auto* levelLifecycle = AzFramework::LevelSystemLifecycleInterface::Get();
+            levelLifecycle && levelLifecycle->IsLevelLoaded())
+        {
+            MarkLevelReady(levelLifecycle->GetCurrentLevelName());
+            return true;
+        }
+
+        const char* startupLevelPath = ResolveRegisteredStartupLevelPath();
+        if (!startupLevelPath)
+        {
+            if (m_startupLevelLoadAttempts == 1 || m_startupLevelLoadAttempts % 60 == 0)
+            {
+                AZ_Warning(
+                    "amandacore",
+                    false,
+                    "Startup level asset is not registered yet: %s",
+                    StartupLevelAssetPath);
+            }
+            return false;
+        }
+
+        auto* console = AZ::Interface<AZ::IConsole>::Get();
+        if (!console)
+        {
+            return false;
+        }
+
+        AZStd::string loadCommand = "LoadLevel ";
+        loadCommand += startupLevelPath;
+        const auto result = console->PerformCommand(loadCommand.c_str());
+        if (!result.IsSuccess())
+        {
+            AZ_Warning("amandacore", false, "Unable to request startup level load: %s", result.GetError().c_str());
+            return false;
+        }
+
+        return true;
     }
 
     void GameCoreSystemComponent::OnLoadingComplete(const char* levelName)

@@ -88,6 +88,7 @@ namespace GameCore
 
     private:
         void ParseLaunchOptions();
+        bool RequestStartupLevelLoad();
         void MarkLevelReady(const char* levelName);
         void AttemptInitialWorldConnect();
         bool ApplyWorldSessionResponse(NetClient::WorldSessionResponse&& response, const char* source);
@@ -105,6 +106,9 @@ namespace GameCore
         ClientWorldState m_worldState;
         ClientCameraState m_cameraState;
         bool m_levelReady = false;
+        bool m_startupLevelLoadPending = false;
+        float m_startupLevelLoadRetryAccumulator = 0.0f;
+        int m_startupLevelLoadAttempts = 0;
         bool m_worldConnectStartLogged = false;
         bool m_levelReadyLogged = false;
         float m_statePollAccumulator = 0.0f;

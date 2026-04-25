@@ -186,18 +186,18 @@ function Invoke-PackageO3deLevelSmoke {
     $gameLog = Join-Path $userRoot "log\Game.log"
     $startTime = Get-Date
     $process = $null
-    $failurePattern = "(?i)(Requested level not found|Bootstrap zone mapping did not match|missing AssetCatalog|AssetCatalog.*missing|project path not found)"
+    $failurePattern = "(?i)(Requested level not found|Startup level asset is not registered|Bootstrap zone mapping did not match|missing AssetCatalog|AssetCatalog.*missing|project path not found)"
     $failureMatch = ""
     $levelReady = $false
 
     try {
+        $escapedPackageRoot = $PackageRoot.Replace('"', '\"')
         $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
         $startInfo.FileName = $gameLauncherPath
         $startInfo.WorkingDirectory = $PackageRoot
+        $startInfo.Arguments = "--project-path `"$escapedPackageRoot`""
         $startInfo.UseShellExecute = $false
         $startInfo.CreateNoWindow = $true
-        $startInfo.ArgumentList.Add("--project-path")
-        $startInfo.ArgumentList.Add($PackageRoot)
         $process = [System.Diagnostics.Process]::Start($startInfo)
 
         $deadline = (Get-Date).AddSeconds(90)
