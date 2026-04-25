@@ -122,17 +122,17 @@ type housingLeaveRequest struct {
 }
 
 type housingStorageDepositRequest struct {
-	WorldSessionToken string `json:"worldSessionToken"`
-	InventorySlotIndex int   `json:"inventorySlotIndex"`
-	StorageSlotIndex   *int  `json:"storageSlotIndex,omitempty"`
-	StackCount         int   `json:"stackCount"`
+	WorldSessionToken  string `json:"worldSessionToken"`
+	InventorySlotIndex int    `json:"inventorySlotIndex"`
+	StorageSlotIndex   *int   `json:"storageSlotIndex,omitempty"`
+	StackCount         int    `json:"stackCount"`
 }
 
 type housingStorageWithdrawRequest struct {
-	WorldSessionToken string `json:"worldSessionToken"`
-	StorageSlotIndex   int   `json:"storageSlotIndex"`
-	InventorySlotIndex *int  `json:"inventorySlotIndex,omitempty"`
-	StackCount         int   `json:"stackCount"`
+	WorldSessionToken  string `json:"worldSessionToken"`
+	StorageSlotIndex   int    `json:"storageSlotIndex"`
+	InventorySlotIndex *int   `json:"inventorySlotIndex,omitempty"`
+	StackCount         int    `json:"stackCount"`
 }
 
 type housingStorageMoveRequest struct {
@@ -143,16 +143,16 @@ type housingStorageMoveRequest struct {
 
 type decorationPlaceRequest struct {
 	WorldSessionToken string  `json:"worldSessionToken"`
-	DecorationID       string  `json:"decorationId"`
-	X                  float64 `json:"x"`
-	Y                  float64 `json:"y"`
-	Z                  float64 `json:"z"`
-	RotationYaw        float64 `json:"rotationYaw"`
+	DecorationID      string  `json:"decorationId"`
+	X                 float64 `json:"x"`
+	Y                 float64 `json:"y"`
+	Z                 float64 `json:"z"`
+	RotationYaw       float64 `json:"rotationYaw"`
 }
 
 type decorationRemoveRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
-	PlacementID        string `json:"placementId"`
+	PlacementID       string `json:"placementId"`
 }
 
 type targetRequest struct {
@@ -619,30 +619,30 @@ type dungeonInstanceState struct {
 }
 
 type worldServer struct {
-	store              *store.FileStore
-	metrics            *worldMetrics
-	mutex              sync.Mutex
-	sessionsByToken    map[string]*worldSessionState
-	sessionTokenByChar map[string]string
-	mobs               map[string]*mobState
-	mobOrder           []string
-	dungeonInstances   map[string]*dungeonInstanceState
-	instanceByParty    map[string]string
-	instanceCounter    int64
+	store                  *store.FileStore
+	metrics                *worldMetrics
+	mutex                  sync.Mutex
+	sessionsByToken        map[string]*worldSessionState
+	sessionTokenByChar     map[string]string
+	mobs                   map[string]*mobState
+	mobOrder               []string
+	dungeonInstances       map[string]*dungeonInstanceState
+	instanceByParty        map[string]string
+	instanceCounter        int64
 	housingInstanceCounter int64
-	quests             map[string]questDefinition
-	questOrder         []string
-	quest              questDefinition
-	friendlyNPCs       map[string]friendlyNPCDefinition
-	friendlyNPCOrder   []string
-	gatheringNodes     map[string]*gatheringNodeState
-	gatheringNodeOrder []string
-	zones              map[string]zoneDefinition
-	chatMessages       []chatEnvelope
-	chatSequence       int64
-	partyInvites       map[string]partyInviteState
-	partyInviteCounter int64
-	lastUpdatedAt      time.Time
+	quests                 map[string]questDefinition
+	questOrder             []string
+	quest                  questDefinition
+	friendlyNPCs           map[string]friendlyNPCDefinition
+	friendlyNPCOrder       []string
+	gatheringNodes         map[string]*gatheringNodeState
+	gatheringNodeOrder     []string
+	zones                  map[string]zoneDefinition
+	chatMessages           []chatEnvelope
+	chatSequence           int64
+	partyInvites           map[string]partyInviteState
+	partyInviteCounter     int64
+	lastUpdatedAt          time.Time
 }
 
 func newWorldServer(fileStore *store.FileStore) *worldServer {

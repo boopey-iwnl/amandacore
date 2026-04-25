@@ -67,16 +67,6 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 	mux.HandleFunc("POST /v1/world/action-bar/clear", server.instrumentEndpointFunc("action_bar_clear", server.handleActionBarClear))
 	mux.HandleFunc("POST /v1/world/inventory/move", server.instrumentEndpointFunc("inventory_move", server.handleInventoryMove))
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
-	mux.HandleFunc("GET /v1/world/housing/status", server.instrumentEndpointFunc("housing_status", server.handleHousingStatus))
-	mux.HandleFunc("POST /v1/world/housing/enter", server.instrumentEndpointFunc("housing_enter", server.handleHousingEnter))
-	mux.HandleFunc("POST /v1/world/housing/leave", server.instrumentEndpointFunc("housing_leave", server.handleHousingLeave))
-	mux.HandleFunc("GET /v1/world/housing/storage", server.instrumentEndpointFunc("housing_storage", server.handleHousingStorageList))
-	mux.HandleFunc("POST /v1/world/housing/storage/deposit", server.instrumentEndpointFunc("housing_storage_deposit", server.handleHousingStorageDeposit))
-	mux.HandleFunc("POST /v1/world/housing/storage/withdraw", server.instrumentEndpointFunc("housing_storage_withdraw", server.handleHousingStorageWithdraw))
-	mux.HandleFunc("POST /v1/world/housing/storage/move", server.instrumentEndpointFunc("housing_storage_move", server.handleHousingStorageMove))
-	mux.HandleFunc("GET /v1/world/housing/decorations", server.instrumentEndpointFunc("housing_decorations", server.handleHousingDecorationsList))
-	mux.HandleFunc("POST /v1/world/housing/decorations/place", server.instrumentEndpointFunc("housing_decoration_place", server.handleHousingDecorationPlace))
-	mux.HandleFunc("POST /v1/world/housing/decorations/remove", server.instrumentEndpointFunc("housing_decoration_remove", server.handleHousingDecorationRemove))
 	mux.HandleFunc("POST /v1/world/vendor/buy", server.instrumentEndpointFunc("vendor_buy", server.handleVendorBuy))
 	mux.HandleFunc("POST /v1/world/vendor/sell", server.instrumentEndpointFunc("vendor_sell", server.handleVendorSell))
 	mux.HandleFunc("POST /v1/world/attack/auto", server.instrumentEndpointFunc("attack_auto", server.handleAutoAttack))
@@ -147,7 +137,12 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			session.DisplayName = character.DisplayName
 			session.Connected = true
 			session.LastSeenAt = time.Now().Unix()
-			if session.ZoneID == "" {
+			if session.HousingSpaceID != "" {
+				if err := s.returnSessionFromHousingLocked(session, "connect_resume"); err != nil {
+					httpapi.Error(w, http.StatusInternalServerError, "housing_recover_failed", err.Error())
+					return
+				}
+			} else if session.ZoneID == "" {
 				session.ZoneID = character.ZoneID
 			}
 			s.resetSessionCombatStateLocked(session, "reconnect")
@@ -244,6 +239,14 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	session.DisplayName = character.DisplayName
 	session.Connected = true
 	session.LastSeenAt = time.Now().Unix()
+	if session.HousingSpaceID != "" {
+		session.HousingSpaceID = ""
+		session.HousingInstanceID = ""
+		session.ReturnZoneID = ""
+		session.ReturnX = 0
+		session.ReturnY = 0
+		session.ReturnZ = 0
+	}
 	session.ZoneID = character.ZoneID
 	session.X = character.PositionX
 	session.Y = character.PositionY
@@ -302,6 +305,11 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
 
+	if session.HousingSpaceID != "" {
+		httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+		return
+	}
+
 	persistStartedAt := time.Now()
 	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
 	s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
@@ -349,6 +357,16 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	session.LastSeenAt = time.Now().Unix()
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
+
+	if session.HousingSpaceID != "" {
+		if err := s.returnSessionFromHousingLocked(session, "disconnect"); err != nil {
+			httpapi.Error(w, http.StatusInternalServerError, "housing_recover_failed", err.Error())
+			return
+		}
+		s.metrics.recordSessionEvent("disconnect_succeeded")
+		httpapi.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
+	}
 
 	persistStartedAt := time.Now()
 	persistZoneID, persistX, persistY, persistZ := session.ZoneID, session.X, session.Y, session.Z
@@ -961,6 +979,10 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		entities = append(entities, buildGatheringNodeEntity(node, nowMs))
 	}
 
+	if session.HousingSpaceID != "" {
+		entities = append(entities, s.buildHousingEntitiesLocked(session)...)
+	}
+
 	for _, mob := range s.hostileMobsForSessionLocked(session) {
 		if mob == nil || mob.ZoneID != session.ZoneID {
 			continue
@@ -986,6 +1008,9 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 
 	for _, candidate := range s.sessionsByToken {
 		if candidate.Token == session.Token || !candidate.Connected || candidate.ZoneID != session.ZoneID {
+			continue
+		}
+		if candidate.InstanceID != session.InstanceID || candidate.HousingSpaceID != session.HousingSpaceID {
 			continue
 		}
 
@@ -1045,6 +1070,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"zoneMap":              s.buildZoneMapResponse(session),
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
+		"housing":              s.buildHousingResponseLocked(session),
 		"currentTargetId":      session.CurrentTargetID,
 		"autoAttackActive":     session.AutoAttackActive,
 		"globalCooldownEndsAt": session.GlobalCooldownEnds,
