@@ -110,6 +110,12 @@ The world server now owns an original typed ability resolver. Ability definition
 
 Aura runtime state is authoritative on the server and exposed to clients as protocol-neutral state. The dev content package uses `dev_stalker_pressure` and `dev_pressure_mark` only as AmandaCore-owned validation data for aura apply/tick/expire behavior. Future ability work should add richer effect categories behind this same resolver rather than moving combat decisions into clients or transport adapters.
 
+## Client-facing combat wiring
+
+`Client/Game/AmandaCore.WorldClient` now consumes the server combat response fields directly. The diagnostic client can select the nearest hostile target, submit `dev_basic_strike`, poll authoritative state, and render player health, target health, cooldowns, cast state, aura state, combat domain events, state diffs, NPC death, and kill credit.
+
+This remains a diagnostic client, not the final O3DE HUD. The important boundary is already in place: the client sends target and ability intents only, and all damage, death, aura, cooldown, and progression results come back from the world service.
+
 ## Milestone one slice
 
 - One outdoor zone with two streamable cells and one micro-instance hook.

@@ -7,6 +7,7 @@
 - `Shared/AmandaCoreShared`: shared C++ gameplay and platform contracts for combat, movement, quests, loot, auth/session types, realm routing, character selection, and world join tickets.
 - `Services`: Go-based account, auth, realm, character, world, and admin service binaries sharing a functional dev file-store backend.
 - `Client/Launcher`: Windows-first C# launcher code for registration, login, realm listing, character flow, and world join handoff.
+- `Client/Game/AmandaCore.WorldClient`: diagnostic .NET world client for movement, target selection, Basic Strike, server health/death/cooldown/aura feedback, and kill-credit display.
 - `Gems`: expanded O3DE Gem source skeletons for the planned runtime split.
 - `Content` and `Docs`: clean-room schemas, example authored content, architecture guidance, and reference capture notes.
 
@@ -25,7 +26,7 @@
 - `Services/internal/observability` exposes stable AmandaCore event names for ticks, command queues, entities, combat, admin actions, and persistence snapshots.
 - `Docs/ContentPipeline.md` documents the AmandaCore-owned future content package path.
 
-Intentionally not implemented yet: full NPC spawn loops, hostile AI, auto-attack/combat resolver expansion, ability/effect execution, kill credit and loot, quest objective tracking, zone content package loading, and Dawnwake Isles zone skeletons from authored maps.
+Intentionally not implemented yet: full O3DE combat HUD wiring, production encounter content, loot table expansion, full quest objective UI, and finalized Dawnwake Isles world-space transforms from authored maps.
 
 ## Key paths
 
@@ -93,6 +94,14 @@ go run ./cmd/loadsim --clients 3 --duration 10s --cmd-rate 2 --scenario ability-
 ```
 
 The scenario exercises the original AmandaCore effect resolver, aura apply/tick/expire lifecycle, cast completion, and cooldown events without requiring O3DE.
+
+The fallback world client can also drive a live combat diagnostic after a join ticket is issued:
+
+```powershell
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --auto-combat-demo
+```
+
+The diagnostic client sends target and ability intents only. It renders target health, cooldowns, aura state, combat events, state diffs, NPC death, and kill credit from the authoritative world response.
 
 The Dawnwake Isles multi-zone skeleton can be exercised without O3DE:
 

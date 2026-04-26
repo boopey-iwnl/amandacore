@@ -1024,13 +1024,9 @@ func DefaultStartingLearnedAbilityIDs() []string {
 }
 
 func NormalizeLearnedAbilityIDs(source []string) []string {
-	if len(source) == 0 {
-		return DefaultStartingLearnedAbilityIDs()
-	}
-
 	seen := map[string]struct{}{}
-	normalized := make([]string, 0, len(source))
-	for _, abilityID := range source {
+	normalized := make([]string, 0, len(source)+len(DefaultStartingLearnedAbilityIDs()))
+	appendAbility := func(abilityID string) {
 		switch abilityID {
 		case "ember_bolt":
 			abilityID = SteadyStrikeAbilityID
@@ -1038,17 +1034,20 @@ func NormalizeLearnedAbilityIDs(source []string) []string {
 			abilityID = BraceAbilityID
 		}
 		if abilityID == "" {
-			continue
+			return
 		}
 		if _, exists := seen[abilityID]; exists {
-			continue
+			return
 		}
 		seen[abilityID] = struct{}{}
 		normalized = append(normalized, abilityID)
 	}
 
-	if len(normalized) == 0 {
-		return DefaultStartingLearnedAbilityIDs()
+	for _, abilityID := range source {
+		appendAbility(abilityID)
+	}
+	for _, abilityID := range DefaultStartingLearnedAbilityIDs() {
+		appendAbility(abilityID)
 	}
 
 	return normalized

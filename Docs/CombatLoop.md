@@ -6,7 +6,7 @@ This milestone adds the first server-authoritative hostile NPC loop:
 
 Login/Register -> Select/Create Character -> Join World -> Spawn Player -> Spawn Hostile NPC -> Move Near NPC -> Select NPC -> Use Basic Strike -> Server Applies Damage -> NPC Dies -> Kill Credit Is Awarded -> NPC Respawns.
 
-The real client can continue to use the existing world state response. The server now also emits protocol-agnostic domain events and state diffs for combat state changes.
+The diagnostic world client consumes the existing world state response. The server emits protocol-agnostic domain events and state diffs for combat state changes, and the client displays them without computing combat locally.
 
 ## NPC Archetype Model
 
@@ -137,17 +137,33 @@ Pop-Location
 
 The report includes ability commands, effect events, aura application/tick/expiry counts, cast start/completion counts, cooldown events, tick duration, queue depth placeholder, and errors.
 
+## Diagnostic Client Wiring
+
+The fallback `.NET` world client supports a thin combat control surface:
+
+- `T`: move near and select the nearest visible hostile target through `/v1/world/target`
+- `F`: submit `dev_basic_strike` through `/v1/world/attack/ability`
+- `P`: poll `/v1/world/state`
+
+The client renders player health, target health, target auras, action bar cooldown state, cast state, recent combat events, state diffs, and kill credits from the authoritative world response. It does not calculate damage, death, cooldown readiness, aura ticks, or progression locally.
+
+Automated diagnostic command:
+
+```powershell
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --auto-combat-demo
+```
+
 ## Limitations And Next Steps
 
 - Only one dev hostile archetype is added.
 - Basic Strike remains fixed damage with no crit, dodge, miss, or mitigation.
-- The ability/effect/aura system is a skeleton. It supports deterministic direct damage, healing, aura apply/tick/expire, cooldown categories, and cast/channel timing, but does not yet include full stat scaling policies, interrupt rules, dispels, immunities, resistances, or client UI.
+- The ability/effect/aura system is a skeleton. It supports deterministic direct damage, healing, aura apply/tick/expire, cooldown categories, and cast/channel timing, but does not yet include full stat scaling policies, interrupt rules, dispels, immunities, resistances, or O3DE combat HUD wiring.
 - NPC movement is direct step movement, not navmesh pathing.
 - Player death has no full respawn flow.
 - Loot tables are intentionally not implemented.
 - Quest objective integration consumes the new kill-credit boundary later.
 
-Next recommended milestone: ability content expansion and client-facing combat UI wiring.
+Next recommended milestone: O3DE combat HUD wiring and richer ability content expansion.
 
 ## Clean-room reference boundary
 

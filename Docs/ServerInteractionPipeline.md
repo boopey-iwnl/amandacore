@@ -84,6 +84,27 @@ The world response includes protocol-neutral deltas for future clients:
 
 These names are AmandaCore state contracts, not wire packet names. Transport adapters should map them into whatever client protocol is current without changing simulation authority.
 
+## Diagnostic Client Consumption
+
+`Client/Game/AmandaCore.WorldClient` now exercises this contract from the client side. It sends only:
+
+- movement deltas
+- target-selection intent
+- ability-use intent
+- state poll requests
+
+The client then displays:
+
+- player and target health
+- target aura state
+- action bar cooldowns
+- cast state
+- recent combat domain events
+- recent state diffs
+- kill credits
+
+This is intentionally a thin diagnostic UI. It proves the command/state/event shape the O3DE HUD can later consume without moving combat authority into the client.
+
 ## Clean-room reference boundary
 
 This implementation uses original AmandaCore code and data.
