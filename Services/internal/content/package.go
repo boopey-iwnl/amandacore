@@ -231,11 +231,15 @@ type HandoffGateTrigger struct {
 
 type SpawnGroupDefinition struct {
 	SpawnGroupID   string                 `json:"spawn_group_id"`
+	ZoneID         string                 `json:"zone_id"`
 	NPCArchetypeID string                 `json:"npc_archetype_id"`
 	LootTableID    string                 `json:"loot_table_id"`
+	SpawnPointIDs  []string               `json:"spawn_point_ids"`
 	SpawnPoints    []SpawnPointDefinition `json:"spawn_points"`
+	DesiredCount   int                    `json:"desired_count"`
 	RespawnSeconds int                    `json:"respawn_seconds"`
 	MaxAlive       int                    `json:"max_alive"`
+	ActivationMode string                 `json:"activation_mode"`
 	Tags           []string               `json:"tags"`
 }
 
