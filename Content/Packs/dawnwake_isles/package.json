@@ -10,6 +10,11 @@
     "zones/dawnwake_tideglass_shoal.zone.json",
     "zones/dawnwake_windspur_rise.zone.json"
   ],
+  "map_exports": [
+    "maps/dawnwake_landing.map.json",
+    "maps/dawnwake_tideglass_shoal.map.json",
+    "maps/dawnwake_windspur_rise.map.json"
+  ],
   "npc_catalogs": [
     "npcs/dawnwake_npcs.json"
   ],

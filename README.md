@@ -74,4 +74,11 @@ cd Services
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-traversal-basic --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 
+For Dawnwake map export and streaming hook validation:
+
+```powershell
+cd Services
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
+```
+
 The loadsim uses the loader default when `--content` is omitted. The HTTP world service loads package content when `AMANDACORE_CONTENT_PACKAGE` is set; otherwise it keeps the existing starter world.

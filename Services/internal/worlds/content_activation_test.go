@@ -95,6 +95,9 @@ func TestDawnwakePackageActivatesMultipleZoneRuntimes(t *testing.T) {
 	if server.contentActivation.TransitionsLoaded != 4 {
 		t.Fatalf("expected 4 transitions loaded, got %#v", server.contentActivation)
 	}
+	if server.contentActivation.MapExportsLoaded != 3 || server.contentActivation.StreamingCellsLoaded != 9 {
+		t.Fatalf("expected Dawnwake map exports and streaming cells loaded, got %#v", server.contentActivation)
+	}
 	if runtime := server.zoneRuntimes["dawnwake_tideglass_shoal"]; runtime == nil || runtime.TransitionCount != 2 {
 		t.Fatalf("expected Tideglass runtime with two transitions, got %#v", runtime)
 	}
@@ -103,6 +106,45 @@ func TestDawnwakePackageActivatesMultipleZoneRuntimes(t *testing.T) {
 	}
 	if provider := server.friendlyNPCs["dw_provider_lantern_pier"]; provider.ID == "" || provider.ZoneID != "dawnwake_landing" {
 		t.Fatalf("expected Dawnwake quest provider in landing, got %#v", provider)
+	}
+}
+
+func TestDawnwakeMapExportActivatesStreamingHints(t *testing.T) {
+	server := newWorldServerWithContentPackage(nil, "Content/Packs/dawnwake_isles/package.json")
+
+	runtime := server.zoneRuntimes["dawnwake_landing"]
+	if runtime == nil {
+		t.Fatalf("expected Dawnwake Landing runtime")
+	}
+	if runtime.MapID != "dw_map_landing" {
+		t.Fatalf("expected landing map id, got %q", runtime.MapID)
+	}
+	if len(runtime.AdjacentZoneIDs) != 1 || runtime.AdjacentZoneIDs[0] != "dawnwake_tideglass_shoal" {
+		t.Fatalf("unexpected adjacent zones: %#v", runtime.AdjacentZoneIDs)
+	}
+	if len(runtime.StreamingCells) != 3 || len(runtime.TransitionHints) != 1 {
+		t.Fatalf("expected streaming cells and transition hints, got %#v", runtime)
+	}
+}
+
+func TestStreamingHintsResponseIncludesActiveZoneMapMetadata(t *testing.T) {
+	server := newWorldServerWithContentPackage(nil, "Content/Packs/dawnwake_isles/package.json")
+	session := &worldSessionState{ZoneID: "dawnwake_tideglass_shoal"}
+
+	response := server.buildStreamingHintsResponse(session)
+	if response["enabled"] != true {
+		t.Fatalf("expected streaming hints enabled, got %#v", response)
+	}
+	if response["mapId"] != "dw_map_tideglass_shoal" {
+		t.Fatalf("expected Tideglass map id, got %#v", response["mapId"])
+	}
+	hints, ok := response["transitionHints"].([]map[string]any)
+	if !ok || len(hints) != 2 {
+		t.Fatalf("expected two transition hints, got %#v", response["transitionHints"])
+	}
+	cells, ok := response["streamingCells"].([]map[string]any)
+	if !ok || len(cells) != 3 {
+		t.Fatalf("expected three streaming cells, got %#v", response["streamingCells"])
 	}
 }
 
@@ -151,5 +193,30 @@ func TestDawnwakeTraversalLoadsimCompletes(t *testing.T) {
 	}
 	if report.QuestsCompleted != 1 || report.LootClaimsCompleted != 1 || report.InventoryGrants["dw_tideglass_splinter"] != 1 {
 		t.Fatalf("expected Dawnwake quest, loot, and inventory flow, got %#v", report)
+	}
+}
+
+func TestDawnwakeStreamingLoadsimCompletesFullTraversal(t *testing.T) {
+	report, err := RunContentPackageLoadsim(ContentPackageLoadsimOptions{
+		Clients:     1,
+		Duration:    100000000,
+		CommandRate: 2,
+		Scenario:    "dawnwake-streaming-basic",
+		ContentPath: "Content/Packs/dawnwake_isles/package.json",
+	})
+	if err != nil {
+		t.Fatalf("loadsim failed: %v report=%#v", err, report)
+	}
+	if report.MapExportsLoaded != 3 || report.StreamingCellsLoaded != 9 {
+		t.Fatalf("expected map export metadata in report, got %#v", report)
+	}
+	if report.TransitionsCompleted != 4 || len(report.ZonesEntered) != 5 {
+		t.Fatalf("expected full Dawnwake loop traversal, got %#v", report)
+	}
+	if report.StreamingHintsObserved < 5 {
+		t.Fatalf("expected streaming hints to be observed across traversal, got %#v", report)
+	}
+	if report.QuestsCompleted != 1 || report.LootClaimsCompleted != 1 {
+		t.Fatalf("expected Dawnwake quest and loot flow, got %#v", report)
 	}
 }

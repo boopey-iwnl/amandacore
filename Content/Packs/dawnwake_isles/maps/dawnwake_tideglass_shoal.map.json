@@ -1,0 +1,189 @@
+{
+  "map_id": "dw_map_tideglass_shoal",
+  "zone_id": "dawnwake_tideglass_shoal",
+  "display_name": "Tideglass Shoal Placeholder Map",
+  "coordinate_space": "o3de_placeholder",
+  "authoring_source": "AmandaCore original placeholder map metadata.",
+  "bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "min_z": 0,
+    "max_x": 260,
+    "max_y": 210,
+    "max_z": 24
+  },
+  "entry_points": [
+    {
+      "entry_id": "from_landing_causeway",
+      "position": {
+        "x": 18,
+        "y": 102,
+        "z": 0.1
+      },
+      "facing_yaw": 80
+    },
+    {
+      "entry_id": "from_windspur_ridge",
+      "position": {
+        "x": 238,
+        "y": 174,
+        "z": 0.1
+      },
+      "facing_yaw": 245
+    }
+  ],
+  "adjacent_zones": [
+    {
+      "zone_id": "dawnwake_landing",
+      "transition_id": "to_landing",
+      "direction": "west",
+      "requires_reciprocal": true,
+      "tags": [
+        "causeway"
+      ]
+    },
+    {
+      "zone_id": "dawnwake_windspur_rise",
+      "transition_id": "to_windspur_rise",
+      "direction": "east",
+      "requires_reciprocal": true,
+      "tags": [
+        "ridge"
+      ]
+    }
+  ],
+  "transition_points": [
+    {
+      "transition_id": "to_landing",
+      "display_name": "Landing Causeway Stream",
+      "target_zone_id": "dawnwake_landing",
+      "destination_entry_id": "from_tideglass_causeway",
+      "streaming_cell_id": "dw_tideglass_west_causeway",
+      "hint": "prepare dawnwake_landing near the western causeway",
+      "position": {
+        "x": 8,
+        "y": 102,
+        "z": 0.1
+      },
+      "radius": 8,
+      "tags": [
+        "streaming_hint",
+        "causeway"
+      ]
+    },
+    {
+      "transition_id": "to_windspur_rise",
+      "display_name": "Windspur Ridge Stream",
+      "target_zone_id": "dawnwake_windspur_rise",
+      "destination_entry_id": "from_tideglass_ridge",
+      "streaming_cell_id": "dw_tideglass_ridge_path",
+      "hint": "prepare dawnwake_windspur_rise above the eastern ridge",
+      "position": {
+        "x": 250,
+        "y": 178,
+        "z": 0.1
+      },
+      "radius": 8,
+      "tags": [
+        "streaming_hint",
+        "ridge"
+      ]
+    }
+  ],
+  "streaming_cells": [
+    {
+      "cell_id": "dw_tideglass_west_causeway",
+      "display_name": "West Causeway",
+      "bounds": {
+        "min_x": 0,
+        "min_y": 72,
+        "min_z": 0,
+        "max_x": 72,
+        "max_y": 134,
+        "max_z": 24
+      },
+      "priority": 3,
+      "tags": [
+        "transition"
+      ]
+    },
+    {
+      "cell_id": "dw_tideglass_shallows",
+      "display_name": "Tideglass Shallows",
+      "bounds": {
+        "min_x": 72,
+        "min_y": 72,
+        "min_z": 0,
+        "max_x": 184,
+        "max_y": 154,
+        "max_z": 24
+      },
+      "priority": 1,
+      "tags": [
+        "spawn",
+        "quest"
+      ]
+    },
+    {
+      "cell_id": "dw_tideglass_ridge_path",
+      "display_name": "Ridge Path",
+      "bounds": {
+        "min_x": 184,
+        "min_y": 146,
+        "min_z": 0,
+        "max_x": 260,
+        "max_y": 210,
+        "max_z": 24
+      },
+      "priority": 3,
+      "tags": [
+        "transition"
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "landmark_id": "dw_tideglass_marker",
+      "display_name": "Shoal Marker",
+      "kind": "quest_provider",
+      "position": {
+        "x": 32,
+        "y": 108,
+        "z": 0.1
+      },
+      "tags": [
+        "quest"
+      ]
+    },
+    {
+      "landmark_id": "dw_tideglass_spark_pools",
+      "display_name": "Spark Pools",
+      "kind": "vista",
+      "position": {
+        "x": 132,
+        "y": 116,
+        "z": 0.1
+      },
+      "tags": [
+        "vista"
+      ]
+    },
+    {
+      "landmark_id": "dw_tideglass_windspur_gate",
+      "display_name": "Windspur Gate",
+      "kind": "transition",
+      "position": {
+        "x": 250,
+        "y": 178,
+        "z": 0.1
+      },
+      "tags": [
+        "transition"
+      ]
+    }
+  ],
+  "tags": [
+    "dawnwake",
+    "placeholder_map"
+  ]
+}

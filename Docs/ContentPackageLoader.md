@@ -30,6 +30,9 @@ Content/Packs/dawnwake_isles/
   zones/dawnwake_landing.zone.json
   zones/dawnwake_tideglass_shoal.zone.json
   zones/dawnwake_windspur_rise.zone.json
+  maps/dawnwake_landing.map.json
+  maps/dawnwake_tideglass_shoal.map.json
+  maps/dawnwake_windspur_rise.map.json
   npcs/dawnwake_npcs.json
   items/dawnwake_items.json
   loot/dawnwake_loot.json
@@ -57,6 +60,7 @@ Relative paths are resolved from the current working directory first, then by wa
 - `description`
 - `authorship`
 - `zones`
+- `map_exports`
 - `npc_catalogs`
 - `item_catalogs`
 - `loot_catalogs`
@@ -93,6 +97,25 @@ Validation requires valid bounds, positions inside bounds, unique zone IDs, posi
 
 Validation rejects transition positions outside the source zone, missing target zones, and missing destination entry points.
 
+## Map Export Format
+
+Map export files are AmandaCore-owned placeholder metadata for server validation and future O3DE streaming hooks. They are not terrain, prefab, asset, or world-partition files.
+
+A map export defines:
+
+- `map_id`, `zone_id`, `display_name`
+- `coordinate_space`, currently `amandacore_server` or `o3de_placeholder`
+- `bounds`
+- `entry_points`
+- `adjacent_zones`
+- `transition_points`
+- `streaming_cells`
+- `landmarks`
+- `authoring_source`
+- `tags`
+
+Validation requires each map export to reference an existing zone, have bounds that contain the zone bounds, keep entry points, transition points, landmarks, and streaming cells inside map bounds, reference existing target zones and destination entries, and match transition metadata already declared by the zone. Adjacent zones can require reciprocal adjacency; Dawnwake uses that for its current transition loop.
+
 ## Catalogs
 
 NPC catalogs define archetypes with health, level, disposition, combat ranges, damage, cadence, optional default abilities, and tags.
@@ -122,11 +145,21 @@ The loader reports all practical errors without panicking. Error codes include:
 - `ObjectiveGraphCycle`
 - `RuntimeConfigInvalid`
 
-Package-level validation catches duplicate IDs, missing files, malformed JSON, broken spawn/NPC/loot/item/quest/ability/aura references, invalid numeric ranges, positions outside zone bounds, invalid runtime config, and quest objective dependency cycles.
+Package-level validation catches duplicate IDs, missing files, malformed JSON, broken spawn/NPC/loot/item/quest/ability/aura/map references, invalid numeric ranges, positions outside zone or map bounds, invalid runtime config, missing reciprocal adjacency where required, transition metadata mismatches, and quest objective dependency cycles.
 
 ## Runtime Activation
 
-Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones and transition points to current world zone definitions, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers simple quest projections, and merges package items into the current item lookup path.
+Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones and transition points to current world zone definitions, attaches map export metadata to zone runtimes, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers simple quest projections, and merges package items into the current item lookup path.
+
+For zones with map exports, `ZoneRuntime` includes:
+
+- `MapID`
+- map bounds
+- adjacent zone IDs
+- transition hints
+- streaming cells
+
+World responses include a `streaming` payload for the active zone. It exposes map ID, bounds, adjacent zones, transition hints, and placeholder streaming cells for future client wiring while keeping Go authoritative over traversal.
 
 Existing hardcoded Stonewake and Brindlebrook flows remain as fallback. The content package is additive and does not replace the current starter content yet.
 
@@ -143,6 +176,8 @@ Structured events include:
 - `content.zone.loaded`
 - `content.zone.transition.loaded`
 - `content.zone.transition.validation_failed`
+- `content.map_export.loaded`
+- `content.map_export.validation_failed`
 - `content.catalog.loaded`
 - `content.reference.resolved`
 - `content.reference.broken`
@@ -155,6 +190,8 @@ Structured events include:
 - `loadsim.content.completed`
 - `loadsim.dawnwake.started`
 - `loadsim.dawnwake.completed`
+- `loadsim.streaming.started`
+- `loadsim.streaming.completed`
 
 ## Loadsim
 
@@ -176,14 +213,23 @@ go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake
 
 The report includes loaded package status, validation errors, activated zones, loaded catalogs, spawned NPCs, registered quest providers, transition counts, quest acceptance, NPC kills, loot claims, inventory grants, quest completion, reward grants, tick timing, queue depth, and errors.
 
+The Dawnwake streaming scenario validates the map exports and traverses the current full Dawnwake loop:
+
+```powershell
+cd Services
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
+```
+
+The report adds map exports loaded, streaming cells loaded, streaming hints observed, and zones entered.
+
 ## Current Limitations
 
 - Ability and aura package entries are validated and registered, but combat still resolves the existing hardcoded Warrior ability catalog.
 - Runtime quest activation projects the first supported objective into the current single-objective quest shape while retaining the full objective graph in `RuntimeContentRegistry`.
 - Loot claiming in loadsim is deterministic and server-side; public world HTTP loot endpoints are not introduced in this milestone.
-- Dawnwake transition handling is a server-side runtime skeleton. It validates adjacency and moves sessions to destination entry points, but does not stream terrain, O3DE assets, or client-side world partitions yet.
+- Dawnwake transition handling is a server-side runtime skeleton. It validates adjacency, attaches placeholder streaming hints, and moves sessions to destination entry points, but does not stream terrain, O3DE assets, or client-side world partitions yet.
 - This is not a content editor, O3DE export pipeline, terrain streamer, or compiled binary content format.
 
 ## Next Milestone
 
-The next milestone should connect Dawnwake package zones to O3DE-authored placeholder map exports and server-side streaming hooks while keeping the Go simulation authoritative.
+The next milestone should turn the placeholder map metadata into a generated AmandaCore export path from O3DE-owned authoring data, then add client-facing transition previews and broader streamed-world handoff coverage.

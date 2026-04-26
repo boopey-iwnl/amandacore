@@ -1272,6 +1272,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"stateDiffs":           cloneStateDiffs(s.stateDiffs),
 		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
 		"zoneMap":              s.buildZoneMapResponse(session),
+		"streaming":            s.buildStreamingHintsResponse(session),
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"housing":              s.buildHousingResponseLocked(session),

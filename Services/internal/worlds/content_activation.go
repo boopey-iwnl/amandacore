@@ -13,6 +13,11 @@ type ZoneRuntime struct {
 	ZoneID                  string
 	DisplayName             string
 	RuntimeConfig           contentpkg.ZoneRuntimeConfig
+	MapID                   string
+	MapBounds               contentpkg.ZoneBounds
+	AdjacentZoneIDs         []string
+	TransitionHints         []ZoneTransitionHint
+	StreamingCells          []ZoneStreamingCell
 	EntryPointCount         int
 	SpawnGroupCount         int
 	QuestProviderCount      int
@@ -30,8 +35,31 @@ type ContentActivationResult struct {
 	NPCsSpawned              int
 	QuestProvidersRegistered int
 	TransitionsLoaded        int
+	MapExportsLoaded         int
+	StreamingCellsLoaded     int
 	QuestsRegistered         int
 	Errors                   []contentpkg.ContentValidationError
+}
+
+type ZoneTransitionHint struct {
+	TransitionID       string
+	DisplayName        string
+	TargetZoneID       string
+	DestinationEntryID string
+	StreamingCellID    string
+	Hint               string
+	X                  float64
+	Y                  float64
+	Z                  float64
+	Radius             float64
+}
+
+type ZoneStreamingCell struct {
+	CellID      string
+	DisplayName string
+	Bounds      contentpkg.ZoneBounds
+	Priority    int
+	Tags        []string
 }
 
 func (s *worldServer) loadConfiguredContentPackageLocked(contentPackagePath string) {
@@ -58,6 +86,7 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 		PackageVersion: registry.Version,
 		CatalogsLoaded: map[string]int{
 			"zones":       len(registry.Zones),
+			"map_exports": len(registry.MapExports),
 			"npcs":        len(registry.NPCs),
 			"items":       len(registry.Items),
 			"loot_tables": len(registry.LootTables),
@@ -83,6 +112,7 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 
 	for _, zoneID := range contentpkg.SortedKeys(registry.Zones) {
 		zone := registry.Zones[zoneID]
+		mapExport, hasMapExport := registry.MapExportByZone[zone.ZoneID]
 		s.zones[zone.ZoneID] = zoneDefinition{
 			ID:          zone.ZoneID,
 			DisplayName: zone.DisplayName,
@@ -106,14 +136,26 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			TransitionCount:    len(zone.Transitions),
 			ActivatedAt:        time.Now().UTC(),
 		}
+		if hasMapExport {
+			zoneRuntime.MapID = mapExport.MapID
+			zoneRuntime.MapBounds = mapExport.Bounds
+			zoneRuntime.AdjacentZoneIDs = contentMapAdjacentZoneIDs(mapExport)
+			zoneRuntime.TransitionHints = contentMapTransitionHints(mapExport)
+			zoneRuntime.StreamingCells = contentMapStreamingCells(mapExport)
+			result.MapExportsLoaded++
+			result.StreamingCellsLoaded += len(mapExport.StreamingCells)
+		}
 		s.zoneRuntimes[zone.ZoneID] = zoneRuntime
 		result.ZonesActivated++
 		result.TransitionsLoaded += len(zone.Transitions)
 		observability.LogEvent("world-service", contentpkg.EventWorldZoneRuntimeCreated, map[string]any{
-			"packageId":       registry.PackageID,
-			"zoneId":          zone.ZoneID,
-			"tickMs":          zone.Runtime.TickMS,
-			"transitionCount": len(zone.Transitions),
+			"packageId":          registry.PackageID,
+			"zoneId":             zone.ZoneID,
+			"tickMs":             zone.Runtime.TickMS,
+			"transitionCount":    len(zone.Transitions),
+			"mapId":              zoneRuntime.MapID,
+			"streamingCellCount": len(zoneRuntime.StreamingCells),
+			"adjacentZoneCount":  len(zoneRuntime.AdjacentZoneIDs),
 		})
 
 		for _, provider := range zone.QuestProviders {
@@ -146,6 +188,8 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 		"npcsSpawned":              result.NPCsSpawned,
 		"questProvidersRegistered": result.QuestProvidersRegistered,
 		"transitionsLoaded":        result.TransitionsLoaded,
+		"mapExportsLoaded":         result.MapExportsLoaded,
+		"streamingCellsLoaded":     result.StreamingCellsLoaded,
 		"questsRegistered":         result.QuestsRegistered,
 	})
 	return result
@@ -312,6 +356,55 @@ func contentZoneTransitions(zone contentpkg.ZoneDefinition) []zonePointDefinitio
 		})
 	}
 	return points
+}
+
+func contentMapAdjacentZoneIDs(export contentpkg.MapExportDefinition) []string {
+	zoneIDs := make([]string, 0, len(export.AdjacentZones))
+	seen := map[string]struct{}{}
+	for _, adjacent := range export.AdjacentZones {
+		if adjacent.ZoneID == "" {
+			continue
+		}
+		if _, exists := seen[adjacent.ZoneID]; exists {
+			continue
+		}
+		seen[adjacent.ZoneID] = struct{}{}
+		zoneIDs = append(zoneIDs, adjacent.ZoneID)
+	}
+	return zoneIDs
+}
+
+func contentMapTransitionHints(export contentpkg.MapExportDefinition) []ZoneTransitionHint {
+	hints := make([]ZoneTransitionHint, 0, len(export.TransitionPoints))
+	for _, transition := range export.TransitionPoints {
+		hints = append(hints, ZoneTransitionHint{
+			TransitionID:       transition.TransitionID,
+			DisplayName:        transition.DisplayName,
+			TargetZoneID:       transition.TargetZoneID,
+			DestinationEntryID: transition.DestinationEntryID,
+			StreamingCellID:    transition.StreamingCellID,
+			Hint:               transition.Hint,
+			X:                  transition.Position.X,
+			Y:                  transition.Position.Y,
+			Z:                  transition.Position.Z,
+			Radius:             transition.Radius,
+		})
+	}
+	return hints
+}
+
+func contentMapStreamingCells(export contentpkg.MapExportDefinition) []ZoneStreamingCell {
+	cells := make([]ZoneStreamingCell, 0, len(export.StreamingCells))
+	for _, cell := range export.StreamingCells {
+		cells = append(cells, ZoneStreamingCell{
+			CellID:      cell.CellID,
+			DisplayName: cell.DisplayName,
+			Bounds:      cell.Bounds,
+			Priority:    cell.Priority,
+			Tags:        append([]string(nil), cell.Tags...),
+		})
+	}
+	return cells
 }
 
 func providerForQuest(registry contentpkg.RuntimeContentRegistry, questID string) string {
