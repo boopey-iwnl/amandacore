@@ -379,7 +379,12 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
         "Docs\QA\KnownIssues.md",
         "Docs\QA\Alpha01FeatureFreeze.md",
         "Docs\QA\ReleaseNotes.md",
+        "Docs\QA\ReleaseNotes-Alpha-0.15.md",
         "Docs\QA\TesterInstructions.md",
+        "Content\Art\Icons\Abilities\ability_auto_attack.png",
+        "Content\Art\Icons\UI\icon_missing.png",
+        "Content\Art\Materials\mat_stonewake_grass_lush.material",
+        "Content\Packs\dev_foundation\package.json",
         "release-package-manifest.json",
         "Infra\dev\package-alpha.ps1",
         "Infra\dev\version-manifest.json",
@@ -406,7 +411,8 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
         '(^|/)platform-state\.json$',
         '(?i)(^|/)(m2_|milestone2_|milestone3_)[^/]*',
         '(?i)(^|/)milestone.*_runtime_ticket\.txt$',
-        '(?i)\.(log|tmp|png|jpg|jpeg)$'
+        '(?i)\.(log|tmp)$',
+        '(?i)^(?!Content/Art/).*\.(png|jpg|jpeg)$'
     )
 
     if ($RunO3deLevelSmoke) {
