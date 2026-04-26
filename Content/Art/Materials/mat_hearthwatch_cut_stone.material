@@ -1,0 +1,17 @@
+{
+    "description": "AmandaCore 0.2 source material for mat_hearthwatch_cut_stone.",
+    "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+    "materialTypeVersion": 5,
+    "propertyValues": {
+        "baseColor.color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        ],
+        "baseColor.textureBlendMode": "Lerp",
+        "baseColor.textureMap": "../Textures/Stone/village_cut_stone.png",
+        "roughness.factor": 0.82,
+        "metallic.factor": 0.0
+    }
+}

@@ -1,0 +1,1597 @@
+{
+  "schema": "amandacore.textureManifest.v1",
+  "release": "0.2.0",
+  "source": {
+    "kind": "user_provided_local_folder",
+    "sourcePathStoredAs": "relative_only",
+    "absoluteSourcePathOmitted": true
+  },
+  "auditSummary": {
+    "scannedFiles": 328,
+    "scannedBytes": 1039641491,
+    "scannedMiB": 991.48,
+    "extensions": {
+      ".png": 328
+    },
+    "dimensions": {
+      "1254x1254": 319,
+      "1448x1086": 8,
+      "1055x1491": 1
+    },
+    "duplicateGroups": 18,
+    "duplicateFiles": 36,
+    "unsupportedFormats": [],
+    "suspiciousTermMatches": 0,
+    "importedFiles": 52
+  },
+  "materials": [
+    {
+      "materialId": "mat_stonewake_grass_lush",
+      "category": "terrain",
+      "bucket": "grass",
+      "texturePath": "Content/Art/Textures/Terrain/stonewake_grass_lush.png",
+      "materialPath": "Content/Art/Materials/mat_stonewake_grass_lush.material"
+    },
+    {
+      "materialId": "mat_stonewake_grass_worn",
+      "category": "terrain",
+      "bucket": "grass",
+      "texturePath": "Content/Art/Textures/Terrain/stonewake_grass_worn.png",
+      "materialPath": "Content/Art/Materials/mat_stonewake_grass_worn.material"
+    },
+    {
+      "materialId": "mat_valefurrow_farm_soil",
+      "category": "terrain",
+      "bucket": "farm_soil",
+      "texturePath": "Content/Art/Textures/Terrain/stonewake_farm_furrows.png",
+      "materialPath": "Content/Art/Materials/mat_valefurrow_farm_soil.material"
+    },
+    {
+      "materialId": "mat_stonewake_mud_dark",
+      "category": "terrain",
+      "bucket": "mud",
+      "texturePath": "Content/Art/Textures/Terrain/stonewake_mud_dark.png",
+      "materialPath": "Content/Art/Materials/mat_stonewake_mud_dark.material"
+    },
+    {
+      "materialId": "mat_tideworn_shore_sand",
+      "category": "terrain",
+      "bucket": "sand",
+      "texturePath": "Content/Art/Textures/Terrain/shore_sand_pebbles.png",
+      "materialPath": "Content/Art/Materials/mat_tideworn_shore_sand.material"
+    },
+    {
+      "materialId": "mat_stonewake_rocky_ground",
+      "category": "terrain",
+      "bucket": "rocky_ground",
+      "texturePath": "Content/Art/Textures/Terrain/rocky_ground_gray.png",
+      "materialPath": "Content/Art/Materials/mat_stonewake_rocky_ground.material"
+    },
+    {
+      "materialId": "mat_stonewake_dirt_path",
+      "category": "terrain",
+      "bucket": "roads_paths",
+      "texturePath": "Content/Art/Textures/Terrain/stonewake_dirt_path.png",
+      "materialPath": "Content/Art/Materials/mat_stonewake_dirt_path.material"
+    },
+    {
+      "materialId": "mat_hearthwatch_cobble_path",
+      "category": "architecture",
+      "bucket": "stone_path",
+      "texturePath": "Content/Art/Textures/Architecture/hearthwatch_cobble_path.png",
+      "materialPath": "Content/Art/Materials/mat_hearthwatch_cobble_path.material"
+    },
+    {
+      "materialId": "mat_harbor_dock_planks",
+      "category": "buildings",
+      "bucket": "dock_planks",
+      "texturePath": "Content/Art/Textures/Wood/harbor_dock_planks.png",
+      "materialPath": "Content/Art/Materials/mat_harbor_dock_planks.material"
+    },
+    {
+      "materialId": "mat_hearthwatch_village_wood",
+      "category": "buildings",
+      "bucket": "wood",
+      "texturePath": "Content/Art/Textures/Wood/village_weathered_planks.png",
+      "materialPath": "Content/Art/Materials/mat_hearthwatch_village_wood.material"
+    },
+    {
+      "materialId": "mat_hearthwatch_thatch_roof",
+      "category": "buildings",
+      "bucket": "roofing",
+      "texturePath": "Content/Art/Textures/Architecture/village_thatch_roof.png",
+      "materialPath": "Content/Art/Materials/mat_hearthwatch_thatch_roof.material"
+    },
+    {
+      "materialId": "mat_hearthwatch_wood_shingles",
+      "category": "buildings",
+      "bucket": "roofing",
+      "texturePath": "Content/Art/Textures/Architecture/village_wood_shingles.png",
+      "materialPath": "Content/Art/Materials/mat_hearthwatch_wood_shingles.material"
+    },
+    {
+      "materialId": "mat_hearthwatch_cut_stone",
+      "category": "buildings",
+      "bucket": "stone",
+      "texturePath": "Content/Art/Textures/Stone/village_cut_stone.png",
+      "materialPath": "Content/Art/Materials/mat_hearthwatch_cut_stone.material"
+    },
+    {
+      "materialId": "mat_hearthwatch_village_plaster",
+      "category": "buildings",
+      "bucket": "plaster",
+      "texturePath": "Content/Art/Textures/Architecture/village_white_plaster.png",
+      "materialPath": "Content/Art/Materials/mat_hearthwatch_village_plaster.material"
+    },
+    {
+      "materialId": "mat_prop_barrel_wood",
+      "category": "props",
+      "bucket": "barrels",
+      "texturePath": "Content/Art/Textures/Props/barrel_wood.png",
+      "materialPath": "Content/Art/Materials/mat_prop_barrel_wood.material"
+    },
+    {
+      "materialId": "mat_prop_crate_wood",
+      "category": "props",
+      "bucket": "crates",
+      "texturePath": "Content/Art/Textures/Props/crate_weathered_wood.png",
+      "materialPath": "Content/Art/Materials/mat_prop_crate_wood.material"
+    },
+    {
+      "materialId": "mat_prop_sack_cloth",
+      "category": "props",
+      "bucket": "sacks",
+      "texturePath": "Content/Art/Textures/Props/sack_cloth.png",
+      "materialPath": "Content/Art/Materials/mat_prop_sack_cloth.material"
+    },
+    {
+      "materialId": "mat_quarry_stone_gray",
+      "category": "terrain",
+      "bucket": "cliff_rock",
+      "texturePath": "Content/Art/Textures/Rock/quarry_stone_gray.png",
+      "materialPath": "Content/Art/Materials/mat_quarry_stone_gray.material"
+    },
+    {
+      "materialId": "mat_cave_black_rock",
+      "category": "terrain",
+      "bucket": "cave",
+      "texturePath": "Content/Art/Textures/Rock/cave_black_rock.png",
+      "materialPath": "Content/Art/Materials/mat_cave_black_rock.material"
+    },
+    {
+      "materialId": "mat_ashen_lava_cracks",
+      "category": "fx",
+      "bucket": "lava",
+      "texturePath": "Content/Art/Textures/FX/volcanic_lava_cracks.png",
+      "materialPath": "Content/Art/Materials/mat_ashen_lava_cracks.material"
+    },
+    {
+      "materialId": "mat_ancient_rune_gold",
+      "category": "fx",
+      "bucket": "emissive_runes",
+      "texturePath": "Content/Art/Textures/FX/ancient_rune_gold.png",
+      "materialPath": "Content/Art/Materials/mat_ancient_rune_gold.material"
+    },
+    {
+      "materialId": "mat_ancient_rune_violet",
+      "category": "fx",
+      "bucket": "emissive_runes",
+      "texturePath": "Content/Art/Textures/FX/ancient_rune_violet.png",
+      "materialPath": "Content/Art/Materials/mat_ancient_rune_violet.material"
+    },
+    {
+      "materialId": "mat_stream_water_placeholder",
+      "category": "fx",
+      "bucket": "water_foam",
+      "texturePath": "Content/Art/Textures/Water/stream_water_foam.png",
+      "materialPath": "Content/Art/Materials/mat_stream_water_placeholder.material"
+    },
+    {
+      "materialId": "mat_foliage_grass_patch",
+      "category": "foliage",
+      "bucket": "grass_cards",
+      "texturePath": "Content/Art/Textures/Foliage/grass_card_patch.png",
+      "materialPath": "Content/Art/Materials/mat_foliage_grass_patch.material"
+    },
+    {
+      "materialId": "mat_valefurrow_furrow_overlay",
+      "category": "terrain",
+      "bucket": "farm_soil",
+      "texturePath": "Content/Art/Textures/Terrain/furrow_blend_overlay.png",
+      "materialPath": "Content/Art/Materials/mat_valefurrow_furrow_overlay.material"
+    },
+    {
+      "materialId": "mat_shore_foam_decal",
+      "category": "fx",
+      "bucket": "water_foam",
+      "texturePath": "Content/Art/Textures/FX/shore_foam_decal.png",
+      "materialPath": "Content/Art/Materials/mat_shore_foam_decal.material"
+    },
+    {
+      "materialId": "mat_blue_rune_decal",
+      "category": "fx",
+      "bucket": "emissive_runes",
+      "texturePath": "Content/Art/Textures/FX/blue_rune_decal.png",
+      "materialPath": "Content/Art/Materials/mat_blue_rune_decal.material"
+    },
+    {
+      "materialId": "mat_foliage_mossy_grass",
+      "category": "foliage",
+      "bucket": "moss",
+      "texturePath": "Content/Art/Textures/Foliage/mossy_grass_cover.png",
+      "materialPath": "Content/Art/Materials/mat_foliage_mossy_grass.material"
+    },
+    {
+      "materialId": "mat_foliage_shrub_dense",
+      "category": "foliage",
+      "bucket": "shrubs",
+      "texturePath": "Content/Art/Textures/Foliage/shrub_leaves_dense.png",
+      "materialPath": "Content/Art/Materials/mat_foliage_shrub_dense.material"
+    },
+    {
+      "materialId": "mat_crop_wheat_placeholder",
+      "category": "foliage",
+      "bucket": "crops",
+      "texturePath": "Content/Art/Textures/Foliage/wheat_crop_placeholder.png",
+      "materialPath": "Content/Art/Materials/mat_crop_wheat_placeholder.material"
+    },
+    {
+      "materialId": "mat_tree_bark_brown",
+      "category": "foliage",
+      "bucket": "bark",
+      "texturePath": "Content/Art/Textures/Foliage/tree_bark_brown.png",
+      "materialPath": "Content/Art/Materials/mat_tree_bark_brown.material"
+    },
+    {
+      "materialId": "mat_tree_bark_rugged",
+      "category": "foliage",
+      "bucket": "bark",
+      "texturePath": "Content/Art/Textures/Foliage/tree_bark_rugged.png",
+      "materialPath": "Content/Art/Materials/mat_tree_bark_rugged.material"
+    }
+  ],
+  "icons": [
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_46 PM.png",
+      "sourceSha256": "cc11e17e3c03467fc5910ff23ceffffd74b7d722268f0ec060dee14b2013aad2",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_auto_attack.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39485,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_auto_attack",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_52 PM (1).png",
+      "sourceSha256": "cc11e17e3c03467fc5910ff23ceffffd74b7d722268f0ec060dee14b2013aad2",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_steady_strike.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39485,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_steady_strike",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_52 PM (2).png",
+      "sourceSha256": "2a9265eedfd5116006f95f27f0ff7a1ee805023eadece9645bf34ced57b00323",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_brace.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 38416,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_brace",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_52 PM (4).png",
+      "sourceSha256": "529e159942be25d9b97313b158369ec3123636f43a1d08f153a5a2f43eff8ed4",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_fire_placeholder.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 34932,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_fire_placeholder",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_53 PM (6).png",
+      "sourceSha256": "b8dbb2583c09decd2b2efd93bf1cf6626d3cc59751cb5efcdbd0d517694f6ef4",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_road_ration.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 35457,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_road_ration",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_54 PM (7).png",
+      "sourceSha256": "441c8c22d4f67ef83f29305950ed62456081112e8314fd734d56fcca5b7978ab",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Items/item_oat_bundle.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 41131,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_oat_bundle",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_54 PM (8).png",
+      "sourceSha256": "d07132e318705769554a2b46058c8a1bcaaa9e41a2bf310a966d3f67f79a0c68",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/currency_copper.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 38698,
+      "assetType": "icon",
+      "category": "currency",
+      "bucket": "currency",
+      "iconId": "currency_copper",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_55 PM (9).png",
+      "sourceSha256": "2760b3b7a773a0cca7ff85b82e2dfc232269af2897bbb5916f84747535897050",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_militia_token.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 41302,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_militia_token",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_03 PM (1).png",
+      "sourceSha256": "65b1ddf2ee8913be5f8b64d40ef4cc5110251c2835338e530dc3723714241103",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_driving_blow.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 38790,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_driving_blow",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_03 PM (2).png",
+      "sourceSha256": "2fa2129c002f77875263e04dba26bafe59ed79c062cea24436482018b99f90a3",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_padded_vest.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 41566,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_padded_vest",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_03 PM (3).png",
+      "sourceSha256": "5f1027856697833796b1098d88ffe3dd77d4f8277533ac1444f1dd05fb4412f8",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_handwraps.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39364,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_handwraps",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_04 PM (6).png",
+      "sourceSha256": "951bf623cd0fa33829d75f54ad0810f0e5165ed4beede107262ca0950241ab68",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_rallying_call.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39575,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_rallying_call",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_05 PM (7).png",
+      "sourceSha256": "8a3e919052e99123cca14a7ad98f9cec962ac837b0062bd58d9a11398e131157",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_scroll_supplies.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 36956,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_scroll_supplies",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_05 PM (8).png",
+      "sourceSha256": "599d4db18ca0472a9f67f0fbe04745c690fab11f2a02da08666185424100ad87",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Items/item_ore_chunk.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 35685,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_ore_chunk",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_05 PM (9).png",
+      "sourceSha256": "358d6e8634975519f561d71de24f485ce985c95cba987f4deafc260f4c4754d5",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Items/item_torn_cloth.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 34040,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_torn_cloth",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_17 PM (1).png",
+      "sourceSha256": "93d1a84cc0b7bc2af6c72df22558fffbc9bec1c60331efdf8c3ec14d331c4ef3",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_hampering_strike.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 37185,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_hampering_strike",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_17 PM (2).png",
+      "sourceSha256": "87163963d44dfa21c7bce9460a8513823a8404918f6005d8c303cdf1dcf49384",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/UI/menu_spellbook.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 35189,
+      "assetType": "icon",
+      "category": "ui",
+      "bucket": "ui",
+      "iconId": "menu_spellbook",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_18 PM (8).png",
+      "sourceSha256": "ebb112236f01388d0a40466bd9882b5e0eddfd404d1799fd050c781e714b91a3",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_field_boots.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 34082,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_field_boots",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_18 PM (10).png",
+      "sourceSha256": "3c91a5c397f2fbedeb5624ddce8d95eb1bdaeb6ce0d8939097648763b6b8f408",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_field_dressing.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 36110,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_field_dressing",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "assetType": "icon",
+      "category": "ui",
+      "bucket": "fallback",
+      "iconId": "icon_missing",
+      "path": "Content/Art/Icons/UI/icon_missing.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 913,
+      "generated": true,
+      "usage": "Fallback for missing or unknown icon ids."
+    }
+  ],
+  "assets": [
+    {
+      "sourceRelativePath": "core terrain/ChatGPT Image Apr 25, 2026, 07_32_28 PM (2).png",
+      "sourceSha256": "407db1ffa270d6ef410605131c6078dbad5140a65fbd162b958554cec24ee3cd",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/stonewake_grass_lush.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 3065292,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "grass",
+      "materialId": "mat_stonewake_grass_lush"
+    },
+    {
+      "sourceRelativePath": "core terrain/ChatGPT Image Apr 25, 2026, 07_32_28 PM (5).png",
+      "sourceSha256": "9c5bc9abfe57caf0b5c31ccf71b0d84bdd23b04f942f661f34c6b2b32fc3df5f",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/stonewake_grass_worn.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2736928,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "grass",
+      "materialId": "mat_stonewake_grass_worn"
+    },
+    {
+      "sourceRelativePath": "core terrain/ChatGPT Image Apr 25, 2026, 07_32_24 PM.png",
+      "sourceSha256": "f8579adf7f0d1d22eb7faa4eb8d169e8d8945477f26dc5d75fccc7fc400cc255",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/stonewake_farm_furrows.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2631577,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "farm_soil",
+      "materialId": "mat_valefurrow_farm_soil"
+    },
+    {
+      "sourceRelativePath": "core terrain/ChatGPT Image Apr 25, 2026, 07_32_28 PM (6).png",
+      "sourceSha256": "8829def0d862e57f79bcd5d1e1400256175b50fa21e7e7352334e43720492e85",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/stonewake_mud_dark.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2570941,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "mud",
+      "materialId": "mat_stonewake_mud_dark"
+    },
+    {
+      "sourceRelativePath": "core terrain/ChatGPT Image Apr 25, 2026, 07_32_28 PM (8).png",
+      "sourceSha256": "cc4e2281536ce33376c83ce30e700edbbd7ddaf07dde2d9d87c2e9aea380f15a",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/shore_sand_pebbles.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2991934,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "sand",
+      "materialId": "mat_tideworn_shore_sand"
+    },
+    {
+      "sourceRelativePath": "core terrain/ChatGPT Image Apr 25, 2026, 07_32_39 PM (1).png",
+      "sourceSha256": "2accbc944b5b4f1679d4eb241f3139891816a91e8e3927cbbefe9508b0dc75ce",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/rocky_ground_gray.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2858693,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "rocky_ground",
+      "materialId": "mat_stonewake_rocky_ground"
+    },
+    {
+      "sourceRelativePath": "Roads_paths_bridges_surfaces/ChatGPT Image Apr 25, 2026, 07_14_43 PM (1).png",
+      "sourceSha256": "876eb462206bddcbb855e5d2c6b1eb7000ce21df5a3af9986b8fffd29b1b7a68",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/stonewake_dirt_path.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2668308,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "roads_paths",
+      "materialId": "mat_stonewake_dirt_path"
+    },
+    {
+      "sourceRelativePath": "Roads_paths_bridges_surfaces/ChatGPT Image Apr 25, 2026, 07_14_44 PM (8).png",
+      "sourceSha256": "65fe5d3bc807c0bd1b49ed5ed6e4fec7a2eecbd9a271324630866b19878659fe",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Architecture/hearthwatch_cobble_path.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2945568,
+      "assetType": "texture",
+      "category": "architecture",
+      "bucket": "stone_path",
+      "materialId": "mat_hearthwatch_cobble_path"
+    },
+    {
+      "sourceRelativePath": "Roads_paths_bridges_surfaces/ChatGPT Image Apr 25, 2026, 07_17_32 PM (4).png",
+      "sourceSha256": "ed0129b4206a68bffb61502a11de1da94212df81003c5835a48fc0a52e7ed070",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Wood/harbor_dock_planks.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2449399,
+      "assetType": "texture",
+      "category": "buildings",
+      "bucket": "dock_planks",
+      "materialId": "mat_harbor_dock_planks"
+    },
+    {
+      "sourceRelativePath": "Buildings_human_settlement_textures/ChatGPT Image Apr 25, 2026, 07_15_43 PM (4).png",
+      "sourceSha256": "e768f9062ae4e6b54d38f1bb80d07e29f659b1ae502af00547dce603894cc467",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Wood/village_weathered_planks.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2421966,
+      "assetType": "texture",
+      "category": "buildings",
+      "bucket": "wood",
+      "materialId": "mat_hearthwatch_village_wood"
+    },
+    {
+      "sourceRelativePath": "Buildings_human_settlement_textures/ChatGPT Image Apr 25, 2026, 07_15_43 PM (5).png",
+      "sourceSha256": "763c512a94b02bdd4ec72f9aa6f9ec51d32b06bd64fb0400d062067ecf6f2a0c",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Architecture/village_thatch_roof.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2269792,
+      "assetType": "texture",
+      "category": "buildings",
+      "bucket": "roofing",
+      "materialId": "mat_hearthwatch_thatch_roof"
+    },
+    {
+      "sourceRelativePath": "Buildings_human_settlement_textures/ChatGPT Image Apr 25, 2026, 07_15_43 PM (6).png",
+      "sourceSha256": "0a87f7eb3ca40cdec6b6d24c2f309737213f6b61e7f402be902e36c953fe162c",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Architecture/village_wood_shingles.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2580012,
+      "assetType": "texture",
+      "category": "buildings",
+      "bucket": "roofing",
+      "materialId": "mat_hearthwatch_wood_shingles"
+    },
+    {
+      "sourceRelativePath": "Buildings_human_settlement_textures/ChatGPT Image Apr 25, 2026, 07_15_43 PM (7).png",
+      "sourceSha256": "10c45ef5b5e711c647a6843ef6d81ff12ff98ae95f4a58e1c770f86e1abb67e6",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Stone/village_cut_stone.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2158267,
+      "assetType": "texture",
+      "category": "buildings",
+      "bucket": "stone",
+      "materialId": "mat_hearthwatch_cut_stone"
+    },
+    {
+      "sourceRelativePath": "Buildings_human_settlement_textures/ChatGPT Image Apr 25, 2026, 07_15_43 PM (8).png",
+      "sourceSha256": "b2a147fff3cb95625bd201962a7493fb498a37bff30dc19d526b5906a218972f",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Architecture/village_white_plaster.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2715428,
+      "assetType": "texture",
+      "category": "buildings",
+      "bucket": "plaster",
+      "materialId": "mat_hearthwatch_village_plaster"
+    },
+    {
+      "sourceRelativePath": "Buildings_human_settlement_textures/ChatGPT Image Apr 25, 2026, 07_18_32 PM (5).png",
+      "sourceSha256": "c5c5af24c6d6e8b215e49e266aa63ae20763577a881963270023630532474538",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Props/barrel_wood.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2136178,
+      "assetType": "texture",
+      "category": "props",
+      "bucket": "barrels",
+      "materialId": "mat_prop_barrel_wood"
+    },
+    {
+      "sourceRelativePath": "Buildings_human_settlement_textures/ChatGPT Image Apr 25, 2026, 07_18_32 PM (6).png",
+      "sourceSha256": "826f7a62b1fffbf8018f9edb2d92dce2825b8f5e5d2811b359abdabfcaeb9674",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Props/crate_weathered_wood.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2537651,
+      "assetType": "texture",
+      "category": "props",
+      "bucket": "crates",
+      "materialId": "mat_prop_crate_wood"
+    },
+    {
+      "sourceRelativePath": "Training and combat objects/ChatGPT Image Apr 25, 2026, 07_42_46 PM.png",
+      "sourceSha256": "f21d2b300bc9246ee4e32bf7ecb0c79ef0084da13485e6760e928038a53167b8",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Props/sack_cloth.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2712839,
+      "assetType": "texture",
+      "category": "props",
+      "bucket": "sacks",
+      "materialId": "mat_prop_sack_cloth"
+    },
+    {
+      "sourceRelativePath": "Rock_cliff_mountain_cave_textures/1.png",
+      "sourceSha256": "f96e2539c4aec1dd6f6e2cb76b24df32a30208a729c4330b456a6d5df064f6cf",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Rock/quarry_stone_gray.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2610982,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "cliff_rock",
+      "materialId": "mat_quarry_stone_gray"
+    },
+    {
+      "sourceRelativePath": "Rock_cliff_mountain_cave_textures/4.png",
+      "sourceSha256": "f325b53ab333aad3698f56aef65056d9e13044f7f80bfccec0283e8a927dd782",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Rock/cave_black_rock.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2664840,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "cave",
+      "materialId": "mat_cave_black_rock"
+    },
+    {
+      "sourceRelativePath": "Rock_cliff_mountain_cave_textures/8.png",
+      "sourceSha256": "71c92ba20b5e60d4a82a05e2749af547a0f860bfb9953ba8737c1c70d7464674",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/FX/volcanic_lava_cracks.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2659934,
+      "assetType": "texture",
+      "category": "fx",
+      "bucket": "lava",
+      "materialId": "mat_ashen_lava_cracks"
+    },
+    {
+      "sourceRelativePath": "Magic, VFX, and emissive/ChatGPT Image Apr 25, 2026, 07_36_25 PM (2).png",
+      "sourceSha256": "c9e1b2a1ece80c63ac9af605123560d0af82eac4001a1a6ff48da7404cfb51e0",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/FX/ancient_rune_gold.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2166935,
+      "assetType": "texture",
+      "category": "fx",
+      "bucket": "emissive_runes",
+      "materialId": "mat_ancient_rune_gold"
+    },
+    {
+      "sourceRelativePath": "Magic, VFX, and emissive/ChatGPT Image Apr 25, 2026, 07_36_26 PM (10).png",
+      "sourceSha256": "1215a4a8acc0091b9b694aff4d64bb77ba59f47f92437288debfe8e0cd445cfc",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/FX/ancient_rune_violet.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2344253,
+      "assetType": "texture",
+      "category": "fx",
+      "bucket": "emissive_runes",
+      "materialId": "mat_ancient_rune_violet"
+    },
+    {
+      "sourceRelativePath": "Magic, VFX, and emissive/ChatGPT Image Apr 25, 2026, 07_38_17 PM (4).png",
+      "sourceSha256": "52d030f65a0e0a641c4c0242d6952e2260892f5d9c04c40eeb25ea071f95e0ae",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Water/stream_water_foam.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 1912047,
+      "assetType": "texture",
+      "category": "fx",
+      "bucket": "water_foam",
+      "materialId": "mat_stream_water_placeholder"
+    },
+    {
+      "sourceRelativePath": "Decals and blend overlays/ChatGPT Image Apr 25, 2026, 07_22_25 PM (4).png",
+      "sourceSha256": "54316ba35ce277cc95144689710149886c4228e9dff189c365a7f542ed112e42",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Foliage/grass_card_patch.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2075391,
+      "assetType": "texture",
+      "category": "foliage",
+      "bucket": "grass_cards",
+      "materialId": "mat_foliage_grass_patch"
+    },
+    {
+      "sourceRelativePath": "Decals and blend overlays/ChatGPT Image Apr 25, 2026, 07_26_31 PM (2).png",
+      "sourceSha256": "d0da027aea3bd2ebca587a1c6bb4b40876fde3834dcc32b59f15ea84a336410c",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Terrain/furrow_blend_overlay.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 1832428,
+      "assetType": "texture",
+      "category": "terrain",
+      "bucket": "farm_soil",
+      "materialId": "mat_valefurrow_furrow_overlay"
+    },
+    {
+      "sourceRelativePath": "Decals and blend overlays/ChatGPT Image Apr 25, 2026, 07_26_31 PM (8).png",
+      "sourceSha256": "f72fa6c622c7009d6249fc1c507fb5616965d85fda94ef9a96756834258de969",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/FX/shore_foam_decal.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 1921170,
+      "assetType": "texture",
+      "category": "fx",
+      "bucket": "water_foam",
+      "materialId": "mat_shore_foam_decal"
+    },
+    {
+      "sourceRelativePath": "Decals and blend overlays/ChatGPT Image Apr 25, 2026, 07_26_31 PM (9).png",
+      "sourceSha256": "19488d20828fa441a66cb0ed903854239a017666cbfbfb13ccddf559ad6c326d",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/FX/blue_rune_decal.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2113378,
+      "assetType": "texture",
+      "category": "fx",
+      "bucket": "emissive_runes",
+      "materialId": "mat_blue_rune_decal"
+    },
+    {
+      "sourceRelativePath": "Leaves and plants/ChatGPT Image Apr 25, 2026, 07_30_20 PM (2).png",
+      "sourceSha256": "80e45a05befbe3225d9adfba17c6f96a89e614d73ca4a54a9f785f577b62164e",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Foliage/mossy_grass_cover.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 3149770,
+      "assetType": "texture",
+      "category": "foliage",
+      "bucket": "moss",
+      "materialId": "mat_foliage_mossy_grass"
+    },
+    {
+      "sourceRelativePath": "Leaves and plants/ChatGPT Image Apr 25, 2026, 07_30_20 PM (5).png",
+      "sourceSha256": "440bc5e34ac079f3133727fc418afa27dd39d1fc4f2d156299a84540814abfaf",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Foliage/shrub_leaves_dense.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2692753,
+      "assetType": "texture",
+      "category": "foliage",
+      "bucket": "shrubs",
+      "materialId": "mat_foliage_shrub_dense"
+    },
+    {
+      "sourceRelativePath": "Leaves and plants/ChatGPT Image Apr 25, 2026, 07_31_43 PM (1).png",
+      "sourceSha256": "6d9807f40980dea22a18af0ec8c66084493d8f9708d036a7666eddc919d0fc32",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Foliage/wheat_crop_placeholder.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 3035780,
+      "assetType": "texture",
+      "category": "foliage",
+      "bucket": "crops",
+      "materialId": "mat_crop_wheat_placeholder"
+    },
+    {
+      "sourceRelativePath": "Vegetation_textures _Trees/1.png",
+      "sourceSha256": "87bdde43eb046e32fe80c95560dd6cdfdc6d82f1700deb7600e4631137953535",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Foliage/tree_bark_brown.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2776780,
+      "assetType": "texture",
+      "category": "foliage",
+      "bucket": "bark",
+      "materialId": "mat_tree_bark_brown"
+    },
+    {
+      "sourceRelativePath": "Vegetation_textures _Trees/2.png",
+      "sourceSha256": "3c9e55901b2c99b9eae4836964fb0d44026d382138508fb516b21dc0f612159b",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Textures/Foliage/tree_bark_rugged.png",
+      "runtimeDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "sizeBytes": 2446088,
+      "assetType": "texture",
+      "category": "foliage",
+      "bucket": "bark",
+      "materialId": "mat_tree_bark_rugged"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_46 PM.png",
+      "sourceSha256": "cc11e17e3c03467fc5910ff23ceffffd74b7d722268f0ec060dee14b2013aad2",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_auto_attack.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39485,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_auto_attack",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_52 PM (1).png",
+      "sourceSha256": "cc11e17e3c03467fc5910ff23ceffffd74b7d722268f0ec060dee14b2013aad2",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_steady_strike.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39485,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_steady_strike",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_52 PM (2).png",
+      "sourceSha256": "2a9265eedfd5116006f95f27f0ff7a1ee805023eadece9645bf34ced57b00323",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_brace.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 38416,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_brace",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_52 PM (4).png",
+      "sourceSha256": "529e159942be25d9b97313b158369ec3123636f43a1d08f153a5a2f43eff8ed4",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_fire_placeholder.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 34932,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_fire_placeholder",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_53 PM (6).png",
+      "sourceSha256": "b8dbb2583c09decd2b2efd93bf1cf6626d3cc59751cb5efcdbd0d517694f6ef4",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_road_ration.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 35457,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_road_ration",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_54 PM (7).png",
+      "sourceSha256": "441c8c22d4f67ef83f29305950ed62456081112e8314fd734d56fcca5b7978ab",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Items/item_oat_bundle.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 41131,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_oat_bundle",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_54 PM (8).png",
+      "sourceSha256": "d07132e318705769554a2b46058c8a1bcaaa9e41a2bf310a966d3f67f79a0c68",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/currency_copper.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 38698,
+      "assetType": "icon",
+      "category": "currency",
+      "bucket": "currency",
+      "iconId": "currency_copper",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_44_55 PM (9).png",
+      "sourceSha256": "2760b3b7a773a0cca7ff85b82e2dfc232269af2897bbb5916f84747535897050",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_militia_token.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 41302,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_militia_token",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_03 PM (1).png",
+      "sourceSha256": "65b1ddf2ee8913be5f8b64d40ef4cc5110251c2835338e530dc3723714241103",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_driving_blow.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 38790,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_driving_blow",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_03 PM (2).png",
+      "sourceSha256": "2fa2129c002f77875263e04dba26bafe59ed79c062cea24436482018b99f90a3",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_padded_vest.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 41566,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_padded_vest",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_03 PM (3).png",
+      "sourceSha256": "5f1027856697833796b1098d88ffe3dd77d4f8277533ac1444f1dd05fb4412f8",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_handwraps.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39364,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_handwraps",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_04 PM (6).png",
+      "sourceSha256": "951bf623cd0fa33829d75f54ad0810f0e5165ed4beede107262ca0950241ab68",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_rallying_call.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 39575,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_rallying_call",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_05 PM (7).png",
+      "sourceSha256": "8a3e919052e99123cca14a7ad98f9cec962ac837b0062bd58d9a11398e131157",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_scroll_supplies.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 36956,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_scroll_supplies",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_05 PM (8).png",
+      "sourceSha256": "599d4db18ca0472a9f67f0fbe04745c690fab11f2a02da08666185424100ad87",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Items/item_ore_chunk.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 35685,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_ore_chunk",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_05 PM (9).png",
+      "sourceSha256": "358d6e8634975519f561d71de24f485ce985c95cba987f4deafc260f4c4754d5",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Items/item_torn_cloth.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 34040,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_torn_cloth",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_17 PM (1).png",
+      "sourceSha256": "93d1a84cc0b7bc2af6c72df22558fffbc9bec1c60331efdf8c3ec14d331c4ef3",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Abilities/ability_hampering_strike.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 37185,
+      "assetType": "icon",
+      "category": "ability",
+      "bucket": "ability",
+      "iconId": "ability_hampering_strike",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_17 PM (2).png",
+      "sourceSha256": "87163963d44dfa21c7bce9460a8513823a8404918f6005d8c303cdf1dcf49384",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/UI/menu_spellbook.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 35189,
+      "assetType": "icon",
+      "category": "ui",
+      "bucket": "ui",
+      "iconId": "menu_spellbook",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_18 PM (8).png",
+      "sourceSha256": "ebb112236f01388d0a40466bd9882b5e0eddfd404d1799fd050c781e714b91a3",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_field_boots.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 34082,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_field_boots",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "sourceRelativePath": "icons/ChatGPT Image Apr 25, 2026, 07_45_18 PM (10).png",
+      "sourceSha256": "3c91a5c397f2fbedeb5624ddce8d95eb1bdaeb6ce0d8939097648763b6b8f408",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "path": "Content/Art/Icons/Inventory/item_field_dressing.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 36110,
+      "assetType": "icon",
+      "category": "item",
+      "bucket": "item",
+      "iconId": "item_field_dressing",
+      "fallback": "Content/Art/Icons/UI/icon_missing.png"
+    },
+    {
+      "assetType": "icon",
+      "category": "ui",
+      "bucket": "fallback",
+      "iconId": "icon_missing",
+      "path": "Content/Art/Icons/UI/icon_missing.png",
+      "runtimeDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "sizeBytes": 913,
+      "generated": true,
+      "usage": "Fallback for missing or unknown icon ids."
+    }
+  ],
+  "skippedPolicy": [
+    {
+      "bucket": "duplicates",
+      "reason": "Exact SHA-256 duplicate of an imported or reviewed source image."
+    },
+    {
+      "bucket": "dawnwake_maps",
+      "reason": "Reference maps, not runtime textures/icons for this import."
+    },
+    {
+      "bucket": "unused_generated_variants",
+      "reason": "Release 0.2.0 imports a curated optimized subset for coverage and repo size control."
+    }
+  ]
+}

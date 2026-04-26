@@ -5,10 +5,10 @@ param(
     [int]$DurationMinutes = 5,
     [string]$StepInterval = "250ms",
     [string]$OutputRoot = "",
-    [string]$AuthEndpoint = "http://localhost:8081",
-    [string]$RealmEndpoint = "http://localhost:8083",
-    [string]$CharacterEndpoint = "http://localhost:8084",
-    [string]$WorldEndpoint = "http://localhost:8085"
+    [string]$AuthEndpoint = "http://127.0.0.1:8081",
+    [string]$RealmEndpoint = "http://127.0.0.1:8083",
+    [string]$CharacterEndpoint = "http://127.0.0.1:8084",
+    [string]$WorldEndpoint = "http://127.0.0.1:8085"
 )
 
 $ErrorActionPreference = "Stop"

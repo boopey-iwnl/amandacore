@@ -2,9 +2,9 @@ param(
     [string]$Username = "alpha_tester",
     [string]$Password = "AlphaTest!123",
     [string]$CharacterName = "Alphaone",
-    [string]$AuthBaseUrl = "http://localhost:8081",
-    [string]$RealmBaseUrl = "http://localhost:8083",
-    [string]$CharacterBaseUrl = "http://localhost:8084",
+    [string]$AuthBaseUrl = "http://127.0.0.1:8081",
+    [string]$RealmBaseUrl = "http://127.0.0.1:8083",
+    [string]$CharacterBaseUrl = "http://127.0.0.1:8084",
     [switch]$SelfTest
 )
 

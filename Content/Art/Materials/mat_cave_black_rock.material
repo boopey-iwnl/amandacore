@@ -1,0 +1,17 @@
+{
+    "description": "AmandaCore 0.2 source material for mat_cave_black_rock.",
+    "materialType": "@gemroot:Atom_Feature_Common@/Assets/Materials/Types/StandardPBR.materialtype",
+    "materialTypeVersion": 5,
+    "propertyValues": {
+        "baseColor.color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        ],
+        "baseColor.textureBlendMode": "Lerp",
+        "baseColor.textureMap": "../Textures/Rock/cave_black_rock.png",
+        "roughness.factor": 0.82,
+        "metallic.factor": 0.0
+    }
+}

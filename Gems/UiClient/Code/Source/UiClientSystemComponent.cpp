@@ -780,22 +780,29 @@ namespace UiClient
         {
             if (abilityId == AutoAttackAbilityId)
             {
-                return "weapon";
+                return "ability_auto_attack";
             }
-            if (abilityId == SteadyStrikeAbilityId || abilityId == DrivingBlowAbilityId ||
-                abilityId == HamperingStrikeAbilityId || abilityId == OverhandCutAbilityId)
+            if (abilityId == SteadyStrikeAbilityId)
             {
-                return "strike";
+                return "ability_steady_strike";
+            }
+            if (abilityId == DrivingBlowAbilityId || abilityId == OverhandCutAbilityId)
+            {
+                return "ability_driving_blow";
+            }
+            if (abilityId == HamperingStrikeAbilityId)
+            {
+                return "ability_hampering_strike";
             }
             if (abilityId == BraceAbilityId || abilityId == GuardedFormAbilityId || abilityId == IronResolveAbilityId)
             {
-                return "defense";
+                return "ability_brace";
             }
             if (abilityId == RallyingCallAbilityId)
             {
-                return "utility";
+                return "ability_rallying_call";
             }
-            return "ability";
+            return "icon_missing";
         }
 
         AZStd::string ItemIconKind(const NetClient::InventorySlotState& slot)
@@ -806,29 +813,70 @@ namespace UiClient
             }
             if (slot.m_itemType == "weapon")
             {
-                return "weapon";
+                return "ability_auto_attack";
             }
             if (slot.m_itemType == "armor")
             {
-                return "armor";
+                return "item_padded_vest";
             }
             if (slot.m_itemType == "consumable")
             {
-                return "consumable";
+                return "item_road_ration";
             }
             if (slot.m_itemType == "material")
             {
-                return "material";
+                return "item_ore_chunk";
             }
             if (slot.m_itemType == "quest")
             {
-                return "quest";
+                return "item_scroll_supplies";
             }
             if (slot.m_itemType == "junk")
             {
-                return "junk";
+                return "item_torn_cloth";
             }
-            return "item";
+            return "icon_missing";
+        }
+
+        AZStd::string IconFamily(const AZStd::string& kind)
+        {
+            if (kind == "ability_auto_attack" || kind == "ability_steady_strike" ||
+                kind == "ability_driving_blow" || kind == "ability_hampering_strike" ||
+                kind == "weapon" || kind == "strike")
+            {
+                return "strike";
+            }
+            if (kind == "ability_brace" || kind == "item_padded_vest" || kind == "item_handwraps" ||
+                kind == "armor" || kind == "defense")
+            {
+                return "defense";
+            }
+            if (kind == "ability_rallying_call" || kind == "item_road_ration" || kind == "item_field_dressing" ||
+                kind == "consumable" || kind == "utility")
+            {
+                return "utility";
+            }
+            if (kind == "item_oat_bundle" || kind == "menu_spellbook")
+            {
+                return "nature";
+            }
+            if (kind == "item_ore_chunk" || kind == "material")
+            {
+                return "material";
+            }
+            if (kind == "item_scroll_supplies" || kind == "item_militia_token" || kind == "quest")
+            {
+                return "quest";
+            }
+            if (kind == "currency_copper")
+            {
+                return "currency";
+            }
+            if (kind == "item_torn_cloth" || kind == "junk")
+            {
+                return "cloth";
+            }
+            return "missing";
         }
 
         void DrawProceduralIcon(
@@ -838,32 +886,89 @@ namespace UiClient
             const AZStd::string& kind,
             bool muted = false)
         {
-            const ImU32 baseColor = muted
-                ? ColorU32(55, 52, 49, 255)
-                : (kind == "weapon" || kind == "strike"
-                    ? ColorU32(94, 58, 44, 255)
-                    : (kind == "defense" || kind == "armor"
-                        ? ColorU32(43, 73, 88, 255)
-                        : (kind == "consumable" || kind == "utility"
-                            ? ColorU32(50, 91, 68, 255)
-                            : (kind == "material"
-                                ? ColorU32(76, 67, 49, 255)
-                                : (kind == "quest"
-                                    ? ColorU32(91, 73, 35, 255)
-                                    : ColorU32(58, 62, 72, 255))))));
-            const ImU32 accentColor = muted
-                ? ColorU32(128, 118, 96, 255)
-                : (kind == "weapon" || kind == "strike"
-                    ? ColorU32(232, 187, 96, 255)
-                    : (kind == "defense" || kind == "armor"
-                        ? ColorU32(146, 203, 221, 255)
-                        : (kind == "consumable" || kind == "utility"
-                            ? ColorU32(163, 220, 145, 255)
-                            : (kind == "material"
-                                ? ColorU32(214, 183, 118, 255)
-                                : (kind == "quest"
-                                    ? ColorU32(238, 213, 109, 255)
-                                    : ColorU32(205, 205, 194, 255))))));
+            const AZStd::string family = IconFamily(kind);
+            const auto baseColorForFamily = [](const AZStd::string& iconFamily, bool isMuted) -> ImU32
+            {
+                if (isMuted)
+                {
+                    return ColorU32(55, 52, 49, 255);
+                }
+                if (iconFamily == "strike")
+                {
+                    return ColorU32(94, 58, 44, 255);
+                }
+                if (iconFamily == "defense")
+                {
+                    return ColorU32(43, 73, 88, 255);
+                }
+                if (iconFamily == "utility")
+                {
+                    return ColorU32(50, 91, 68, 255);
+                }
+                if (iconFamily == "nature")
+                {
+                    return ColorU32(34, 79, 48, 255);
+                }
+                if (iconFamily == "material")
+                {
+                    return ColorU32(76, 67, 49, 255);
+                }
+                if (iconFamily == "quest")
+                {
+                    return ColorU32(91, 73, 35, 255);
+                }
+                if (iconFamily == "currency")
+                {
+                    return ColorU32(90, 70, 34, 255);
+                }
+                if (iconFamily == "cloth")
+                {
+                    return ColorU32(84, 48, 48, 255);
+                }
+                return ColorU32(58, 62, 72, 255);
+            };
+            const auto accentColorForFamily = [](const AZStd::string& iconFamily, bool isMuted) -> ImU32
+            {
+                if (isMuted)
+                {
+                    return ColorU32(128, 118, 96, 255);
+                }
+                if (iconFamily == "strike")
+                {
+                    return ColorU32(232, 187, 96, 255);
+                }
+                if (iconFamily == "defense")
+                {
+                    return ColorU32(146, 203, 221, 255);
+                }
+                if (iconFamily == "utility")
+                {
+                    return ColorU32(163, 220, 145, 255);
+                }
+                if (iconFamily == "nature")
+                {
+                    return ColorU32(168, 221, 122, 255);
+                }
+                if (iconFamily == "material")
+                {
+                    return ColorU32(214, 183, 118, 255);
+                }
+                if (iconFamily == "quest")
+                {
+                    return ColorU32(238, 213, 109, 255);
+                }
+                if (iconFamily == "currency")
+                {
+                    return ColorU32(239, 191, 86, 255);
+                }
+                if (iconFamily == "cloth")
+                {
+                    return ColorU32(221, 108, 91, 255);
+                }
+                return ColorU32(205, 205, 194, 255);
+            };
+            const ImU32 baseColor = baseColorForFamily(family, muted);
+            const ImU32 accentColor = accentColorForFamily(family, muted);
 
             const ImVec2 center((minBounds.x + maxBounds.x) * 0.5f, (minBounds.y + maxBounds.y) * 0.5f);
             const float width = maxBounds.x - minBounds.x;
@@ -871,7 +976,20 @@ namespace UiClient
             drawList->AddRectFilled(minBounds, maxBounds, baseColor, 7.0f);
             drawList->AddRect(minBounds, maxBounds, ColorU32(201, 159, 78, muted ? 120 : 210), 7.0f, 0, 1.5f);
 
-            if (kind == "weapon" || kind == "strike")
+            if (family == "missing")
+            {
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.28f, minBounds.y + height * 0.28f),
+                    ImVec2(maxBounds.x - width * 0.28f, maxBounds.y - height * 0.28f),
+                    accentColor,
+                    3.0f);
+                drawList->AddLine(
+                    ImVec2(maxBounds.x - width * 0.28f, minBounds.y + height * 0.28f),
+                    ImVec2(minBounds.x + width * 0.28f, maxBounds.y - height * 0.28f),
+                    accentColor,
+                    3.0f);
+            }
+            else if (family == "strike")
             {
                 drawList->AddLine(
                     ImVec2(minBounds.x + width * 0.25f, maxBounds.y - height * 0.23f),
@@ -884,7 +1002,7 @@ namespace UiClient
                     ImVec2(maxBounds.x - width * 0.20f, minBounds.y + height * 0.34f),
                     accentColor);
             }
-            else if (kind == "defense" || kind == "armor")
+            else if (family == "defense")
             {
                 drawList->AddTriangleFilled(
                     ImVec2(center.x, minBounds.y + height * 0.18f),
@@ -897,7 +1015,7 @@ namespace UiClient
                     ImVec2(center.x, maxBounds.y - height * 0.16f),
                     ColorU32(100, 151, 171, muted ? 160 : 255));
             }
-            else if (kind == "consumable" || kind == "utility")
+            else if (family == "utility")
             {
                 drawList->AddCircleFilled(center, AZ::GetMin(width, height) * 0.22f, accentColor, 24);
                 drawList->AddRectFilled(
@@ -906,12 +1024,23 @@ namespace UiClient
                     ColorU32(226, 237, 202, muted ? 120 : 230),
                     3.0f);
             }
-            else if (kind == "material")
+            else if (family == "nature")
+            {
+                drawList->AddLine(
+                    ImVec2(center.x, maxBounds.y - height * 0.18f),
+                    ImVec2(center.x, minBounds.y + height * 0.22f),
+                    accentColor,
+                    3.0f);
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.16f, center.y - height * 0.04f), width * 0.13f, accentColor, 16);
+                drawList->AddCircleFilled(ImVec2(center.x + width * 0.16f, center.y - height * 0.10f), width * 0.12f, ColorU32(118, 190, 89, muted ? 140 : 255), 16);
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.04f, center.y - height * 0.20f), width * 0.11f, ColorU32(206, 186, 84, muted ? 130 : 255), 16);
+            }
+            else if (family == "material")
             {
                 drawList->AddCircleFilled(ImVec2(center.x - width * 0.10f, center.y + height * 0.06f), width * 0.16f, accentColor, 16);
                 drawList->AddCircleFilled(ImVec2(center.x + width * 0.13f, center.y - height * 0.08f), width * 0.13f, ColorU32(184, 160, 103, muted ? 120 : 255), 16);
             }
-            else if (kind == "quest")
+            else if (family == "quest")
             {
                 drawList->AddRectFilled(
                     ImVec2(minBounds.x + width * 0.28f, minBounds.y + height * 0.18f),
@@ -922,6 +1051,26 @@ namespace UiClient
                     ImVec2(minBounds.x + width * 0.36f, minBounds.y + height * 0.36f),
                     ImVec2(maxBounds.x - width * 0.34f, minBounds.y + height * 0.36f),
                     baseColor,
+                    2.0f);
+            }
+            else if (family == "currency")
+            {
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.12f, center.y + height * 0.04f), width * 0.17f, accentColor, 24);
+                drawList->AddCircle(ImVec2(center.x - width * 0.12f, center.y + height * 0.04f), width * 0.17f, ColorU32(255, 236, 149, muted ? 110 : 230), 24, 2.0f);
+                drawList->AddCircleFilled(ImVec2(center.x + width * 0.12f, center.y - height * 0.06f), width * 0.15f, ColorU32(221, 151, 66, muted ? 120 : 255), 24);
+            }
+            else if (family == "cloth")
+            {
+                drawList->AddQuadFilled(
+                    ImVec2(minBounds.x + width * 0.22f, minBounds.y + height * 0.24f),
+                    ImVec2(maxBounds.x - width * 0.18f, minBounds.y + height * 0.30f),
+                    ImVec2(maxBounds.x - width * 0.28f, maxBounds.y - height * 0.20f),
+                    ImVec2(minBounds.x + width * 0.16f, maxBounds.y - height * 0.26f),
+                    accentColor);
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.25f, center.y),
+                    ImVec2(maxBounds.x - width * 0.25f, center.y + height * 0.04f),
+                    ColorU32(255, 186, 165, muted ? 120 : 220),
                     2.0f);
             }
             else

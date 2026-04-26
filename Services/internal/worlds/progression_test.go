@@ -197,7 +197,7 @@ func TestDevQuestGraphProgressionAndRewards(t *testing.T) {
 }
 
 func TestProgressionPersistenceStoresQuestAndInventory(t *testing.T) {
-	fileStore, err := store.NewFileStore(filepath.Join(t.TempDir(), "platform-state.json"), "test-build", "http://localhost:8085")
+	fileStore, err := store.NewFileStore(filepath.Join(t.TempDir(), "platform-state.json"), "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("store create failed: %v", err)
 	}
