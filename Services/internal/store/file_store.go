@@ -58,6 +58,7 @@ type state struct {
 	HousingStorage      map[string][]platform.HousingStorageSlot  `json:"housingStorage"`
 	HousingDecorations  map[string][]platform.DecorationPlacement `json:"housingDecorations"`
 	AccountProgress     map[string]platform.AccountProgressState  `json:"accountProgress"`
+	MigrationHistory    map[string]MigrationRecord                `json:"migrationHistory"`
 	BuildManifest       platform.BuildManifest                    `json:"buildManifest"`
 }
 
@@ -68,7 +69,16 @@ type FileStore struct {
 	state    state
 }
 
+type FileStoreOpenOptions struct {
+	ApplyMigrations bool
+	SaveOnOpen      bool
+}
+
 func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore, error) {
+	return NewFileStoreWithOptions(path, buildID, worldEndpoint, FileStoreOpenOptions{ApplyMigrations: true, SaveOnOpen: true})
+}
+
+func NewFileStoreWithOptions(path string, buildID string, worldEndpoint string, options FileStoreOpenOptions) (*FileStore, error) {
 	buildManifest := defaultBuildManifest(buildID, worldEndpoint)
 	fileStore := &FileStore{
 		path:     path,
@@ -94,6 +104,7 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 			HousingStorage:      map[string][]platform.HousingStorageSlot{},
 			HousingDecorations:  map[string][]platform.DecorationPlacement{},
 			AccountProgress:     map[string]platform.AccountProgressState{},
+			MigrationHistory:    map[string]MigrationRecord{},
 			BuildManifest:       buildManifest,
 		},
 	}
@@ -103,8 +114,19 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 	}
 	defer fileStore.unlockState()
 
+	if options.ApplyMigrations {
+		if _, err := fileStore.applyMigrationsLocked(MigrationOptions{}); err != nil {
+			return nil, err
+		}
+	}
 	fileStore.applyRuntimeBuildManifest(buildManifest, worldEndpoint)
-	return fileStore, fileStore.saveLocked()
+	if !options.SaveOnOpen {
+		return fileStore, nil
+	}
+	if err := fileStore.saveLocked(); err != nil {
+		return nil, err
+	}
+	return fileStore, nil
 }
 
 func (s *FileStore) RegisterAccount(username string, password string) (platform.Account, error) {
@@ -1651,6 +1673,9 @@ func (s *FileStore) load() error {
 		}
 		s.state.AccountProgress = loaded.AccountProgress
 	}
+	if loaded.MigrationHistory != nil {
+		s.state.MigrationHistory = loaded.MigrationHistory
+	}
 	if loaded.BuildManifest.ID != "" {
 		s.state.BuildManifest = loaded.BuildManifest
 	}
@@ -1748,6 +1773,9 @@ func (s *FileStore) reloadLocked() error {
 		for accountID, progress := range loaded.AccountProgress {
 			loaded.AccountProgress[accountID] = platform.NormalizeAccountProgress(accountID, progress)
 		}
+	}
+	if loaded.MigrationHistory == nil {
+		loaded.MigrationHistory = map[string]MigrationRecord{}
 	}
 	if loaded.BuildManifest.ID == "" {
 		loaded.BuildManifest = s.state.BuildManifest
