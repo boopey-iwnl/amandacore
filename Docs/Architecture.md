@@ -57,6 +57,12 @@ Each Gem has a single, durable responsibility:
 
 The data model is deliberately wider than the first slice so future work can scale without a rewrite. JSON Schema definitions live in `Content/Schemas/gameplay.schema.json`, and example authored content lives in `Content/GameData/ZoneSlice`.
 
+### Zone handoff and shard coordination
+
+The first server-authoritative handoff skeleton is documented in `Docs/ZoneHandoffShardCoordinator.md`. The Go world runtime now owns deterministic zone-to-shard assignments, in-process shard worker states, per-zone queue capacity, character zone ownership, handoff request/accept/reject/complete records, reconnect correction, and a `zone-handoff-basic` load simulator.
+
+This is not a distributed runtime yet. It keeps execution in one world process while shaping the contracts needed for future shard workers, durable handoff journals, and content-authored transition gates.
+
 ## Recommended future O3DE wiring
 
 - Build `AmandaCoreShared` as a normal static library and link it into both client and server Gems.
