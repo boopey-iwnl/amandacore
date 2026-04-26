@@ -1300,6 +1300,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"vendor":               s.buildVendorResponse(session),
 		"quest":                s.buildQuestResponse(session),
 		"quests":               s.buildQuestListResponse(session),
+		"killCredits":          buildKillCreditResponse(session.KillCredits),
 		"lootContainers":       s.buildLootContainersResponseLocked(session),
 		"domainEvents":         cloneDomainEvents(s.domainEvents),
 		"stateDiffs":           cloneStateDiffs(s.stateDiffs),
