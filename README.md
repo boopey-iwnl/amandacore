@@ -57,3 +57,13 @@ The local stack waits for each service to report healthy before returning contro
 - retain position state
 
 Milestone `0.1` hardening details, commands, and pass/fail behavior are documented in `Docs/Milestone01-AccountToWorld.md`.
+
+## Server interaction load simulation
+
+The authoritative server-side interaction pipeline can be exercised without O3DE or the launcher:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\run-world-loadsim.ps1 -Clients 100 -DurationSeconds 60 -CommandsPerSecond 5
+```
+
+The simulator runs in process against AmandaCore's session gateway, world runtime, command queue, movement validator, state diffs, persistence handoff, and metrics. Details are documented in `Docs/ServerInteractionPipeline.md`.

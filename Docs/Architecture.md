@@ -71,6 +71,12 @@ The data model is deliberately wider than the first slice so future work can sca
 - Client performs prediction and interpolation but always accepts authoritative corrections.
 - Domain message and snapshot shapes are defined in `AmandaCoreShared/Messages.h` so alternate transports or backends can adapt without rewriting gameplay code.
 
+## Authoritative interaction pipeline
+
+`Services/internal/simcore` defines AmandaCore-native canonical commands, domain events, and state diffs. `Services/internal/worlds` owns the session gateway, bounded command queue, fixed-step `WorldRuntime`, zone/entity runtime state, authoritative movement validation, dirty-state persistence handoff, and interaction metrics.
+
+The world HTTP service keeps the existing launcher-compatible join, move, disconnect, and reconnect behavior while routing outdoor movement through the canonical queue and tick path. `Docs/ServerInteractionPipeline.md` documents the milestone and the in-process load simulator.
+
 ## Milestone one slice
 
 - One outdoor zone with two streamable cells and one micro-instance hook.

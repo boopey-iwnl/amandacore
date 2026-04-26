@@ -693,6 +693,9 @@ type dungeonInstanceState struct {
 type worldServer struct {
 	store                  *store.FileStore
 	metrics                *worldMetrics
+	gateway                *SessionGateway
+	runtime                *WorldRuntime
+	persistence            *PersistenceHandoff
 	mutex                  sync.Mutex
 	sessionsByToken        map[string]*worldSessionState
 	sessionTokenByChar     map[string]string
@@ -721,9 +724,22 @@ type worldServer struct {
 }
 
 func newWorldServer(fileStore *store.FileStore) *worldServer {
+	gateway := NewSessionGateway()
+	persistence := NewPersistenceHandoff(fileStore)
+	runtime := NewWorldRuntime(WorldRuntimeConfig{
+		MovementRules: MovementRules{
+			MaxStepDistance: defaultMoveMaxStep,
+			Bounds:          RuntimeBounds{MinX: 0, MinY: 0, MaxX: starterZoneMaxX, MaxY: starterZoneMaxY},
+			ServerZ:         playableGroundZ,
+			ControlZ:        true,
+		},
+	}, gateway, persistence)
 	server := &worldServer{
 		store:              fileStore,
 		metrics:            newWorldMetrics(),
+		gateway:            gateway,
+		runtime:            runtime,
+		persistence:        persistence,
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},

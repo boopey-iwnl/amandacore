@@ -10,6 +10,7 @@ import (
 	"amandacore/services/internal/httpapi"
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
+	"amandacore/services/internal/simcore"
 	"amandacore/services/internal/store"
 )
 
@@ -35,13 +36,13 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 			return
 		}
 
-		observability.LogEvent("world-service", "character.selected", map[string]any{
+		observability.LogEvent("world-service", observability.EventCharacterSelected, map[string]any{
 			"accountId":   session.AccountID,
 			"sessionId":   session.ID,
 			"characterId": request.CharacterID,
 			"realmId":     request.RealmID,
 		})
-		observability.LogEvent("world-service", "world.join_ticket_issued", map[string]any{
+		observability.LogEvent("world-service", observability.EventWorldJoinTicketIssued, map[string]any{
 			"accountId":   ticket.AccountID,
 			"sessionId":   ticket.SessionID,
 			"ticketId":    ticket.TicketID,
@@ -171,7 +172,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	observability.LogEvent("world-service", "world.join_ticket_consumed", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldJoinTicketConsumed, map[string]any{
 		"ticketId":    ticket.TicketID,
 		"accountId":   ticket.AccountID,
 		"sessionId":   ticket.SessionID,
@@ -215,7 +216,8 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				s.reviveSessionLocked(session)
 			}
 			s.applyCharacterProgressionLocked(session, character)
-			observability.LogEvent("world-service", "world.player_spawned", map[string]any{
+			s.attachRuntimeSessionLocked(session, time.Now().UTC())
+			observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
 				"worldSessionToken": session.Token,
 				"accountId":         session.AccountID,
 				"characterId":       session.CharacterID,
@@ -256,7 +258,8 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	s.sessionsByToken[session.Token] = session
 	s.sessionTokenByChar[session.CharacterID] = session.Token
-	observability.LogEvent("world-service", "world.player_spawned", map[string]any{
+	s.attachRuntimeSessionLocked(session, time.Now().UTC())
+	observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
@@ -292,6 +295,14 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 		s.metrics.recordSessionEvent("reconnect_missing")
 		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
 		return
+	}
+	if s.gateway != nil {
+		_, _ = s.gateway.RequestReconnect(simcore.SessionID(session.Token), time.Now().UTC())
+		observability.LogEvent("world-service", observability.EventWorldSessionReconnectRequested, map[string]any{
+			"worldSessionToken": session.Token,
+			"accountId":         session.AccountID,
+			"characterId":       session.CharacterID,
+		})
 	}
 
 	character, err := s.store.GetCharacterByID(session.CharacterID)
@@ -335,8 +346,21 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 		s.reviveSessionLocked(session)
 	}
 	s.applyCharacterProgressionLocked(session, character)
+	if s.gateway != nil {
+		_, _ = s.gateway.CompleteReconnect(simcore.SessionID(session.Token), simcore.Vector3{X: session.X, Y: session.Y, Z: session.Z}, time.Now().UTC())
+		observability.LogEvent("world-service", observability.EventWorldSessionReconnectCompleted, map[string]any{
+			"worldSessionToken": session.Token,
+			"accountId":         session.AccountID,
+			"characterId":       session.CharacterID,
+			"zoneId":            session.ZoneID,
+			"x":                 session.X,
+			"y":                 session.Y,
+			"z":                 session.Z,
+		})
+	}
+	s.attachRuntimeSessionLocked(session, time.Now().UTC())
 
-	observability.LogEvent("world-service", "world.reconnected", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldReconnected, map[string]any{
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
@@ -378,26 +402,48 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nextX, nextY := s.resolveMovementLocked(session, request.DeltaX, request.DeltaY)
-	session.X = nextX
-	session.Y = nextY
-	session.LastSeenAt = time.Now().Unix()
-
 	if session.HousingSpaceID != "" || session.InstanceID != "" {
+		nextX, nextY := s.resolveMovementLocked(session, request.DeltaX, request.DeltaY)
+		session.X = nextX
+		session.Y = nextY
+		session.LastSeenAt = time.Now().Unix()
 		httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 		return
 	}
 
-	persistStartedAt := time.Now()
-	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
-	s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
+	authoritative, correctionReason, err := s.processMoveIntentLocked(session, request.DeltaX, request.DeltaY, time.Now().UTC())
 	if err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
+		httpapi.Error(w, http.StatusBadRequest, "movement_rejected", err.Error())
+		return
+	}
+	session.X = authoritative.X
+	session.Y = authoritative.Y
+	session.Z = authoritative.Z
+	session.LastSeenAt = time.Now().Unix()
+
+	persistStartedAt := time.Now()
+	flushResults := s.flushDirtyPersistenceLocked(r.Context(), "move")
+	var flushErr error
+	for _, result := range flushResults {
+		if result.Error != nil {
+			flushErr = result.Error
+			break
+		}
+	}
+	s.recordPersistenceDuration("character_state_move_flush", persistStartedAt, flushErr)
+	if flushErr != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", flushErr.Error())
+		return
+	}
+	character, err := s.store.GetCharacterByID(session.CharacterID)
+	if err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "character_save_readback_failed", err.Error())
 		return
 	}
 
-	observability.LogEvent("world-service", "world.character_saved", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
 		"reason":            "move",
+		"correctionReason":  correctionReason,
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
@@ -433,6 +479,15 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 
 	session.Connected = false
 	session.LastSeenAt = time.Now().Unix()
+	if s.gateway != nil {
+		_, _ = s.gateway.Disconnect(simcore.SessionID(session.Token), "client_disconnect", time.Now().UTC())
+		observability.LogEvent("world-service", observability.EventWorldSessionDetached, map[string]any{
+			"worldSessionToken": session.Token,
+			"accountId":         session.AccountID,
+			"characterId":       session.CharacterID,
+			"reason":            "client_disconnect",
+		})
+	}
 	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
@@ -459,14 +514,32 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 			persistZoneID, persistX, persistY, persistZ = secondZoneID, 590, 342, 0
 		}
 	}
-	character, err := s.store.UpdateCharacterState(session.CharacterID, persistZoneID, persistX, persistY, persistZ)
-	s.recordPersistenceDuration("character_state_disconnect", persistStartedAt, err)
+	s.persistence.MarkCharacterDirty(
+		simcore.CharacterID(session.CharacterID),
+		simcore.ZoneID(persistZoneID),
+		simcore.Vector3{X: persistX, Y: persistY, Z: persistZ},
+		"disconnect",
+		time.Now().UTC())
+	flushResults := s.flushDirtyPersistenceLocked(r.Context(), "disconnect")
+	var flushErr error
+	for _, result := range flushResults {
+		if result.Error != nil {
+			flushErr = result.Error
+			break
+		}
+	}
+	s.recordPersistenceDuration("character_state_disconnect_flush", persistStartedAt, flushErr)
+	if flushErr != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", flushErr.Error())
+		return
+	}
+	character, err := s.store.GetCharacterByID(session.CharacterID)
 	if err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
+		httpapi.Error(w, http.StatusInternalServerError, "character_save_readback_failed", err.Error())
 		return
 	}
 
-	observability.LogEvent("world-service", "world.character_saved", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
 		"reason":            "disconnect",
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,

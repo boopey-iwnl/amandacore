@@ -10,6 +10,7 @@ import (
 
 	"amandacore/services/internal/httpapi"
 	"amandacore/services/internal/observability"
+	"amandacore/services/internal/simcore"
 )
 
 const (
@@ -97,7 +98,14 @@ func (s *worldServer) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	counts := s.sessionCountsLocked()
 	s.mutex.Unlock()
 
-	httpapi.WriteJSON(w, http.StatusOK, s.metrics.snapshot(counts))
+	snapshot := s.metrics.snapshot(counts)
+	if s.runtime != nil {
+		snapshot["interactionRuntime"] = s.runtime.SnapshotMetrics()
+	}
+	if s.persistence != nil {
+		snapshot["persistenceHandoff"] = s.persistence.Stats()
+	}
+	httpapi.WriteJSON(w, http.StatusOK, snapshot)
 }
 
 func (s *worldServer) sessionCountsLocked() worldSessionCounts {
@@ -147,8 +155,11 @@ func (s *worldServer) cleanupStaleSessionsLocked(now time.Time) {
 		if s.sessionTokenByChar[session.CharacterID] == token {
 			delete(s.sessionTokenByChar, session.CharacterID)
 		}
+		if s.gateway != nil {
+			_, _ = s.gateway.Expire(simcore.SessionID(token), now)
+		}
 		dropped++
-		observability.LogEvent("world-service", "world.session_stale_dropped", map[string]any{
+		observability.LogEvent("world-service", observability.EventWorldSessionExpired, map[string]any{
 			"worldSessionToken": token,
 			"accountId":         session.AccountID,
 			"characterId":       session.CharacterID,
