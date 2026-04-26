@@ -61,6 +61,8 @@ The first server-side runtime content package loader is documented in `Docs/Cont
 
 `Content/Packs/dev_foundation` proves a compact loot/quest progression package. `Content/Packs/dawnwake_isles` adds the first original multi-zone continent skeleton with five package-authored zones, adjacency metadata, transition gates, starter spawn groups, quest provider placeholders, and loadsim coverage.
 
+`Docs/MultiZoneSharding.md` documents the first deterministic zone shard assignment skeleton and the `dawnwake-multizone-sharding-basic` loadsim. It is an in-process pressure and routing proof only; production distributed shard workers and durable handoff are future work.
+
 Current Dawnwake coordinates are placeholder server-side rectangles pending map tracing from the owner-supplied Dawnwake Isles and Kingsfall Harbor references. O3DE mapping remains a separate transform layer; the server package is the authoritative runtime input.
 
 ### Clean-room reference boundary

@@ -158,10 +158,13 @@ The Dawnwake traversal scenario validates package load, continent activation, de
 ```powershell
 Push-Location Services
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ../Content/Packs/dawnwake_isles/package.json
+go run ./cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario dawnwake-multizone-sharding-basic --transition-loops 3 --shards 2 --seed 42 --content ../Content/Packs/dawnwake_isles/package.json
 Pop-Location
 ```
 
-The legacy scenario alias `dawnwake-traversal-basic` is still accepted. The report includes package load, continent ID, zones activated, transition gates loaded, players attached, transition counts, visibility evaluation counts, streaming hint counts, NPCs spawned, quest providers, tick duration summaries, queue depth, and errors.
+The legacy scenario alias `dawnwake-traversal-basic` is still accepted. The `dawnwake-streaming-basic` report includes package load, continent ID, zones activated, transition gates loaded, players attached, transition counts, visibility evaluation counts, streaming hint counts, NPCs spawned, quest providers, tick duration summaries, queue depth, and errors.
+
+The `dawnwake-multizone-sharding-basic` scenario performs repeated transition probes across enabled gates and reports deterministic zone shard assignments, final zone population, final shard population, transition counts, rejected commands, simulated queue depth, and tick timing percentiles. This is still a local loadsim and sharding skeleton, not production distributed runtime ownership.
 
 ## Clean-room reference boundary
 
@@ -184,16 +187,12 @@ No source code, SQL, packet layouts, opcodes, command names, schemas, content ID
 
 ## Next Milestone
 
-The next recommended milestone is larger load tests and multi-zone sharding:
+The next recommended milestone is production zone handoff and shard coordinator design:
 
-- multi-zone load simulation
-- configurable simulated player counts
-- zone population distribution
-- transition stress testing
-- command queue pressure tests
-- tick duration percentiles
-- session gateway pressure tests
-- zone runtime isolation tests
-- backpressure behavior
-- shard assignment skeleton
-- tests and reporting
+- character zone ownership service contract
+- handoff request/ack/reject flow
+- durable handoff journal
+- reconnect correction after handoff
+- per-zone command queue abstraction
+- shard worker lifecycle
+- scenario tests for rejected and retried handoffs

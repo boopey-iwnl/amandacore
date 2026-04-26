@@ -160,21 +160,24 @@ Run from the Go module root:
 cd Services
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
+go run ./cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario dawnwake-multizone-sharding-basic --transition-loops 3 --shards 2 --seed 42 --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 
 The `content-package-basic` scenario loads and validates the compact dev package, activates zones, counts spawned NPCs, accepts `dev_first_hunt`, resolves a stalker kill, claims deterministic guaranteed loot, grants quest rewards, and reports tick timing.
 
 The `dawnwake-streaming-basic` scenario loads and validates Dawnwake continent topology, activates package zones, counts transition gates, simulates one transition probe per client from the default entry, records visibility and streaming-hint counts, and reports tick timing.
 
+The `dawnwake-multizone-sharding-basic` scenario repeats transition probes across enabled gates, builds deterministic zone shard assignments, reports final zone and shard populations, records transition counts, and emits tick timing percentiles for local pressure testing.
+
 ## Current Limitations
 
 - Ability and aura package entries are validated and registered, but combat still resolves the existing hardcoded Warrior ability catalog.
 - Runtime quest activation supports kill, collect, and provider-interaction objective graph nodes. Broader branching, optional objectives, repeatable quests, and editor-authored quest UI are future work.
-- Dawnwake transition handling is metadata and loadsim validation only; production zone handoff, cross-zone interest replication, and sharding are future milestones.
+- Dawnwake transition handling is metadata and loadsim validation only. The sharding skeleton reports deterministic zone ownership assignments but does not yet run distributed shard workers or production player handoff.
 - Dawnwake coordinates are placeholder server rectangles pending map tracing.
 - Loadsim loot claiming is deterministic and server-side. Client UI for package-authored loot windows and quest offers is future work.
 - This is not a content editor, O3DE export pipeline, terrain streamer, or compiled binary content format.
 
 ## Next Milestone
 
-Larger load tests and multi-zone sharding should add configurable simulated player distributions, transition stress testing, command queue pressure checks, tick duration percentiles, session gateway pressure tests, zone runtime isolation tests, backpressure behavior, shard assignment skeleton, tests, and reporting.
+Production zone handoff and shard coordinator design should add a character zone ownership service contract, handoff request/ack/reject flow, durable handoff journal, reconnect correction after handoff, per-zone command queue abstraction, shard worker lifecycle, and scenario tests for rejected and retried handoffs.

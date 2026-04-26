@@ -13,11 +13,14 @@ import (
 )
 
 type options struct {
-	Clients     int
-	Duration    time.Duration
-	CommandRate float64
-	Scenario    string
-	ContentPath string
+	Clients         int
+	Duration        time.Duration
+	CommandRate     float64
+	Scenario        string
+	ContentPath     string
+	TransitionLoops int
+	Seed            int64
+	ShardCount      int
 }
 
 func main() {
@@ -42,13 +45,16 @@ func main() {
 		})
 		printContentReport(report)
 		exitForContentReport(report, err)
-	case "dawnwake-streaming-basic", "dawnwake-traversal-basic":
+	case "dawnwake-streaming-basic", "dawnwake-traversal-basic", "dawnwake-multizone-sharding-basic":
 		report, err := worlds.RunDawnwakeStreamingLoadsim(worlds.DawnwakeStreamingLoadsimOptions{
-			Clients:     opts.Clients,
-			Duration:    opts.Duration,
-			CommandRate: opts.CommandRate,
-			Scenario:    opts.Scenario,
-			ContentPath: opts.ContentPath,
+			Clients:         opts.Clients,
+			Duration:        opts.Duration,
+			CommandRate:     opts.CommandRate,
+			Scenario:        opts.Scenario,
+			ContentPath:     opts.ContentPath,
+			TransitionLoops: opts.TransitionLoops,
+			Seed:            opts.Seed,
+			ShardCount:      opts.ShardCount,
 		})
 		printDawnwakeReport(report)
 		exitForDawnwakeReport(report, err)
@@ -65,6 +71,9 @@ func parseOptions() options {
 	flag.Float64Var(&opts.CommandRate, "cmd-rate", 2, "nominal commands per second per player")
 	flag.StringVar(&opts.Scenario, "scenario", "quest-basic", "scenario name")
 	flag.StringVar(&opts.ContentPath, "content", "", "content package manifest path")
+	flag.IntVar(&opts.TransitionLoops, "transition-loops", 0, "transition probes per simulated player for Dawnwake scenarios")
+	flag.Int64Var(&opts.Seed, "seed", 42, "deterministic loadsim seed")
+	flag.IntVar(&opts.ShardCount, "shards", 2, "zone shard count for Dawnwake multizone loadsim")
 	flag.Parse()
 
 	duration, err := time.ParseDuration(durationText)
@@ -78,6 +87,12 @@ func parseOptions() options {
 	}
 	if opts.CommandRate <= 0 {
 		exitf("--cmd-rate must be greater than zero")
+	}
+	if opts.TransitionLoops < 0 {
+		exitf("--transition-loops must be zero or greater")
+	}
+	if opts.ShardCount <= 0 {
+		exitf("--shards must be greater than zero")
 	}
 	return opts
 }
@@ -152,6 +167,7 @@ func printContentReport(report worlds.ContentPackageLoadsimReport) {
 
 func printDawnwakeReport(report worlds.DawnwakeStreamingLoadsimReport) {
 	fmt.Println("Dawnwake streaming loadsim report")
+	fmt.Printf("- scenario: %s\n", report.Scenario)
 	fmt.Printf("- content package loaded: %v\n", report.ContentPackageLoaded)
 	fmt.Printf("- package id: %s\n", report.PackageID)
 	fmt.Printf("- continent id: %s\n", report.ContinentID)
@@ -163,6 +179,14 @@ func printDawnwakeReport(report worlds.DawnwakeStreamingLoadsimReport) {
 	fmt.Printf("- catalogs loaded: %s\n", formatCounts(report.CatalogsLoaded))
 	fmt.Printf("- transition gates loaded: %d\n", report.TransitionGatesLoaded)
 	fmt.Printf("- players attached: %d\n", report.PlayersAttached)
+	fmt.Printf("- transition loops: %d\n", report.TransitionLoops)
+	fmt.Printf("- seed: %d\n", report.Seed)
+	fmt.Printf("- shard count: %d\n", report.ShardCount)
+	fmt.Printf("- shard assignments: %s\n", formatStringMap(report.ShardAssignments))
+	fmt.Printf("- shard population: %s\n", formatCounts(report.ShardPopulation))
+	fmt.Printf("- zone population: %s\n", formatCounts(report.ZonePopulation))
+	fmt.Printf("- transition counts: %s\n", formatCounts(report.TransitionCounts))
+	fmt.Printf("- zone transition counts: %s\n", formatCounts(report.ZoneTransitionCounts))
 	fmt.Printf("- zone transitions requested: %d\n", report.ZoneTransitionsRequested)
 	fmt.Printf("- zone transitions completed: %d\n", report.ZoneTransitionsCompleted)
 	fmt.Printf("- zone transitions rejected: %d\n", report.ZoneTransitionsRejected)
@@ -171,8 +195,12 @@ func printDawnwakeReport(report worlds.DawnwakeStreamingLoadsimReport) {
 	fmt.Printf("- NPCs spawned: %d\n", report.NPCsSpawned)
 	fmt.Printf("- quest providers registered: %d\n", report.QuestProvidersRegistered)
 	fmt.Printf("- average tick duration: %.3fms\n", report.AverageTickDurationMs)
+	fmt.Printf("- p50 tick duration: %.3fms\n", report.P50TickDurationMs)
+	fmt.Printf("- p95 tick duration: %.3fms\n", report.P95TickDurationMs)
+	fmt.Printf("- p99 tick duration: %.3fms\n", report.P99TickDurationMs)
 	fmt.Printf("- max tick duration: %.3fms\n", report.MaxTickDurationMs)
 	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	fmt.Printf("- rejected commands: %d\n", report.RejectedCommands)
 	fmt.Printf("- errors: %d\n", len(report.Errors))
 	for _, runError := range report.Errors {
 		fmt.Printf("  - %s\n", runError)
@@ -181,6 +209,25 @@ func printDawnwakeReport(report worlds.DawnwakeStreamingLoadsimReport) {
 	if err == nil {
 		fmt.Printf("- json: %s\n", string(encoded))
 	}
+}
+
+func formatStringMap(values map[string]string) string {
+	if len(values) == 0 {
+		return "{}"
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := "{"
+	for index, key := range keys {
+		if index > 0 {
+			result += ", "
+		}
+		result += fmt.Sprintf("%s:%s", key, values[key])
+	}
+	return result + "}"
 }
 
 func formatCounts(counts map[string]int) string {

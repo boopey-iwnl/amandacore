@@ -66,6 +66,7 @@ Run from the Go module root:
 cd Services
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
+go run ./cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario dawnwake-multizone-sharding-basic --transition-loops 3 --shards 2 --seed 42 --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 
-The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`. The Dawnwake scenario loads `dawnwake_isles`, validates continent topology and transition gates, activates package zones into the world runtime, probes the first enabled zone transition per simulated client, and reports transition, visibility, NPC, quest-provider, and tick timing counts.
+The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`. The Dawnwake scenarios load `dawnwake_isles`, validate continent topology and transition gates, activate package zones into the world runtime, probe enabled zone transitions, and report transition, visibility, NPC, quest-provider, shard assignment, population, queue pressure, and tick timing counts.
