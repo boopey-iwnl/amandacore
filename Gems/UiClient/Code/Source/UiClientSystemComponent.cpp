@@ -4496,17 +4496,18 @@ namespace UiClient
             struct MenuButtonState
             {
                 const char* m_label;
+                const char* m_panelName;
                 bool* m_toggle;
             };
 
             talentsOpen = false;
             MenuButtonState buttons[] = {
-                {"Char", &characterSheetOpen},
-                {"Spells", &spellbookOpen},
-                {"Quests", &questLogOpen},
-                {"Map", &mapOpen},
-                {"Bag", &bagOpen},
-                {"Settings", &settingsOpen},
+                {"Char", "character", &characterSheetOpen},
+                {"Spells", "spells", &spellbookOpen},
+                {"Quests", "quests", &questLogOpen},
+                {"Map", "map", &mapOpen},
+                {"Bag", "bag", &bagOpen},
+                {"Settings", "settings", &settingsOpen},
             };
 
             for (size_t index = 0; index < AZ_ARRAY_SIZE(buttons); ++index)
@@ -4518,6 +4519,11 @@ namespace UiClient
                 if (ImGui::Button(buttons[index].m_label, ImVec2(index == 5 ? 74.0f : 58.0f, 28.0f)))
                 {
                     *buttons[index].m_toggle = !*buttons[index].m_toggle;
+                    AZ_Printf(
+                        "amandacore",
+                        "client.utility_menu_toggle panel=%s open=%s source=button",
+                        buttons[index].m_panelName,
+                        *buttons[index].m_toggle ? "true" : "false");
                 }
             }
             socialOpen = false;

@@ -3,6 +3,9 @@
 #include <Atom/RPI.Public/AuxGeom/AuxGeomDraw.h>
 #include <Atom/RPI.Public/AuxGeom/AuxGeomFeatureProcessorInterface.h>
 #include <Atom/RPI.Public/Scene.h>
+#include <AtomLyIntegration/CommonFeatures/Material/MaterialComponentBus.h>
+#include <AzCore/Asset/AssetManagerBus.h>
+#include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Component/Entity.h>
 #include <AzCore/Interface/Interface.h>
@@ -32,8 +35,8 @@ namespace MovementPhysics
     namespace
     {
         constexpr float ValidationFloorZ = 0.0f;
-        constexpr float ValidationFloorExtent = 480.0f;
-        constexpr float ValidationFloorExtentY = 300.0f;
+        constexpr float ValidationFloorExtent = 512.0f;
+        constexpr float ValidationFloorExtentY = 384.0f;
         constexpr float ValidationMarkerZ = 0.08f;
         constexpr float ValidationSpawnMarkerRadius = 0.18f;
         constexpr float ValidationSpawnX = 10.0f;
@@ -91,6 +94,12 @@ namespace MovementPhysics
         constexpr float AvatarMoveTurnRate = 10.0f;
         constexpr float AvatarStrideBlendRate = 7.5f;
         constexpr float PoseLogDistanceThreshold = 0.75f;
+        constexpr const char* StonewakeGroundEntityName = "Ground";
+        constexpr const char* StonewakeGroundMaterialAssetPaths[] = {
+            "content/art/materials/mat_stonewake_grass_lush.azmaterial",
+            "content/art/materials/mat_stonewake_grass_worn.azmaterial",
+            "content/art/materials/mat_stonewake_rocky_ground.azmaterial",
+        };
 
         bool IsInsideWestApproachObstacle(const AZ::Vector3& position)
         {
@@ -263,6 +272,8 @@ namespace MovementPhysics
             m_pendingCameraReset = true;
             m_avatarStridePhase = 0.0f;
             m_avatarStrideBlend = 0.0f;
+            m_stonewakeGroundMaterialApplied = false;
+            m_loggedStonewakeGroundMaterialMissing = false;
         }
 
         const bool orbiting = m_cameraOrbitModeActive;
@@ -480,6 +491,7 @@ namespace MovementPhysics
         SetCharacterBasePosition(m_cachedFinalPresentationPosition);
         SyncEntityTransformToCharacterBase(m_cachedFinalPresentationPosition);
         UpdateCameraComponent();
+        ApplyStonewakeGroundMaterial();
         DrawValidationArena();
         DrawLocalPlayerProxy();
     }
@@ -488,6 +500,7 @@ namespace MovementPhysics
     {
         const auto& channelId = inputChannel.GetInputChannelId();
         const bool active = inputChannel.IsActive();
+        const bool imguiWantsMouse = ImGui::GetIO().WantCaptureMouse || ImGui::IsAnyItemActive();
 
         if (ImGui::GetIO().WantTextInput)
         {
@@ -512,6 +525,12 @@ namespace MovementPhysics
 
         if (channelId == AzFramework::InputDeviceMouse::Button::Left)
         {
+            if (imguiWantsMouse)
+            {
+                m_leftMouseHeld = false;
+                return false;
+            }
+
             m_leftMouseHeld = active;
             return false;
         }
@@ -519,6 +538,11 @@ namespace MovementPhysics
         if (channelId == AzFramework::InputDeviceMouse::Button::Right)
         {
             const bool wasOrbiting = m_cameraOrbitModeActive;
+            if (imguiWantsMouse && !wasOrbiting)
+            {
+                return false;
+            }
+
             m_cameraOrbitModeActive = active;
             if (wasOrbiting && !m_cameraOrbitModeActive)
             {
@@ -531,11 +555,16 @@ namespace MovementPhysics
             {
                 m_chaseLockActive = false;
             }
-            return !inputChannel.IsStateBegan();
+            return wasOrbiting || m_cameraOrbitModeActive;
         }
 
         if (channelId == AzFramework::InputDeviceMouse::Movement::X)
         {
+            if (!m_cameraOrbitModeActive || imguiWantsMouse)
+            {
+                return false;
+            }
+
             if (m_cameraOrbitModeActive)
             {
                 m_cameraOrbitYawRadians = WrapAngleRadians(m_cameraOrbitYawRadians - (inputChannel.GetValue() * CameraYawSensitivity));
@@ -546,6 +575,11 @@ namespace MovementPhysics
 
         if (channelId == AzFramework::InputDeviceMouse::Movement::Y)
         {
+            if (!m_cameraOrbitModeActive || imguiWantsMouse)
+            {
+                return false;
+            }
+
             if (m_cameraOrbitModeActive)
             {
                 m_cameraPitchRadians = AZ::GetClamp(
@@ -1053,6 +1087,69 @@ namespace MovementPhysics
         m_cachedFinalPoseValid = true;
     }
 
+    void LocalPlayerControllerComponent::ApplyStonewakeGroundMaterial()
+    {
+        if (m_stonewakeGroundMaterialApplied)
+        {
+            return;
+        }
+
+        AZ::Data::AssetId materialAssetId;
+        const char* resolvedMaterialPath = nullptr;
+        for (const char* candidatePath : StonewakeGroundMaterialAssetPaths)
+        {
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(
+                materialAssetId,
+                &AZ::Data::AssetCatalogRequestBus::Events::GetAssetIdByPath,
+                candidatePath,
+                AZ::Data::AssetType{},
+                false);
+            if (materialAssetId.IsValid())
+            {
+                resolvedMaterialPath = candidatePath;
+                break;
+            }
+        }
+
+        AZ::EntityId groundEntityId;
+        AZ::ComponentApplicationBus::Broadcast(
+            &AZ::ComponentApplicationRequests::EnumerateEntities,
+            [&groundEntityId](AZ::Entity* entity)
+            {
+                if (!groundEntityId.IsValid() && entity && entity->GetName() == StonewakeGroundEntityName)
+                {
+                    groundEntityId = entity->GetId();
+                }
+            });
+
+        if (!materialAssetId.IsValid() || !groundEntityId.IsValid())
+        {
+            if (!m_loggedStonewakeGroundMaterialMissing)
+            {
+                m_loggedStonewakeGroundMaterialMissing = true;
+                AZ_Warning(
+                    "amandacore",
+                    false,
+                    "client.stonewake_ground_material_missing materialResolved=%s groundEntityResolved=%s",
+                    materialAssetId.IsValid() ? "true" : "false",
+                    groundEntityId.IsValid() ? "true" : "false");
+            }
+            return;
+        }
+
+        AZ::Render::MaterialComponentRequestBus::Event(
+            groundEntityId,
+            &AZ::Render::MaterialComponentRequestBus::Events::SetMaterialAssetIdOnDefaultSlot,
+            materialAssetId);
+
+        m_stonewakeGroundMaterialApplied = true;
+        AZ_Printf(
+            "amandacore",
+            "client.stonewake_ground_material_applied entity=%s material=%s",
+            StonewakeGroundEntityName,
+            resolvedMaterialPath ? resolvedMaterialPath : "unknown");
+    }
+
     void LocalPlayerControllerComponent::DrawValidationArena()
     {
         AZ::RPI::Scene* scene = AZ::RPI::Scene::GetSceneForEntityId(GetEntityId());
@@ -1072,11 +1169,12 @@ namespace MovementPhysics
             m_loggedValidationFloor = true;
             AZ_Printf(
                 "amandacore",
-                "client.world_material_coverage_visible center=(%.1f, %.1f, %.1f) extent=%.1f spawn=(%.1f, %.1f, %.1f) materials=stonewake_0_2",
+                "client.world_material_coverage_visible center=(%.1f, %.1f, %.1f) extent=(%.1f, %.1f) spawn=(%.1f, %.1f, %.1f) material=stonewake_grass_lush overlays=stonewake_0_2 interiors=4",
                 ValidationFloorExtent * 0.5f,
                 ValidationFloorExtentY * 0.5f,
                 ValidationFloorZ,
                 ValidationFloorExtent,
+                ValidationFloorExtentY,
                 ValidationSpawnX,
                 ValidationSpawnY,
                 ValidationFloorZ);
@@ -1086,7 +1184,6 @@ namespace MovementPhysics
         const AZ::Color pathColor(0.78f, 0.60f, 0.28f, 1.0f);
         const AZ::Color obstacleColor(0.38f, 0.39f, 0.43f, 1.0f);
         const AZ::Color encounterColor(0.90f, 0.42f, 0.22f, 1.0f);
-        const AZ::Color groundBaseColor(0.24f, 0.33f, 0.23f, 1.0f);
         const AZ::Color groundTileLight(0.31f, 0.43f, 0.25f, 1.0f);
         const AZ::Color groundTileDark(0.22f, 0.32f, 0.21f, 1.0f);
         const AZ::Color hearthwatchYardColor(0.42f, 0.39f, 0.31f, 1.0f);
@@ -1111,62 +1208,51 @@ namespace MovementPhysics
         const AZ::Color wetShoreColor(0.45f, 0.39f, 0.30f, 1.0f);
         const AZ::Color runeColor(0.28f, 0.74f, 0.92f, 1.0f);
 
-        auxGeom->DrawAabb(
-            AZ::Aabb::CreateCenterHalfExtents(
-                AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtentY * 0.5f, -0.22f),
-                AZ::Vector3(ValidationFloorExtent * 0.5f, ValidationFloorExtentY * 0.5f, 0.22f)),
-            groundBaseColor,
-            AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
-
-        auto isHearthwatchHub = [](float x, float y) -> bool
+        struct SurfacePatch
         {
-            return x >= 0.0f && x <= 92.0f && y >= 0.0f && y <= 58.0f;
+            AZ::Vector3 m_center;
+            AZ::Vector3 m_halfExtents;
+            AZ::Color m_color;
         };
-
-        for (int tileY = 0; tileY < 25; ++tileY)
+        const SurfacePatch surfacePatches[] = {
+            {AZ::Vector3(42.0f, 26.0f, 0.035f), AZ::Vector3(40.0f, 22.0f, 0.035f), hearthwatchYardColor},
+            {AZ::Vector3(126.0f, 68.0f, 0.030f), AZ::Vector3(34.0f, 18.0f, 0.030f), mossColor},
+            {AZ::Vector3(196.0f, 114.0f, 0.030f), AZ::Vector3(28.0f, 16.0f, 0.030f), groundTileLight},
+            {AZ::Vector3(292.0f, 158.0f, 0.030f), AZ::Vector3(44.0f, 18.0f, 0.030f), rockyGroundColor},
+            {AZ::Vector3(402.0f, 238.0f, 0.030f), AZ::Vector3(38.0f, 22.0f, 0.030f), groundTileDark},
+            {AZ::Vector3(462.0f, 318.0f, 0.030f), AZ::Vector3(30.0f, 22.0f, 0.030f), mossColor},
+        };
+        for (const SurfacePatch& patch : surfacePatches)
         {
-            for (int tileX = 0; tileX < 40; ++tileX)
-            {
-                const float centerX = (static_cast<float>(tileX) * 12.0f) + 6.0f;
-                const float centerY = (static_cast<float>(tileY) * 12.0f) + 6.0f;
-                const bool hubTile = isHearthwatchHub(centerX, centerY);
-                const int materialSelector = ((tileX * 17) + (tileY * 31)) % 9;
-                const AZ::Color tileColor = hubTile
-                    ? hearthwatchYardColor
-                    : (materialSelector == 0
-                        ? mossColor
-                        : (materialSelector == 1 ? rockyGroundColor : (materialSelector <= 4 ? groundTileLight : groundTileDark)));
-                auxGeom->DrawAabb(
-                    AZ::Aabb::CreateCenterHalfExtents(
-                        AZ::Vector3(centerX, centerY, -0.03f),
-                        AZ::Vector3(5.9f, 5.9f, 0.03f)),
-                    tileColor,
-                    AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(patch.m_center, patch.m_halfExtents),
+                patch.m_color,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+        }
 
-                if (hubTile)
-                {
-                    if (((tileX + tileY) % 3) == 0)
-                    {
-                        auxGeom->DrawAabb(
-                            AZ::Aabb::CreateCenterHalfExtents(
-                                AZ::Vector3(centerX, centerY, 0.035f),
-                                AZ::Vector3(1.7f, 0.10f, 0.025f)),
-                            hearthwatchCobbleColor,
-                            AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
-                    }
-                    continue;
-                }
+        for (int cobbleIndex = 0; cobbleIndex < 30; ++cobbleIndex)
+        {
+            const float centerX = 8.0f + (static_cast<float>(cobbleIndex % 10) * 7.2f);
+            const float centerY = 8.0f + (static_cast<float>(cobbleIndex / 10) * 13.0f);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(centerX, centerY, 0.090f),
+                    AZ::Vector3(1.35f, 0.16f, 0.025f)),
+                hearthwatchCobbleColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+        }
 
-                if (((tileX * 5) + tileY) % 17 == 0)
-                {
-                    auxGeom->DrawAabb(
-                        AZ::Aabb::CreateCenterHalfExtents(
-                            AZ::Vector3(centerX - 2.2f, centerY + 1.8f, 0.035f),
-                            AZ::Vector3(1.1f, 0.08f, 0.025f)),
-                        groundTileLight,
-                        AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
-                }
-            }
+        for (int grassBreakIndex = 0; grassBreakIndex < 26; ++grassBreakIndex)
+        {
+            const float centerX = 104.0f + (static_cast<float>((grassBreakIndex * 37) % 350));
+            const float centerY = 52.0f + (static_cast<float>((grassBreakIndex * 29) % 290));
+            const AZ::Color breakColor = (grassBreakIndex % 3) == 0 ? mossColor : groundTileLight;
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(centerX, centerY, 0.075f),
+                    AZ::Vector3(2.4f, 0.10f, 0.025f)),
+                breakColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
         }
 
         const AZ::Vector3 streamCenters[] = {
@@ -1227,6 +1313,18 @@ namespace MovementPhysics
                 AZ::Aabb::CreateCenterHalfExtents(roadCenters[roadIndex], roadExtents[roadIndex]),
                 roadColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    roadCenters[roadIndex] + AZ::Vector3(0.0f, 1.55f, 0.070f),
+                    AZ::Vector3(roadExtents[roadIndex].GetX() * 0.82f, 0.08f, 0.025f)),
+                roadEdgeColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    roadCenters[roadIndex] + AZ::Vector3(0.0f, -1.55f, 0.070f),
+                    AZ::Vector3(roadExtents[roadIndex].GetX() * 0.82f, 0.08f, 0.025f)),
+                roadEdgeColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
 
             for (int pebbleIndex = 0; pebbleIndex < 7; ++pebbleIndex)
             {
@@ -1264,6 +1362,82 @@ namespace MovementPhysics
             }
         }
 
+        auto drawOpenRoom = [&auxGeom, &woodColor, &roofColor](
+                                const AZ::Vector3& center,
+                                const AZ::Vector3& halfExtents,
+                                const AZ::Color& wallColor,
+                                const AZ::Color& floorColor)
+        {
+            const float floorZ = 0.105f;
+            const float wallThickness = 0.16f;
+            const float wallHeight = 1.05f;
+            const float wallCenterZ = floorZ + (wallHeight * 0.5f);
+            const float doorwayHalfWidth = AZ::GetMin(halfExtents.GetX() * 0.34f, 1.15f);
+            const float frontSegmentHalfX = AZ::GetMax((halfExtents.GetX() - doorwayHalfWidth) * 0.5f, 0.15f);
+
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX(), center.GetY(), floorZ),
+                    AZ::Vector3(halfExtents.GetX(), halfExtents.GetY(), 0.055f)),
+                floorColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX() - halfExtents.GetX(), center.GetY(), wallCenterZ),
+                    AZ::Vector3(wallThickness, halfExtents.GetY(), wallHeight * 0.5f)),
+                wallColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX() + halfExtents.GetX(), center.GetY(), wallCenterZ),
+                    AZ::Vector3(wallThickness, halfExtents.GetY(), wallHeight * 0.5f)),
+                wallColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX(), center.GetY() + halfExtents.GetY(), wallCenterZ),
+                    AZ::Vector3(halfExtents.GetX() + wallThickness, wallThickness, wallHeight * 0.5f)),
+                wallColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX() - doorwayHalfWidth - frontSegmentHalfX, center.GetY() - halfExtents.GetY(), wallCenterZ),
+                    AZ::Vector3(frontSegmentHalfX, wallThickness, wallHeight * 0.5f)),
+                wallColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX() + doorwayHalfWidth + frontSegmentHalfX, center.GetY() - halfExtents.GetY(), wallCenterZ),
+                    AZ::Vector3(frontSegmentHalfX, wallThickness, wallHeight * 0.5f)),
+                wallColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX(), center.GetY() + (halfExtents.GetY() * 0.40f), wallCenterZ + (wallHeight * 0.58f)),
+                    AZ::Vector3(halfExtents.GetX() + 0.28f, halfExtents.GetY() * 0.35f, 0.12f)),
+                roofColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX(), center.GetY() + 0.16f, floorZ + 0.24f),
+                    AZ::Vector3(0.75f, 0.22f, 0.12f)),
+                woodColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX() - (halfExtents.GetX() * 0.42f), center.GetY() - 0.34f, floorZ + 0.18f),
+                    AZ::Vector3(0.18f, 0.72f, 0.10f)),
+                woodColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(center.GetX() + (halfExtents.GetX() * 0.42f), center.GetY() - 0.34f, floorZ + 0.18f),
+                    AZ::Vector3(0.18f, 0.72f, 0.10f)),
+                woodColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+        };
+
         const AZ::Vector3 buildingCenters[] = {
             AZ::Vector3(7.0f, 7.0f, 1.0f),
             AZ::Vector3(18.0f, 7.0f, 0.9f),
@@ -1293,6 +1467,19 @@ namespace MovementPhysics
             const AZ::Color wallColor = buildingIndex == 6 || buildingIndex == 7
                 ? cutStoneColor
                 : (buildingIndex == 4 || buildingIndex == 8 || buildingIndex == 9 ? woodColor : plasterColor);
+            if (buildingIndex < 4)
+            {
+                drawOpenRoom(
+                    buildingCenters[buildingIndex],
+                    AZ::Vector3(
+                        buildingExtents[buildingIndex].GetX() + 0.35f,
+                        buildingExtents[buildingIndex].GetY() + 0.30f,
+                        0.0f),
+                    wallColor,
+                    hearthwatchCobbleColor);
+                continue;
+            }
+
             auxGeom->DrawAabb(
                 AZ::Aabb::CreateCenterHalfExtents(buildingCenters[buildingIndex], buildingExtents[buildingIndex]),
                 wallColor,

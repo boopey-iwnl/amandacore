@@ -44,6 +44,7 @@ namespace MovementPhysics
         void SyncEntityTransformToCharacterBase(const AZ::Vector3& basePosition);
         void SetCharacterBasePosition(const AZ::Vector3& basePosition);
         void ApplyWorldPosition(float x, float y, float z);
+        void ApplyStonewakeGroundMaterial();
         void DrawValidationArena();
         void DrawLocalPlayerProxy();
 
@@ -85,6 +86,8 @@ namespace MovementPhysics
         bool m_loggedEntitySync = false;
         bool m_loggedMovementTranslationApplied = false;
         bool m_loggedCameraSourceFollow = false;
+        bool m_stonewakeGroundMaterialApplied = false;
+        bool m_loggedStonewakeGroundMaterialMissing = false;
         bool m_pendingCameraReset = false;
         bool m_cameraOrbitModeActive = false;
         bool m_chaseLockActive = true;
