@@ -1,9 +1,11 @@
 #pragma once
 
 #include <AzCore/Component/Component.h>
+#include <AzCore/Component/EntityId.h>
 #include <AzCore/Component/TickBus.h>
 #include <AzCore/Math/Vector2.h>
 #include <AzCore/Math/Vector3.h>
+#include <AzCore/std/containers/vector.h>
 #include <AzCore/std/string/string.h>
 #include <AzFramework/Input/Events/InputChannelEventListener.h>
 #include <AzFramework/Viewport/ViewportId.h>
@@ -45,6 +47,8 @@ namespace MovementPhysics
         void SetCharacterBasePosition(const AZ::Vector3& basePosition);
         void ApplyWorldPosition(float x, float y, float z);
         void ApplyStonewakeGroundMaterial();
+        void SpawnStonewakeMaterialSurfaces();
+        void DestroyStonewakeMaterialSurfaces();
         void DrawValidationArena();
         void DrawLocalPlayerProxy();
 
@@ -88,6 +92,9 @@ namespace MovementPhysics
         bool m_loggedCameraSourceFollow = false;
         bool m_stonewakeGroundMaterialApplied = false;
         bool m_loggedStonewakeGroundMaterialMissing = false;
+        bool m_stonewakeMaterialSurfacesSpawned = false;
+        bool m_loggedStonewakeMaterialSurfaceMissing = false;
+        bool m_loggedCameraCollisionDisabled = false;
         bool m_pendingCameraReset = false;
         bool m_cameraOrbitModeActive = false;
         bool m_chaseLockActive = true;
@@ -108,6 +115,7 @@ namespace MovementPhysics
         AZ::Vector3 m_lastLoggedCameraSourcePosition = AZ::Vector3::CreateZero();
         AZ::Vector2 m_pendingServerDelta = AZ::Vector2::CreateZero();
         AZ::Vector2 m_pendingServerCorrection = AZ::Vector2::CreateZero();
+        AZStd::vector<AZ::EntityId> m_stonewakeMaterialSurfaceEntityIds;
         AZStd::string m_lastWorldSessionToken;
         AzFramework::ViewportId m_defaultViewportId = AzFramework::InvalidViewportId;
     };

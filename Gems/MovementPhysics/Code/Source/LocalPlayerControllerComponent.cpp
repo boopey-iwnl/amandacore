@@ -4,20 +4,23 @@
 #include <Atom/RPI.Public/AuxGeom/AuxGeomFeatureProcessorInterface.h>
 #include <Atom/RPI.Public/Scene.h>
 #include <AtomLyIntegration/CommonFeatures/Material/MaterialComponentBus.h>
+#include <AtomLyIntegration/CommonFeatures/Material/MaterialComponentConstants.h>
+#include <AtomLyIntegration/CommonFeatures/Mesh/MeshComponentBus.h>
+#include <AtomLyIntegration/CommonFeatures/Mesh/MeshComponentConstants.h>
 #include <AzCore/Asset/AssetManagerBus.h>
 #include <AzCore/Component/ComponentApplicationBus.h>
 #include <AzCore/Component/TransformBus.h>
 #include <AzCore/Component/Entity.h>
-#include <AzCore/Interface/Interface.h>
 #include <AzCore/Math/Aabb.h>
 #include <AzCore/Math/Color.h>
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Transform.h>
 #include <AzCore/Math/Vector2.h>
 #include <AzCore/Serialization/SerializeContext.h>
-#include <AzFramework/Physics/Common/PhysicsSceneQueries.h>
-#include <AzFramework/Physics/PhysicsScene.h>
 #include <AzFramework/API/ApplicationAPI.h>
+#include <AzFramework/Components/NonUniformScaleComponent.h>
+#include <AzFramework/Components/TransformComponent.h>
+#include <AzFramework/Entity/GameEntityContextBus.h>
 #include <AzFramework/Input/Channels/InputChannel.h>
 #include <AzFramework/Input/Devices/Keyboard/InputDeviceKeyboard.h>
 #include <AzFramework/Input/Devices/Mouse/InputDeviceMouse.h>
@@ -66,8 +69,6 @@ namespace MovementPhysics
         constexpr float CameraMinPitchRadians = -0.95f;
         constexpr float CameraMaxPitchRadians = -0.26f;
         constexpr float CameraFloorFallbackZ = ValidationFloorZ + 0.30f;
-        constexpr float CameraCollisionSafetyDistance = 0.18f;
-        constexpr float CameraMinimumResolvedDistance = 1.10f;
         constexpr float AvatarFootHeight = 0.08f;
         constexpr float AvatarAnkleHeight = 0.30f;
         constexpr float AvatarKneeHeight = 0.70f;
@@ -95,6 +96,8 @@ namespace MovementPhysics
         constexpr float AvatarStrideBlendRate = 7.5f;
         constexpr float PoseLogDistanceThreshold = 0.75f;
         constexpr const char* StonewakeGroundEntityName = "Ground";
+        constexpr const char* StonewakeBaseGroundModelAssetPath = "objects/groudplane/groundplane_512x512m.fbx.azmodel";
+        constexpr const char* StonewakeSurfacePlaneModelAssetPath = "objects/shaderball/ground_plane_4x4m.fbx.azmodel";
         constexpr const char* StonewakeGroundMaterialAssetPaths[] = {
             "content/art/materials/mat_stonewake_grass_lush.azmaterial",
             "content/art/materials/mat_stonewake_grass_worn.azmaterial",
@@ -192,6 +195,7 @@ namespace MovementPhysics
 
     void LocalPlayerControllerComponent::Deactivate()
     {
+        DestroyStonewakeMaterialSurfaces();
         AZ::TickBus::Handler::BusDisconnect();
         AzFramework::InputChannelEventListener::Disconnect();
     }
@@ -274,6 +278,7 @@ namespace MovementPhysics
             m_avatarStrideBlend = 0.0f;
             m_stonewakeGroundMaterialApplied = false;
             m_loggedStonewakeGroundMaterialMissing = false;
+            DestroyStonewakeMaterialSurfaces();
         }
 
         const bool orbiting = m_cameraOrbitModeActive;
@@ -492,6 +497,7 @@ namespace MovementPhysics
         SyncEntityTransformToCharacterBase(m_cachedFinalPresentationPosition);
         UpdateCameraComponent();
         ApplyStonewakeGroundMaterial();
+        SpawnStonewakeMaterialSurfaces();
         DrawValidationArena();
         DrawLocalPlayerProxy();
     }
@@ -537,56 +543,78 @@ namespace MovementPhysics
 
         if (channelId == AzFramework::InputDeviceMouse::Button::Right)
         {
-            const bool wasOrbiting = m_cameraOrbitModeActive;
-            if (imguiWantsMouse && !wasOrbiting)
+            if (inputChannel.IsStateBegan())
             {
-                return false;
+                if (imguiWantsMouse)
+                {
+                    m_cameraOrbitModeActive = false;
+                    m_chaseLockActive = true;
+                    return false;
+                }
+
+                m_cameraOrbitModeActive = true;
+                m_chaseLockActive = false;
+                return true;
             }
 
-            m_cameraOrbitModeActive = active;
-            if (wasOrbiting && !m_cameraOrbitModeActive)
+            if (inputChannel.IsStateEnded() || !active || imguiWantsMouse)
             {
-                m_cameraOrbitYawRadians = 0.0f;
-                m_cameraPitchRadians = CameraDefaultPitchRadians;
-                m_cameraYawRadians = m_avatarFacingRadians;
-                m_chaseLockActive = true;
+                const bool wasOrbiting = m_cameraOrbitModeActive;
+                m_cameraOrbitModeActive = false;
+                if (wasOrbiting)
+                {
+                    m_cameraOrbitYawRadians = 0.0f;
+                    m_cameraPitchRadians = CameraDefaultPitchRadians;
+                    m_cameraYawRadians = m_avatarFacingRadians;
+                    m_chaseLockActive = true;
+                }
+                return wasOrbiting;
             }
-            else if (m_cameraOrbitModeActive)
-            {
-                m_chaseLockActive = false;
-            }
-            return wasOrbiting || m_cameraOrbitModeActive;
+
+            return m_cameraOrbitModeActive;
         }
 
         if (channelId == AzFramework::InputDeviceMouse::Movement::X)
         {
-            if (!m_cameraOrbitModeActive || imguiWantsMouse)
+            if (imguiWantsMouse)
             {
                 return false;
             }
 
-            if (m_cameraOrbitModeActive)
+            if (!m_cameraOrbitModeActive)
             {
-                m_cameraOrbitYawRadians = WrapAngleRadians(m_cameraOrbitYawRadians - (inputChannel.GetValue() * CameraYawSensitivity));
-                m_cameraYawRadians = WrapAngleRadians(m_avatarFacingRadians + m_cameraOrbitYawRadians);
+                if (auto* gameCore = GameCore::IGameCoreRequests::Get())
+                {
+                    return gameCore->GetClientWorldState().m_worldConnected;
+                }
+                return false;
             }
+
+            m_cameraOrbitYawRadians = WrapAngleRadians(m_cameraOrbitYawRadians - (inputChannel.GetValue() * CameraYawSensitivity));
+            m_cameraYawRadians = WrapAngleRadians(m_avatarFacingRadians + m_cameraOrbitYawRadians);
             return true;
         }
 
         if (channelId == AzFramework::InputDeviceMouse::Movement::Y)
         {
-            if (!m_cameraOrbitModeActive || imguiWantsMouse)
+            if (imguiWantsMouse)
             {
                 return false;
             }
 
-            if (m_cameraOrbitModeActive)
+            if (!m_cameraOrbitModeActive)
             {
-                m_cameraPitchRadians = AZ::GetClamp(
-                    m_cameraPitchRadians - (inputChannel.GetValue() * CameraPitchSensitivity),
-                    CameraMinPitchRadians,
-                    CameraMaxPitchRadians);
+                if (auto* gameCore = GameCore::IGameCoreRequests::Get())
+                {
+                    return gameCore->GetClientWorldState().m_worldConnected;
+                }
+                return false;
             }
+
+            m_cameraPitchRadians = AZ::GetClamp(
+                m_cameraPitchRadians - (inputChannel.GetValue() * CameraPitchSensitivity),
+                CameraMinPitchRadians,
+                CameraMaxPitchRadians);
             return true;
         }
 
@@ -771,56 +799,13 @@ namespace MovementPhysics
         const float desiredDistance = cameraDelta.GetLength();
 
         bool sceneQueryResolved = false;
-        if (desiredDistance > 0.001f)
+        if (!m_loggedCameraCollisionDisabled)
         {
-            AzPhysics::SceneHandle sceneHandle = AzPhysics::InvalidSceneHandle;
-            Physics::DefaultWorldBus::BroadcastResult(
-                sceneHandle,
-                &Physics::DefaultWorldRequests::GetDefaultSceneHandle);
-
-            if (sceneHandle != AzPhysics::InvalidSceneHandle)
-            {
-                if (AzPhysics::SceneInterface* sceneInterface = AZ::Interface<AzPhysics::SceneInterface>::Get())
-                {
-                    const AZ::Vector3 cameraDirection = cameraDelta / desiredDistance;
-                    AzPhysics::RayCastRequest rayRequest;
-                    rayRequest.m_start = anchorWorldPosition;
-                    rayRequest.m_direction = cameraDirection;
-                    rayRequest.m_distance = desiredDistance;
-                    rayRequest.m_queryType = AzPhysics::SceneQuery::QueryType::StaticAndDynamic;
-                    rayRequest.m_hitFlags = AzPhysics::SceneQuery::HitFlags::Position | AzPhysics::SceneQuery::HitFlags::Normal;
-                    rayRequest.m_filterCallback = [entityId = GetEntityId()](const AzPhysics::SimulatedBody* body, const Physics::Shape*)
-                    {
-                        if (body && body->GetEntityId() == entityId)
-                        {
-                            return AzPhysics::SceneQuery::QueryHitType::None;
-                        }
-                        return AzPhysics::SceneQuery::QueryHitType::Block;
-                    };
-
-                    AzPhysics::SceneQueryHits queryHits;
-                    if (sceneInterface->QueryScene(sceneHandle, &rayRequest, queryHits) && !queryHits.m_hits.empty())
-                    {
-                        const AzPhysics::SceneQueryHit& hit = queryHits.m_hits.front();
-                        if ((hit.m_resultFlags & AzPhysics::SceneQuery::ResultFlags::Distance) != AzPhysics::SceneQuery::ResultFlags::Invalid)
-                        {
-                            const float resolvedDistance = AZ::GetClamp(
-                                hit.m_distance - CameraCollisionSafetyDistance,
-                                CameraMinimumResolvedDistance,
-                                desiredDistance);
-                            if (resolvedDistance < desiredDistance - 0.001f)
-                            {
-                                resolvedCameraWorldPosition = anchorWorldPosition + (cameraDirection * resolvedDistance);
-                                sceneQueryResolved = true;
-                                AZ_Printf(
-                                    "amandacore",
-                                    "client.camera_scene_query_resolved hit=true resolvedDistance=%.3f",
-                                    resolvedDistance);
-                            }
-                        }
-                    }
-                }
-            }
+            m_loggedCameraCollisionDisabled = true;
+            AZ_Printf(
+                "amandacore",
+                "client.camera_scene_query_mode=disabled_for_0_2 fixedFollowDistance=%.3f",
+                m_cameraFollowDistance);
         }
 
         if (!sceneQueryResolved && resolvedCameraWorldPosition.GetZ() < CameraFloorFallbackZ)
@@ -1148,6 +1133,314 @@ namespace MovementPhysics
             "client.stonewake_ground_material_applied entity=%s material=%s",
             StonewakeGroundEntityName,
             resolvedMaterialPath ? resolvedMaterialPath : "unknown");
+    }
+
+    void LocalPlayerControllerComponent::SpawnStonewakeMaterialSurfaces()
+    {
+        if (m_stonewakeMaterialSurfacesSpawned)
+        {
+            return;
+        }
+
+        auto resolveAssetIdByPath = [](const char* assetPath)
+        {
+            AZ::Data::AssetId assetId;
+            AZ::Data::AssetCatalogRequestBus::BroadcastResult(
+                assetId,
+                &AZ::Data::AssetCatalogRequestBus::Events::GetAssetIdByPath,
+                assetPath,
+                AZ::Data::AssetType{},
+                false);
+            return assetId;
+        };
+
+        struct StonewakeMaterialSurfaceDefinition
+        {
+            const char* m_name;
+            const char* m_modelAssetPath;
+            const char* m_materialAssetPath;
+            AZ::Vector3 m_position;
+            AZ::Vector3 m_nonUniformScale;
+            AZ::Quaternion m_rotation;
+        };
+
+        const AZ::Quaternion flatRotation = AZ::Quaternion::CreateIdentity();
+        const AZ::Quaternion northWallRotation = AZ::Quaternion::CreateRotationX(AZ::Constants::Pi * 0.5f);
+        const AZ::Quaternion eastWallRotation =
+            AZ::Quaternion::CreateRotationY(AZ::Constants::Pi * -0.5f) * AZ::Quaternion::CreateRotationZ(AZ::Constants::Pi * 0.5f);
+        const AZ::Quaternion roofRotation = AZ::Quaternion::CreateRotationY(-0.18f);
+
+        const StonewakeMaterialSurfaceDefinition surfaceDefinitions[] = {
+            {
+                "Stonewake_TexturedTerrain_Base",
+                StonewakeBaseGroundModelAssetPath,
+                "content/art/materials/mat_stonewake_grass_lush.azmaterial",
+                AZ::Vector3(256.0f, 192.0f, 0.018f),
+                AZ::Vector3::CreateOne(),
+                flatRotation,
+            },
+            {
+                "Stonewake_Hearthwatch_CobbleYard",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_hearthwatch_cobble_path.azmaterial",
+                AZ::Vector3(42.0f, 26.0f, 0.205f),
+                AZ::Vector3(20.0f, 11.0f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_WornGrass_WestApproach",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_grass_worn.azmaterial",
+                AZ::Vector3(126.0f, 68.0f, 0.185f),
+                AZ::Vector3(17.0f, 9.0f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_RockyGround_Ridge",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_rocky_ground.azmaterial",
+                AZ::Vector3(292.0f, 158.0f, 0.185f),
+                AZ::Vector3(22.0f, 9.0f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_MossGrass_EastVale",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_foliage_mossy_grass.azmaterial",
+                AZ::Vector3(402.0f, 238.0f, 0.185f),
+                AZ::Vector3(19.0f, 11.0f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_DirtRoad_Hearthwatch",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_dirt_path.azmaterial",
+                AZ::Vector3(55.0f, 26.0f, 0.225f),
+                AZ::Vector3(13.0f, 1.7f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_DirtRoad_Training",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_dirt_path.azmaterial",
+                AZ::Vector3(154.0f, 82.0f, 0.225f),
+                AZ::Vector3(18.0f, 1.85f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_DirtRoad_CentralVale",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_dirt_path.azmaterial",
+                AZ::Vector3(314.0f, 172.0f, 0.225f),
+                AZ::Vector3(20.0f, 2.0f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_DirtRoad_EastRise",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_dirt_path.azmaterial",
+                AZ::Vector3(438.0f, 246.0f, 0.225f),
+                AZ::Vector3(11.0f, 2.1f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_TrainingRing_Dirt",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_dirt_path.azmaterial",
+                AZ::Vector3(91.0f, 44.0f, 0.235f),
+                AZ::Vector3(4.8f, 4.8f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_FarmSoil_Valefurrow",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_valefurrow_farm_soil.azmaterial",
+                AZ::Vector3(198.0f, 116.0f, 0.205f),
+                AZ::Vector3(15.0f, 8.0f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_StreamWater_Crossing",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stream_water_placeholder.azmaterial",
+                AZ::Vector3(352.0f, 215.0f, 0.240f),
+                AZ::Vector3(19.0f, 1.65f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Stonewake_ShoreMud_Crossing",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_stonewake_mud_dark.azmaterial",
+                AZ::Vector3(352.0f, 215.0f, 0.200f),
+                AZ::Vector3(20.0f, 3.2f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Hearthwatch_CommandFloor_Wood",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_hearthwatch_village_wood.azmaterial",
+                AZ::Vector3(62.0f, 34.0f, 0.265f),
+                AZ::Vector3(3.4f, 2.2f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Hearthwatch_RoomFloor_Cobble",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_hearthwatch_cobble_path.azmaterial",
+                AZ::Vector3(38.0f, 18.0f, 0.265f),
+                AZ::Vector3(2.8f, 2.1f, 1.0f),
+                flatRotation,
+            },
+            {
+                "Hearthwatch_WhitePlaster_Wall",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_hearthwatch_village_plaster.azmaterial",
+                AZ::Vector3(64.0f, 41.0f, 1.45f),
+                AZ::Vector3(3.2f, 0.70f, 1.0f),
+                northWallRotation,
+            },
+            {
+                "Hearthwatch_CutStone_Wall",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_hearthwatch_cut_stone.azmaterial",
+                AZ::Vector3(74.0f, 30.0f, 1.35f),
+                AZ::Vector3(2.8f, 0.65f, 1.0f),
+                eastWallRotation,
+            },
+            {
+                "Hearthwatch_ThatchRoof_Patch",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_hearthwatch_thatch_roof.azmaterial",
+                AZ::Vector3(64.0f, 34.0f, 2.45f),
+                AZ::Vector3(3.8f, 2.5f, 1.0f),
+                roofRotation,
+            },
+            {
+                "Hearthwatch_ShingleRoof_Patch",
+                StonewakeSurfacePlaneModelAssetPath,
+                "content/art/materials/mat_hearthwatch_wood_shingles.azmaterial",
+                AZ::Vector3(38.0f, 18.0f, 2.20f),
+                AZ::Vector3(3.1f, 2.3f, 1.0f),
+                roofRotation,
+            },
+        };
+
+        unsigned int spawnedCount = 0;
+        for (const StonewakeMaterialSurfaceDefinition& surfaceDefinition : surfaceDefinitions)
+        {
+            const AZ::Data::AssetId modelAssetId = resolveAssetIdByPath(surfaceDefinition.m_modelAssetPath);
+            const AZ::Data::AssetId materialAssetId = resolveAssetIdByPath(surfaceDefinition.m_materialAssetPath);
+            if (!modelAssetId.IsValid() || !materialAssetId.IsValid())
+            {
+                if (!m_loggedStonewakeMaterialSurfaceMissing)
+                {
+                    m_loggedStonewakeMaterialSurfaceMissing = true;
+                    AZ_Warning(
+                        "amandacore",
+                        false,
+                        "client.stonewake_textured_surface_missing modelResolved=%s materialResolved=%s model=%s material=%s",
+                        modelAssetId.IsValid() ? "true" : "false",
+                        materialAssetId.IsValid() ? "true" : "false",
+                        surfaceDefinition.m_modelAssetPath,
+                        surfaceDefinition.m_materialAssetPath);
+                }
+                continue;
+            }
+
+            AZ::Entity* entity = nullptr;
+            AzFramework::GameEntityContextRequestBus::BroadcastResult(
+                entity,
+                &AzFramework::GameEntityContextRequestBus::Events::CreateGameEntity,
+                surfaceDefinition.m_name);
+            if (!entity)
+            {
+                AZ_Warning("amandacore", false, "client.stonewake_textured_surface_entity_create_failed name=%s", surfaceDefinition.m_name);
+                continue;
+            }
+
+            auto* transformComponent = entity->CreateComponent<AzFramework::TransformComponent>();
+            auto* nonUniformScaleComponent = entity->CreateComponent<AzFramework::NonUniformScaleComponent>();
+            AZ::Component* meshComponent = entity->CreateComponent(AZ::Render::MeshComponentTypeId);
+            AZ::Component* materialComponent = entity->CreateComponent(AZ::Render::MaterialComponentTypeId);
+            if (!transformComponent || !nonUniformScaleComponent || !meshComponent || !materialComponent)
+            {
+                AZ_Warning(
+                    "amandacore",
+                    false,
+                    "client.stonewake_textured_surface_component_missing name=%s transform=%s scale=%s mesh=%s material=%s",
+                    surfaceDefinition.m_name,
+                    transformComponent ? "true" : "false",
+                    nonUniformScaleComponent ? "true" : "false",
+                    meshComponent ? "true" : "false",
+                    materialComponent ? "true" : "false");
+                delete entity;
+                continue;
+            }
+
+            nonUniformScaleComponent->SetScale(surfaceDefinition.m_nonUniformScale);
+            entity->Init();
+            AzFramework::GameEntityContextRequestBus::Broadcast(
+                &AzFramework::GameEntityContextRequestBus::Events::AddGameEntity,
+                entity);
+            AzFramework::GameEntityContextRequestBus::Broadcast(
+                &AzFramework::GameEntityContextRequestBus::Events::ActivateGameEntity,
+                entity->GetId());
+
+            const AZ::Transform worldTransform = AZ::Transform::CreateFromQuaternionAndTranslation(
+                surfaceDefinition.m_rotation,
+                surfaceDefinition.m_position);
+            AZ::TransformBus::Event(
+                entity->GetId(),
+                &AZ::TransformBus::Events::SetWorldTM,
+                worldTransform);
+            AZ::NonUniformScaleRequestBus::Event(
+                entity->GetId(),
+                &AZ::NonUniformScaleRequestBus::Events::SetScale,
+                surfaceDefinition.m_nonUniformScale);
+            AZ::Render::MeshComponentRequestBus::Event(
+                entity->GetId(),
+                &AZ::Render::MeshComponentRequestBus::Events::SetModelAssetPath,
+                AZStd::string(surfaceDefinition.m_modelAssetPath));
+            AZ::Render::MaterialComponentRequestBus::Event(
+                entity->GetId(),
+                &AZ::Render::MaterialComponentRequestBus::Events::SetMaterialAssetIdOnDefaultSlot,
+                materialAssetId);
+
+            m_stonewakeMaterialSurfaceEntityIds.push_back(entity->GetId());
+            ++spawnedCount;
+            AZ_Printf(
+                "amandacore",
+                "client.stonewake_textured_surface_spawned name=%s model=%s material=%s",
+                surfaceDefinition.m_name,
+                surfaceDefinition.m_modelAssetPath,
+                surfaceDefinition.m_materialAssetPath);
+        }
+
+        if (spawnedCount > 0)
+        {
+            m_stonewakeMaterialSurfacesSpawned = true;
+            AZ_Printf(
+                "amandacore",
+                "client.stonewake_textured_surface_coverage count=%u source=curated_png_materials scope=stonewake_0_2",
+                spawnedCount);
+        }
+    }
+
+    void LocalPlayerControllerComponent::DestroyStonewakeMaterialSurfaces()
+    {
+        for (const AZ::EntityId& entityId : m_stonewakeMaterialSurfaceEntityIds)
+        {
+            if (entityId.IsValid())
+            {
+                AzFramework::GameEntityContextRequestBus::Broadcast(
+                    &AzFramework::GameEntityContextRequestBus::Events::DestroyGameEntity,
+                    entityId);
+            }
+        }
+
+        m_stonewakeMaterialSurfaceEntityIds.clear();
+        m_stonewakeMaterialSurfacesSpawned = false;
+        m_loggedStonewakeMaterialSurfaceMissing = false;
     }
 
     void LocalPlayerControllerComponent::DrawValidationArena()
