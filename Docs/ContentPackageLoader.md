@@ -97,9 +97,9 @@ Package-level validation catches duplicate IDs, missing files, malformed JSON, b
 
 ## Runtime Activation
 
-Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones to current world zone definitions, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers simple quest projections, and merges package items into the current item lookup path.
+Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones to current world zone definitions, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers content loot tables, and converts package quest objective graphs into the current server-authoritative quest graph model.
 
-Existing hardcoded Stonewake and Brindlebrook flows remain as fallback. The content package is additive and does not replace the current starter content yet.
+Existing hardcoded Stonewake, Brindlebrook, and dev progression flows remain as fallback. The content package is additive and does not replace current starter content. If a package item, loot table, or quest ID already exists in built-in content, runtime activation preserves the built-in definition and keeps the package definition in the `RuntimeContentRegistry` for validation/reporting. Package-spawned NPC entity IDs use a content prefix so authored spawn points cannot collide with built-in dev spawn IDs.
 
 Structured events include:
 
@@ -134,8 +134,8 @@ The `content-package-basic` scenario loads and validates the package, activates 
 ## Current Limitations
 
 - Ability and aura package entries are validated and registered, but combat still resolves the existing hardcoded Warrior ability catalog.
-- Runtime quest activation projects the first supported objective into the current single-objective quest shape while retaining the full objective graph in `RuntimeContentRegistry`.
-- Loot claiming in loadsim is deterministic and server-side; public world HTTP loot endpoints are not introduced in this milestone.
+- Runtime quest activation supports kill, collect, and provider-interaction objective graph nodes. Broader branching, optional objectives, repeatable quests, and editor-authored quest UI are future work.
+- Loadsim loot claiming is deterministic and server-side. Client UI for package-authored loot windows and quest offers is future work.
 - This is not a content editor, O3DE export pipeline, terrain streamer, or compiled binary content format.
 
 ## Next Milestone

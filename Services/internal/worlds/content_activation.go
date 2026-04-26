@@ -64,16 +64,43 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 
 	for _, itemID := range contentpkg.SortedKeys(registry.Items) {
 		item := registry.Items[itemID]
+		if _, exists := itemDefinitions[item.ItemID]; exists {
+			continue
+		}
 		itemDefinitions[item.ItemID] = itemDefinition{
 			ItemID:        item.ItemID,
 			DisplayName:   item.DisplayName,
+			Description:   item.Description,
+			Kind:          contentItemKind(item.Kind),
 			Type:          contentItemKind(item.Kind),
 			Subtype:       "content_package",
 			Quality:       contentItemQuality(item.Quality),
 			Stackable:     item.MaxStack > 1,
 			MaxStack:      item.MaxStack,
 			RequiredLevel: 1,
+			Tags:          append([]string(nil), item.Tags...),
 		}
+	}
+	for _, lootTableID := range contentpkg.SortedKeys(registry.LootTables) {
+		lootTable := registry.LootTables[lootTableID]
+		if _, exists := devLootTables[lootTable.LootTableID]; exists {
+			continue
+		}
+		worldTable := LootTableDefinition{
+			LootTableID: lootTable.LootTableID,
+			Entries:     make([]LootEntry, 0, len(lootTable.Entries)),
+		}
+		for _, entry := range lootTable.Entries {
+			worldTable.Entries = append(worldTable.Entries, LootEntry{
+				ItemID:            entry.ItemID,
+				MinQuantity:       entry.MinQuantity,
+				MaxQuantity:       entry.MaxQuantity,
+				DropChancePercent: entry.DropChancePercent,
+				IsGuaranteed:      entry.Guaranteed,
+				Tags:              append([]string(nil), entry.Tags...),
+			})
+		}
+		devLootTables[worldTable.LootTableID] = worldTable
 	}
 
 	for _, zoneID := range contentpkg.SortedKeys(registry.Zones) {
@@ -125,9 +152,11 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 		if worldQuest.ID == "" {
 			continue
 		}
-		s.quests[worldQuest.ID] = worldQuest
-		s.questOrder = appendUniqueString(s.questOrder, worldQuest.ID)
-		result.QuestsRegistered++
+		if _, exists := s.quests[worldQuest.ID]; !exists {
+			s.quests[worldQuest.ID] = worldQuest
+			s.questOrder = appendUniqueString(s.questOrder, worldQuest.ID)
+			result.QuestsRegistered++
+		}
 	}
 
 	s.contentActivation = result
@@ -218,6 +247,7 @@ func (s *worldServer) contentQuestDefinition(registry contentpkg.RuntimeContentR
 		ID:              quest.QuestID,
 		ZoneID:          zoneForQuest(registry, quest.QuestID),
 		Title:           quest.DisplayName,
+		Summary:         quest.Summary,
 		ObjectiveText:   quest.Summary,
 		GiverNPCID:      providerID,
 		TurnInNPCID:     providerID,
@@ -225,6 +255,8 @@ func (s *worldServer) contentQuestDefinition(registry contentpkg.RuntimeContentR
 		RewardItems:     contentQuestRewards(quest, registry),
 		LevelBand:       fmt.Sprintf("%d", contentMaxInt(quest.RequiredLevel, 1)),
 		PrerequisiteIDs: append([]string(nil), quest.PrerequisiteQuestIDs...),
+		Tags:            append([]string(nil), quest.Tags...),
+		ObjectiveGraph:  contentObjectiveGraph(quest.ObjectiveGraph),
 	}
 	for _, node := range quest.ObjectiveGraph.Nodes {
 		switch node.Kind {
@@ -265,6 +297,46 @@ func contentQuestRewards(quest contentpkg.QuestDefinition, registry contentpkg.R
 		})
 	}
 	return rewards
+}
+
+func contentObjectiveGraph(graph contentpkg.QuestObjectiveGraph) questObjectiveGraph {
+	nodes := make([]questObjectiveNode, 0, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		worldNode := questObjectiveNode{
+			NodeID:      node.NodeID,
+			TargetCount: contentMaxInt(node.RequiredCount, 1),
+			DependsOn:   append([]string(nil), node.DependsOn...),
+		}
+		switch node.Kind {
+		case "kill_npc":
+			worldNode.Kind = objectiveKindKillNPC
+			worldNode.TargetNpcArchetype = node.TargetID
+		case "collect_item":
+			worldNode.Kind = objectiveKindCollectItem
+			worldNode.TargetItemID = node.TargetID
+		case "talk_provider":
+			worldNode.Kind = objectiveKindInteractWithEntity
+			worldNode.TargetEntityID = node.TargetID
+		default:
+			worldNode.Kind = objectiveKindInteractWithEntity
+			worldNode.TargetEntityID = node.TargetID
+		}
+		nodes = append(nodes, worldNode)
+	}
+	if len(nodes) > 0 {
+		dependents := map[string]bool{}
+		for _, node := range nodes {
+			for _, dependency := range node.DependsOn {
+				dependents[dependency] = true
+			}
+		}
+		for index := range nodes {
+			if !dependents[nodes[index].NodeID] {
+				nodes[index].Terminal = true
+			}
+		}
+	}
+	return questObjectiveGraph{Nodes: nodes}
 }
 
 func contentZoneLandmarks(zone contentpkg.ZoneDefinition) []zonePointDefinition {
@@ -321,19 +393,25 @@ func zoneForQuest(registry contentpkg.RuntimeContentRegistry, questID string) st
 func contentSpawnEntityID(spawnPointID string) string {
 	trimmed := strings.TrimSpace(spawnPointID)
 	if strings.HasPrefix(trimmed, "spawn_") {
-		return "npc_" + strings.TrimPrefix(trimmed, "spawn_")
+		return "npc_content_" + strings.TrimPrefix(trimmed, "spawn_")
 	}
-	return "npc_" + trimmed
+	return "npc_content_" + trimmed
 }
 
 func contentItemKind(kind string) string {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case itemTypeWeapon, itemTypeArmor, itemTypeConsumable, itemTypeMaterial, itemTypeQuest, itemTypeJunk:
 		return strings.ToLower(strings.TrimSpace(kind))
-	case "currency":
+	case itemTypeCurrency, "currency", "currencytoken":
+		return itemTypeCurrency
+	case itemTypeEquipment, "equipment", "equipmentplaceholder":
+		return itemTypeEquipment
+	case "craftingmaterial":
 		return itemTypeMaterial
-	case "equipment":
-		return itemTypeArmor
+	case "questitem":
+		return itemTypeQuest
+	case "misc":
+		return itemTypeJunk
 	default:
 		return itemTypeMaterial
 	}
@@ -341,8 +419,10 @@ func contentItemKind(kind string) string {
 
 func contentItemQuality(quality string) string {
 	switch strings.ToLower(strings.TrimSpace(quality)) {
-	case itemQualityPoor, itemQualityCommon:
+	case itemQualityPoor, itemQualityCommon, itemQualityUncommon, itemQualityRare:
 		return strings.ToLower(strings.TrimSpace(quality))
+	case itemQualityEpicPlaceholder, "epicplaceholder":
+		return itemQualityEpicPlaceholder
 	default:
 		return itemQualityCommon
 	}
