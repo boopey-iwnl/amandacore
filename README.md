@@ -69,3 +69,13 @@ Pop-Location
 ```
 
 The scenario loads `dawnwake_isles`, activates its continent runtime, spawns simulated players at the default entry, transfers through the first zone gate, and reports transition and visibility counts.
+
+Additional Dawnwake scenarios are available for multi-zone population, transition stress, command pressure, and zone isolation:
+
+```powershell
+Push-Location Services
+go run ./cmd/loadsim --clients 100 --duration 60s --cmd-rate 5 --scenario dawnwake-multizone-sharding --content ../Content/Packs/dawnwake_isles/package.json --zone-distribution "dawnwake_landing=40,amberglass_fields=25,mistwood_reach=15,highroad_pass=10,kingsfall_harbor=10"
+Pop-Location
+```
+
+See `Docs/DawnwakeLoadTesting.md` for the scenario list, report fields, queue/backpressure behavior, and shard assignment skeleton.

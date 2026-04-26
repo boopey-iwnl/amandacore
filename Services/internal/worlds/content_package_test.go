@@ -2,6 +2,7 @@ package worlds
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"amandacore/services/internal/observability"
@@ -340,6 +341,110 @@ func TestReconnectRestoresZoneIDOrCorrectsInvalidPosition(t *testing.T) {
 	}
 }
 
+func TestZoneCommandQueueBackpressureAndDrain(t *testing.T) {
+	runtime := newDawnwakeRuntime(t)
+	if _, _, err := runtime.SpawnCharacterAtDefaultEntry("char_queue"); err != nil {
+		t.Fatalf("spawn failed: %v", err)
+	}
+	zoneRuntime := runtime.Zones["dawnwake_landing"]
+	zoneRuntime.ConfigureCommandQueue(1)
+
+	first, err := runtime.RouteCommandToQueue(WorldCommand{CommandID: "cmd_001", CharacterID: "char_queue", Name: "move"})
+	if err != nil {
+		t.Fatalf("first command route failed: %v", err)
+	}
+	if !first.Accepted || first.Backpressured {
+		t.Fatalf("expected first command accepted, got %#v", first)
+	}
+	second, err := runtime.RouteCommandToQueue(WorldCommand{CommandID: "cmd_002", CharacterID: "char_queue", Name: "ability"})
+	if err != nil {
+		t.Fatalf("second command route failed: %v", err)
+	}
+	if !second.Backpressured || second.Accepted {
+		t.Fatalf("expected second command backpressured, got %#v", second)
+	}
+	stats := zoneRuntime.QueueStats()
+	if stats.Depth != 1 || stats.TotalBackpressured != 1 || stats.MaxDepth != 1 {
+		t.Fatalf("unexpected queue stats before drain: %#v", stats)
+	}
+	command, ok := zoneRuntime.DequeueCommand()
+	if !ok || command.CommandID != "cmd_001" {
+		t.Fatalf("unexpected dequeued command: %#v ok=%t", command, ok)
+	}
+	stats = zoneRuntime.QueueStats()
+	if stats.Depth != 0 || stats.TotalDequeued != 1 {
+		t.Fatalf("unexpected queue stats after drain: %#v", stats)
+	}
+}
+
+func TestShardAssignmentMapsEveryZoneToSingleOwner(t *testing.T) {
+	runtime := newDawnwakeRuntime(t)
+	index, err := runtime.AssignZonesToShards(ShardAssignmentPolicy{Prefix: "test-shard", MaxZonesPerShard: 1})
+	if err != nil {
+		t.Fatalf("assign shards failed: %v", err)
+	}
+	if len(index.ZoneToShard) != len(runtime.Zones) {
+		t.Fatalf("expected every zone assigned, got %#v", index.ZoneToShard)
+	}
+	seenZones := map[string]bool{}
+	for shardID, zoneIDs := range index.ShardToZones {
+		if len(zoneIDs) != 1 {
+			t.Fatalf("expected one zone per shard for %s, got %#v", shardID, zoneIDs)
+		}
+		for _, zoneID := range zoneIDs {
+			if seenZones[zoneID] {
+				t.Fatalf("zone %s assigned more than once", zoneID)
+			}
+			seenZones[zoneID] = true
+			handle, found := runtime.ZoneShard(zoneID)
+			if !found || handle.ShardID != shardID || handle.Runtime == nil {
+				t.Fatalf("bad zone shard handle for %s: %#v found=%t", zoneID, handle, found)
+			}
+		}
+	}
+}
+
+func TestTransferRejectsDestinationWithoutShardOwner(t *testing.T) {
+	runtime := newDawnwakeRuntime(t)
+	if _, _, err := runtime.SpawnCharacterAtDefaultEntry("char_shard_transfer"); err != nil {
+		t.Fatalf("spawn failed: %v", err)
+	}
+	_, _ = runtime.MoveCharacter("char_shard_transfer", 176, 0, 0)
+	delete(runtime.Shards.ZoneToShard, "amberglass_fields")
+
+	result, err := runtime.MoveCharacter("char_shard_transfer", 10, 0, 0)
+	if err != nil {
+		t.Fatalf("transfer should reject without transport error: %v", err)
+	}
+	if !result.Rejected || !strings.Contains(result.RejectionReason, "destination zone is not bound") {
+		t.Fatalf("expected destination shard rejection, got %#v", result)
+	}
+	if runtime.Characters["char_shard_transfer"].ZoneID != "dawnwake_landing" {
+		t.Fatalf("character should remain in source zone after rejection")
+	}
+}
+
+func TestRepeatedTransitionStressKeepsSingleZoneOwnership(t *testing.T) {
+	runtime := newDawnwakeRuntime(t)
+	if _, _, err := runtime.SpawnCharacterAtDefaultEntry("char_transition_stress"); err != nil {
+		t.Fatalf("spawn failed: %v", err)
+	}
+	for index := 0; index < 8; index++ {
+		if err := moveThroughFirstEnabledGate(runtime, "char_transition_stress"); err != nil {
+			t.Fatalf("transition %d failed: %v", index, err)
+		}
+		activeZones := 0
+		for _, zone := range runtime.Zones {
+			if _, found := zone.Characters["char_transition_stress"]; found {
+				activeZones++
+			}
+		}
+		if activeZones != 1 {
+			t.Fatalf("expected one owning zone after transition %d, got %d", index, activeZones)
+		}
+	}
+}
+
 func loadDawnwakeRegistry(t *testing.T) *RuntimeContentRegistry {
 	t.Helper()
 	registry, err := NewContentPackageLoader().Load(filepath.Join("..", "..", "..", "Content", "Packs", "dawnwake_isles", "package.json"))
@@ -374,4 +479,66 @@ func entitiesContain(entities []RuntimeEntity, entityID string) bool {
 		}
 	}
 	return false
+}
+
+func moveThroughFirstEnabledGate(runtime *ContinentRuntime, characterID string) error {
+	state := runtime.Characters[characterID]
+	if state == nil {
+		return nil
+	}
+	zoneRuntime := runtime.Zones[state.ZoneID]
+	if zoneRuntime == nil {
+		return nil
+	}
+	var gate ZoneTransitionGate
+	for _, candidate := range zoneRuntime.Definition.TransitionGates {
+		if !candidate.Disabled {
+			gate = candidate
+			break
+		}
+	}
+	if gate.TransitionID == "" {
+		return nil
+	}
+	center := WorldPosition{
+		ZoneID: state.ZoneID,
+		X:      (gate.GateBounds.MinX + gate.GateBounds.MaxX) / 2,
+		Y:      (gate.GateBounds.MinY + gate.GateBounds.MaxY) / 2,
+		Z:      (gate.GateBounds.MinZ + gate.GateBounds.MaxZ) / 2,
+	}
+	if _, err := runtime.MoveCharacter(characterID, center.X-state.Position.X, center.Y-state.Position.Y, center.Z-state.Position.Z); err != nil {
+		return err
+	}
+	deltaX, deltaY := testExitDelta(zoneRuntime.Definition.Bounds, gate.GateBounds)
+	result, err := runtime.MoveCharacter(characterID, deltaX, deltaY, 0)
+	if err != nil {
+		return err
+	}
+	if !result.Completed || result.Rejected {
+		return &testError{message: "transition did not complete"}
+	}
+	return nil
+}
+
+func testExitDelta(zone ZoneBounds, gate ZoneBounds) (float64, float64) {
+	switch {
+	case gate.MaxX >= zone.MaxX:
+		return 10, 0
+	case gate.MinX <= zone.MinX:
+		return -10, 0
+	case gate.MaxY >= zone.MaxY:
+		return 0, 10
+	case gate.MinY <= zone.MinY:
+		return 0, -10
+	default:
+		return 10, 0
+	}
+}
+
+type testError struct {
+	message string
+}
+
+func (e *testError) Error() string {
+	return e.message
 }

@@ -61,6 +61,8 @@ The data model is deliberately wider than the first slice so future work can sca
 
 Current Dawnwake coordinates are placeholder server-side rectangles pending map tracing from the owner-supplied Dawnwake Isles and Kingsfall Harbor images. O3DE mapping remains a separate transform layer; the server package is the authoritative runtime input.
 
+The Dawnwake load testing milestone adds deterministic population distribution, transition stress, zone command queues, queue backpressure reporting, tick duration percentiles, and a single-process shard assignment skeleton. Shard IDs currently bind active zones inside one process; they do not imply distributed runtime ownership yet.
+
 ### Clean-room reference boundary
 
 This implementation uses original AmandaCore code and data. TrinityCore and AzerothCore were used only as high-level architectural reference. Dawnwake Isles is AmandaCore-original world content. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, map formats, area tables, zone tables, spawn schemas, coordinates, quest tables, item tables, creature tables, spell tables, aura tables, reward schemas, or database structures were copied or adapted.

@@ -786,6 +786,8 @@ type ZoneRuntime struct {
 	Definition ZoneDefinition
 	Entities   EntityRegistry
 	Characters map[string]*CharacterZoneState
+	CommandQ   ZoneCommandQueue
+	ShardID    ShardID
 	Active     bool
 }
 
@@ -818,6 +820,61 @@ type SimulationTick struct {
 	QueueDepth int
 }
 
+type ZoneCommandQueue struct {
+	Capacity           int
+	Pending            []WorldCommand
+	TotalEnqueued      int
+	TotalDequeued      int
+	TotalBackpressured int
+	MaxDepth           int
+}
+
+type CommandQueueResult struct {
+	Accepted      bool
+	Backpressured bool
+	Reason        string
+	ZoneID        string
+	CommandID     string
+	CommandName   string
+	QueueDepth    int
+	MaxQueueDepth int
+}
+
+type CommandQueueStats struct {
+	ZoneID             string
+	Capacity           int
+	Depth              int
+	MaxDepth           int
+	TotalEnqueued      int
+	TotalDequeued      int
+	TotalBackpressured int
+}
+
+type ShardID string
+
+type ShardAssignmentPolicy struct {
+	Prefix           string
+	MaxZonesPerShard int
+	ZoneOrder        []string
+}
+
+type ShardAssignment struct {
+	ShardID string
+	ZoneID  string
+	Reason  string
+}
+
+type ZoneShardHandle struct {
+	ShardID string
+	ZoneID  string
+	Runtime *ZoneRuntime
+}
+
+type ShardRuntimeIndex struct {
+	ZoneToShard  map[string]string
+	ShardToZones map[string][]string
+}
+
 func (f ZoneRuntimeFactory) CreateZoneRuntime(zone ZoneDefinition) *ZoneRuntime {
 	runtime := &ZoneRuntime{
 		ZoneID:     zone.ZoneID,
@@ -827,6 +884,7 @@ func (f ZoneRuntimeFactory) CreateZoneRuntime(zone ZoneDefinition) *ZoneRuntime 
 			ZoneIndex: map[string]string{},
 		},
 		Characters: map[string]*CharacterZoneState{},
+		CommandQ:   NewZoneCommandQueue(0),
 		Active:     true,
 	}
 	for _, group := range zone.SpawnGroups {
@@ -875,6 +933,133 @@ func (r *EntityRegistry) Remove(entityID string) {
 	delete(r.ZoneIndex, entityID)
 }
 
+func NewZoneCommandQueue(capacity int) ZoneCommandQueue {
+	if capacity < 0 {
+		capacity = 0
+	}
+	return ZoneCommandQueue{Capacity: capacity, Pending: []WorldCommand{}}
+}
+
+func (z *ZoneRuntime) ConfigureCommandQueue(capacity int) {
+	z.CommandQ = NewZoneCommandQueue(capacity)
+	observability.LogEvent("world-service", observability.EventWorldZoneQueueDepthSampled, map[string]any{
+		"zoneId":       z.ZoneID,
+		"queueDepth":   0,
+		"queueMax":     0,
+		"queueCap":     z.CommandQ.Capacity,
+		"sampleReason": "configured",
+	})
+}
+
+func (z *ZoneRuntime) EnqueueCommand(command WorldCommand) CommandQueueResult {
+	if z.CommandQ.Pending == nil {
+		z.CommandQ.Pending = []WorldCommand{}
+	}
+	depth := len(z.CommandQ.Pending)
+	if z.CommandQ.Capacity > 0 && depth >= z.CommandQ.Capacity {
+		z.CommandQ.TotalBackpressured++
+		result := CommandQueueResult{
+			Accepted:      false,
+			Backpressured: true,
+			Reason:        "zone command queue capacity reached",
+			ZoneID:        z.ZoneID,
+			CommandID:     command.CommandID,
+			CommandName:   command.Name,
+			QueueDepth:    depth,
+			MaxQueueDepth: z.CommandQ.MaxDepth,
+		}
+		observability.LogEvent("world-service", observability.EventWorldZoneCommandBackpressured, result.eventFields())
+		return result
+	}
+	z.CommandQ.Pending = append(z.CommandQ.Pending, command)
+	z.CommandQ.TotalEnqueued++
+	depth = len(z.CommandQ.Pending)
+	if depth > z.CommandQ.MaxDepth {
+		z.CommandQ.MaxDepth = depth
+	}
+	result := CommandQueueResult{
+		Accepted:      true,
+		ZoneID:        z.ZoneID,
+		CommandID:     command.CommandID,
+		CommandName:   command.Name,
+		QueueDepth:    depth,
+		MaxQueueDepth: z.CommandQ.MaxDepth,
+	}
+	observability.LogEvent("world-service", observability.EventWorldZoneCommandEnqueued, result.eventFields())
+	observability.LogEvent("world-service", observability.EventWorldZoneQueueDepthSampled, map[string]any{
+		"zoneId":       z.ZoneID,
+		"queueDepth":   depth,
+		"queueMax":     z.CommandQ.MaxDepth,
+		"queueCap":     z.CommandQ.Capacity,
+		"sampleReason": "enqueue",
+	})
+	return result
+}
+
+func (z *ZoneRuntime) DequeueCommand() (WorldCommand, bool) {
+	if len(z.CommandQ.Pending) == 0 {
+		return WorldCommand{}, false
+	}
+	command := z.CommandQ.Pending[0]
+	copy(z.CommandQ.Pending, z.CommandQ.Pending[1:])
+	z.CommandQ.Pending = z.CommandQ.Pending[:len(z.CommandQ.Pending)-1]
+	z.CommandQ.TotalDequeued++
+	observability.LogEvent("world-service", observability.EventWorldZoneCommandDequeued, map[string]any{
+		"zoneId":      z.ZoneID,
+		"commandId":   command.CommandID,
+		"commandName": command.Name,
+		"queueDepth":  len(z.CommandQ.Pending),
+	})
+	observability.LogEvent("world-service", observability.EventWorldZoneQueueDepthSampled, map[string]any{
+		"zoneId":       z.ZoneID,
+		"queueDepth":   len(z.CommandQ.Pending),
+		"queueMax":     z.CommandQ.MaxDepth,
+		"queueCap":     z.CommandQ.Capacity,
+		"sampleReason": "dequeue",
+	})
+	return command, true
+}
+
+func (z *ZoneRuntime) DrainCommandQueue(limit int) []WorldCommand {
+	if limit <= 0 || limit > len(z.CommandQ.Pending) {
+		limit = len(z.CommandQ.Pending)
+	}
+	commands := make([]WorldCommand, 0, limit)
+	for len(commands) < limit {
+		command, ok := z.DequeueCommand()
+		if !ok {
+			break
+		}
+		commands = append(commands, command)
+	}
+	return commands
+}
+
+func (z *ZoneRuntime) QueueStats() CommandQueueStats {
+	return CommandQueueStats{
+		ZoneID:             z.ZoneID,
+		Capacity:           z.CommandQ.Capacity,
+		Depth:              len(z.CommandQ.Pending),
+		MaxDepth:           z.CommandQ.MaxDepth,
+		TotalEnqueued:      z.CommandQ.TotalEnqueued,
+		TotalDequeued:      z.CommandQ.TotalDequeued,
+		TotalBackpressured: z.CommandQ.TotalBackpressured,
+	}
+}
+
+func (r CommandQueueResult) eventFields() map[string]any {
+	return map[string]any{
+		"zoneId":        r.ZoneID,
+		"commandId":     r.CommandID,
+		"commandName":   r.CommandName,
+		"accepted":      r.Accepted,
+		"backpressured": r.Backpressured,
+		"reason":        r.Reason,
+		"queueDepth":    r.QueueDepth,
+		"maxQueueDepth": r.MaxQueueDepth,
+	}
+}
+
 type ContinentRuntime struct {
 	Registry        *RuntimeContentRegistry
 	Definition      ContinentDefinition
@@ -882,6 +1067,7 @@ type ContinentRuntime struct {
 	EntityZoneIndex map[string]string
 	Characters      map[string]*CharacterZoneState
 	Visibility      map[string]VisibilitySet
+	Shards          *ShardRuntimeIndex
 	Events          []DomainEvent
 }
 
@@ -932,6 +1118,13 @@ func (r *RuntimeContentRegistry) ActivateContinent(continentID string) (*Contine
 		"continentId": continentID,
 		"zoneCount":   len(runtime.Zones),
 	})
+	if _, err := runtime.AssignZonesToShards(ShardAssignmentPolicy{Prefix: continentID + "-shard"}); err != nil {
+		observability.LogEvent("world-service", observability.EventWorldShardAssignmentFailed, map[string]any{
+			"continentId": continentID,
+			"reason":      err.Error(),
+		})
+		return nil, err
+	}
 	return runtime, nil
 }
 
@@ -971,6 +1164,14 @@ func (w *WorldRuntime) RouteCommand(command WorldCommand) (ZoneRuntimeHandle, er
 	return w.Continents[continentID].RouteCommand(command)
 }
 
+func (w *WorldRuntime) RouteCommandToQueue(command WorldCommand) (CommandQueueResult, error) {
+	handle, err := w.RouteCommand(command)
+	if err != nil {
+		return CommandQueueResult{}, err
+	}
+	return handle.Runtime.EnqueueCommand(command), nil
+}
+
 type WorldCommand struct {
 	CommandID   string
 	CharacterID string
@@ -983,6 +1184,18 @@ func (r *ContinentRuntime) SpawnCharacterAtDefaultEntry(characterID string) (Cha
 	if err != nil {
 		return CharacterZoneState{}, nil, err
 	}
+	return r.SpawnCharacterAtEntry(characterID, zone.ZoneID, entry.EntryPointID)
+}
+
+func (r *ContinentRuntime) SpawnCharacterAtEntry(characterID string, zoneID string, entryPointID string) (CharacterZoneState, []StateDiff, error) {
+	zone, found := r.Registry.Zones[zoneID]
+	if !found {
+		return CharacterZoneState{}, nil, fmt.Errorf("zone %s is not loaded", zoneID)
+	}
+	entry, found := zone.entryPoint(entryPointID)
+	if !found {
+		return CharacterZoneState{}, nil, fmt.Errorf("entry point %s is not loaded in zone %s", entryPointID, zoneID)
+	}
 	state := CharacterZoneState{
 		CharacterID: characterID,
 		ZoneID:      zone.ZoneID,
@@ -991,6 +1204,29 @@ func (r *ContinentRuntime) SpawnCharacterAtDefaultEntry(characterID string) (Cha
 		Connected:   true,
 	}
 	return state, r.setCharacterZoneState(state, "", true), nil
+}
+
+func (r *ContinentRuntime) PlaceCharacterAtEntry(characterID string, zoneID string, entryPointID string) (CharacterZoneState, []StateDiff, error) {
+	zone, found := r.Registry.Zones[zoneID]
+	if !found {
+		return CharacterZoneState{}, nil, fmt.Errorf("zone %s is not loaded", zoneID)
+	}
+	entry, found := zone.entryPoint(entryPointID)
+	if !found {
+		return CharacterZoneState{}, nil, fmt.Errorf("entry point %s is not loaded in zone %s", entryPointID, zoneID)
+	}
+	previousZoneID := ""
+	if existing, found := r.Characters[characterID]; found {
+		previousZoneID = existing.ZoneID
+	}
+	state := CharacterZoneState{
+		CharacterID: characterID,
+		ZoneID:      zone.ZoneID,
+		Position:    entry.Position,
+		Facing:      entry.Facing,
+		Connected:   true,
+	}
+	return state, r.setCharacterZoneState(state, previousZoneID, true), nil
 }
 
 func (r *ContinentRuntime) RouteCommand(command WorldCommand) (ZoneRuntimeHandle, error) {
@@ -1003,6 +1239,14 @@ func (r *ContinentRuntime) RouteCommand(command WorldCommand) (ZoneRuntimeHandle
 		return ZoneRuntimeHandle{}, fmt.Errorf("character %s is assigned to missing zone %s", command.CharacterID, state.ZoneID)
 	}
 	return ZoneRuntimeHandle{ZoneID: state.ZoneID, Runtime: runtime}, nil
+}
+
+func (r *ContinentRuntime) RouteCommandToQueue(command WorldCommand) (CommandQueueResult, error) {
+	handle, err := r.RouteCommand(command)
+	if err != nil {
+		return CommandQueueResult{}, err
+	}
+	return handle.Runtime.EnqueueCommand(command), nil
 }
 
 func (r *ContinentRuntime) MoveCharacter(characterID string, deltaX float64, deltaY float64, deltaZ float64) (ZoneTransferResult, error) {
@@ -1106,6 +1350,14 @@ func (r *ContinentRuntime) RequestZoneTransfer(request ZoneTransferRequest) (Zon
 	}
 	if state.ZoneID != request.FromZoneID {
 		return reject("character is not owned by source zone")
+	}
+	if r.Shards != nil && len(r.Shards.ZoneToShard) > 0 {
+		if _, assigned := r.Shards.ZoneToShard[request.FromZoneID]; !assigned {
+			return reject("source zone is not bound to a shard")
+		}
+		if _, assigned := r.Shards.ZoneToShard[request.ToZoneID]; !assigned {
+			return reject("destination zone is not bound to a shard")
+		}
 	}
 	gate, gateFound := sourceRuntime.Definition.transition(request.TransitionID)
 	if !gateFound {
@@ -1491,6 +1743,86 @@ func hasString(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func (r *ContinentRuntime) AssignZonesToShards(policy ShardAssignmentPolicy) (*ShardRuntimeIndex, error) {
+	if len(r.Zones) == 0 {
+		return nil, fmt.Errorf("continent runtime has no zones to assign")
+	}
+	if policy.Prefix == "" {
+		policy.Prefix = string(r.Definition.ContinentID) + "-shard"
+	}
+	if policy.MaxZonesPerShard <= 0 {
+		policy.MaxZonesPerShard = len(r.Zones)
+	}
+	zoneOrder := append([]string(nil), policy.ZoneOrder...)
+	if len(zoneOrder) == 0 {
+		zoneOrder = append(zoneOrder, r.Definition.Zones...)
+	}
+	index := &ShardRuntimeIndex{
+		ZoneToShard:  map[string]string{},
+		ShardToZones: map[string][]string{},
+	}
+	for assignmentIndex, zoneID := range zoneOrder {
+		zoneRuntime, found := r.Zones[zoneID]
+		if !found {
+			observability.LogEvent("world-service", observability.EventWorldShardAssignmentFailed, map[string]any{
+				"continentId": r.Definition.ContinentID,
+				"zoneId":      zoneID,
+				"reason":      "zone is not active",
+			})
+			return nil, fmt.Errorf("zone %s is not active", zoneID)
+		}
+		if _, exists := index.ZoneToShard[zoneID]; exists {
+			observability.LogEvent("world-service", observability.EventWorldShardAssignmentFailed, map[string]any{
+				"continentId": r.Definition.ContinentID,
+				"zoneId":      zoneID,
+				"reason":      "zone assigned twice",
+			})
+			return nil, fmt.Errorf("zone %s assigned twice", zoneID)
+		}
+		shardID := fmt.Sprintf("%s-%03d", policy.Prefix, assignmentIndex/policy.MaxZonesPerShard+1)
+		index.ZoneToShard[zoneID] = shardID
+		index.ShardToZones[shardID] = append(index.ShardToZones[shardID], zoneID)
+		zoneRuntime.ShardID = ShardID(shardID)
+		observability.LogEvent("world-service", observability.EventWorldShardAssigned, map[string]any{
+			"continentId": r.Definition.ContinentID,
+			"zoneId":      zoneID,
+			"shardId":     shardID,
+		})
+		observability.LogEvent("world-service", observability.EventWorldShardZoneBound, map[string]any{
+			"continentId": r.Definition.ContinentID,
+			"zoneId":      zoneID,
+			"shardId":     shardID,
+		})
+	}
+	for zoneID := range r.Zones {
+		if _, assigned := index.ZoneToShard[zoneID]; !assigned {
+			observability.LogEvent("world-service", observability.EventWorldShardAssignmentFailed, map[string]any{
+				"continentId": r.Definition.ContinentID,
+				"zoneId":      zoneID,
+				"reason":      "active zone missing from assignment policy",
+			})
+			return nil, fmt.Errorf("active zone %s missing from shard assignment policy", zoneID)
+		}
+	}
+	r.Shards = index
+	return index, nil
+}
+
+func (r *ContinentRuntime) ZoneShard(zoneID string) (ZoneShardHandle, bool) {
+	if r.Shards == nil {
+		return ZoneShardHandle{}, false
+	}
+	shardID, found := r.Shards.ZoneToShard[zoneID]
+	if !found {
+		return ZoneShardHandle{}, false
+	}
+	runtime, found := r.Zones[zoneID]
+	if !found {
+		return ZoneShardHandle{}, false
+	}
+	return ZoneShardHandle{ShardID: shardID, ZoneID: zoneID, Runtime: runtime}, true
 }
 
 func AsValidationErrors(err error) (ValidationErrors, bool) {

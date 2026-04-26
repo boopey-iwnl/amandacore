@@ -20,6 +20,18 @@ movement delta -> boundary check -> transition request -> topology validation ->
 
 Future protocol adapters and session gateway work should submit canonical commands into this same routing layer. The adapter should not own topology or transition decisions.
 
+## Queue And Backpressure Skeleton
+
+Each active `ZoneRuntime` can now own an in-memory command queue. The queue is FIFO, can be bounded by capacity, and reports enqueue, dequeue, backpressure, current depth, and max depth counters. Capacity `0` is unbounded; positive capacity rejects new commands once the zone queue is full.
+
+This is a scheduling and observability boundary, not a production worker pool. Future work can replace the queue internals with a shard-local work loop while keeping command routing and backpressure reporting stable.
+
+## Shard Assignment Skeleton
+
+`ContinentRuntime.AssignZonesToShards` binds active zones to shard IDs. The current policy supports multiple zones per shard or one zone per shard. Transfers validate that both source and destination zones are bound to shard owners, while character ownership remains zone-scoped.
+
+The initial implementation is single-process. It prepares the code for a future distributed shard coordinator without introducing cluster dependencies into the current milestone.
+
 ## Visibility Output
 
 Visibility is emitted as internal state diff data for future networking and O3DE streaming:

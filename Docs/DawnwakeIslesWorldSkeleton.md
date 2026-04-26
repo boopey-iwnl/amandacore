@@ -164,6 +164,8 @@ Pop-Location
 
 The report includes package load, continent activation, zones activated, transition gates loaded, players attached, transition counts, visibility evaluation counts, NPCs spawned, tick duration summaries, queue depth, and errors.
 
+Additional Dawnwake load scenarios are documented in `Docs/DawnwakeLoadTesting.md`. They cover configurable zone population distribution, repeated transition stress, command queue pressure, queue backpressure, tick duration percentiles, and the shard assignment skeleton.
+
 ## Clean-room reference boundary
 
 This implementation uses original AmandaCore code and data.
@@ -182,6 +184,8 @@ No source code, SQL, packet layouts, opcodes, command names, schemas, content ID
 - Adjacent-zone visibility is exposed as streaming hints, not cross-zone entity replication.
 - Kingsfall Harbor has city runtime hints and provider placeholders, not full city services.
 - Reconnect persistence is currently represented by an interface and in-memory implementation.
+- Load simulations are deterministic skeletons, not representative player behavior models.
+- Shard assignment is single-process and does not yet move work across machines.
 - No navmesh, terrain, O3DE import, phasing, city economy, or production streamer is included.
 
 ## Next Milestone
