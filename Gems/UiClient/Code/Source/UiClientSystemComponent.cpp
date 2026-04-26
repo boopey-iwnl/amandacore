@@ -688,7 +688,20 @@ namespace UiClient
             }
         }
 
-        bool BeginHudPanel(const char* identifier, const char* title, const ImVec2& position, const ImVec2& size, bool compact = false)
+        constexpr float HudButtonHeight = 30.0f;
+
+        ImVec2 HudButtonSize(float width)
+        {
+            return ImVec2(width, HudButtonHeight);
+        }
+
+        bool BeginHudPanel(
+            const char* identifier,
+            const char* title,
+            const ImVec2& position,
+            const ImVec2& size,
+            bool compact = false,
+            bool allowScroll = false)
         {
             ImGui::SetNextWindowPos(position, ImGuiCond_Always);
             ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -696,12 +709,15 @@ namespace UiClient
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, compact ? ImVec2(7.0f, 7.0f) : ImVec2(14.0f, 14.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, compact ? 8.0f : 16.0f);
-            const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
                 ImGuiWindowFlags_NoResize |
                 ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoScrollbar |
                 ImGuiWindowFlags_NoTitleBar |
                 ImGuiWindowFlags_NoSavedSettings;
+            if (!allowScroll)
+            {
+                flags |= ImGuiWindowFlags_NoScrollbar;
+            }
             const bool visible = ImGui::Begin(identifier, nullptr, flags);
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor(2);
@@ -2273,7 +2289,7 @@ namespace UiClient
                 }
                 else if (offer.m_canLearn)
                 {
-                    if (ImGui::Button("Learn", ImVec2(92.0f, 0.0f)))
+                    if (ImGui::Button("Learn", HudButtonSize(92.0f)))
                     {
                         gameCore->LearnTrainerAbility(trainer.m_id, offer.m_abilityId);
                     }
@@ -2583,7 +2599,7 @@ namespace UiClient
             if (canBuy)
             {
                 ImGui::SameLine(590.0f);
-                if (ImGui::Button("Buyout", ImVec2(78.0f, 0.0f)))
+                if (ImGui::Button("Buyout", HudButtonSize(78.0f)))
                 {
                     pendingBuyoutIndex = rowIndex;
                     ImGui::OpenPopup("Confirm Buyout");
@@ -2592,7 +2608,7 @@ namespace UiClient
             else if (listing.m_state == "active")
             {
                 ImGui::SameLine(590.0f);
-                if (ImGui::Button("Cancel", ImVec2(78.0f, 0.0f)) && gameCore)
+                if (ImGui::Button("Cancel", HudButtonSize(78.0f)) && gameCore)
                 {
                     gameCore->CancelAuction(listing.m_auctionId);
                 }
@@ -2645,7 +2661,7 @@ namespace UiClient
                     ImGui::SetNextItemWidth(120.0f);
                     ImGui::Combo("Sort", &selectedSort, sortLabels, AZ_ARRAY_SIZE(sortLabels));
                     ImGui::SameLine();
-                    if (ImGui::Button("Refresh", ImVec2(82.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Refresh", HudButtonSize(82.0f)) && gameCore)
                     {
                         gameCore->BrowseAuctions(searchBuffer, itemTypes[selectedItemType], sortValues[selectedSort]);
                     }
@@ -2677,7 +2693,7 @@ namespace UiClient
                                 listing.m_itemDisplayName.c_str(),
                                 listing.m_stackCount,
                                 FormatCopperAmount(listing.m_buyoutCopper).c_str());
-                            if (ImGui::Button("Confirm", ImVec2(96.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Confirm", HudButtonSize(96.0f)) && gameCore)
                             {
                                 gameCore->BuyoutAuction(listing.m_auctionId);
                                 pendingBuyoutIndex = -1;
@@ -2685,7 +2701,7 @@ namespace UiClient
                             }
                             ImGui::SameLine();
                         }
-                        if (ImGui::Button("Cancel", ImVec2(96.0f, 0.0f)))
+                        if (ImGui::Button("Cancel", HudButtonSize(96.0f)))
                         {
                             pendingBuyoutIndex = -1;
                             ImGui::CloseCurrentPopup();
@@ -2807,7 +2823,7 @@ namespace UiClient
                     {
                         ImGui::TextDisabled("Deposit appears after selecting an item.");
                     }
-                    if (ImGui::Button("Create Listing", ImVec2(150.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Create Listing", HudButtonSize(150.0f)) && gameCore)
                     {
                         const int buyoutCopper = atoi(buyoutBuffer);
                         if (gameCore->ListAuctionItem(selectedSellSlot, stackCount, buyoutCopper, durationSeconds[selectedDuration]))
@@ -2848,12 +2864,12 @@ namespace UiClient
             const AZStd::string buttonLabel = pendingKeybindActionId == actionId
                 ? "Press a key..."
                 : DisplayKeyName(binding);
-            if (ImGui::Button(buttonLabel.c_str(), ImVec2(132.0f, 0.0f)))
+            if (ImGui::Button(buttonLabel.c_str(), HudButtonSize(132.0f)))
             {
                 pendingKeybindActionId = actionId;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Unbind", ImVec2(74.0f, 0.0f)))
+            if (ImGui::Button("Unbind", HudButtonSize(74.0f)))
             {
                 binding.clear();
                 if (pendingKeybindActionId == actionId)
@@ -3057,7 +3073,7 @@ namespace UiClient
                     }
                     if (talent.m_canSelect)
                     {
-                        if (ImGui::Button("Select", ImVec2(92.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Select", HudButtonSize(92.0f)) && gameCore)
                         {
                             gameCore->SelectTalent(talent.m_id);
                         }
@@ -3164,7 +3180,7 @@ namespace UiClient
                     if (trackable && gameCore)
                     {
                         const char* buttonLabel = quest.m_tracked ? "Untrack" : "Track";
-                        if (ImGui::Button(buttonLabel, ImVec2(96.0f, 0.0f)))
+                        if (ImGui::Button(buttonLabel, HudButtonSize(96.0f)))
                         {
                             gameCore->TrackQuest(quest.m_id, !quest.m_tracked);
                         }
@@ -3481,12 +3497,12 @@ namespace UiClient
                     ImGui::SetNextItemWidth(210.0f);
                     ImGui::InputText("Name", nameBuffer, nameBufferSize);
                     ImGui::SameLine();
-                    if (ImGui::Button("Add", ImVec2(62.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Add", HudButtonSize(62.0f)) && gameCore)
                     {
                         gameCore->AddFriend(nameBuffer);
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Remove", ImVec2(86.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Remove", HudButtonSize(86.0f)) && gameCore)
                     {
                         gameCore->RemoveFriend(nameBuffer);
                     }
@@ -3507,7 +3523,7 @@ namespace UiClient
                             ImGui::Text(" | %s", friendState.m_zoneId.c_str());
                             ImGui::SameLine();
                             ImGui::PushID(friendState.m_characterId.c_str());
-                            if (ImGui::Button("Invite", ImVec2(72.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Invite", HudButtonSize(72.0f)) && gameCore)
                             {
                                 gameCore->InviteParty(friendState.m_displayName, friendState.m_characterId);
                             }
@@ -3523,12 +3539,12 @@ namespace UiClient
                     ImGui::SetNextItemWidth(210.0f);
                     ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
                     ImGui::SameLine();
-                    if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Invite", HudButtonSize(82.0f)) && gameCore)
                     {
                         gameCore->InviteParty(nameBuffer, {});
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Leave", HudButtonSize(72.0f)) && gameCore)
                     {
                         gameCore->LeaveParty();
                     }
@@ -3544,7 +3560,7 @@ namespace UiClient
                         ImGui::SetNextItemWidth(250.0f);
                         ImGui::InputText("Guild Name", guildNameBuffer, guildNameBufferSize);
                         ImGui::SameLine();
-                        if (ImGui::Button("Create", ImVec2(86.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Create", HudButtonSize(86.0f)) && gameCore)
                         {
                             gameCore->CreateGuild(guildNameBuffer);
                         }
@@ -3569,7 +3585,7 @@ namespace UiClient
                             ImGui::SetNextItemWidth(190.0f);
                             ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
                             ImGui::SameLine();
-                            if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Invite", HudButtonSize(82.0f)) && gameCore)
                             {
                                 gameCore->InviteGuild(nameBuffer);
                             }
@@ -3579,20 +3595,20 @@ namespace UiClient
                             ImGui::SetNextItemWidth(286.0f);
                             ImGui::InputText("Message", guildMotdBuffer, guildMotdBufferSize);
                             ImGui::SameLine();
-                            if (ImGui::Button("Set", ImVec2(58.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Set", HudButtonSize(58.0f)) && gameCore)
                             {
                                 gameCore->SetGuildMessageOfTheDay(guildMotdBuffer);
                             }
                         }
 
-                        if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Leave", HudButtonSize(72.0f)) && gameCore)
                         {
                             gameCore->LeaveGuild();
                         }
                         if (HasGuildPermission(guild, "disband_guild"))
                         {
                             ImGui::SameLine();
-                            if (ImGui::Button("Disband", ImVec2(92.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Disband", HudButtonSize(92.0f)) && gameCore)
                             {
                                 gameCore->DisbandGuild();
                             }
@@ -3619,7 +3635,7 @@ namespace UiClient
                             {
                                 if (HasGuildPermission(guild, "promote_member"))
                                 {
-                                    if (ImGui::Button("Promote", ImVec2(82.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Promote", HudButtonSize(82.0f)) && gameCore)
                                     {
                                         gameCore->PromoteGuildMember(member.m_displayName);
                                     }
@@ -3627,7 +3643,7 @@ namespace UiClient
                                 }
                                 if (HasGuildPermission(guild, "demote_member"))
                                 {
-                                    if (ImGui::Button("Demote", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Demote", HudButtonSize(78.0f)) && gameCore)
                                     {
                                         gameCore->DemoteGuildMember(member.m_displayName);
                                     }
@@ -3635,7 +3651,7 @@ namespace UiClient
                                 }
                                 if (HasGuildPermission(guild, "remove_member"))
                                 {
-                                    if (ImGui::Button("Remove", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Remove", HudButtonSize(78.0f)) && gameCore)
                                     {
                                         gameCore->RemoveGuildMember(member.m_displayName);
                                     }
@@ -4726,11 +4742,11 @@ namespace UiClient
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 4.0f, 312.0f);
         const ImVec2 trackerSize(292.0f, 292.0f);
         const ImVec2 trackerPos(rightActionBarTwoPos.x - trackerSize.x - 12.0f, 286.0f);
-        const ImVec2 actionBarSize(744.0f, 122.0f);
+        const ImVec2 actionBarSize(744.0f, 154.0f);
         const ImVec2 actionBarPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
-        const ImVec2 upperActionBarSize(744.0f, 66.0f);
+        const ImVec2 upperActionBarSize(744.0f, 72.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
         const ImVec2 microMenuSize(410.0f, 42.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
@@ -5014,7 +5030,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_bagOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize))
+        if (m_bagOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize, false, true))
         {
             DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot);
         }
@@ -5023,7 +5039,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize))
+        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize, false, true))
         {
             DrawSocialWindow(
                 gameCore,
@@ -5040,7 +5056,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize))
+        if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize, false, true))
         {
             if (DrawSettingsWindow(
                     gameCore,
@@ -5067,7 +5083,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_spellbookOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize))
+        if (m_spellbookOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize, false, true))
         {
             DrawSpellbook(worldState, actionEditMode, m_pendingActionAssignmentAbilityId);
         }
@@ -5076,7 +5092,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_characterSheetOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize))
+        if (m_characterSheetOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize, false, true))
         {
             DrawCharacterSheetWindow(worldState);
         }
@@ -5085,7 +5101,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize))
+        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize, false, true))
         {
             DrawTalentWindow(gameCore, worldState);
         }
@@ -5094,7 +5110,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize))
+        if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize, false, true))
         {
             DrawQuestLogWindow(gameCore, worldState);
         }
@@ -5103,7 +5119,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize))
+        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize, false, true))
         {
             DrawZoneMapWindow(worldState, playerX, playerY);
         }
@@ -5112,7 +5128,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize))
+        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize, false, true))
         {
             DrawAuctionWindow(
                 gameCore,
@@ -5130,7 +5146,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_trainerOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize))
+        if (m_trainerOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize, false, true))
         {
             DrawTrainerWindow(gameCore, worldState);
         }
@@ -5139,7 +5155,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_questGossipOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize))
+        if (m_questGossipOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize, false, true))
         {
             if (const char* closeReason = DrawQuestGossipWindow(gameCore, worldState))
             {

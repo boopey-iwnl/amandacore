@@ -44,7 +44,8 @@ namespace MovementPhysics
         constexpr float BackpedalSpeedFactor = 0.62f;
         constexpr float SubmitIntervalSeconds = 0.10f;
         constexpr float CorrectionSnapDistance = 1.25f;
-        constexpr float CorrectionBlendRate = 7.5f;
+        constexpr float CorrectionBlendRate = 5.25f;
+        constexpr float CorrectionDeadZoneDistance = 0.045f;
         constexpr float CorrectionEpsilon = 0.002f;
         constexpr float CharacterBaseSnapZ = 0.05f;
         constexpr float AvatarTurnRate = 2.75f;
@@ -419,9 +420,9 @@ namespace MovementPhysics
                         authoritativePosition.GetX(),
                         authoritativePosition.GetY());
                 }
-                else if (correctionDistance > 0.001f)
+                else if (correctionDistance > CorrectionDeadZoneDistance)
                 {
-                    m_pendingServerCorrection += correctionVector;
+                    m_pendingServerCorrection = correctionVector;
                     AZ_Printf(
                         "amandacore",
                         "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=queued_blend",
@@ -429,6 +430,10 @@ namespace MovementPhysics
                         localPlanarPosition.GetY(),
                         authoritativePosition.GetX(),
                         authoritativePosition.GetY());
+                }
+                else
+                {
+                    m_pendingServerCorrection = AZ::Vector2::CreateZero();
                 }
             }
         }
