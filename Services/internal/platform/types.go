@@ -44,8 +44,8 @@ const (
 	LegacyWayfarerArchetypeID = "wayfarer_warden"
 
 	AutoAttackAbilityID      = "auto_attack"
-	SteadyStrikeAbilityID    = "steady_strike"
 	DevBasicStrikeAbilityID  = "dev_basic_strike"
+	SteadyStrikeAbilityID    = "steady_strike"
 	BraceAbilityID           = "brace"
 	DrivingBlowAbilityID     = "driving_blow"
 	RallyingCallAbilityID    = "rallying_call"
@@ -388,6 +388,13 @@ type CharacterQuestObjectiveProgress struct {
 	UpdatedAt   int64  `json:"updatedAt,omitempty"`
 }
 
+type CharacterKillCredit struct {
+	ArchetypeID string `json:"archetypeId"`
+	Count       int    `json:"count"`
+	Reason      string `json:"reason,omitempty"`
+	UpdatedAt   int64  `json:"updatedAt"`
+}
+
 type CharacterPvPStats struct {
 	CharacterID   string `json:"characterId"`
 	DuelsWon      int    `json:"duelsWon"`
@@ -514,6 +521,7 @@ type Character struct {
 	ActionBarSlots    []CharacterActionBarSlot          `json:"actionBarSlots"`
 	Talents           map[string]int                    `json:"talents"`
 	Quests            map[string]CharacterQuestProgress `json:"quests"`
+	KillCredits       map[string]CharacterKillCredit    `json:"killCredits"`
 	TrackedQuestIDs   []string                          `json:"trackedQuestIds"`
 	PvPStats          CharacterPvPStats                 `json:"pvpStats"`
 	BindPoint         CharacterBindPoint                `json:"bindPoint"`
@@ -766,6 +774,7 @@ func NormalizeCharacter(character Character) Character {
 	if character.Quests == nil {
 		character.Quests = map[string]CharacterQuestProgress{}
 	}
+	character.KillCredits = NormalizeCharacterKillCredits(character.KillCredits)
 	character.TrackedQuestIDs = NormalizeStringIDs(character.TrackedQuestIDs)
 	character.PvPStats = NormalizeCharacterPvPStats(character.ID, character.PvPStats)
 	character.BindPoint = NormalizeCharacterBindPoint(character.ID, character.BindPoint)
@@ -1008,19 +1017,16 @@ func LevelForExperience(experience int) int {
 func DefaultStartingLearnedAbilityIDs() []string {
 	return []string{
 		AutoAttackAbilityID,
+		DevBasicStrikeAbilityID,
 		SteadyStrikeAbilityID,
 		BraceAbilityID,
 	}
 }
 
 func NormalizeLearnedAbilityIDs(source []string) []string {
-	if len(source) == 0 {
-		return DefaultStartingLearnedAbilityIDs()
-	}
-
 	seen := map[string]struct{}{}
-	normalized := make([]string, 0, len(source))
-	for _, abilityID := range source {
+	normalized := make([]string, 0, len(source)+len(DefaultStartingLearnedAbilityIDs()))
+	appendAbility := func(abilityID string) {
 		switch abilityID {
 		case "ember_bolt":
 			abilityID = SteadyStrikeAbilityID
@@ -1028,17 +1034,20 @@ func NormalizeLearnedAbilityIDs(source []string) []string {
 			abilityID = BraceAbilityID
 		}
 		if abilityID == "" {
-			continue
+			return
 		}
 		if _, exists := seen[abilityID]; exists {
-			continue
+			return
 		}
 		seen[abilityID] = struct{}{}
 		normalized = append(normalized, abilityID)
 	}
 
-	if len(normalized) == 0 {
-		return DefaultStartingLearnedAbilityIDs()
+	for _, abilityID := range source {
+		appendAbility(abilityID)
+	}
+	for _, abilityID := range DefaultStartingLearnedAbilityIDs() {
+		appendAbility(abilityID)
 	}
 
 	return normalized
@@ -1051,6 +1060,20 @@ func NormalizeTalentRanks(source map[string]int) map[string]int {
 			continue
 		}
 		normalized[talentID] = rank
+	}
+	return normalized
+}
+
+func NormalizeCharacterKillCredits(source map[string]CharacterKillCredit) map[string]CharacterKillCredit {
+	normalized := map[string]CharacterKillCredit{}
+	for archetypeID, credit := range source {
+		if credit.ArchetypeID == "" {
+			credit.ArchetypeID = archetypeID
+		}
+		if credit.ArchetypeID == "" || credit.Count <= 0 {
+			continue
+		}
+		normalized[credit.ArchetypeID] = credit
 	}
 	return normalized
 }

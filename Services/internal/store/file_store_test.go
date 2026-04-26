@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -91,6 +92,9 @@ func TestCharacterCreationAndJoinTicket(t *testing.T) {
 	if character.LearnedAbilityIDs[0] != platform.AutoAttackAbilityID {
 		t.Fatalf("expected auto attack as first learned ability, got %s", character.LearnedAbilityIDs[0])
 	}
+	if !slices.Contains(character.LearnedAbilityIDs, platform.DevBasicStrikeAbilityID) {
+		t.Fatalf("expected dev basic strike as a starting learned ability, got %#v", character.LearnedAbilityIDs)
+	}
 
 	ticket, err := fileStore.IssueWorldJoinTicket(account.ID, session.ID, character.ID, "sunset-frontier-dev")
 	if err != nil {
@@ -109,6 +113,28 @@ func TestCharacterCreationAndJoinTicket(t *testing.T) {
 	}
 	if character.Inventory[1].ItemID != "linen_wrap" || character.Inventory[1].StackCount != 2 {
 		t.Fatalf("expected starter wrap in slot 1, got %#v", character.Inventory[1])
+	}
+}
+
+func TestCharacterNormalizationBackfillsNewStarterAbilities(t *testing.T) {
+	character := platform.NormalizeCharacter(platform.Character{
+		ID:                "char_legacy",
+		AccountID:         "acct_legacy",
+		RealmID:           "sunset-frontier-dev",
+		DisplayName:       "Legacy",
+		LearnedAbilityIDs: []string{platform.AutoAttackAbilityID, platform.SteadyStrikeAbilityID, platform.BraceAbilityID},
+		ActionBarSlots: []platform.CharacterActionBarSlot{
+			{SlotIndex: 0, AbilityID: platform.AutoAttackAbilityID},
+			{SlotIndex: 1, AbilityID: platform.SteadyStrikeAbilityID},
+			{SlotIndex: 2, AbilityID: platform.BraceAbilityID},
+		},
+	})
+
+	if !slices.Contains(character.LearnedAbilityIDs, platform.DevBasicStrikeAbilityID) {
+		t.Fatalf("expected normalization to backfill dev basic strike, got %#v", character.LearnedAbilityIDs)
+	}
+	if character.ActionBarSlots[3].AbilityID != "" {
+		t.Fatalf("expected normalization to preserve empty action bar slot 3, got %s", character.ActionBarSlots[3].AbilityID)
 	}
 }
 

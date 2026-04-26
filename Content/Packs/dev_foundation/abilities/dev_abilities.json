@@ -1,0 +1,49 @@
+{
+  "abilities": [
+    {
+      "ability_id": "dev_stalker_swipe",
+      "display_name": "Stalker Swipe",
+      "school": "physical",
+      "target_rule": "enemy",
+      "range": 2.5,
+      "timing": {
+        "cast_ms": 0
+      },
+      "cooldown_ms": 1500,
+      "cooldown_category": "npc_melee",
+      "effects": [
+        {
+          "kind": "direct_damage",
+          "magnitude": 3
+        }
+      ],
+      "tags": [
+        "dev",
+        "npc"
+      ]
+    },
+    {
+      "ability_id": "dev_stalker_pressure",
+      "display_name": "Stalker Pressure",
+      "school": "physical",
+      "target_rule": "enemy",
+      "range": 2.5,
+      "timing": {
+        "cast_ms": 0
+      },
+      "cooldown_ms": 6000,
+      "cooldown_category": "npc_pressure",
+      "effects": [
+        {
+          "kind": "apply_aura",
+          "aura_id": "dev_pressure_mark",
+          "magnitude": 1
+        }
+      ],
+      "tags": [
+        "dev",
+        "aura-check"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "items": [
+    { "item_id": "dawnwake_weathered_coin", "display_name": "Weathered Dawnwake Coin", "type": "material_placeholder", "quality": "common", "tags": ["dawnwake", "placeholder"] },
+    { "item_id": "dawnwake_salt_wrap", "display_name": "Salt-Wrapped Ration", "type": "consumable_placeholder", "quality": "common", "tags": ["dawnwake", "placeholder"] }
+  ]
+}

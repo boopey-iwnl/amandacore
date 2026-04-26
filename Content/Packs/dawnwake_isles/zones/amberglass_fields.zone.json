@@ -1,0 +1,58 @@
+{
+  "zone_id": "amberglass_fields",
+  "display_name": "Amberglass Fields",
+  "description": "A provisional inland wilds zone linking the landing, forest reach, and highroad route.",
+  "bounds": { "min_x": 200, "min_y": 0, "min_z": -25, "max_x": 420, "max_y": 160, "max_z": 180, "accuracy": "placeholder", "source": "pending_map_trace" },
+  "entry_points": [
+    { "entry_point_id": "amberglass_west_road", "display_name": "Road from Dawnwake Landing", "position": { "x": 206, "y": 82, "z": 0 }, "facing_yaw": 90, "tags": ["transition_arrival"] },
+    { "entry_point_id": "amberglass_mistwood_path", "display_name": "Mistwood Path", "position": { "x": 306, "y": 154, "z": 0 }, "facing_yaw": 180, "tags": ["transition_arrival"] },
+    { "entry_point_id": "amberglass_highroad_gate", "display_name": "Highroad Gate", "position": { "x": 412, "y": 98, "z": 0 }, "facing_yaw": 270, "tags": ["transition_arrival"] }
+  ],
+  "transition_gates": [
+    {
+      "transition_id": "amberglass_to_landing_road",
+      "from_zone_id": "amberglass_fields",
+      "to_zone_id": "dawnwake_landing",
+      "kind": "Road",
+      "gate_bounds": { "min_x": 200, "min_y": 62, "min_z": -5, "max_x": 206, "max_y": 102, "max_z": 25, "accuracy": "placeholder", "source": "pending_map_trace" },
+      "entry_point_id_on_arrival": "landing_east_road",
+      "tags": ["walk"]
+    },
+    {
+      "transition_id": "amberglass_to_mistwood_north_path",
+      "from_zone_id": "amberglass_fields",
+      "to_zone_id": "mistwood_reach",
+      "kind": "Road",
+      "gate_bounds": { "min_x": 286, "min_y": 154, "min_z": -5, "max_x": 326, "max_y": 160, "max_z": 25, "accuracy": "placeholder", "source": "pending_map_trace" },
+      "entry_point_id_on_arrival": "mistwood_south_path",
+      "tags": ["walk", "wilds"]
+    },
+    {
+      "transition_id": "amberglass_to_highroad_pass",
+      "from_zone_id": "amberglass_fields",
+      "to_zone_id": "highroad_pass",
+      "kind": "MountainPass",
+      "gate_bounds": { "min_x": 414, "min_y": 78, "min_z": -5, "max_x": 420, "max_y": 118, "max_z": 35, "accuracy": "placeholder", "source": "pending_map_trace" },
+      "entry_point_id_on_arrival": "highroad_west_pass",
+      "tags": ["walk", "pass"]
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "amberglass_reef_stalkers",
+      "display_name": "Dawnwake Reef Stalker",
+      "archetype_id": "dawnwake_reef_stalker",
+      "disposition": "Hostile",
+      "spawn_points": [
+        { "spawn_point_id": "amberglass_reef_stalker_01", "position": { "x": 252, "y": 64, "z": 0 }, "tags": ["field_edge"] },
+        { "spawn_point_id": "amberglass_reef_stalker_02", "position": { "x": 284, "y": 90, "z": 0 }, "tags": ["field_edge"] }
+      ],
+      "tags": ["placeholder", "hostile"]
+    }
+  ],
+  "quest_providers": [],
+  "runtime_config": { "activation_policy": "activate_with_continent", "hostile_density": "medium", "future_hooks": ["o3de_field_marker_export"] },
+  "streaming_hints": { "interest_radius": 76, "adjacent_preload_distance": 46, "priority": "normal", "notes": ["Central routing zone for early Dawnwake traversal."] },
+  "tags": ["inland", "wilds", "placeholder_bounds"],
+  "metadata": { "accuracy": "placeholder", "source": "pending_map_trace", "todo": "Replace field boundary and route gate rectangles after Dawnwake Isles map trace." }
+}

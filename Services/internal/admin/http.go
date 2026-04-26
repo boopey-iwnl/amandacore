@@ -736,6 +736,14 @@ func audit(fileStore *store.FileStore, actor platform.Account, action string, ta
 }
 
 func auditWithAccountID(fileStore *store.FileStore, actorAccountID string, action string, targetAccountID string, targetCharacterID string, reason string, before map[string]any, after map[string]any, metadata map[string]any) error {
+	observability.LogEvent("admin-service", observability.EventAdminActionRequested, map[string]any{
+		"action":            action,
+		"actorAccountId":    actorAccountID,
+		"targetAccountId":   targetAccountID,
+		"targetCharacterId": targetCharacterID,
+		"reasonProvided":    strings.TrimSpace(reason) != "",
+	})
+
 	event, err := fileStore.RecordAuditEvent(platform.AuditEvent{
 		Action:            action,
 		ActorAccountID:    actorAccountID,
@@ -749,6 +757,14 @@ func auditWithAccountID(fileStore *store.FileStore, actorAccountID string, actio
 	if err != nil {
 		return err
 	}
+	observability.LogEvent("admin-service", observability.EventAdminActionApplied, map[string]any{
+		"auditEventId":      event.ID,
+		"action":            action,
+		"actorAccountId":    actorAccountID,
+		"targetAccountId":   targetAccountID,
+		"targetCharacterId": targetCharacterID,
+		"reasonProvided":    strings.TrimSpace(reason) != "",
+	})
 	observability.LogEvent("admin-service", action, map[string]any{
 		"auditEventId":      event.ID,
 		"actorAccountId":    actorAccountID,

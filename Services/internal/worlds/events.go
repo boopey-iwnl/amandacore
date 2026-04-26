@@ -25,6 +25,16 @@ const (
 	EventCombatDamageApplied       = "combat.damage_applied"
 	EventCombatCooldownStarted     = "combat.cooldown_started"
 	EventCombatTargetDefeated      = "combat.target_defeated"
+	EventAbilityCastStarted        = "ability.cast_started"
+	EventAbilityCastCompleted      = "ability.cast_completed"
+	EventAbilityCastInterrupted    = "ability.cast_interrupted"
+	EventAbilityEffectResolved     = "ability.effect_resolved"
+	EventAuraApplied               = "aura.applied"
+	EventAuraRefreshed             = "aura.refreshed"
+	EventAuraTicked                = "aura.ticked"
+	EventAuraExpired               = "aura.expired"
+	EventCooldownStarted           = "cooldown.started"
+	EventCooldownReady             = "cooldown.ready"
 	EventEntityHealthChanged       = "entity.health_changed"
 	EventEntityDied                = "entity.died"
 	EventPlayerDied                = "player.died"
@@ -35,6 +45,10 @@ const (
 	EventWorldStateDiffEmitted     = "world.state.diff_emitted"
 	EventLoadsimQuestStarted       = "loadsim.quest.started"
 	EventLoadsimQuestCompleted     = "loadsim.quest.completed"
+	EventLoadsimCombatStarted      = "loadsim.combat.started"
+	EventLoadsimCombatCompleted    = "loadsim.combat.completed"
+	EventLoadsimAbilityStarted     = "loadsim.ability.started"
+	EventLoadsimAbilityCompleted   = "loadsim.ability.completed"
 	eventItemCatalogLoaded         = "item.catalog.loaded"
 	eventInventoryGrantRequested   = "inventory.item_grant_requested"
 	eventInventoryItemGranted      = "inventory.item_granted"
@@ -55,6 +69,8 @@ const (
 	eventProgressionCreditAwarded  = EventProgressionCreditAwarded
 	eventProgressionCreditRejected = "progression.kill_credit_rejected"
 	eventProgressionCreditSaved    = EventProgressionCreditSaved
+	eventProgressionKillCredit     = EventProgressionCreditAwarded
+	eventProgressionKillPersisted  = EventProgressionCreditSaved
 	eventQuestCatalogLoaded        = "quest.catalog.loaded"
 	eventQuestAcceptRequested      = "quest.accept_requested"
 	eventQuestAccepted             = "quest.accepted"
@@ -85,12 +101,26 @@ const (
 	eventCombatDamageApplied       = EventCombatDamageApplied
 	eventCombatCooldownStarted     = EventCombatCooldownStarted
 	eventCombatTargetDefeated      = EventCombatTargetDefeated
+	eventAbilityCastStarted        = EventAbilityCastStarted
+	eventAbilityCastCompleted      = EventAbilityCastCompleted
+	eventAbilityCastInterrupted    = EventAbilityCastInterrupted
+	eventAbilityEffectResolved     = EventAbilityEffectResolved
+	eventAuraApplied               = EventAuraApplied
+	eventAuraRefreshed             = EventAuraRefreshed
+	eventAuraTicked                = EventAuraTicked
+	eventAuraExpired               = EventAuraExpired
+	eventCooldownStarted           = EventCooldownStarted
+	eventCooldownReady             = EventCooldownReady
 	eventEntityHealthChanged       = EventEntityHealthChanged
 	eventEntityDied                = EventEntityDied
 	eventPlayerDied                = EventPlayerDied
 	eventWorldEntitySpawned        = EventWorldEntitySpawned
 	eventWorldEntityRemoved        = EventWorldEntityRemoved
 	eventWorldStateDiffEmitted     = EventWorldStateDiffEmitted
+	eventLoadsimCombatStarted      = EventLoadsimCombatStarted
+	eventLoadsimCombatCompleted    = EventLoadsimCombatCompleted
+	eventLoadsimAbilityStarted     = EventLoadsimAbilityStarted
+	eventLoadsimAbilityCompleted   = EventLoadsimAbilityCompleted
 )
 
 const (
@@ -101,6 +131,9 @@ const (
 	DiffAbilityResult           = "AbilityResultDelta"
 	DiffEntityDeath             = "EntityDeathDelta"
 	DiffProgression             = "ProgressionDelta"
+	DiffAuraState               = "AuraStateDelta"
+	DiffCooldown                = "CooldownDelta"
+	DiffCastState               = "CastStateDelta"
 	diffEntitySpawn             = DiffEntitySpawn
 	diffEntityHealth            = DiffEntityHealth
 	diffEntityCombatState       = DiffEntityCombatState
@@ -108,6 +141,9 @@ const (
 	diffAbilityResult           = DiffAbilityResult
 	diffEntityDeath             = DiffEntityDeath
 	diffProgression             = DiffProgression
+	diffAuraState               = DiffAuraState
+	diffCooldown                = DiffCooldown
+	diffCastState               = DiffCastState
 	diffInventoryDelta          = "InventoryDelta"
 	diffLootContainerCreated    = "LootContainerCreatedDelta"
 	diffLootContainerUpdated    = "LootContainerUpdatedDelta"
@@ -127,32 +163,106 @@ type domainEvent = DomainEvent
 type stateDiff = StateDiff
 
 type DomainEvent struct {
+	Sequence     int64          `json:"sequence,omitempty"`
+	Name         string         `json:"name,omitempty"`
+	EventName    string         `json:"eventName,omitempty"`
 	Type         string         `json:"type"`
+	AtUnixMs     int64          `json:"atUnixMs,omitempty"`
 	OccurredAtMs int64          `json:"occurredAtMs"`
+	CharacterID  string         `json:"characterId,omitempty"`
+	EntityID     string         `json:"entityId,omitempty"`
+	ZoneID       string         `json:"zoneId,omitempty"`
+	Payload      map[string]any `json:"payload,omitempty"`
 	Fields       map[string]any `json:"fields,omitempty"`
 }
 
 type StateDiff struct {
+	Sequence     int64          `json:"sequence,omitempty"`
+	DiffType     string         `json:"diffType,omitempty"`
 	Type         string         `json:"type"`
+	AtUnixMs     int64          `json:"atUnixMs,omitempty"`
 	OccurredAtMs int64          `json:"occurredAtMs"`
+	CharacterID  string         `json:"characterId,omitempty"`
 	EntityID     string         `json:"entityId,omitempty"`
+	ZoneID       string         `json:"zoneId,omitempty"`
+	Payload      map[string]any `json:"payload,omitempty"`
 	Fields       map[string]any `json:"fields,omitempty"`
 }
 
-func newDomainEvent(eventName string, fields map[string]any) DomainEvent {
+func newDomainEvent(eventName string, args ...any) DomainEvent {
+	fields := map[string]any{}
+	characterID := ""
+	entityID := ""
+	zoneID := ""
+	if len(args) == 1 {
+		if typed, ok := args[0].(map[string]any); ok {
+			fields = typed
+		}
+	}
+	if len(args) == 4 {
+		characterID, _ = args[0].(string)
+		entityID, _ = args[1].(string)
+		zoneID, _ = args[2].(string)
+		if typed, ok := args[3].(map[string]any); ok {
+			fields = typed
+		}
+	}
+	nowMs := nowMillis()
+	cloned := cloneEventFields(fields)
+	if characterID != "" {
+		cloned["characterId"] = characterID
+	}
+	if entityID != "" {
+		cloned["entityId"] = entityID
+	}
+	if zoneID != "" {
+		cloned["zoneId"] = zoneID
+	}
 	return DomainEvent{
+		Name:         eventName,
+		EventName:    eventName,
 		Type:         eventName,
-		OccurredAtMs: nowMillis(),
-		Fields:       cloneEventFields(fields),
+		AtUnixMs:     nowMs,
+		OccurredAtMs: nowMs,
+		CharacterID:  characterID,
+		EntityID:     entityID,
+		ZoneID:       zoneID,
+		Payload:      cloneEventFields(cloned),
+		Fields:       cloned,
 	}
 }
 
-func newStateDiff(diffType string, entityID string, fields map[string]any) StateDiff {
+func newStateDiff(diffType string, args ...any) StateDiff {
+	characterID := ""
+	entityID := ""
+	zoneID := ""
+	fields := map[string]any{}
+	if len(args) == 2 {
+		entityID, _ = args[0].(string)
+		if typed, ok := args[1].(map[string]any); ok {
+			fields = typed
+		}
+	}
+	if len(args) == 4 {
+		characterID, _ = args[0].(string)
+		entityID, _ = args[1].(string)
+		zoneID, _ = args[2].(string)
+		if typed, ok := args[3].(map[string]any); ok {
+			fields = typed
+		}
+	}
+	nowMs := nowMillis()
+	cloned := cloneEventFields(fields)
 	return StateDiff{
+		DiffType:     diffType,
 		Type:         diffType,
-		OccurredAtMs: nowMillis(),
+		AtUnixMs:     nowMs,
+		OccurredAtMs: nowMs,
+		CharacterID:  characterID,
 		EntityID:     entityID,
-		Fields:       cloneEventFields(fields),
+		ZoneID:       zoneID,
+		Payload:      cloneEventFields(cloned),
+		Fields:       cloned,
 	}
 }
 
@@ -162,33 +272,104 @@ func (s *worldServer) emitWorldEventLocked(eventName string, fields map[string]a
 	}
 	nowMs := nowMillis()
 	eventFields := cloneEventFields(fields)
+	s.eventSequence++
 	s.domainEvents = appendCappedDomainEvent(s.domainEvents, DomainEvent{
+		Sequence:     s.eventSequence,
+		Name:         eventName,
+		EventName:    eventName,
 		Type:         eventName,
+		AtUnixMs:     nowMs,
 		OccurredAtMs: nowMs,
+		Payload:      cloneEventFields(eventFields),
 		Fields:       eventFields,
 	}, maxRecentDomainEvents)
 	observability.LogEvent("world-service", eventName, eventFields)
 
 	for _, diff := range diffs {
-		if diff.Type == "" {
+		diffType := diff.Type
+		if diffType == "" {
+			diffType = diff.DiffType
+		}
+		if diffType == "" {
 			continue
+		}
+		if diff.Type == "" {
+			diff.Type = diffType
+		}
+		if diff.DiffType == "" {
+			diff.DiffType = diffType
 		}
 		if diff.OccurredAtMs == 0 {
 			diff.OccurredAtMs = nowMs
 		}
+		if diff.AtUnixMs == 0 {
+			diff.AtUnixMs = diff.OccurredAtMs
+		}
 		diff.Fields = cloneEventFields(diff.Fields)
+		diff.Payload = cloneEventFields(eventPayload(diff))
+		s.eventSequence++
+		diff.Sequence = s.eventSequence
 		s.stateDiffs = appendCappedStateDiff(s.stateDiffs, diff, maxRecentStateDiffs)
 		diffFields := map[string]any{
-			"diffType": diff.Type,
+			"diffType": diffType,
 			"entityId": diff.EntityID,
 		}
-		s.domainEvents = appendCappedDomainEvent(s.domainEvents, DomainEvent{
-			Type:         EventWorldStateDiffEmitted,
-			OccurredAtMs: nowMs,
-			Fields:       diffFields,
-		}, maxRecentDomainEvents)
-		observability.LogEvent("world-service", EventWorldStateDiffEmitted, diffFields)
+		if diff.CharacterID != "" {
+			diffFields["characterId"] = diff.CharacterID
+		}
+		if diff.ZoneID != "" {
+			diffFields["zoneId"] = diff.ZoneID
+		}
+		s.emitDomainEventLocked(EventWorldStateDiffEmitted, diffFields)
 	}
+}
+
+func (s *worldServer) emitDomainEventLocked(name string, payload map[string]any) DomainEvent {
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	s.eventSequence++
+	nowMs := nowMillis()
+	fields := cloneEventFields(payload)
+	event := DomainEvent{
+		Sequence:     s.eventSequence,
+		Name:         name,
+		EventName:    name,
+		Type:         name,
+		AtUnixMs:     nowMs,
+		OccurredAtMs: nowMs,
+		Payload:      cloneEventFields(fields),
+		Fields:       fields,
+	}
+	s.domainEvents = appendCappedDomainEvent(s.domainEvents, event, maxRecentDomainEvents)
+	observability.LogEvent("world-service", name, fields)
+	return event
+}
+
+func (s *worldServer) emitStateDiffLocked(diffType string, entityID string, payload map[string]any) StateDiff {
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	s.eventSequence++
+	nowMs := nowMillis()
+	fields := cloneEventFields(payload)
+	diff := StateDiff{
+		Sequence:     s.eventSequence,
+		DiffType:     diffType,
+		Type:         diffType,
+		EntityID:     entityID,
+		AtUnixMs:     nowMs,
+		OccurredAtMs: nowMs,
+		Payload:      cloneEventFields(fields),
+		Fields:       fields,
+	}
+	s.stateDiffs = appendCappedStateDiff(s.stateDiffs, diff, maxRecentStateDiffs)
+	s.emitDomainEventLocked(eventWorldStateDiffEmitted, map[string]any{
+		"diffType": diffType,
+		"entityId": entityID,
+		"sequence": diff.Sequence,
+	})
+	return diff
 }
 
 func entitySpawnDelta(mob *mobState) StateDiff {
@@ -244,6 +425,39 @@ func abilityResultDelta(sourceID string, targetID string, abilityID string, dama
 	})
 }
 
+func auraStateDelta(entityID string, aura auraInstance, action string) StateDiff {
+	return newStateDiff(DiffAuraState, entityID, map[string]any{
+		"action":         action,
+		"auraId":         aura.AuraID,
+		"displayName":    aura.DisplayName,
+		"kind":           aura.Kind,
+		"sourceEntityId": aura.SourceEntityID,
+		"targetEntityId": aura.TargetEntityID,
+		"stackCount":     aura.StackCount,
+		"expiresAtMs":    aura.ExpiresAtMs,
+		"nextTickAtMs":   aura.NextTickAtMs,
+	})
+}
+
+func cooldownDelta(characterID string, abilityID string, category string, endsAtMs int64, action string) StateDiff {
+	return newStateDiff(DiffCooldown, characterID, map[string]any{
+		"action":    action,
+		"abilityId": abilityID,
+		"category":  category,
+		"endsAtMs":  endsAtMs,
+		"readyAtMs": endsAtMs,
+	})
+}
+
+func castStateDelta(characterID string, abilityID string, targetID string, endsAtMs int64, action string) StateDiff {
+	return newStateDiff(DiffCastState, characterID, map[string]any{
+		"action":    action,
+		"abilityId": abilityID,
+		"targetId":  targetID,
+		"endsAtMs":  endsAtMs,
+	})
+}
+
 func entityDeathDelta(entityID string, killedBy string, respawnAtMs int64) StateDiff {
 	return newStateDiff(DiffEntityDeath, entityID, map[string]any{
 		"killedByEntityId": killedBy,
@@ -274,8 +488,16 @@ func cloneDomainEvents(source []DomainEvent) []DomainEvent {
 	cloned := make([]DomainEvent, len(source))
 	for index, event := range source {
 		cloned[index] = DomainEvent{
+			Sequence:     event.Sequence,
+			Name:         event.Name,
+			EventName:    event.EventName,
 			Type:         event.Type,
+			AtUnixMs:     event.AtUnixMs,
 			OccurredAtMs: event.OccurredAtMs,
+			CharacterID:  event.CharacterID,
+			EntityID:     event.EntityID,
+			ZoneID:       event.ZoneID,
+			Payload:      cloneEventFields(event.Payload),
 			Fields:       cloneEventFields(event.Fields),
 		}
 	}
@@ -289,9 +511,15 @@ func cloneStateDiffs(source []StateDiff) []StateDiff {
 	cloned := make([]StateDiff, len(source))
 	for index, diff := range source {
 		cloned[index] = StateDiff{
+			Sequence:     diff.Sequence,
+			DiffType:     diff.DiffType,
 			Type:         diff.Type,
+			AtUnixMs:     diff.AtUnixMs,
 			OccurredAtMs: diff.OccurredAtMs,
+			CharacterID:  diff.CharacterID,
 			EntityID:     diff.EntityID,
+			ZoneID:       diff.ZoneID,
+			Payload:      cloneEventFields(diff.Payload),
 			Fields:       cloneEventFields(diff.Fields),
 		}
 	}
@@ -309,7 +537,22 @@ func cloneEventFields(source map[string]any) map[string]any {
 	return cloned
 }
 
-func appendCappedDomainEvent(source []DomainEvent, event DomainEvent, limit int) []DomainEvent {
+func cloneAnyMap(source map[string]any) map[string]any {
+	return cloneEventFields(source)
+}
+
+func eventPayload(diff StateDiff) map[string]any {
+	if len(diff.Payload) > 0 {
+		return diff.Payload
+	}
+	return diff.Fields
+}
+
+func appendCappedDomainEvent(source []DomainEvent, event DomainEvent, limits ...int) []DomainEvent {
+	limit := maxRecentDomainEvents
+	if len(limits) > 0 {
+		limit = limits[0]
+	}
 	source = append(source, event)
 	if limit <= 0 || len(source) <= limit {
 		return source
@@ -317,12 +560,24 @@ func appendCappedDomainEvent(source []DomainEvent, event DomainEvent, limit int)
 	return append([]DomainEvent(nil), source[len(source)-limit:]...)
 }
 
-func appendCappedStateDiff(source []StateDiff, diff StateDiff, limit int) []StateDiff {
+func appendCappedStateDiff(source []StateDiff, diff StateDiff, limits ...int) []StateDiff {
+	limit := maxRecentStateDiffs
+	if len(limits) > 0 {
+		limit = limits[0]
+	}
 	source = append(source, diff)
 	if limit <= 0 || len(source) <= limit {
 		return source
 	}
 	return append([]StateDiff(nil), source[len(source)-limit:]...)
+}
+
+func (s *worldServer) recentDomainEventsLocked() []DomainEvent {
+	return cloneDomainEvents(s.domainEvents)
+}
+
+func (s *worldServer) recentStateDiffsLocked() []StateDiff {
+	return cloneStateDiffs(s.stateDiffs)
 }
 
 func eventTimeFromMs(ms int64) time.Time {

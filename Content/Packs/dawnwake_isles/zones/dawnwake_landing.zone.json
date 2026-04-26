@@ -1,0 +1,49 @@
+{
+  "zone_id": "dawnwake_landing",
+  "display_name": "Dawnwake Landing",
+  "description": "A provisional coastal starter zone for AmandaCore-original Dawnwake Isles onboarding.",
+  "bounds": { "min_x": 0, "min_y": 0, "min_z": -25, "max_x": 200, "max_y": 160, "max_z": 160, "accuracy": "placeholder", "source": "pending_map_trace" },
+  "entry_points": [
+    { "entry_point_id": "landing_shore", "display_name": "Landing Shore", "position": { "x": 20, "y": 80, "z": 0 }, "facing_yaw": 90, "tags": ["default", "coastal"] },
+    { "entry_point_id": "landing_east_road", "display_name": "East Road from Amberglass", "position": { "x": 190, "y": 82, "z": 0 }, "facing_yaw": 270, "tags": ["transition_arrival"] }
+  ],
+  "transition_gates": [
+    {
+      "transition_id": "landing_to_amberglass_road",
+      "from_zone_id": "dawnwake_landing",
+      "to_zone_id": "amberglass_fields",
+      "kind": "Road",
+      "gate_bounds": { "min_x": 194, "min_y": 62, "min_z": -5, "max_x": 200, "max_y": 102, "max_z": 25, "accuracy": "placeholder", "source": "pending_map_trace" },
+      "entry_point_id_on_arrival": "amberglass_west_road",
+      "tags": ["walk", "starter_route"]
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "landing_tide_scavengers",
+      "display_name": "Dawnwake Tide Scavenger",
+      "archetype_id": "dawnwake_tide_scavenger",
+      "disposition": "Hostile",
+      "spawn_points": [
+        { "spawn_point_id": "landing_tide_scavenger_01", "position": { "x": 68, "y": 42, "z": 0 }, "tags": ["coast"] },
+        { "spawn_point_id": "landing_tide_scavenger_02", "position": { "x": 88, "y": 55, "z": 0 }, "tags": ["coast"] }
+      ],
+      "tags": ["placeholder", "hostile"]
+    }
+  ],
+  "quest_providers": [
+    {
+      "provider_id": "dawnwake_landing_pathfinder",
+      "display_name": "Dawnwake Landing Pathfinder",
+      "kind": "notice_npc_placeholder",
+      "position": { "x": 28, "y": 84, "z": 0 },
+      "quest_ids": ["dawnwake_first_steps"],
+      "services": ["quest"],
+      "tags": ["starter"]
+    }
+  ],
+  "runtime_config": { "activation_policy": "activate_with_continent", "hostile_density": "light", "future_hooks": ["o3de_spawn_marker_export", "starter_phase_placeholder"] },
+  "streaming_hints": { "interest_radius": 70, "adjacent_preload_distance": 42, "priority": "starter", "notes": ["Provisional rectangular bounds; replace with map-traced Dawnwake Landing shape."] },
+  "tags": ["starter", "coastal", "placeholder_bounds"],
+  "metadata": { "accuracy": "placeholder", "source": "pending_map_trace", "todo": "Map-accurate shoreline, road curve, and landing camp marker positions must be filled from supplied project images." }
+}

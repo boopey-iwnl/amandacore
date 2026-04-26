@@ -1,0 +1,35 @@
+{
+  "continent_id": "dawnwake_isles",
+  "display_name": "Dawnwake Isles",
+  "description": "Original AmandaCore continent skeleton for early Dawnwake Isles traversal and future O3DE streaming.",
+  "origin": { "x": 0, "y": 0, "z": 0 },
+  "units": "AmandaCore server units; +X runs east, +Y runs inland/north, +Z is elevation.",
+  "zones": [
+    { "zone_id": "dawnwake_landing", "display_name": "Dawnwake Landing", "tags": ["coastal", "starter"] },
+    { "zone_id": "amberglass_fields", "display_name": "Amberglass Fields", "tags": ["inland", "wilds"] },
+    { "zone_id": "mistwood_reach", "display_name": "Mistwood Reach", "tags": ["forest", "wilds"] },
+    { "zone_id": "highroad_pass", "display_name": "Highroad Pass", "tags": ["route", "pass"] },
+    { "zone_id": "kingsfall_harbor", "display_name": "Kingsfall Harbor", "tags": ["city", "capital"] }
+  ],
+  "adjacency": [
+    { "adjacency_id": "landing_to_amberglass", "from_zone_id": "dawnwake_landing", "to_zone_id": "amberglass_fields", "kind": "Road", "tags": ["walkable", "starter_route"] },
+    { "adjacency_id": "amberglass_to_mistwood", "from_zone_id": "amberglass_fields", "to_zone_id": "mistwood_reach", "kind": "Road", "tags": ["walkable", "wilds_route"] },
+    { "adjacency_id": "amberglass_to_highroad", "from_zone_id": "amberglass_fields", "to_zone_id": "highroad_pass", "kind": "MountainPass", "tags": ["walkable", "route"] },
+    { "adjacency_id": "highroad_to_kingsfall", "from_zone_id": "highroad_pass", "to_zone_id": "kingsfall_harbor", "kind": "CityGate", "tags": ["walkable", "city_gate"] }
+  ],
+  "default_entry": {
+    "zone_id": "dawnwake_landing",
+    "entry_point_id": "landing_shore"
+  },
+  "streaming": {
+    "activation_policy": "activate_all_for_milestone",
+    "default_interest_radius": 72,
+    "gate_hint_radius": 42
+  },
+  "tags": ["dawnwake", "placeholder_bounds", "continent_skeleton"],
+  "metadata": {
+    "accuracy": "placeholder",
+    "source": "pending_map_trace",
+    "todo": "Replace rectangular scaffold bounds and transition centers with project-owner supplied Dawnwake Isles map traces before 0.5."
+  }
+}

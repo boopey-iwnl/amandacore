@@ -369,6 +369,161 @@ namespace UiClient
             return AZStd::string::format("Range %.1fm  |  out of range", distanceToTarget);
         }
 
+        AZStd::string FormatRemainingTime(AZ::s64 endsAtMs, AZ::s64 nowMs)
+        {
+            if (endsAtMs <= nowMs)
+            {
+                return {};
+            }
+
+            const AZ::s64 remainingMs = endsAtMs - nowMs;
+            if (remainingMs >= 10000)
+            {
+                return AZStd::string::format("%llds", static_cast<long long>((remainingMs + 999) / 1000));
+            }
+            return AZStd::string::format("%.1fs", static_cast<double>(remainingMs) / 1000.0);
+        }
+
+        AZStd::string GetAbilityDisplayName(const NetClient::WorldSessionResponse& session, const AZStd::string& abilityId)
+        {
+            if (abilityId.empty())
+            {
+                return {};
+            }
+
+            for (const auto& slot : session.m_actionBarSlots)
+            {
+                if (slot.m_abilityId == abilityId && !slot.m_displayName.empty())
+                {
+                    return slot.m_displayName;
+                }
+            }
+            for (const auto& entry : session.m_spellbookEntries)
+            {
+                if (entry.m_id == abilityId && !entry.m_displayName.empty())
+                {
+                    return entry.m_displayName;
+                }
+            }
+            if (abilityId == AutoAttackAbilityId)
+            {
+                return "Auto Attack";
+            }
+            if (abilityId == SteadyStrikeAbilityId)
+            {
+                return "Steady Strike";
+            }
+            return abilityId;
+        }
+
+        AZStd::string FormatAuraLabel(const NetClient::AuraState& aura, AZ::s64 nowMs)
+        {
+            AZStd::string label = aura.m_displayName.empty() ? aura.m_auraId : aura.m_displayName;
+            if (label.empty())
+            {
+                label = "Aura";
+            }
+            if (aura.m_stackCount > 1)
+            {
+                label += AZStd::string::format(" x%d", aura.m_stackCount);
+            }
+            const AZStd::string remaining = FormatRemainingTime(aura.m_expiresAtMs, nowMs);
+            if (!remaining.empty())
+            {
+                label += AZStd::string::format(" %s", remaining.c_str());
+            }
+            return label;
+        }
+
+        AZStd::string FormatAuraLine(const AZStd::vector<NetClient::AuraState>& auras, AZ::s64 nowMs, size_t maxAuras)
+        {
+            if (auras.empty())
+            {
+                return {};
+            }
+
+            AZStd::string line;
+            const size_t auraCount = std::min(auras.size(), maxAuras);
+            for (size_t index = 0; index < auraCount; ++index)
+            {
+                if (!line.empty())
+                {
+                    line += ", ";
+                }
+                line += FormatAuraLabel(auras[index], nowMs);
+            }
+            if (auras.size() > auraCount)
+            {
+                line += AZStd::string::format(", +%zu", auras.size() - auraCount);
+            }
+            return line;
+        }
+
+        AZStd::string FormatKillCreditSummary(const AZStd::vector<NetClient::KillCreditState>& credits)
+        {
+            if (credits.empty())
+            {
+                return {};
+            }
+
+            const auto& credit = credits.back();
+            AZStd::string summary = AZStd::string::format("%s x%d", credit.m_archetypeId.c_str(), credit.m_count);
+            if (!credit.m_reason.empty())
+            {
+                summary += AZStd::string::format(" (%s)", credit.m_reason.c_str());
+            }
+            return summary;
+        }
+
+        bool IsCombatEventType(const AZStd::string& type)
+        {
+            return type.rfind("combat.", 0) == 0 ||
+                type.rfind("npc.", 0) == 0 ||
+                type.rfind("ability.", 0) == 0 ||
+                type.rfind("aura.", 0) == 0 ||
+                type.rfind("cooldown.", 0) == 0 ||
+                type == "entity.health_changed" ||
+                type == "entity.died" ||
+                type == "player.died" ||
+                type == "progression.kill_credit_awarded" ||
+                type == "progression.kill_credit_persisted" ||
+                type == "EntityHealthDelta" ||
+                type == "EntityCombatStateDelta" ||
+                type == "TargetSelectionDelta" ||
+                type == "AbilityResultDelta" ||
+                type == "EntityDeathDelta" ||
+                type == "AuraStateDelta" ||
+                type == "CooldownDelta" ||
+                type == "CastStateDelta" ||
+                type == "ProgressionDelta";
+        }
+
+        AZ::s64 MaxEventSequence(const AZStd::vector<NetClient::WorldEventEntry>& events)
+        {
+            AZ::s64 sequence = 0;
+            for (const auto& event : events)
+            {
+                sequence = AZ::GetMax(sequence, event.m_sequence);
+            }
+            return sequence;
+        }
+
+        bool HasVisibleCooldown(const NetClient::WorldSessionResponse& session, AZ::s64 nowMs)
+        {
+            if (session.m_globalCooldownEndsAt > nowMs)
+            {
+                return true;
+            }
+            for (const auto& slot : session.m_actionBarSlots)
+            {
+                if (slot.m_cooldownRemainingMs > 0 || slot.m_cooldownEndsAt > nowMs)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         const NetClient::VisibleEntity* FindTargetEntity(const GameCore::ClientWorldState& worldState)
         {
             if (worldState.m_session.m_currentTargetId.empty())
@@ -1118,6 +1273,17 @@ namespace UiClient
                 static_cast<float>(worldState.m_session.m_maxResource),
                 ColorU32(54, 117, 181),
                 ImVec2(160.0f, 16.0f));
+            const AZ::s64 nowMs = NowMs();
+            const AZStd::string castRemaining = FormatRemainingTime(worldState.m_session.m_castEndsAt, nowMs);
+            if (!castRemaining.empty())
+            {
+                ImGui::Text("Casting %s  |  %s", GetAbilityDisplayName(worldState.m_session, worldState.m_session.m_castingAbilityId).c_str(), castRemaining.c_str());
+            }
+            const AZStd::string auraLine = FormatAuraLine(worldState.m_session.m_auras, nowMs, 2);
+            if (!auraLine.empty())
+            {
+                ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+            }
             ImGui::Text("Friendly NPCs %.1fm", distanceToCommandPoint);
         }
 
@@ -1171,6 +1337,11 @@ namespace UiClient
                 ImGui::Text("%s  |  %s", targetEntity->m_duelOpponent ? "Duel opponent" : "Player", targetEntity->m_alive ? "available" : "down");
                 DrawMeter("Vitality", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
                 ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
+                const AZStd::string auraLine = FormatAuraLine(targetEntity->m_auras, NowMs(), 2);
+                if (!auraLine.empty())
+                {
+                    ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+                }
                 if (worldState.m_session.m_pvp.m_safeZone.m_noDuel)
                 {
                     ImGui::TextUnformatted("Safe zone: duels unavailable");
@@ -1209,6 +1380,15 @@ namespace UiClient
             DrawMeter("Integrity", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(198, 93, 34), ImVec2(160.0f, 18.0f));
             ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
             ImGui::Text("Behavior: %s", targetEntity->m_aiState.empty() ? "idle" : targetEntity->m_aiState.c_str());
+            const AZStd::string auraLine = FormatAuraLine(targetEntity->m_auras, NowMs(), 2);
+            if (!auraLine.empty())
+            {
+                ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+            }
+            if (!targetEntity->m_alive)
+            {
+                ImGui::TextUnformatted("Defeated. Awaiting authoritative respawn.");
+            }
         }
 
         void DrawMinimap(
@@ -1744,6 +1924,80 @@ namespace UiClient
             }
             ImGui::Spacing();
             ImGui::TextUnformatted("System feed only");
+        }
+
+        void DrawCombatEventEntries(
+            const AZStd::vector<NetClient::WorldEventEntry>& events,
+            const char* prefix,
+            int& drawn,
+            int maxDrawn)
+        {
+            for (size_t offset = 0; offset < events.size() && drawn < maxDrawn; ++offset)
+            {
+                const NetClient::WorldEventEntry& event = events[events.size() - offset - 1];
+                if (!IsCombatEventType(event.m_type))
+                {
+                    continue;
+                }
+
+                AZStd::string line = AZStd::string::format("%s %s", prefix, event.m_type.c_str());
+                if (!event.m_summary.empty())
+                {
+                    line += " | ";
+                    line += event.m_summary;
+                }
+                ImGui::BulletText("%s", line.c_str());
+                ++drawn;
+            }
+        }
+
+        void DrawCombatFeed(const GameCore::ClientWorldState& worldState, const NetClient::VisibleEntity* targetEntity)
+        {
+            ImGui::TextUnformatted("Authoritative Combat");
+            ImGui::Separator();
+
+            if (targetEntity)
+            {
+                ImGui::Text("Target: %s", GetMobDisplayLabel(*targetEntity).c_str());
+                ImGui::Text(
+                    "Health %.0f / %.0f  |  %s",
+                    targetEntity->m_health,
+                    targetEntity->m_maxHealth,
+                    targetEntity->m_alive ? "alive" : "dead");
+            }
+            else
+            {
+                ImGui::TextUnformatted("Target: none");
+            }
+
+            const AZ::s64 nowMs = NowMs();
+            const AZStd::string gcdRemaining = FormatRemainingTime(worldState.m_session.m_globalCooldownEndsAt, nowMs);
+            if (!gcdRemaining.empty())
+            {
+                ImGui::Text("Global cooldown: %s", gcdRemaining.c_str());
+            }
+            const AZStd::string playerAuras = FormatAuraLine(worldState.m_session.m_auras, nowMs, 3);
+            if (!playerAuras.empty())
+            {
+                ImGui::TextWrapped("Player auras: %s", playerAuras.c_str());
+            }
+
+            const AZStd::string creditSummary = FormatKillCreditSummary(worldState.m_session.m_killCredits);
+            if (!creditSummary.empty())
+            {
+                ImGui::TextWrapped("Kill credit: %s", creditSummary.c_str());
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::TextUnformatted("Server feed");
+            int drawn = 0;
+            DrawCombatEventEntries(worldState.m_session.m_domainEvents, "event", drawn, 6);
+            DrawCombatEventEntries(worldState.m_session.m_stateDiffs, "diff", drawn, 6);
+            if (drawn == 0)
+            {
+                ImGui::TextUnformatted("No combat updates yet.");
+            }
         }
 
         void DrawActionSlots(
@@ -4601,7 +4855,13 @@ namespace UiClient
             ImGui::End();
             m_lastWorldConnected = false;
             m_loggedActionBarVisible = false;
+            m_loggedActionBarCooldownRendered = false;
+            m_loggedCombatHudReady = false;
             m_loggedPlayableZoneReady = false;
+            m_lastTargetFrameSummary.clear();
+            m_lastKillCreditSummary.clear();
+            m_lastCombatDomainEventSequence = 0;
+            m_lastCombatStateDiffSequence = 0;
             return;
         }
 
@@ -4617,6 +4877,18 @@ namespace UiClient
         const bool hasHostileTarget = targetEntity && targetEntity->m_kind == "hostile_mob";
         const auto& cameraState = gameCore->GetCameraState();
         const bool actionEditMode = m_shiftHeld || ImGui::GetIO().KeyShift;
+
+        if (!m_loggedCombatHudReady)
+        {
+            AZ_Printf(
+                "amandacore",
+                "client.combat_hud_ready auras=%zu killCredits=%zu domainEvents=%zu stateDiffs=%zu",
+                worldState.m_session.m_auras.size(),
+                worldState.m_session.m_killCredits.size(),
+                worldState.m_session.m_domainEvents.size(),
+                worldState.m_session.m_stateDiffs.size());
+            m_loggedCombatHudReady = true;
+        }
 
         if (worldState.m_pendingInteractionSequence != m_lastHandledInteractionSequence)
         {
@@ -4648,6 +4920,10 @@ namespace UiClient
             }
             AddHudEvent(m_lastWorldSessionToken.empty() ? "World session linked" : "World session refreshed");
             m_lastWorldSessionToken = worldState.m_session.m_worldSessionToken;
+            m_lastTargetFrameSummary.clear();
+            m_lastKillCreditSummary.clear();
+            m_lastCombatDomainEventSequence = 0;
+            m_lastCombatStateDiffSequence = 0;
         }
         if (nearCommandPoint != m_lastNearCommandPoint)
         {
@@ -4674,12 +4950,67 @@ namespace UiClient
                 AddHudEvent(AZStd::string::format("Target locked: %s", GetMobDisplayLabel(*targetEntity).c_str()));
                 m_lastHudTargetId = targetEntity->m_id;
             }
+            const AZStd::string targetFrameSummary = AZStd::string::format(
+                "%s|%.0f|%.0f|%s|%zu|%s",
+                targetEntity->m_id.c_str(),
+                targetEntity->m_health,
+                targetEntity->m_maxHealth,
+                targetEntity->m_alive ? "alive" : "dead",
+                targetEntity->m_auras.size(),
+                targetEntity->m_aiState.c_str());
+            if (targetFrameSummary != m_lastTargetFrameSummary)
+            {
+                AZ_Printf(
+                    "amandacore",
+                    "client.target_frame_updated targetId=%s health=%.0f maxHealth=%.0f alive=%s auras=%zu aiState=%s",
+                    targetEntity->m_id.c_str(),
+                    targetEntity->m_health,
+                    targetEntity->m_maxHealth,
+                    targetEntity->m_alive ? "true" : "false",
+                    targetEntity->m_auras.size(),
+                    targetEntity->m_aiState.c_str());
+                if (!targetEntity->m_alive)
+                {
+                    AddHudEvent(AZStd::string::format("Target defeated: %s", GetMobDisplayLabel(*targetEntity).c_str()));
+                }
+                m_lastTargetFrameSummary = targetFrameSummary;
+            }
         }
         else if (!m_lastHudTargetId.empty())
         {
             AZ_Printf("amandacore", "client.target_hud_cleared");
             AddHudEvent("Target cleared");
             m_lastHudTargetId.clear();
+            m_lastTargetFrameSummary.clear();
+        }
+
+        const AZStd::string killCreditSummary = FormatKillCreditSummary(worldState.m_session.m_killCredits);
+        if (!killCreditSummary.empty() && killCreditSummary != m_lastKillCreditSummary)
+        {
+            AZ_Printf("amandacore", "client.kill_credit_displayed credit=%s", killCreditSummary.c_str());
+            AddHudEvent(AZStd::string::format("Kill credit: %s", killCreditSummary.c_str()));
+            m_lastKillCreditSummary = killCreditSummary;
+        }
+
+        const AZ::s64 maxDomainSequence = MaxEventSequence(worldState.m_session.m_domainEvents);
+        const AZ::s64 maxStateDiffSequence = MaxEventSequence(worldState.m_session.m_stateDiffs);
+        if (maxDomainSequence > m_lastCombatDomainEventSequence || maxStateDiffSequence > m_lastCombatStateDiffSequence)
+        {
+            AZ_Printf(
+                "amandacore",
+                "client.combat_hud_state_applied domainSeq=%lld stateDiffSeq=%lld domainEvents=%zu stateDiffs=%zu",
+                static_cast<long long>(maxDomainSequence),
+                static_cast<long long>(maxStateDiffSequence),
+                worldState.m_session.m_domainEvents.size(),
+                worldState.m_session.m_stateDiffs.size());
+            m_lastCombatDomainEventSequence = maxDomainSequence;
+            m_lastCombatStateDiffSequence = maxStateDiffSequence;
+        }
+
+        if (!m_loggedActionBarCooldownRendered && HasVisibleCooldown(worldState.m_session, nowMs))
+        {
+            AZ_Printf("amandacore", "client.action_bar_cooldown_rendered");
+            m_loggedActionBarCooldownRendered = true;
         }
 
         if (worldState.m_session.m_quest.m_state != m_lastQuestState)
@@ -4732,9 +5063,11 @@ namespace UiClient
         }
 
         const ImVec2 playerFramePos(18.0f, 18.0f);
-        const ImVec2 playerFrameSize(250.0f, 132.0f);
+        const ImVec2 playerFrameSize(250.0f, 156.0f);
         const ImVec2 targetFramePos(280.0f, 18.0f);
-        const ImVec2 targetFrameSize(250.0f, 132.0f);
+        const ImVec2 targetFrameSize(300.0f, 168.0f);
+        const ImVec2 combatFeedPos(280.0f, 196.0f);
+        const ImVec2 combatFeedSize(360.0f, 170.0f);
         const ImVec2 minimapSize(250.0f, 244.0f);
         const ImVec2 minimapPos(displaySize.x - minimapSize.x - 18.0f, 18.0f);
         const ImVec2 rightActionBarSize(66.0f, AZ::GetClamp(displaySize.y - 330.0f, 360.0f, 748.0f));
@@ -4862,6 +5195,12 @@ namespace UiClient
         if (BeginHudPanel("##target_frame", "Target", targetFramePos, targetFrameSize))
         {
             DrawTargetFrame(gameCore, targetEntity, worldState, playerX, playerY);
+        }
+        ImGui::End();
+
+        if (BeginHudPanel("##combat_feed", "Combat", combatFeedPos, combatFeedSize))
+        {
+            DrawCombatFeed(worldState, targetEntity);
         }
         ImGui::End();
 

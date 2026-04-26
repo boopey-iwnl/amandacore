@@ -19,10 +19,13 @@ The launcher starts the O3DE client with:
 --join-ticket <ticketId> --world-endpoint <endpoint>
 ```
 
-Milestone 2 remains movement-only. It proves:
+The O3DE client path remains the preferred playable slice. The fallback `.NET` client is diagnostic only, and now proves both movement and the server-authoritative combat command path:
 
 - `TestZone01` loads
 - world connect/bootstrap happens after `client.level_ready`
 - the player spawns from the authoritative world session
 - WASD movement and third-person camera work
 - disconnect/reconnect restores persisted position
+- diagnostic target selection sends the world target intent
+- diagnostic Basic Strike input sends the world ability intent
+- target health, NPC death, cooldowns, aura state, and kill credit are rendered from authoritative responses
