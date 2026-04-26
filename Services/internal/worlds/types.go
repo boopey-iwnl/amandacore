@@ -810,6 +810,7 @@ type worldServer struct {
 	stateDiffs             []StateDiff
 	killCreditLedger       KillCreditLedger
 	zones                  map[string]zoneDefinition
+	shardCoordinator       *ShardCoordinator
 	chatMessages           []chatEnvelope
 	chatSequence           int64
 	partyInvites           map[string]partyInviteState
@@ -839,6 +840,7 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		partyInvites: map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
+	server.ensureShardCoordinatorLocked()
 	server.ensureMobsLocked()
 	server.ensureGatheringNodesLocked()
 	server.emitWorldEventLocked(eventItemCatalogLoaded, map[string]any{"itemCount": len(itemDefinitions)})

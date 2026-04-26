@@ -99,9 +99,12 @@ The new loadsim scenario is:
 
 ```powershell
 go run ./Services/cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario quest-basic
+go run ./Services/cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario zone-handoff-basic --transition-loops 3 --shards 2 --queue-capacity 64
 ```
 
 It creates temporary test accounts and characters, accepts `dev_first_hunt`, defeats the dev hostile NPC through the server combat path, claims loot, completes the quest, and prints counts for accepted quests, NPC kills, kill credits, loot containers, claims, inventory grants, objective updates, ready quests, completed quests, rewards, rejected commands, tick duration, queue depth, and errors.
+
+The zone handoff scenario is documented separately in `Docs/ZoneHandoffShardCoordinator.md`.
 
 ## Current Limitations
 
@@ -114,10 +117,11 @@ It creates temporary test accounts and characters, accepts `dev_first_hunt`, def
 
 ## Next Milestone
 
-The next recommended milestone is the zone content package loader:
+The next recommended milestone is the zone content package loader with handoff gate integration:
 
 - original AmandaCore content manifest format
 - zone definition loading
+- content-authored transition and handoff gates
 - spawn point loading
 - NPC archetype references
 - loot table references
