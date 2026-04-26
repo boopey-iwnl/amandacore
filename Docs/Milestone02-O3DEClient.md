@@ -46,7 +46,7 @@ Action:
 Expected launcher logs:
 - `Issued world join ticket ...`
 - `Resolved client executable path: ...amandacore.GameLauncher.exe`
-- `Launch command: ... --join-ticket abcd...wxyz --world-endpoint http://localhost:8085`
+- `Launch command: ... --join-ticket abcd...wxyz --world-endpoint http://127.0.0.1:8085`
 - `Client process start succeeded. Pid: ...`
 - `Launched configured game client executable.`
 

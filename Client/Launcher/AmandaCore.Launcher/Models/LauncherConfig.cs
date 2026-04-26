@@ -5,10 +5,10 @@ namespace AmandaCore.Launcher.Models;
 
 internal sealed class LauncherConfig
 {
-    public string AuthServiceBaseUrl { get; set; } = "http://localhost:8081";
-    public string RealmServiceBaseUrl { get; set; } = "http://localhost:8083";
-    public string CharacterServiceBaseUrl { get; set; } = "http://localhost:8084";
-    public string WorldServiceBaseUrl { get; set; } = "http://localhost:8085";
+    public string AuthServiceBaseUrl { get; set; } = "http://127.0.0.1:8081";
+    public string RealmServiceBaseUrl { get; set; } = "http://127.0.0.1:8083";
+    public string CharacterServiceBaseUrl { get; set; } = "http://127.0.0.1:8084";
+    public string WorldServiceBaseUrl { get; set; } = "http://127.0.0.1:8085";
     public string ClientExecutablePath { get; set; } = string.Empty;
     [JsonIgnore]
     public ClientExecutableResolution Resolution { get; private set; } = ClientExecutableResolution.Empty;

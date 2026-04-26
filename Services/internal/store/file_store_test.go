@@ -13,7 +13,7 @@ import (
 
 func TestAdminSeedAndLogin(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create file store: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestAdminSeedAndLogin(t *testing.T) {
 
 func TestCharacterCreationAndJoinTicket(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create file store: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 				"id":             "sunset-frontier-dev",
 				"displayName":    "Sunset Frontier Dev",
 				"region":         "local",
-				"endpoint":       "http://localhost:8085",
+				"endpoint":       "http://127.0.0.1:8085",
 				"supportedBuild": "test-build",
 				"onlinePlayers":  0,
 				"online":         true,
@@ -156,7 +156,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 			"requiredServices":  []string{"auth-service"},
 			"launcherNews":      "test",
 			"allowedForLogin":   true,
-			"worldEndpointHint": "http://localhost:8085",
+			"worldEndpointHint": "http://127.0.0.1:8085",
 		},
 	}
 
@@ -168,7 +168,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 		t.Fatalf("failed to write legacy state: %v", err)
 	}
 
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to open store with legacy state: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 
 func TestUpdateCharacterProgressionPersistsLearnedAbilities(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create file store: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestUpdateCharacterProgressionPersistsLearnedAbilities(t *testing.T) {
 		t.Fatalf("expected learned abilities to persist driving blow, got %#v", updated.LearnedAbilityIDs)
 	}
 
-	reopenedStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	reopenedStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to reopen store: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestUpdateCharacterProgressionPersistsLearnedAbilities(t *testing.T) {
 
 func TestMultipleStoreInstancesPersistWithoutCorruption(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create initial file store: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestMultipleStoreInstancesPersistWithoutCorruption(t *testing.T) {
 		go func(worker int) {
 			defer waitGroup.Done()
 
-			workerStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+			workerStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 			if err != nil {
 				errorChannel <- fmt.Errorf("worker %d failed to open store: %w", worker, err)
 				return

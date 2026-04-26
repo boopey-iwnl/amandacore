@@ -56,7 +56,7 @@ The summary includes build manifest data, scenario, client count, duration, requ
 The world service exposes a lightweight local endpoint:
 
 ```text
-GET http://localhost:8085/v1/world/metrics
+GET http://127.0.0.1:8085/v1/world/metrics
 ```
 
 It reports:

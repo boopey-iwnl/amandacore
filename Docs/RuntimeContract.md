@@ -66,7 +66,7 @@ Response:
       "id": "sunset-frontier-dev",
       "displayName": "Sunset Frontier Dev",
       "region": "local",
-      "endpoint": "http://localhost:8085",
+      "endpoint": "http://127.0.0.1:8085",
       "supportedBuild": "amandacore-local-0.2.0",
       "onlinePlayers": 0,
       "online": true
@@ -117,7 +117,7 @@ Response:
   "accountId": "acct_...",
   "characterId": "char_...",
   "realmId": "sunset-frontier-dev",
-  "worldEndpoint": "http://localhost:8085",
+  "worldEndpoint": "http://127.0.0.1:8085",
   "expiresAt": 1776499999,
   "consumedAt": 0
 }

@@ -318,7 +318,7 @@ function Test-ServiceHealth {
     )
 
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:$Port/health" -UseBasicParsing -TimeoutSec 2
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/health" -UseBasicParsing -TimeoutSec 2
         Add-Result -Name "$Name health" -Passed ($response.StatusCode -eq 200) -Detail "HTTP $($response.StatusCode)"
     }
     catch {

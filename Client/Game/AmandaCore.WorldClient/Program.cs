@@ -88,7 +88,7 @@ internal sealed record ClientOptions(string JoinTicketId, string WorldEndpoint, 
     public static ClientOptions Parse(string[] args)
     {
         string? joinTicket = null;
-        var worldEndpoint = "http://localhost:8085";
+        var worldEndpoint = "http://127.0.0.1:8085";
         var autoDemo = false;
 
         for (var index = 0; index < args.Length; index++)

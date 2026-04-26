@@ -13,5 +13,5 @@ It is intentionally thin and not an O3DE scene yet. Its job is to prove the live
 Example:
 
 ```powershell
-dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://127.0.0.1:8085
 ```
