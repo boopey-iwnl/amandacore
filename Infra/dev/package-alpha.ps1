@@ -342,7 +342,7 @@ if (-not $SkipSmoke) {
     $smokePackageRoot = $script:stagingRoot
     $smokeExtractRoot = ""
     if (-not $SkipArchive) {
-        $smokeExtractRoot = Join-Path $OutputRoot "$PackageName-smoke-extract"
+        $smokeExtractRoot = Join-Path $OutputRoot "smoke-extract"
         Assert-ChildPath -Parent $OutputRoot -Child $smokeExtractRoot
         Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
         Add-Type -AssemblyName System.IO.Compression.FileSystem
