@@ -58,14 +58,14 @@ The local stack waits for each service to report healthy before returning contro
 
 Milestone `0.1` hardening details, commands, and pass/fail behavior are documented in `Docs/Milestone01-AccountToWorld.md`.
 
-## Dawnwake traversal loadsim
+## Content package and Dawnwake loadsims
 
-The Dawnwake Isles multi-zone skeleton can be exercised without O3DE:
+Run from the Go module root:
 
 ```powershell
-Push-Location Services
-go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-traversal-basic --content ../Content/Packs/dawnwake_isles/package.json
-Pop-Location
+cd Services
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 
-The scenario loads `dawnwake_isles`, activates its continent runtime, spawns simulated players at the default entry, transfers through the first zone gate, and reports transition and visibility counts.
+The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`. The Dawnwake scenario loads `dawnwake_isles`, validates continent topology and transition gates, activates package zones into the world runtime, probes the first enabled zone transition per simulated client, and reports transition, visibility, NPC, quest-provider, and tick timing counts.

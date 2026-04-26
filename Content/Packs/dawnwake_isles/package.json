@@ -1,9 +1,13 @@
 {
   "package_id": "dawnwake_isles",
   "display_name": "Dawnwake Isles",
-  "schema_version": "amandacore.content.v1",
   "version": "0.1.0",
-  "continent": "continent/dawnwake_isles.continent.json",
+  "schema_version": "1",
+  "description": "Original AmandaCore Dawnwake Isles multi-zone skeleton for traversal, runtime activation, and future O3DE streaming.",
+  "authorship": "AmandaCore original development content.",
+  "continent_files": [
+    "continent/dawnwake_isles.continent.json"
+  ],
   "zones": [
     "zones/dawnwake_landing.zone.json",
     "zones/amberglass_fields.zone.json",
@@ -11,16 +15,27 @@
     "zones/highroad_pass.zone.json",
     "zones/kingsfall_harbor.zone.json"
   ],
-  "npcs": "npcs/dawnwake_npcs.json",
-  "items": "items/dawnwake_items.json",
-  "loot": "loot/dawnwake_loot.json",
-  "quests": "quests/dawnwake_quests.json",
-  "abilities": "abilities/dawnwake_abilities.json",
-  "auras": "auras/dawnwake_auras.json",
-  "tags": ["dawnwake", "continent_skeleton", "placeholder_bounds"],
-  "metadata": {
-    "accuracy": "placeholder",
-    "source": "pending_map_trace",
-    "todo": "Replace rectangular scaffold bounds and gate points with coordinates traced from the owner-supplied Dawnwake Isles and Kingsfall Harbor maps before 0.5."
-  }
+  "npc_catalogs": [
+    "npcs/dawnwake_npcs.json"
+  ],
+  "item_catalogs": [
+    "items/dawnwake_items.json"
+  ],
+  "loot_catalogs": [
+    "loot/dawnwake_loot.json"
+  ],
+  "quest_catalogs": [
+    "quests/dawnwake_quests.json"
+  ],
+  "ability_catalogs": [
+    "abilities/dawnwake_abilities.json"
+  ],
+  "aura_catalogs": [
+    "auras/dawnwake_auras.json"
+  ],
+  "tags": [
+    "dawnwake",
+    "continent-skeleton",
+    "placeholder-bounds"
+  ]
 }

@@ -14,8 +14,8 @@ func TestStonewakeStarterContentLoads(t *testing.T) {
 			stonewakeQuestCount++
 		}
 	}
-	if stonewakeQuestCount != 15 {
-		t.Fatalf("expected 15 Stonewake starter quests, got %d", stonewakeQuestCount)
+	if stonewakeQuestCount != 16 {
+		t.Fatalf("expected 16 Stonewake starter quests, got %d", stonewakeQuestCount)
 	}
 
 	stonewakeFriendlyCount := 0
@@ -35,8 +35,8 @@ func TestStonewakeStarterContentLoads(t *testing.T) {
 			stonewakeMobCount++
 		}
 	}
-	if stonewakeMobCount != 37 {
-		t.Fatalf("expected 37 Stonewake mob spawns, got %d", stonewakeMobCount)
+	if stonewakeMobCount != 38 {
+		t.Fatalf("expected 38 Stonewake mob spawns, got %d", stonewakeMobCount)
 	}
 
 	requiredQuests := []string{

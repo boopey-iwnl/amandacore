@@ -1,71 +1,59 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
-	"amandacore/services/internal/observability"
 	"amandacore/services/internal/worlds"
 )
 
 type options struct {
-	Clients  int
-	Duration time.Duration
-	CmdRate  int
-	Scenario string
-	Content  string
-}
-
-type report struct {
-	ContentPackageLoaded      bool
-	ContinentActivated        bool
-	ZonesActivated            int
-	TransitionGatesLoaded     int
-	PlayersAttached           int
-	ZoneTransitionsRequested  int
-	ZoneTransitionsCompleted  int
-	ZoneTransitionsRejected   int
-	VisibilityEvaluations     int
-	VisibilityEnterExitDeltas int
-	NPCsSpawned               int
-	CombatInteractions        int
-	AverageTickDuration       time.Duration
-	MaxTickDuration           time.Duration
-	MaxQueueDepth             int
-	Errors                    []string
+	Clients     int
+	Duration    time.Duration
+	CommandRate float64
+	Scenario    string
+	ContentPath string
 }
 
 func main() {
 	opts := parseOptions()
-	if opts.Scenario != "dawnwake-traversal-basic" {
+
+	switch opts.Scenario {
+	case "quest-basic":
+		report, err := worlds.RunQuestBasicLoadsim(worlds.QuestBasicLoadsimOptions{
+			Clients:  opts.Clients,
+			Duration: opts.Duration,
+			CmdRate:  questCommandRate(opts.CommandRate),
+		})
+		printQuestReport(report)
+		exitForQuestReport(report, err)
+	case "content-package-basic":
+		report, err := worlds.RunContentPackageLoadsim(worlds.ContentPackageLoadsimOptions{
+			Clients:     opts.Clients,
+			Duration:    opts.Duration,
+			CommandRate: opts.CommandRate,
+			Scenario:    opts.Scenario,
+			ContentPath: opts.ContentPath,
+		})
+		printContentReport(report)
+		exitForContentReport(report, err)
+	case "dawnwake-streaming-basic", "dawnwake-traversal-basic":
+		report, err := worlds.RunDawnwakeStreamingLoadsim(worlds.DawnwakeStreamingLoadsimOptions{
+			Clients:     opts.Clients,
+			Duration:    opts.Duration,
+			CommandRate: opts.CommandRate,
+			Scenario:    opts.Scenario,
+			ContentPath: opts.ContentPath,
+		})
+		printDawnwakeReport(report)
+		exitForDawnwakeReport(report, err)
+	default:
 		exitf("unsupported scenario %q", opts.Scenario)
-	}
-	if opts.Content == "" {
-		exitf("--content is required")
-	}
-	observability.LogEvent("loadsim", observability.EventLoadsimDawnwakeStarted, map[string]any{
-		"scenario": opts.Scenario,
-		"clients":  opts.Clients,
-		"duration": opts.Duration.String(),
-		"cmdRate":  opts.CmdRate,
-		"content":  opts.Content,
-	})
-
-	started := time.Now()
-	result := runDawnwakeTraversal(opts)
-	result.AverageTickDuration, result.MaxTickDuration = tickDurations(result, time.Since(started))
-	observability.LogEvent("loadsim", observability.EventLoadsimDawnwakeCompleted, map[string]any{
-		"scenario":              opts.Scenario,
-		"errors":                len(result.Errors),
-		"transitionsCompleted":  result.ZoneTransitionsCompleted,
-		"visibilityEvaluations": result.VisibilityEvaluations,
-	})
-
-	printReport(result)
-	if len(result.Errors) > 0 {
-		os.Exit(1)
 	}
 }
 
@@ -73,172 +61,178 @@ func parseOptions() options {
 	var durationText string
 	opts := options{}
 	flag.IntVar(&opts.Clients, "clients", 1, "number of simulated players")
-	flag.StringVar(&durationText, "duration", "30s", "scenario duration budget")
-	flag.IntVar(&opts.CmdRate, "cmd-rate", 2, "simulated commands per second")
-	flag.StringVar(&opts.Scenario, "scenario", "dawnwake-traversal-basic", "scenario name")
-	flag.StringVar(&opts.Content, "content", "", "content package manifest path")
+	flag.StringVar(&durationText, "duration", "30s", "scenario duration budget, for example 30s")
+	flag.Float64Var(&opts.CommandRate, "cmd-rate", 2, "nominal commands per second per player")
+	flag.StringVar(&opts.Scenario, "scenario", "quest-basic", "scenario name")
+	flag.StringVar(&opts.ContentPath, "content", "", "content package manifest path")
 	flag.Parse()
 
-	var err error
-	opts.Duration, err = time.ParseDuration(durationText)
+	duration, err := time.ParseDuration(durationText)
 	if err != nil {
 		exitf("invalid duration: %v", err)
 	}
+	opts.Duration = duration
+	opts.Scenario = strings.ToLower(strings.TrimSpace(opts.Scenario))
 	if opts.Clients <= 0 {
 		exitf("--clients must be greater than zero")
 	}
-	if opts.CmdRate <= 0 {
+	if opts.CommandRate <= 0 {
 		exitf("--cmd-rate must be greater than zero")
 	}
 	return opts
 }
 
-func runDawnwakeTraversal(opts options) report {
-	result := report{}
-	registry, err := worlds.NewContentPackageLoader().Load(opts.Content)
+func printQuestReport(report worlds.QuestBasicLoadsimReport) {
+	fmt.Println("Quest basic loadsim report")
+	fmt.Printf("- simulated clients: %d\n", report.SimulatedClients)
+	fmt.Printf("- quests accepted: %d\n", report.QuestsAccepted)
+	fmt.Printf("- NPC kills: %d\n", report.NPCKills)
+	fmt.Printf("- kill credits awarded: %d\n", report.KillCreditsAwarded)
+	fmt.Printf("- loot containers created: %d\n", report.LootContainersCreated)
+	fmt.Printf("- loot claims attempted: %d\n", report.LootClaimsAttempted)
+	fmt.Printf("- loot claims completed: %d\n", report.LootClaimsCompleted)
+	fmt.Printf("- inventory grants: %d\n", report.InventoryGrants)
+	fmt.Printf("- objective updates: %d\n", report.ObjectiveUpdates)
+	fmt.Printf("- quests ready: %d\n", report.QuestsReady)
+	fmt.Printf("- quests completed: %d\n", report.QuestsCompleted)
+	fmt.Printf("- rewards granted: %d\n", report.RewardsGranted)
+	fmt.Printf("- rejected commands: %d\n", report.RejectedCommands)
+	fmt.Printf("- average tick duration: %s\n", report.AverageTickDuration)
+	fmt.Printf("- max tick duration: %s\n", report.MaxTickDuration)
+	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	if len(report.Errors) == 0 {
+		fmt.Println("- errors: 0")
+		return
+	}
+	fmt.Printf("- errors: %d\n", len(report.Errors))
+	for _, errText := range report.Errors {
+		fmt.Printf("  - %s\n", errText)
+	}
+}
+
+func questCommandRate(commandRate float64) int {
+	rate := int(commandRate)
+	if rate < 1 {
+		return 1
+	}
+	return rate
+}
+
+func printContentReport(report worlds.ContentPackageLoadsimReport) {
+	fmt.Println("Content package loadsim report")
+	fmt.Printf("- content package loaded: %v\n", report.ContentPackageLoaded)
+	fmt.Printf("- package id: %s\n", report.PackageID)
+	fmt.Printf("- validation errors: %d\n", len(report.ValidationErrors))
+	for _, validationError := range report.ValidationErrors {
+		fmt.Printf("  - %s\n", validationError)
+	}
+	fmt.Printf("- zones activated: %d\n", report.ZonesActivated)
+	fmt.Printf("- catalogs loaded: %s\n", formatCounts(report.CatalogsLoaded))
+	fmt.Printf("- NPCs spawned: %d\n", report.NPCsSpawned)
+	fmt.Printf("- quest providers registered: %d\n", report.QuestProvidersRegistered)
+	fmt.Printf("- quests accepted: %d\n", report.QuestsAccepted)
+	fmt.Printf("- NPC kills: %d\n", report.NPCKills)
+	fmt.Printf("- loot containers created: %d\n", report.LootContainersCreated)
+	fmt.Printf("- loot claims completed: %d\n", report.LootClaimsCompleted)
+	fmt.Printf("- inventory grants: %s\n", formatCounts(report.InventoryGrants))
+	fmt.Printf("- quests completed: %d\n", report.QuestsCompleted)
+	fmt.Printf("- rewards granted: %d\n", report.RewardsGranted)
+	fmt.Printf("- average tick duration: %.3fms\n", report.AverageTickDurationMs)
+	fmt.Printf("- max tick duration: %.3fms\n", report.MaxTickDurationMs)
+	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	fmt.Printf("- errors: %d\n", len(report.Errors))
+	for _, runError := range report.Errors {
+		fmt.Printf("  - %s\n", runError)
+	}
+	encoded, err := json.Marshal(report)
+	if err == nil {
+		fmt.Printf("- json: %s\n", string(encoded))
+	}
+}
+
+func printDawnwakeReport(report worlds.DawnwakeStreamingLoadsimReport) {
+	fmt.Println("Dawnwake streaming loadsim report")
+	fmt.Printf("- content package loaded: %v\n", report.ContentPackageLoaded)
+	fmt.Printf("- package id: %s\n", report.PackageID)
+	fmt.Printf("- continent id: %s\n", report.ContinentID)
+	fmt.Printf("- validation errors: %d\n", len(report.ValidationErrors))
+	for _, validationError := range report.ValidationErrors {
+		fmt.Printf("  - %s\n", validationError)
+	}
+	fmt.Printf("- zones activated: %d\n", report.ZonesActivated)
+	fmt.Printf("- catalogs loaded: %s\n", formatCounts(report.CatalogsLoaded))
+	fmt.Printf("- transition gates loaded: %d\n", report.TransitionGatesLoaded)
+	fmt.Printf("- players attached: %d\n", report.PlayersAttached)
+	fmt.Printf("- zone transitions requested: %d\n", report.ZoneTransitionsRequested)
+	fmt.Printf("- zone transitions completed: %d\n", report.ZoneTransitionsCompleted)
+	fmt.Printf("- zone transitions rejected: %d\n", report.ZoneTransitionsRejected)
+	fmt.Printf("- visibility evaluations: %d\n", report.VisibilityEvaluations)
+	fmt.Printf("- streaming hints emitted: %d\n", report.StreamingHintsEmitted)
+	fmt.Printf("- NPCs spawned: %d\n", report.NPCsSpawned)
+	fmt.Printf("- quest providers registered: %d\n", report.QuestProvidersRegistered)
+	fmt.Printf("- average tick duration: %.3fms\n", report.AverageTickDurationMs)
+	fmt.Printf("- max tick duration: %.3fms\n", report.MaxTickDurationMs)
+	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	fmt.Printf("- errors: %d\n", len(report.Errors))
+	for _, runError := range report.Errors {
+		fmt.Printf("  - %s\n", runError)
+	}
+	encoded, err := json.Marshal(report)
+	if err == nil {
+		fmt.Printf("- json: %s\n", string(encoded))
+	}
+}
+
+func formatCounts(counts map[string]int) string {
+	if len(counts) == 0 {
+		return "{}"
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := "{"
+	for index, key := range keys {
+		if index > 0 {
+			result += ", "
+		}
+		result += fmt.Sprintf("%s:%d", key, counts[key])
+	}
+	return result + "}"
+}
+
+func exitForQuestReport(report worlds.QuestBasicLoadsimReport, err error) {
 	if err != nil {
-		result.Errors = append(result.Errors, fmt.Sprintf("content load failed: %v", err))
-		return result
+		fmt.Fprintf(os.Stderr, "loadsim failed: %v\n", err)
+		os.Exit(1)
 	}
-	result.ContentPackageLoaded = true
+	if len(report.Errors) > 0 {
+		os.Exit(1)
+	}
+}
 
-	runtime, err := registry.ActivateContinent("dawnwake_isles")
+func exitForContentReport(report worlds.ContentPackageLoadsimReport, err error) {
 	if err != nil {
-		result.Errors = append(result.Errors, fmt.Sprintf("continent activation failed: %v", err))
-		return result
+		fmt.Fprintf(os.Stderr, "loadsim failed: %v\n", err)
+		os.Exit(1)
 	}
-	result.ContinentActivated = true
-	result.ZonesActivated = len(runtime.Zones)
-	result.TransitionGatesLoaded = countTransitionGates(runtime)
-	result.NPCsSpawned = countNPCs(runtime)
-
-	for index := 0; index < opts.Clients; index++ {
-		characterID := fmt.Sprintf("loadsim_dawnwake_%03d", index+1)
-		state, _, err := runtime.SpawnCharacterAtDefaultEntry(characterID)
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("%s spawn failed: %v", characterID, err))
-			continue
-		}
-		result.PlayersAttached++
-		if delta, err := runtime.EvaluateVisibility(characterID, worlds.InterestProfile{Radius: 80, IncludeAdjacentStreamingHints: true}); err == nil {
-			result.VisibilityEvaluations++
-			result.VisibilityEnterExitDeltas += len(delta.Entered) + len(delta.Exited)
-		} else {
-			result.Errors = append(result.Errors, fmt.Sprintf("%s visibility before transfer failed: %v", characterID, err))
-		}
-
-		zoneRuntime := runtime.Zones[state.ZoneID]
-		if zoneRuntime == nil || len(zoneRuntime.Definition.TransitionGates) == 0 {
-			result.Errors = append(result.Errors, fmt.Sprintf("%s default zone has no transition gates", characterID))
-			continue
-		}
-		gate := zoneRuntime.Definition.TransitionGates[0]
-		gateCenter := center(gate.GateBounds, state.ZoneID)
-		_, _ = runtime.MoveCharacter(characterID, gateCenter.X-state.Position.X, gateCenter.Y-state.Position.Y, gateCenter.Z-state.Position.Z)
-		exitDeltaX, exitDeltaY := exitDelta(zoneRuntime.Definition.Bounds, gate.GateBounds)
-		transfer, err := runtime.MoveCharacter(characterID, exitDeltaX, exitDeltaY, 0)
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("%s transfer move failed: %v", characterID, err))
-			continue
-		}
-		if transfer.Requested {
-			result.ZoneTransitionsRequested++
-		}
-		if transfer.Completed {
-			result.ZoneTransitionsCompleted++
-		}
-		if transfer.Rejected {
-			result.ZoneTransitionsRejected++
-			result.Errors = append(result.Errors, fmt.Sprintf("%s transition rejected: %s", characterID, transfer.RejectionReason))
-		}
-		if delta, err := runtime.EvaluateVisibility(characterID, worlds.InterestProfile{Radius: 90, IncludeAdjacentStreamingHints: true}); err == nil {
-			result.VisibilityEvaluations++
-			result.VisibilityEnterExitDeltas += len(delta.Entered) + len(delta.Exited)
-		} else {
-			result.Errors = append(result.Errors, fmt.Sprintf("%s visibility after transfer failed: %v", characterID, err))
-		}
-	}
-	result.MaxQueueDepth = opts.Clients
-	return result
-}
-
-func center(bounds worlds.ZoneBounds, zoneID string) worlds.WorldPosition {
-	return worlds.WorldPosition{
-		ZoneID: zoneID,
-		X:      (bounds.MinX + bounds.MaxX) / 2,
-		Y:      (bounds.MinY + bounds.MaxY) / 2,
-		Z:      (bounds.MinZ + bounds.MaxZ) / 2,
+	if len(report.Errors) > 0 || len(report.ValidationErrors) > 0 {
+		os.Exit(1)
 	}
 }
 
-func exitDelta(zone worlds.ZoneBounds, gate worlds.ZoneBounds) (float64, float64) {
-	switch {
-	case gate.MaxX >= zone.MaxX:
-		return 10, 0
-	case gate.MinX <= zone.MinX:
-		return -10, 0
-	case gate.MaxY >= zone.MaxY:
-		return 0, 10
-	case gate.MinY <= zone.MinY:
-		return 0, -10
-	default:
-		return 10, 0
+func exitForDawnwakeReport(report worlds.DawnwakeStreamingLoadsimReport, err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "loadsim failed: %v\n", err)
+		os.Exit(1)
 	}
-}
-
-func countTransitionGates(runtime *worlds.ContinentRuntime) int {
-	total := 0
-	for _, zone := range runtime.Zones {
-		total += len(zone.Definition.TransitionGates)
-	}
-	return total
-}
-
-func countNPCs(runtime *worlds.ContinentRuntime) int {
-	total := 0
-	for _, zone := range runtime.Zones {
-		for _, entity := range zone.Entities.Entities {
-			if entity.Kind == "hostile_mob" || entity.Kind == "quest_giver_npc" {
-				total++
-			}
-		}
-	}
-	return total
-}
-
-func tickDurations(result report, elapsed time.Duration) (time.Duration, time.Duration) {
-	ticks := result.VisibilityEvaluations + result.ZoneTransitionsRequested + result.PlayersAttached
-	if ticks <= 0 {
-		return 0, 0
-	}
-	average := elapsed / time.Duration(ticks)
-	return average, elapsed
-}
-
-func printReport(result report) {
-	fmt.Println("Dawnwake traversal loadsim report")
-	fmt.Printf("content package loaded: %t\n", result.ContentPackageLoaded)
-	fmt.Printf("continent activated: %t\n", result.ContinentActivated)
-	fmt.Printf("zones activated: %d\n", result.ZonesActivated)
-	fmt.Printf("transition gates loaded: %d\n", result.TransitionGatesLoaded)
-	fmt.Printf("players attached: %d\n", result.PlayersAttached)
-	fmt.Printf("zone transitions requested: %d\n", result.ZoneTransitionsRequested)
-	fmt.Printf("zone transitions completed: %d\n", result.ZoneTransitionsCompleted)
-	fmt.Printf("zone transitions rejected: %d\n", result.ZoneTransitionsRejected)
-	fmt.Printf("visibility evaluations: %d\n", result.VisibilityEvaluations)
-	fmt.Printf("visibility enter/exit deltas: %d\n", result.VisibilityEnterExitDeltas)
-	fmt.Printf("NPCs spawned: %d\n", result.NPCsSpawned)
-	fmt.Printf("combat interactions: %d\n", result.CombatInteractions)
-	fmt.Printf("average tick duration: %s\n", result.AverageTickDuration)
-	fmt.Printf("max tick duration: %s\n", result.MaxTickDuration)
-	fmt.Printf("max queue depth: %d\n", result.MaxQueueDepth)
-	fmt.Printf("errors: %d\n", len(result.Errors))
-	for _, err := range result.Errors {
-		fmt.Printf("- %s\n", err)
+	if len(report.Errors) > 0 || len(report.ValidationErrors) > 0 {
+		os.Exit(1)
 	}
 }
 
 func exitf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(1)
+	os.Exit(2)
 }

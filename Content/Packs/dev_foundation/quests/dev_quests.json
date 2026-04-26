@@ -1,0 +1,41 @@
+{
+  "quests": [
+    {
+      "quest_id": "dev_first_hunt",
+      "display_name": "First Hunt",
+      "summary": "Defeat an Isle Stalker near the Dev Isle edge and return with proof.",
+      "required_level": 1,
+      "prerequisite_quest_ids": [],
+      "objective_graph": {
+        "nodes": [
+          {
+            "node_id": "defeat_stalker",
+            "kind": "kill_npc",
+            "target_id": "dev_isle_stalker",
+            "required_count": 1,
+            "depends_on": []
+          },
+          {
+            "node_id": "recover_fang",
+            "kind": "collect_item",
+            "target_id": "dev_stalker_fang",
+            "required_count": 1,
+            "depends_on": [
+              "defeat_stalker"
+            ]
+          }
+        ]
+      },
+      "rewards": [
+        {
+          "item_id": "dev_field_ration",
+          "quantity": 1
+        }
+      ],
+      "tags": [
+        "dev",
+        "starter"
+      ]
+    }
+  ]
+}

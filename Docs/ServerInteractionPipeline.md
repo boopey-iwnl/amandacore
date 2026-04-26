@@ -8,7 +8,7 @@ The Dawnwake skeleton keeps client-facing protocol concerns separate from server
 client/session intent -> world command -> owning zone runtime -> validation -> state mutation -> domain event/state diff -> visibility evaluation
 ```
 
-For zone transfer, the sequence is:
+For future production zone transfer, the intended sequence is:
 
 ```text
 movement delta -> boundary check -> transition request -> topology validation -> source zone exit -> destination zone enter -> route update -> visibility delta
@@ -16,7 +16,7 @@ movement delta -> boundary check -> transition request -> topology validation ->
 
 ## Multi-zone Routing
 
-`WorldRuntime` and `ContinentRuntime` track the character-to-zone ownership index. Commands are routed to the current owner. A character is active in one zone runtime at a time.
+The current Dawnwake milestone validates package-authored transition topology and exposes transition landmarks through world content activation. Production character handoff between package-authored zones is still future work. A character should remain active in one authoritative zone owner at a time when that handoff layer is implemented.
 
 Future protocol adapters and session gateway work should submit canonical commands into this same routing layer. The adapter should not own topology or transition decisions.
 

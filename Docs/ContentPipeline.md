@@ -5,7 +5,7 @@
 AmandaCore content is authored as project-owned JSON and loaded through the Go content package loader.
 
 ```text
-authored JSON package -> ContentPackageLoader -> RuntimeContentRegistry -> ContinentRuntime / ZoneRuntime
+authored JSON package -> ContentPackageLoader -> RuntimeContentRegistry -> worldServer content activation -> ZoneRuntime records
 ```
 
 The Dawnwake Isles package is the first continent package using this flow. It contains original placeholder topology and gameplay references only.

@@ -10,6 +10,7 @@ import (
 
 	"amandacore/services/internal/authn"
 	"amandacore/services/internal/characters"
+	"amandacore/services/internal/platform"
 	"amandacore/services/internal/realms"
 	"amandacore/services/internal/store"
 	"amandacore/services/internal/worlds"
@@ -66,8 +67,8 @@ func TestAccountToWorldGoldenPath(t *testing.T) {
 		t.Fatalf("expected created character class warrior, got %v", characterResponse["classId"])
 	}
 	learnedAbilityIds := characterResponse["learnedAbilityIds"].([]any)
-	if len(learnedAbilityIds) != 3 {
-		t.Fatalf("expected 3 starting learned abilities, got %d", len(learnedAbilityIds))
+	if len(learnedAbilityIds) != len(platform.DefaultStartingLearnedAbilityIDs()) {
+		t.Fatalf("expected %d starting learned abilities, got %d", len(platform.DefaultStartingLearnedAbilityIDs()), len(learnedAbilityIds))
 	}
 	characterID := characterResponse["id"].(string)
 

@@ -1,8 +1,46 @@
 {
   "loot_tables": [
-    { "loot_table_id": "dawnwake_tide_scavenger_scraps", "roll_groups": [{ "item_id": "dawnwake_weathered_coin", "min_count": 1, "max_count": 2, "weight": 60 }], "tags": ["placeholder"] },
-    { "loot_table_id": "dawnwake_reef_stalker_cache", "roll_groups": [{ "item_id": "dawnwake_salt_wrap", "min_count": 1, "max_count": 1, "weight": 45 }], "tags": ["placeholder"] },
-    { "loot_table_id": "dawnwake_harbor_rat_junk", "roll_groups": [], "tags": ["city", "placeholder"] },
-    { "loot_table_id": "dawnwake_bandit_placeholder_pack", "roll_groups": [{ "item_id": "dawnwake_weathered_coin", "min_count": 1, "max_count": 3, "weight": 70 }], "tags": ["placeholder"] }
+    {
+      "loot_table_id": "dawnwake_tide_scavenger_scraps",
+      "entries": [
+        {
+          "item_id": "dawnwake_weathered_coin",
+          "min_quantity": 1,
+          "max_quantity": 2,
+          "drop_chance_percent": 60
+        }
+      ],
+      "tags": ["placeholder"]
+    },
+    {
+      "loot_table_id": "dawnwake_reef_stalker_cache",
+      "entries": [
+        {
+          "item_id": "dawnwake_salt_wrap",
+          "min_quantity": 1,
+          "max_quantity": 1,
+          "drop_chance_percent": 45
+        }
+      ],
+      "tags": ["placeholder"]
+    },
+    {
+      "loot_table_id": "dawnwake_harbor_rat_junk",
+      "entries": [],
+      "allow_empty": true,
+      "tags": ["city", "placeholder"]
+    },
+    {
+      "loot_table_id": "dawnwake_bandit_placeholder_pack",
+      "entries": [
+        {
+          "item_id": "dawnwake_weathered_coin",
+          "min_quantity": 1,
+          "max_quantity": 3,
+          "drop_chance_percent": 70
+        }
+      ],
+      "tags": ["placeholder"]
+    }
   ]
 }

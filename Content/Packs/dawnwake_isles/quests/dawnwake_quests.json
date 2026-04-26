@@ -3,11 +3,26 @@
     {
       "quest_id": "dawnwake_first_steps",
       "display_name": "First Steps on Dawnwake",
-      "provider_id": "dawnwake_landing_pathfinder",
-      "objective_graph": [
-        { "objective_id": "reach_amberglass_road_placeholder", "kind": "ReachLocationPlaceholder", "zone_id": "dawnwake_landing", "target": "landing_to_amberglass_road" }
+      "summary": "Check in with the Dawnwake Landing Pathfinder before following the road inland.",
+      "required_level": 1,
+      "prerequisite_quest_ids": [],
+      "objective_graph": {
+        "nodes": [
+          {
+            "node_id": "speak_with_pathfinder",
+            "kind": "talk_provider",
+            "target_id": "dawnwake_landing_pathfinder",
+            "required_count": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "rewards": [
+        {
+          "item_id": "dawnwake_weathered_coin",
+          "quantity": 1
+        }
       ],
-      "rewards": [],
       "tags": ["starter", "placeholder"]
     }
   ]

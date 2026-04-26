@@ -35,7 +35,7 @@ Package identity:
 
 - `package_id`: `dawnwake_isles`
 - `display_name`: `Dawnwake Isles`
-- `schema_version`: `amandacore.content.v1`
+- `schema_version`: `1`
 - `version`: `0.1.0`
 
 ## Continent Definition
@@ -119,16 +119,15 @@ Successful transfer updates character ownership, places the character at the des
 
 ## Runtime Ownership
 
-`ContinentRuntime` activates validated zone definitions through `ZoneRuntimeFactory`. Each active `ZoneRuntime` owns its local entity registry and zone definition. Character ownership is tracked by `CharacterZoneState`.
+The current implementation activates validated package zones into the existing Go `worldServer`. Each loaded zone gets a `ZoneRuntime` record for package activation metadata, and the package also contributes normal world zone definitions, transition landmarks, NPC spawn definitions, quest providers, loot tables, items, quests, abilities, and auras.
 
-The current model is single-owner:
+The current model is intentionally conservative:
 
-- A character or active entity belongs to exactly one zone runtime.
-- Commands route through the character's owning `ZoneRuntime`.
-- Zone transfer removes the character from the source registry and inserts it into the destination registry.
-- Existing single-zone package behavior is preserved by treating one activated zone as the whole runtime.
-
-`WorldRuntime` can activate all continent definitions in a package and route commands by character ID. This keeps the future sharding boundary explicit without adding a production shard coordinator yet.
+- A character still belongs to one active world zone at a time.
+- Package activation validates transition metadata before the server accepts it.
+- Transition gates are exposed as server-side zone transition landmarks for navigation and loadsim reporting.
+- Production cross-zone handoff, sharding, and cross-zone interest replication are future milestones.
+- Existing single-zone package behavior is preserved by treating a package with one zone as normal additive runtime content.
 
 ## Visibility And Streaming Hints
 
@@ -158,11 +157,11 @@ The Dawnwake traversal scenario validates package load, continent activation, de
 
 ```powershell
 Push-Location Services
-go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-traversal-basic --content ../Content/Packs/dawnwake_isles/package.json
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ../Content/Packs/dawnwake_isles/package.json
 Pop-Location
 ```
 
-The report includes package load, continent activation, zones activated, transition gates loaded, players attached, transition counts, visibility evaluation counts, NPCs spawned, tick duration summaries, queue depth, and errors.
+The legacy scenario alias `dawnwake-traversal-basic` is still accepted. The report includes package load, continent ID, zones activated, transition gates loaded, players attached, transition counts, visibility evaluation counts, streaming hint counts, NPCs spawned, quest providers, tick duration summaries, queue depth, and errors.
 
 ## Clean-room reference boundary
 
@@ -177,11 +176,10 @@ No source code, SQL, packet layouts, opcodes, command names, schemas, content ID
 ## Current Limitations
 
 - Bounds and transition coordinates are placeholder scaffolding pending map tracing.
-- Transition movement uses axis-aligned gate bounds only.
-- Visibility uses a naive same-zone scan.
-- Adjacent-zone visibility is exposed as streaming hints, not cross-zone entity replication.
+- Transition movement is currently metadata validation and loadsim probing, not production handoff.
+- Visibility and streaming hints are loadsim-level counters for this milestone, not cross-zone entity replication.
 - Kingsfall Harbor has city runtime hints and provider placeholders, not full city services.
-- Reconnect persistence is currently represented by an interface and in-memory implementation.
+- Durable zone handoff persistence is not implemented for package-authored Dawnwake traversal yet.
 - No navmesh, terrain, O3DE import, phasing, city economy, or production streamer is included.
 
 ## Next Milestone

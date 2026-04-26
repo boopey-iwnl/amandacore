@@ -57,9 +57,11 @@ Each Gem has a single, durable responsibility:
 
 The data model is deliberately wider than the first slice so future work can scale without a rewrite. JSON Schema definitions live in `Content/Schemas/gameplay.schema.json`, and example authored content lives in `Content/GameData/ZoneSlice`.
 
-`Content/Packs/dawnwake_isles` adds the first original multi-zone continent package. The Go content package loader validates the package manifest, continent topology, zone bounds, transition gates, spawn placement, and quest provider placement before activating a `ContinentRuntime`. Runtime ownership is single-zone for now: each character is owned by exactly one `ZoneRuntime`, and transfer gates move ownership between zone runtimes with state diffs and visibility deltas.
+The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones, catalogs, continent topology, transition gates, spawn placement, and quest provider placement before activation, and activates validated content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows.
 
-Current Dawnwake coordinates are placeholder server-side rectangles pending map tracing from the owner-supplied Dawnwake Isles and Kingsfall Harbor images. O3DE mapping remains a separate transform layer; the server package is the authoritative runtime input.
+`Content/Packs/dev_foundation` proves a compact loot/quest progression package. `Content/Packs/dawnwake_isles` adds the first original multi-zone continent skeleton with five package-authored zones, adjacency metadata, transition gates, starter spawn groups, quest provider placeholders, and loadsim coverage.
+
+Current Dawnwake coordinates are placeholder server-side rectangles pending map tracing from the owner-supplied Dawnwake Isles and Kingsfall Harbor references. O3DE mapping remains a separate transform layer; the server package is the authoritative runtime input.
 
 ### Clean-room reference boundary
 

@@ -1,5 +1,17 @@
 {
   "abilities": [
-    { "ability_id": "dawnwake_signal_flare_placeholder", "display_name": "Signal Flare Placeholder", "kind": "utility_placeholder", "tags": ["placeholder", "future_o3de_hook"] }
+    {
+      "ability_id": "dawnwake_signal_flare_placeholder",
+      "display_name": "Signal Flare Placeholder",
+      "school": "none",
+      "target_rule": "self",
+      "range": 0,
+      "timing": {
+        "cast_ms": 0
+      },
+      "cooldown_ms": 1000,
+      "effects": [],
+      "tags": ["placeholder", "future-o3de-hook"]
+    }
   ]
 }

@@ -1,8 +1,60 @@
 {
-  "archetypes": [
-    { "archetype_id": "dawnwake_tide_scavenger", "display_name": "Dawnwake Tide Scavenger", "level": 1, "max_health": 34, "disposition": "Hostile", "attack_range": 2.5, "aggro_range": 7, "leash_range": 18, "base_damage": 3, "respawn_delay_ms": 12000, "loot_table_id": "dawnwake_tide_scavenger_scraps", "tags": ["dawnwake", "starter", "placeholder"] },
-    { "archetype_id": "dawnwake_reef_stalker", "display_name": "Dawnwake Reef Stalker", "level": 2, "max_health": 52, "disposition": "Hostile", "attack_range": 2.7, "aggro_range": 8, "leash_range": 22, "base_damage": 5, "respawn_delay_ms": 14000, "loot_table_id": "dawnwake_reef_stalker_cache", "tags": ["dawnwake", "wilds", "placeholder"] },
-    { "archetype_id": "dawnwake_harbor_rat", "display_name": "Dawnwake Harbor Rat", "level": 1, "max_health": 18, "disposition": "Neutral", "attack_range": 1.8, "aggro_range": 0, "leash_range": 8, "base_damage": 1, "respawn_delay_ms": 20000, "loot_table_id": "dawnwake_harbor_rat_junk", "tags": ["dawnwake", "city", "low_density", "placeholder"] },
-    { "archetype_id": "dawnwake_road_bandit_placeholder", "display_name": "Dawnwake Road Bandit Placeholder", "level": 4, "max_health": 92, "disposition": "Hostile", "attack_range": 2.8, "aggro_range": 9, "leash_range": 26, "base_damage": 8, "respawn_delay_ms": 18000, "loot_table_id": "dawnwake_bandit_placeholder_pack", "tags": ["dawnwake", "route", "placeholder"] }
+  "npcs": [
+    {
+      "archetype_id": "dawnwake_tide_scavenger",
+      "display_name": "Dawnwake Tide Scavenger",
+      "level": 1,
+      "max_health": 34,
+      "disposition": "hostile",
+      "attack_range": 2.5,
+      "aggro_range": 7,
+      "leash_range": 18,
+      "base_damage": 3,
+      "attack_interval_ms": 1500,
+      "default_ability_ids": [],
+      "tags": ["dawnwake", "starter", "placeholder"]
+    },
+    {
+      "archetype_id": "dawnwake_reef_stalker",
+      "display_name": "Dawnwake Reef Stalker",
+      "level": 2,
+      "max_health": 52,
+      "disposition": "hostile",
+      "attack_range": 2.7,
+      "aggro_range": 8,
+      "leash_range": 22,
+      "base_damage": 5,
+      "attack_interval_ms": 1500,
+      "default_ability_ids": [],
+      "tags": ["dawnwake", "wilds", "placeholder"]
+    },
+    {
+      "archetype_id": "dawnwake_harbor_rat",
+      "display_name": "Dawnwake Harbor Rat",
+      "level": 1,
+      "max_health": 18,
+      "disposition": "neutral",
+      "attack_range": 1.8,
+      "aggro_range": 0,
+      "leash_range": 8,
+      "base_damage": 1,
+      "attack_interval_ms": 1800,
+      "default_ability_ids": [],
+      "tags": ["dawnwake", "city", "low-density", "placeholder"]
+    },
+    {
+      "archetype_id": "dawnwake_road_bandit_placeholder",
+      "display_name": "Dawnwake Road Bandit Placeholder",
+      "level": 4,
+      "max_health": 92,
+      "disposition": "hostile",
+      "attack_range": 2.8,
+      "aggro_range": 9,
+      "leash_range": 26,
+      "base_damage": 8,
+      "attack_interval_ms": 1600,
+      "default_ability_ids": [],
+      "tags": ["dawnwake", "route", "placeholder"]
+    }
   ]
 }
