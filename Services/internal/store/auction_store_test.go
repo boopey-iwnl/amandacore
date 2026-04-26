@@ -72,7 +72,7 @@ func TestAuctionBuyoutSettlesOnceAcrossRestart(t *testing.T) {
 		t.Fatalf("expected buyer item mail and seller proceeds mail, got %#v", mail)
 	}
 
-	reopenedStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	reopenedStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to reopen store: %v", err)
 	}
@@ -143,7 +143,7 @@ func createAuctionTestStore(t *testing.T) (*FileStore, platform.Character, platf
 
 func createAuctionTestCharacters(t *testing.T, storePath string) (*FileStore, platform.Character, platform.Character) {
 	t.Helper()
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create file store: %v", err)
 	}

@@ -30,17 +30,17 @@ if (!(Test-Path $worldClientExe)) {
 $username = "restart_" + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $password = "restart_" + [Guid]::NewGuid().ToString("N")
 
-Invoke-JsonPost "http://localhost:8081/v1/accounts/register" @{ username = $username; password = $password } $null | Out-Null
-$login = Invoke-JsonPost "http://localhost:8081/v1/auth/login" @{ username = $username; password = $password } $null
+Invoke-JsonPost "http://127.0.0.1:8081/v1/accounts/register" @{ username = $username; password = $password } $null | Out-Null
+$login = Invoke-JsonPost "http://127.0.0.1:8081/v1/auth/login" @{ username = $username; password = $password } $null
 $token = $login.accessToken
 
-$realms = Invoke-JsonGet "http://localhost:8083/v1/realms" $null
+$realms = Invoke-JsonGet "http://127.0.0.1:8083/v1/realms" $null
 $realmId = $realms.realms[0].id
 
-$character = Invoke-JsonPost "http://localhost:8084/v1/characters" @{ realmId = $realmId; displayName = "Restart$($username.Substring($username.Length - 4))"; archetypeId = "wayfarer_warden" } $token
-$ticket = Invoke-JsonPost "http://localhost:8085/v1/world/join-ticket" @{ realmId = $realmId; characterId = $character.id } $token
+$character = Invoke-JsonPost "http://127.0.0.1:8084/v1/characters" @{ realmId = $realmId; displayName = "Restart$($username.Substring($username.Length - 4))"; archetypeId = "wayfarer_warden" } $token
+$ticket = Invoke-JsonPost "http://127.0.0.1:8085/v1/world/join-ticket" @{ realmId = $realmId; characterId = $character.id } $token
 
-$process = Start-Process -FilePath $worldClientExe -ArgumentList "--join-ticket", $ticket.ticketId, "--world-endpoint", "http://localhost:8085", "--auto-demo" -PassThru -Wait
+$process = Start-Process -FilePath $worldClientExe -ArgumentList "--join-ticket", $ticket.ticketId, "--world-endpoint", "http://127.0.0.1:8085", "--auto-demo" -PassThru -Wait
 if ($process.ExitCode -ne 0) {
     throw "World client exited with code $($process.ExitCode)"
 }
@@ -48,13 +48,13 @@ if ($process.ExitCode -ne 0) {
 & $stopLocalScript | Out-Null
 & $startLocalScript -BuildFirst:$false | Out-Null
 
-$loginAfterRestart = Invoke-JsonPost "http://localhost:8081/v1/auth/login" @{ username = $username; password = $password } $null
+$loginAfterRestart = Invoke-JsonPost "http://127.0.0.1:8081/v1/auth/login" @{ username = $username; password = $password } $null
 $tokenAfterRestart = $loginAfterRestart.accessToken
 
-$charactersAfterRestart = Invoke-JsonGet ("http://localhost:8084/v1/characters?realmId=" + $realmId) $tokenAfterRestart
+$charactersAfterRestart = Invoke-JsonGet ("http://127.0.0.1:8084/v1/characters?realmId=" + $realmId) $tokenAfterRestart
 $restoredCharacter = $charactersAfterRestart.characters | Select-Object -First 1
-$ticketAfterRestart = Invoke-JsonPost "http://localhost:8085/v1/world/join-ticket" @{ realmId = $realmId; characterId = $restoredCharacter.id } $tokenAfterRestart
-$connectAfterRestart = Invoke-JsonPost "http://localhost:8085/v1/world/connect" @{ ticketId = $ticketAfterRestart.ticketId } $null
+$ticketAfterRestart = Invoke-JsonPost "http://127.0.0.1:8085/v1/world/join-ticket" @{ realmId = $realmId; characterId = $restoredCharacter.id } $tokenAfterRestart
+$connectAfterRestart = Invoke-JsonPost "http://127.0.0.1:8085/v1/world/connect" @{ ticketId = $ticketAfterRestart.ticketId } $null
 
 Write-Host "Restart persistence verified."
 Write-Host "User: $username"

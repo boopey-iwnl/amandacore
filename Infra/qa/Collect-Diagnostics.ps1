@@ -269,7 +269,7 @@ function Get-ServiceHealthSummary {
 
     $results = @()
     foreach ($service in $definitions) {
-        $uri = "http://localhost:$($service.Port)/health"
+        $uri = "http://127.0.0.1:$($service.Port)/health"
         try {
             $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 2
             $results += [pscustomobject]@{
@@ -302,7 +302,7 @@ function Get-PatchManifestSummary {
     try {
         return [pscustomobject]@{
             available = $true
-            manifest = Invoke-RestMethod -Uri "http://localhost:8083/v1/patch/manifest" -Method Get -TimeoutSec 2
+            manifest = Invoke-RestMethod -Uri "http://127.0.0.1:8083/v1/patch/manifest" -Method Get -TimeoutSec 2
             error = ""
         }
     }

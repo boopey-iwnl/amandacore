@@ -44,7 +44,8 @@ namespace MovementPhysics
         constexpr float BackpedalSpeedFactor = 0.62f;
         constexpr float SubmitIntervalSeconds = 0.10f;
         constexpr float CorrectionSnapDistance = 1.25f;
-        constexpr float CorrectionBlendRate = 7.5f;
+        constexpr float CorrectionBlendRate = 5.25f;
+        constexpr float CorrectionDeadZoneDistance = 0.045f;
         constexpr float CorrectionEpsilon = 0.002f;
         constexpr float CharacterBaseSnapZ = 0.05f;
         constexpr float AvatarTurnRate = 2.75f;
@@ -419,9 +420,9 @@ namespace MovementPhysics
                         authoritativePosition.GetX(),
                         authoritativePosition.GetY());
                 }
-                else if (correctionDistance > 0.001f)
+                else if (correctionDistance > CorrectionDeadZoneDistance)
                 {
-                    m_pendingServerCorrection += correctionVector;
+                    m_pendingServerCorrection = correctionVector;
                     AZ_Printf(
                         "amandacore",
                         "client.planar_reconciliation_applied localXY=(%.3f, %.3f) authoritativeXY=(%.3f, %.3f) mode=queued_blend",
@@ -429,6 +430,10 @@ namespace MovementPhysics
                         localPlanarPosition.GetY(),
                         authoritativePosition.GetX(),
                         authoritativePosition.GetY());
+                }
+                else
+                {
+                    m_pendingServerCorrection = AZ::Vector2::CreateZero();
                 }
             }
         }
@@ -1067,7 +1072,7 @@ namespace MovementPhysics
             m_loggedValidationFloor = true;
             AZ_Printf(
                 "amandacore",
-                "client.validation_floor_visible center=(%.1f, %.1f, %.1f) extent=%.1f spawn=(%.1f, %.1f, %.1f)",
+                "client.world_material_coverage_visible center=(%.1f, %.1f, %.1f) extent=%.1f spawn=(%.1f, %.1f, %.1f) materials=stonewake_0_2",
                 ValidationFloorExtent * 0.5f,
                 ValidationFloorExtentY * 0.5f,
                 ValidationFloorZ,
@@ -1081,17 +1086,27 @@ namespace MovementPhysics
         const AZ::Color pathColor(0.78f, 0.60f, 0.28f, 1.0f);
         const AZ::Color obstacleColor(0.38f, 0.39f, 0.43f, 1.0f);
         const AZ::Color encounterColor(0.90f, 0.42f, 0.22f, 1.0f);
-        const AZ::Color groundBaseColor(0.30f, 0.34f, 0.30f, 1.0f);
-        const AZ::Color groundTileLight(0.39f, 0.41f, 0.37f, 1.0f);
-        const AZ::Color groundTileDark(0.28f, 0.31f, 0.29f, 1.0f);
-        const AZ::Color ridgeColor(0.24f, 0.26f, 0.30f, 1.0f);
+        const AZ::Color groundBaseColor(0.24f, 0.33f, 0.23f, 1.0f);
+        const AZ::Color groundTileLight(0.34f, 0.47f, 0.25f, 1.0f);
+        const AZ::Color groundTileDark(0.24f, 0.36f, 0.22f, 1.0f);
+        const AZ::Color mossColor(0.20f, 0.41f, 0.23f, 1.0f);
+        const AZ::Color rockyGroundColor(0.34f, 0.36f, 0.34f, 1.0f);
+        const AZ::Color ridgeColor(0.30f, 0.31f, 0.34f, 1.0f);
         const AZ::Color horizonColor(0.23f, 0.34f, 0.44f, 1.0f);
-        const AZ::Color roadColor(0.47f, 0.38f, 0.27f, 1.0f);
-        const AZ::Color fieldColor(0.33f, 0.43f, 0.24f, 1.0f);
-        const AZ::Color buildingColor(0.25f, 0.29f, 0.32f, 1.0f);
-        const AZ::Color trunkColor(0.34f, 0.24f, 0.16f, 1.0f);
-        const AZ::Color canopyColor(0.18f, 0.42f, 0.24f, 1.0f);
+        const AZ::Color roadColor(0.50f, 0.37f, 0.22f, 1.0f);
+        const AZ::Color roadPebbleColor(0.62f, 0.55f, 0.43f, 1.0f);
+        const AZ::Color fieldColor(0.50f, 0.43f, 0.22f, 1.0f);
+        const AZ::Color cropColor(0.74f, 0.62f, 0.25f, 1.0f);
+        const AZ::Color plasterColor(0.78f, 0.70f, 0.58f, 1.0f);
+        const AZ::Color woodColor(0.42f, 0.28f, 0.16f, 1.0f);
+        const AZ::Color roofColor(0.50f, 0.40f, 0.20f, 1.0f);
+        const AZ::Color cutStoneColor(0.42f, 0.43f, 0.40f, 1.0f);
+        const AZ::Color trunkColor(0.33f, 0.22f, 0.13f, 1.0f);
+        const AZ::Color canopyColor(0.16f, 0.43f, 0.23f, 1.0f);
         const AZ::Color trainingRingColor(0.70f, 0.55f, 0.28f, 1.0f);
+        const AZ::Color waterColor(0.12f, 0.39f, 0.57f, 1.0f);
+        const AZ::Color wetShoreColor(0.45f, 0.39f, 0.30f, 1.0f);
+        const AZ::Color runeColor(0.28f, 0.74f, 0.92f, 1.0f);
 
         auxGeom->DrawAabb(
             AZ::Aabb::CreateCenterHalfExtents(
@@ -1106,13 +1121,53 @@ namespace MovementPhysics
             {
                 const float centerX = (static_cast<float>(tileX) * 12.0f) + 6.0f;
                 const float centerY = (static_cast<float>(tileY) * 12.0f) + 6.0f;
+                const int materialSelector = ((tileX * 17) + (tileY * 31)) % 9;
+                const AZ::Color tileColor = materialSelector == 0
+                    ? mossColor
+                    : (materialSelector == 1 ? rockyGroundColor : (materialSelector <= 4 ? groundTileLight : groundTileDark));
                 auxGeom->DrawAabb(
                     AZ::Aabb::CreateCenterHalfExtents(
                         AZ::Vector3(centerX, centerY, -0.03f),
                         AZ::Vector3(5.9f, 5.9f, 0.03f)),
-                    ((tileX + tileY) % 2) == 0 ? groundTileLight : groundTileDark,
+                    tileColor,
                     AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+
+                if (((tileX * 5) + tileY) % 11 == 0)
+                {
+                    auxGeom->DrawAabb(
+                        AZ::Aabb::CreateCenterHalfExtents(
+                            AZ::Vector3(centerX - 2.2f, centerY + 1.8f, 0.035f),
+                            AZ::Vector3(1.1f, 0.08f, 0.025f)),
+                        groundTileLight,
+                        AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+                }
             }
+        }
+
+        const AZ::Vector3 streamCenters[] = {
+            AZ::Vector3(248.0f, 158.0f, 0.04f),
+            AZ::Vector3(296.0f, 184.0f, 0.04f),
+            AZ::Vector3(352.0f, 215.0f, 0.04f),
+            AZ::Vector3(420.0f, 248.0f, 0.04f),
+        };
+        const AZ::Vector3 streamExtents[] = {
+            AZ::Vector3(30.0f, 2.8f, 0.04f),
+            AZ::Vector3(34.0f, 3.1f, 0.04f),
+            AZ::Vector3(38.0f, 3.3f, 0.04f),
+            AZ::Vector3(30.0f, 3.5f, 0.04f),
+        };
+        for (size_t streamIndex = 0; streamIndex < AZ_ARRAY_SIZE(streamCenters); ++streamIndex)
+        {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(streamCenters[streamIndex], streamExtents[streamIndex]),
+                wetShoreColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    streamCenters[streamIndex] + AZ::Vector3(0.0f, 0.0f, 0.035f),
+                    streamExtents[streamIndex] - AZ::Vector3(0.0f, 1.2f, 0.0f)),
+                waterColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
         }
 
         const AZ::Vector3 roadCenters[] = {
@@ -1141,6 +1196,16 @@ namespace MovementPhysics
                 AZ::Aabb::CreateCenterHalfExtents(roadCenters[roadIndex], roadExtents[roadIndex]),
                 roadColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+
+            for (int pebbleIndex = 0; pebbleIndex < 5; ++pebbleIndex)
+            {
+                const float offsetX = (static_cast<float>(pebbleIndex) - 2.0f) * (roadExtents[roadIndex].GetX() * 0.34f);
+                const float offsetY = (pebbleIndex % 2 == 0 ? 0.75f : -0.75f);
+                auxGeom->DrawSphere(
+                    roadCenters[roadIndex] + AZ::Vector3(offsetX, offsetY, 0.08f),
+                    0.16f,
+                    roadPebbleColor);
+            }
         }
 
         const AZ::Vector3 fieldCenters[] = {
@@ -1156,6 +1221,16 @@ namespace MovementPhysics
                 AZ::Aabb::CreateCenterHalfExtents(fieldCenter, AZ::Vector3(9.0f, 0.28f, 0.04f)),
                 fieldColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+
+            for (int cropIndex = 0; cropIndex < 6; ++cropIndex)
+            {
+                auxGeom->DrawAabb(
+                    AZ::Aabb::CreateCenterHalfExtents(
+                        fieldCenter + AZ::Vector3((static_cast<float>(cropIndex) - 2.5f) * 2.6f, 0.0f, 0.22f),
+                        AZ::Vector3(0.10f, 0.16f, 0.22f)),
+                    cropColor,
+                    AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            }
         }
 
         const AZ::Vector3 buildingCenters[] = {
@@ -1184,10 +1259,19 @@ namespace MovementPhysics
         };
         for (size_t buildingIndex = 0; buildingIndex < AZ_ARRAY_SIZE(buildingCenters); ++buildingIndex)
         {
+            const AZ::Color wallColor = buildingIndex == 6 || buildingIndex == 7
+                ? cutStoneColor
+                : (buildingIndex == 4 || buildingIndex == 8 || buildingIndex == 9 ? woodColor : plasterColor);
             auxGeom->DrawAabb(
                 AZ::Aabb::CreateCenterHalfExtents(buildingCenters[buildingIndex], buildingExtents[buildingIndex]),
-                buildingColor,
+                wallColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    buildingCenters[buildingIndex] + AZ::Vector3(0.0f, 0.0f, buildingExtents[buildingIndex].GetZ() + 0.18f),
+                    AZ::Vector3(buildingExtents[buildingIndex].GetX() + 0.35f, buildingExtents[buildingIndex].GetY() + 0.35f, 0.18f)),
+                buildingIndex == 6 || buildingIndex == 7 ? ridgeColor : roofColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
         }
 
         const AZ::Vector3 horizonCenters[] = {
@@ -1321,6 +1405,60 @@ namespace MovementPhysics
         for (const AZ::Vector3& boulder : boulderCluster)
         {
             auxGeom->DrawSphere(boulder, 0.75f, obstacleColor);
+        }
+
+        const AZ::Vector3 standingStones[] = {
+            AZ::Vector3(228.0f, 114.0f, 1.0f),
+            AZ::Vector3(233.0f, 113.0f, 1.4f),
+            AZ::Vector3(237.0f, 117.0f, 1.0f),
+            AZ::Vector3(235.0f, 123.0f, 1.2f),
+            AZ::Vector3(229.0f, 122.0f, 0.9f),
+        };
+        for (const AZ::Vector3& stone : standingStones)
+        {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(stone, AZ::Vector3(0.42f, 0.28f, stone.GetZ())),
+                cutStoneColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+            auxGeom->DrawSphere(stone + AZ::Vector3(0.0f, 0.0f, stone.GetZ() + 0.22f), 0.16f, runeColor);
+        }
+
+        const AZ::Vector3 quarryBlocks[] = {
+            AZ::Vector3(310.0f, 166.0f, 0.45f),
+            AZ::Vector3(318.0f, 170.0f, 0.55f),
+            AZ::Vector3(328.0f, 176.0f, 0.50f),
+            AZ::Vector3(336.0f, 181.0f, 0.38f),
+        };
+        for (const AZ::Vector3& block : quarryBlocks)
+        {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(block, AZ::Vector3(2.6f, 1.1f, block.GetZ())),
+                ridgeColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
+        }
+
+        const AZ::Vector3 dockPlanks[] = {
+            AZ::Vector3(410.0f, 252.0f, 0.18f),
+            AZ::Vector3(418.0f, 253.0f, 0.18f),
+            AZ::Vector3(426.0f, 254.0f, 0.18f),
+            AZ::Vector3(434.0f, 255.0f, 0.18f),
+        };
+        for (const AZ::Vector3& plank : dockPlanks)
+        {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(plank, AZ::Vector3(3.6f, 0.42f, 0.08f)),
+                woodColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+        }
+
+        for (int tierIndex = 0; tierIndex < 4; ++tierIndex)
+        {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    AZ::Vector3(452.0f, 258.0f, 0.45f + (tierIndex * 0.62f)),
+                    AZ::Vector3(1.15f - (tierIndex * 0.10f), 1.15f - (tierIndex * 0.10f), 0.30f)),
+                cutStoneColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);
         }
 
         for (int segmentIndex = 0; segmentIndex < 12; ++segmentIndex)

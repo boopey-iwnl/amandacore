@@ -58,7 +58,7 @@ func RunQuestBasicLoadsim(opts QuestBasicLoadsimOptions) (QuestBasicLoadsimRepor
 	}
 	defer os.RemoveAll(tempDir)
 
-	fileStore, err := store.NewFileStore(filepath.Join(tempDir, "platform-state.json"), "loadsim-quest-basic", "http://localhost:8085")
+	fileStore, err := store.NewFileStore(filepath.Join(tempDir, "platform-state.json"), "loadsim-quest-basic", "http://127.0.0.1:8085")
 	if err != nil {
 		return report, err
 	}

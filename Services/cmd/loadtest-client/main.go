@@ -180,10 +180,10 @@ func parseOptions() options {
 	var durationText string
 	var stepText string
 	opts := options{}
-	flag.StringVar(&opts.AuthEndpoint, "auth-endpoint", "http://localhost:8081", "auth/account service base URL")
-	flag.StringVar(&opts.RealmEndpoint, "realm-endpoint", "http://localhost:8083", "realm service base URL")
-	flag.StringVar(&opts.CharacterEndpoint, "character-endpoint", "http://localhost:8084", "character service base URL")
-	flag.StringVar(&opts.WorldEndpoint, "world-endpoint", "http://localhost:8085", "world service base URL")
+	flag.StringVar(&opts.AuthEndpoint, "auth-endpoint", "http://127.0.0.1:8081", "auth/account service base URL")
+	flag.StringVar(&opts.RealmEndpoint, "realm-endpoint", "http://127.0.0.1:8083", "realm service base URL")
+	flag.StringVar(&opts.CharacterEndpoint, "character-endpoint", "http://127.0.0.1:8084", "character service base URL")
+	flag.StringVar(&opts.WorldEndpoint, "world-endpoint", "http://127.0.0.1:8085", "world service base URL")
 	flag.IntVar(&opts.Clients, "clients", 2, "number of simulated clients")
 	flag.StringVar(&durationText, "duration", "5m", "run duration, for example 1m, 5m, or 15m")
 	flag.StringVar(&opts.Scenario, "scenario", "mixed", "idle, move, combat, reconnect, or mixed")

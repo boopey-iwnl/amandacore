@@ -27,6 +27,7 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	log.Printf("%s listening on :%s", cfg.ServiceName, cfg.Port)
-	log.Fatal(http.ListenAndServe(":"+cfg.Port, httpapi.WithCORS(mux)))
+	listenAddress := cfg.ListenAddress()
+	log.Printf("%s listening on %s", cfg.ServiceName, listenAddress)
+	log.Fatal(http.ListenAndServe(listenAddress, httpapi.WithCORS(mux)))
 }

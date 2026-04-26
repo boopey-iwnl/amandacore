@@ -688,7 +688,20 @@ namespace UiClient
             }
         }
 
-        bool BeginHudPanel(const char* identifier, const char* title, const ImVec2& position, const ImVec2& size, bool compact = false)
+        constexpr float HudButtonHeight = 30.0f;
+
+        ImVec2 HudButtonSize(float width)
+        {
+            return ImVec2(width, HudButtonHeight);
+        }
+
+        bool BeginHudPanel(
+            const char* identifier,
+            const char* title,
+            const ImVec2& position,
+            const ImVec2& size,
+            bool compact = false,
+            bool allowScroll = false)
         {
             ImGui::SetNextWindowPos(position, ImGuiCond_Always);
             ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -696,12 +709,15 @@ namespace UiClient
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, compact ? ImVec2(7.0f, 7.0f) : ImVec2(14.0f, 14.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, compact ? 8.0f : 16.0f);
-            const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
                 ImGuiWindowFlags_NoResize |
                 ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoScrollbar |
                 ImGuiWindowFlags_NoTitleBar |
                 ImGuiWindowFlags_NoSavedSettings;
+            if (!allowScroll)
+            {
+                flags |= ImGuiWindowFlags_NoScrollbar;
+            }
             const bool visible = ImGui::Begin(identifier, nullptr, flags);
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor(2);
@@ -780,22 +796,29 @@ namespace UiClient
         {
             if (abilityId == AutoAttackAbilityId)
             {
-                return "weapon";
+                return "ability_auto_attack";
             }
-            if (abilityId == SteadyStrikeAbilityId || abilityId == DrivingBlowAbilityId ||
-                abilityId == HamperingStrikeAbilityId || abilityId == OverhandCutAbilityId)
+            if (abilityId == SteadyStrikeAbilityId)
             {
-                return "strike";
+                return "ability_steady_strike";
+            }
+            if (abilityId == DrivingBlowAbilityId || abilityId == OverhandCutAbilityId)
+            {
+                return "ability_driving_blow";
+            }
+            if (abilityId == HamperingStrikeAbilityId)
+            {
+                return "ability_hampering_strike";
             }
             if (abilityId == BraceAbilityId || abilityId == GuardedFormAbilityId || abilityId == IronResolveAbilityId)
             {
-                return "defense";
+                return "ability_brace";
             }
             if (abilityId == RallyingCallAbilityId)
             {
-                return "utility";
+                return "ability_rallying_call";
             }
-            return "ability";
+            return "icon_missing";
         }
 
         AZStd::string ItemIconKind(const NetClient::InventorySlotState& slot)
@@ -806,29 +829,70 @@ namespace UiClient
             }
             if (slot.m_itemType == "weapon")
             {
-                return "weapon";
+                return "ability_auto_attack";
             }
             if (slot.m_itemType == "armor")
             {
-                return "armor";
+                return "item_padded_vest";
             }
             if (slot.m_itemType == "consumable")
             {
-                return "consumable";
+                return "item_road_ration";
             }
             if (slot.m_itemType == "material")
             {
-                return "material";
+                return "item_ore_chunk";
             }
             if (slot.m_itemType == "quest")
             {
-                return "quest";
+                return "item_scroll_supplies";
             }
             if (slot.m_itemType == "junk")
             {
-                return "junk";
+                return "item_torn_cloth";
             }
-            return "item";
+            return "icon_missing";
+        }
+
+        AZStd::string IconFamily(const AZStd::string& kind)
+        {
+            if (kind == "ability_auto_attack" || kind == "ability_steady_strike" ||
+                kind == "ability_driving_blow" || kind == "ability_hampering_strike" ||
+                kind == "weapon" || kind == "strike")
+            {
+                return "strike";
+            }
+            if (kind == "ability_brace" || kind == "item_padded_vest" || kind == "item_handwraps" ||
+                kind == "armor" || kind == "defense")
+            {
+                return "defense";
+            }
+            if (kind == "ability_rallying_call" || kind == "item_road_ration" || kind == "item_field_dressing" ||
+                kind == "consumable" || kind == "utility")
+            {
+                return "utility";
+            }
+            if (kind == "item_oat_bundle" || kind == "menu_spellbook")
+            {
+                return "nature";
+            }
+            if (kind == "item_ore_chunk" || kind == "material")
+            {
+                return "material";
+            }
+            if (kind == "item_scroll_supplies" || kind == "item_militia_token" || kind == "quest")
+            {
+                return "quest";
+            }
+            if (kind == "currency_copper")
+            {
+                return "currency";
+            }
+            if (kind == "item_torn_cloth" || kind == "junk")
+            {
+                return "cloth";
+            }
+            return "missing";
         }
 
         void DrawProceduralIcon(
@@ -838,32 +902,89 @@ namespace UiClient
             const AZStd::string& kind,
             bool muted = false)
         {
-            const ImU32 baseColor = muted
-                ? ColorU32(55, 52, 49, 255)
-                : (kind == "weapon" || kind == "strike"
-                    ? ColorU32(94, 58, 44, 255)
-                    : (kind == "defense" || kind == "armor"
-                        ? ColorU32(43, 73, 88, 255)
-                        : (kind == "consumable" || kind == "utility"
-                            ? ColorU32(50, 91, 68, 255)
-                            : (kind == "material"
-                                ? ColorU32(76, 67, 49, 255)
-                                : (kind == "quest"
-                                    ? ColorU32(91, 73, 35, 255)
-                                    : ColorU32(58, 62, 72, 255))))));
-            const ImU32 accentColor = muted
-                ? ColorU32(128, 118, 96, 255)
-                : (kind == "weapon" || kind == "strike"
-                    ? ColorU32(232, 187, 96, 255)
-                    : (kind == "defense" || kind == "armor"
-                        ? ColorU32(146, 203, 221, 255)
-                        : (kind == "consumable" || kind == "utility"
-                            ? ColorU32(163, 220, 145, 255)
-                            : (kind == "material"
-                                ? ColorU32(214, 183, 118, 255)
-                                : (kind == "quest"
-                                    ? ColorU32(238, 213, 109, 255)
-                                    : ColorU32(205, 205, 194, 255))))));
+            const AZStd::string family = IconFamily(kind);
+            const auto baseColorForFamily = [](const AZStd::string& iconFamily, bool isMuted) -> ImU32
+            {
+                if (isMuted)
+                {
+                    return ColorU32(55, 52, 49, 255);
+                }
+                if (iconFamily == "strike")
+                {
+                    return ColorU32(94, 58, 44, 255);
+                }
+                if (iconFamily == "defense")
+                {
+                    return ColorU32(43, 73, 88, 255);
+                }
+                if (iconFamily == "utility")
+                {
+                    return ColorU32(50, 91, 68, 255);
+                }
+                if (iconFamily == "nature")
+                {
+                    return ColorU32(34, 79, 48, 255);
+                }
+                if (iconFamily == "material")
+                {
+                    return ColorU32(76, 67, 49, 255);
+                }
+                if (iconFamily == "quest")
+                {
+                    return ColorU32(91, 73, 35, 255);
+                }
+                if (iconFamily == "currency")
+                {
+                    return ColorU32(90, 70, 34, 255);
+                }
+                if (iconFamily == "cloth")
+                {
+                    return ColorU32(84, 48, 48, 255);
+                }
+                return ColorU32(58, 62, 72, 255);
+            };
+            const auto accentColorForFamily = [](const AZStd::string& iconFamily, bool isMuted) -> ImU32
+            {
+                if (isMuted)
+                {
+                    return ColorU32(128, 118, 96, 255);
+                }
+                if (iconFamily == "strike")
+                {
+                    return ColorU32(232, 187, 96, 255);
+                }
+                if (iconFamily == "defense")
+                {
+                    return ColorU32(146, 203, 221, 255);
+                }
+                if (iconFamily == "utility")
+                {
+                    return ColorU32(163, 220, 145, 255);
+                }
+                if (iconFamily == "nature")
+                {
+                    return ColorU32(168, 221, 122, 255);
+                }
+                if (iconFamily == "material")
+                {
+                    return ColorU32(214, 183, 118, 255);
+                }
+                if (iconFamily == "quest")
+                {
+                    return ColorU32(238, 213, 109, 255);
+                }
+                if (iconFamily == "currency")
+                {
+                    return ColorU32(239, 191, 86, 255);
+                }
+                if (iconFamily == "cloth")
+                {
+                    return ColorU32(221, 108, 91, 255);
+                }
+                return ColorU32(205, 205, 194, 255);
+            };
+            const ImU32 baseColor = baseColorForFamily(family, muted);
+            const ImU32 accentColor = accentColorForFamily(family, muted);
 
             const ImVec2 center((minBounds.x + maxBounds.x) * 0.5f, (minBounds.y + maxBounds.y) * 0.5f);
             const float width = maxBounds.x - minBounds.x;
@@ -871,7 +992,20 @@ namespace UiClient
             drawList->AddRectFilled(minBounds, maxBounds, baseColor, 7.0f);
             drawList->AddRect(minBounds, maxBounds, ColorU32(201, 159, 78, muted ? 120 : 210), 7.0f, 0, 1.5f);
 
-            if (kind == "weapon" || kind == "strike")
+            if (family == "missing")
+            {
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.28f, minBounds.y + height * 0.28f),
+                    ImVec2(maxBounds.x - width * 0.28f, maxBounds.y - height * 0.28f),
+                    accentColor,
+                    3.0f);
+                drawList->AddLine(
+                    ImVec2(maxBounds.x - width * 0.28f, minBounds.y + height * 0.28f),
+                    ImVec2(minBounds.x + width * 0.28f, maxBounds.y - height * 0.28f),
+                    accentColor,
+                    3.0f);
+            }
+            else if (family == "strike")
             {
                 drawList->AddLine(
                     ImVec2(minBounds.x + width * 0.25f, maxBounds.y - height * 0.23f),
@@ -884,7 +1018,7 @@ namespace UiClient
                     ImVec2(maxBounds.x - width * 0.20f, minBounds.y + height * 0.34f),
                     accentColor);
             }
-            else if (kind == "defense" || kind == "armor")
+            else if (family == "defense")
             {
                 drawList->AddTriangleFilled(
                     ImVec2(center.x, minBounds.y + height * 0.18f),
@@ -897,7 +1031,7 @@ namespace UiClient
                     ImVec2(center.x, maxBounds.y - height * 0.16f),
                     ColorU32(100, 151, 171, muted ? 160 : 255));
             }
-            else if (kind == "consumable" || kind == "utility")
+            else if (family == "utility")
             {
                 drawList->AddCircleFilled(center, AZ::GetMin(width, height) * 0.22f, accentColor, 24);
                 drawList->AddRectFilled(
@@ -906,12 +1040,23 @@ namespace UiClient
                     ColorU32(226, 237, 202, muted ? 120 : 230),
                     3.0f);
             }
-            else if (kind == "material")
+            else if (family == "nature")
+            {
+                drawList->AddLine(
+                    ImVec2(center.x, maxBounds.y - height * 0.18f),
+                    ImVec2(center.x, minBounds.y + height * 0.22f),
+                    accentColor,
+                    3.0f);
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.16f, center.y - height * 0.04f), width * 0.13f, accentColor, 16);
+                drawList->AddCircleFilled(ImVec2(center.x + width * 0.16f, center.y - height * 0.10f), width * 0.12f, ColorU32(118, 190, 89, muted ? 140 : 255), 16);
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.04f, center.y - height * 0.20f), width * 0.11f, ColorU32(206, 186, 84, muted ? 130 : 255), 16);
+            }
+            else if (family == "material")
             {
                 drawList->AddCircleFilled(ImVec2(center.x - width * 0.10f, center.y + height * 0.06f), width * 0.16f, accentColor, 16);
                 drawList->AddCircleFilled(ImVec2(center.x + width * 0.13f, center.y - height * 0.08f), width * 0.13f, ColorU32(184, 160, 103, muted ? 120 : 255), 16);
             }
-            else if (kind == "quest")
+            else if (family == "quest")
             {
                 drawList->AddRectFilled(
                     ImVec2(minBounds.x + width * 0.28f, minBounds.y + height * 0.18f),
@@ -922,6 +1067,26 @@ namespace UiClient
                     ImVec2(minBounds.x + width * 0.36f, minBounds.y + height * 0.36f),
                     ImVec2(maxBounds.x - width * 0.34f, minBounds.y + height * 0.36f),
                     baseColor,
+                    2.0f);
+            }
+            else if (family == "currency")
+            {
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.12f, center.y + height * 0.04f), width * 0.17f, accentColor, 24);
+                drawList->AddCircle(ImVec2(center.x - width * 0.12f, center.y + height * 0.04f), width * 0.17f, ColorU32(255, 236, 149, muted ? 110 : 230), 24, 2.0f);
+                drawList->AddCircleFilled(ImVec2(center.x + width * 0.12f, center.y - height * 0.06f), width * 0.15f, ColorU32(221, 151, 66, muted ? 120 : 255), 24);
+            }
+            else if (family == "cloth")
+            {
+                drawList->AddQuadFilled(
+                    ImVec2(minBounds.x + width * 0.22f, minBounds.y + height * 0.24f),
+                    ImVec2(maxBounds.x - width * 0.18f, minBounds.y + height * 0.30f),
+                    ImVec2(maxBounds.x - width * 0.28f, maxBounds.y - height * 0.20f),
+                    ImVec2(minBounds.x + width * 0.16f, maxBounds.y - height * 0.26f),
+                    accentColor);
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.25f, center.y),
+                    ImVec2(maxBounds.x - width * 0.25f, center.y + height * 0.04f),
+                    ColorU32(255, 186, 165, muted ? 120 : 220),
                     2.0f);
             }
             else
@@ -2124,7 +2289,7 @@ namespace UiClient
                 }
                 else if (offer.m_canLearn)
                 {
-                    if (ImGui::Button("Learn", ImVec2(92.0f, 0.0f)))
+                    if (ImGui::Button("Learn", HudButtonSize(92.0f)))
                     {
                         gameCore->LearnTrainerAbility(trainer.m_id, offer.m_abilityId);
                     }
@@ -2434,7 +2599,7 @@ namespace UiClient
             if (canBuy)
             {
                 ImGui::SameLine(590.0f);
-                if (ImGui::Button("Buyout", ImVec2(78.0f, 0.0f)))
+                if (ImGui::Button("Buyout", HudButtonSize(78.0f)))
                 {
                     pendingBuyoutIndex = rowIndex;
                     ImGui::OpenPopup("Confirm Buyout");
@@ -2443,7 +2608,7 @@ namespace UiClient
             else if (listing.m_state == "active")
             {
                 ImGui::SameLine(590.0f);
-                if (ImGui::Button("Cancel", ImVec2(78.0f, 0.0f)) && gameCore)
+                if (ImGui::Button("Cancel", HudButtonSize(78.0f)) && gameCore)
                 {
                     gameCore->CancelAuction(listing.m_auctionId);
                 }
@@ -2496,7 +2661,7 @@ namespace UiClient
                     ImGui::SetNextItemWidth(120.0f);
                     ImGui::Combo("Sort", &selectedSort, sortLabels, AZ_ARRAY_SIZE(sortLabels));
                     ImGui::SameLine();
-                    if (ImGui::Button("Refresh", ImVec2(82.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Refresh", HudButtonSize(82.0f)) && gameCore)
                     {
                         gameCore->BrowseAuctions(searchBuffer, itemTypes[selectedItemType], sortValues[selectedSort]);
                     }
@@ -2528,7 +2693,7 @@ namespace UiClient
                                 listing.m_itemDisplayName.c_str(),
                                 listing.m_stackCount,
                                 FormatCopperAmount(listing.m_buyoutCopper).c_str());
-                            if (ImGui::Button("Confirm", ImVec2(96.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Confirm", HudButtonSize(96.0f)) && gameCore)
                             {
                                 gameCore->BuyoutAuction(listing.m_auctionId);
                                 pendingBuyoutIndex = -1;
@@ -2536,7 +2701,7 @@ namespace UiClient
                             }
                             ImGui::SameLine();
                         }
-                        if (ImGui::Button("Cancel", ImVec2(96.0f, 0.0f)))
+                        if (ImGui::Button("Cancel", HudButtonSize(96.0f)))
                         {
                             pendingBuyoutIndex = -1;
                             ImGui::CloseCurrentPopup();
@@ -2658,7 +2823,7 @@ namespace UiClient
                     {
                         ImGui::TextDisabled("Deposit appears after selecting an item.");
                     }
-                    if (ImGui::Button("Create Listing", ImVec2(150.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Create Listing", HudButtonSize(150.0f)) && gameCore)
                     {
                         const int buyoutCopper = atoi(buyoutBuffer);
                         if (gameCore->ListAuctionItem(selectedSellSlot, stackCount, buyoutCopper, durationSeconds[selectedDuration]))
@@ -2699,12 +2864,12 @@ namespace UiClient
             const AZStd::string buttonLabel = pendingKeybindActionId == actionId
                 ? "Press a key..."
                 : DisplayKeyName(binding);
-            if (ImGui::Button(buttonLabel.c_str(), ImVec2(132.0f, 0.0f)))
+            if (ImGui::Button(buttonLabel.c_str(), HudButtonSize(132.0f)))
             {
                 pendingKeybindActionId = actionId;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Unbind", ImVec2(74.0f, 0.0f)))
+            if (ImGui::Button("Unbind", HudButtonSize(74.0f)))
             {
                 binding.clear();
                 if (pendingKeybindActionId == actionId)
@@ -2908,7 +3073,7 @@ namespace UiClient
                     }
                     if (talent.m_canSelect)
                     {
-                        if (ImGui::Button("Select", ImVec2(92.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Select", HudButtonSize(92.0f)) && gameCore)
                         {
                             gameCore->SelectTalent(talent.m_id);
                         }
@@ -3015,7 +3180,7 @@ namespace UiClient
                     if (trackable && gameCore)
                     {
                         const char* buttonLabel = quest.m_tracked ? "Untrack" : "Track";
-                        if (ImGui::Button(buttonLabel, ImVec2(96.0f, 0.0f)))
+                        if (ImGui::Button(buttonLabel, HudButtonSize(96.0f)))
                         {
                             gameCore->TrackQuest(quest.m_id, !quest.m_tracked);
                         }
@@ -3332,12 +3497,12 @@ namespace UiClient
                     ImGui::SetNextItemWidth(210.0f);
                     ImGui::InputText("Name", nameBuffer, nameBufferSize);
                     ImGui::SameLine();
-                    if (ImGui::Button("Add", ImVec2(62.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Add", HudButtonSize(62.0f)) && gameCore)
                     {
                         gameCore->AddFriend(nameBuffer);
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Remove", ImVec2(86.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Remove", HudButtonSize(86.0f)) && gameCore)
                     {
                         gameCore->RemoveFriend(nameBuffer);
                     }
@@ -3358,7 +3523,7 @@ namespace UiClient
                             ImGui::Text(" | %s", friendState.m_zoneId.c_str());
                             ImGui::SameLine();
                             ImGui::PushID(friendState.m_characterId.c_str());
-                            if (ImGui::Button("Invite", ImVec2(72.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Invite", HudButtonSize(72.0f)) && gameCore)
                             {
                                 gameCore->InviteParty(friendState.m_displayName, friendState.m_characterId);
                             }
@@ -3374,12 +3539,12 @@ namespace UiClient
                     ImGui::SetNextItemWidth(210.0f);
                     ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
                     ImGui::SameLine();
-                    if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Invite", HudButtonSize(82.0f)) && gameCore)
                     {
                         gameCore->InviteParty(nameBuffer, {});
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Leave", HudButtonSize(72.0f)) && gameCore)
                     {
                         gameCore->LeaveParty();
                     }
@@ -3395,7 +3560,7 @@ namespace UiClient
                         ImGui::SetNextItemWidth(250.0f);
                         ImGui::InputText("Guild Name", guildNameBuffer, guildNameBufferSize);
                         ImGui::SameLine();
-                        if (ImGui::Button("Create", ImVec2(86.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Create", HudButtonSize(86.0f)) && gameCore)
                         {
                             gameCore->CreateGuild(guildNameBuffer);
                         }
@@ -3420,7 +3585,7 @@ namespace UiClient
                             ImGui::SetNextItemWidth(190.0f);
                             ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
                             ImGui::SameLine();
-                            if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Invite", HudButtonSize(82.0f)) && gameCore)
                             {
                                 gameCore->InviteGuild(nameBuffer);
                             }
@@ -3430,20 +3595,20 @@ namespace UiClient
                             ImGui::SetNextItemWidth(286.0f);
                             ImGui::InputText("Message", guildMotdBuffer, guildMotdBufferSize);
                             ImGui::SameLine();
-                            if (ImGui::Button("Set", ImVec2(58.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Set", HudButtonSize(58.0f)) && gameCore)
                             {
                                 gameCore->SetGuildMessageOfTheDay(guildMotdBuffer);
                             }
                         }
 
-                        if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Leave", HudButtonSize(72.0f)) && gameCore)
                         {
                             gameCore->LeaveGuild();
                         }
                         if (HasGuildPermission(guild, "disband_guild"))
                         {
                             ImGui::SameLine();
-                            if (ImGui::Button("Disband", ImVec2(92.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Disband", HudButtonSize(92.0f)) && gameCore)
                             {
                                 gameCore->DisbandGuild();
                             }
@@ -3470,7 +3635,7 @@ namespace UiClient
                             {
                                 if (HasGuildPermission(guild, "promote_member"))
                                 {
-                                    if (ImGui::Button("Promote", ImVec2(82.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Promote", HudButtonSize(82.0f)) && gameCore)
                                     {
                                         gameCore->PromoteGuildMember(member.m_displayName);
                                     }
@@ -3478,7 +3643,7 @@ namespace UiClient
                                 }
                                 if (HasGuildPermission(guild, "demote_member"))
                                 {
-                                    if (ImGui::Button("Demote", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Demote", HudButtonSize(78.0f)) && gameCore)
                                     {
                                         gameCore->DemoteGuildMember(member.m_displayName);
                                     }
@@ -3486,7 +3651,7 @@ namespace UiClient
                                 }
                                 if (HasGuildPermission(guild, "remove_member"))
                                 {
-                                    if (ImGui::Button("Remove", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Remove", HudButtonSize(78.0f)) && gameCore)
                                     {
                                         gameCore->RemoveGuildMember(member.m_displayName);
                                     }
@@ -4577,11 +4742,11 @@ namespace UiClient
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 4.0f, 312.0f);
         const ImVec2 trackerSize(292.0f, 292.0f);
         const ImVec2 trackerPos(rightActionBarTwoPos.x - trackerSize.x - 12.0f, 286.0f);
-        const ImVec2 actionBarSize(744.0f, 122.0f);
+        const ImVec2 actionBarSize(744.0f, 154.0f);
         const ImVec2 actionBarPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
-        const ImVec2 upperActionBarSize(744.0f, 66.0f);
+        const ImVec2 upperActionBarSize(744.0f, 72.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
         const ImVec2 microMenuSize(410.0f, 42.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
@@ -4865,7 +5030,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_bagOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize))
+        if (m_bagOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize, false, true))
         {
             DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot);
         }
@@ -4874,7 +5039,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize))
+        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize, false, true))
         {
             DrawSocialWindow(
                 gameCore,
@@ -4891,7 +5056,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize))
+        if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize, false, true))
         {
             if (DrawSettingsWindow(
                     gameCore,
@@ -4918,7 +5083,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_spellbookOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize))
+        if (m_spellbookOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize, false, true))
         {
             DrawSpellbook(worldState, actionEditMode, m_pendingActionAssignmentAbilityId);
         }
@@ -4927,7 +5092,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_characterSheetOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize))
+        if (m_characterSheetOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize, false, true))
         {
             DrawCharacterSheetWindow(worldState);
         }
@@ -4936,7 +5101,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize))
+        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize, false, true))
         {
             DrawTalentWindow(gameCore, worldState);
         }
@@ -4945,7 +5110,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize))
+        if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize, false, true))
         {
             DrawQuestLogWindow(gameCore, worldState);
         }
@@ -4954,7 +5119,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize))
+        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize, false, true))
         {
             DrawZoneMapWindow(worldState, playerX, playerY);
         }
@@ -4963,7 +5128,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize))
+        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize, false, true))
         {
             DrawAuctionWindow(
                 gameCore,
@@ -4981,7 +5146,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_trainerOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize))
+        if (m_trainerOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize, false, true))
         {
             DrawTrainerWindow(gameCore, worldState);
         }
@@ -4990,7 +5155,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_questGossipOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize))
+        if (m_questGossipOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize, false, true))
         {
             if (const char* closeReason = DrawQuestGossipWindow(gameCore, worldState))
             {
