@@ -12,7 +12,7 @@ Use `PASS`, `FAIL`, `BLOCKED`, or `N/A`. Every `FAIL` or `BLOCKED` needs a bug r
 - [ ] Package extracts or opens without missing files:
 - [ ] Local Ops opens:
 - [ ] Start Local Stack reaches all services healthy:
-- [ ] Open Launcher works:
+- [ ] Launch AmandaCore Launcher works:
 - [ ] Known issues and release notes are available:
 - [ ] Feature freeze document is available:
 - [ ] Package manifest and version manifest are available:

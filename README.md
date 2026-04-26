@@ -22,6 +22,7 @@
 - `Shared/AmandaCoreShared`
 - `Client/Launcher/AmandaCore.Launcher`
 - `Client/Game/AmandaCore.WorldClient`
+- `Client/Tools/AmandaCore.LocalControls`
 - `Services`
 - `Infra/dev`
 - `Gems`
@@ -41,6 +42,19 @@
 3. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\verify-golden-path.ps1`
 4. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\verify-account-to-world-restart.ps1`
 5. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\stop-local.ps1`
+
+## Local playable slice controls
+
+The Local Playable Slice Controls surface is a compiled Windows desktop app at `Client/Tools/AmandaCore.LocalControls`. It wraps the existing `Infra/dev` and `Infra/qa` scripts for starting/stopping the local stack, building local binaries, building and verifying the O3DE client, opening logs, collecting diagnostics, and launching the AmandaCore launcher.
+
+Build and run it with:
+
+```powershell
+dotnet build .\Client\Tools\AmandaCore.LocalControls\AmandaCore.LocalControls.csproj
+dotnet run --project .\Client\Tools\AmandaCore.LocalControls\AmandaCore.LocalControls.csproj
+```
+
+The existing `Infra/dev/Launch-LocalOpsGui.cmd` wrapper now launches this compiled app for compatibility with desktop shortcuts.
 
 The local stack waits for each service to report healthy before returning control. The verification script proves the current milestone path:
 

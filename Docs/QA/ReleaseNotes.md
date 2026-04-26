@@ -19,9 +19,9 @@ This build is feature frozen for the Alpha 0.1 test pass. Testers should use the
 1. Download `AmandaCore-Alpha-0.1-Windows-x64.zip` from the GitHub release.
 2. Extract it to a short writable path, for example `C:\AmandaCoreAlpha01`.
 3. Open `Infra\dev\Launch-LocalOpsGui.cmd`.
-4. Click `Start Services`.
+4. Click `Start local stack`.
 5. Wait until all services show healthy.
-6. Click `Open Launcher`.
+6. Click `Launch AmandaCore Launcher`.
 7. Register or log in, load realms, create or select a Human Warrior, and join the world.
 8. Follow `Docs\QA\checklists\closed-alpha-route.md`.
 
@@ -65,7 +65,7 @@ No approved duplicate known issues are listed for this build. Use `Docs\QA\Known
 
 For every `FAIL` or `BLOCKED` checklist item:
 
-1. Click `Collect Diagnostics` in Local Ops, or run:
+1. Click `Collect diagnostics` in Local Ops, or run:
 
    ```powershell
    powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Infra\qa\Collect-Diagnostics.ps1
@@ -84,4 +84,4 @@ Do not include real passwords, private keys, personal documents, or unrelated sc
 - `Infra\qa\Seed-TestAccount.ps1` creates or reuses a local tester account and Human Warrior through local APIs.
 - `Infra\qa\Reset-LocalTestState.ps1` backs up and resets local state while preserving logs.
 - `Infra\dev\package-alpha.ps1` creates an allowlisted Alpha 0.1 package and checksum.
-- `Infra\dev\Launch-LocalOpsGui.cmd` exposes diagnostics, QA docs, and guarded state reset actions.
+- `Infra\dev\Launch-LocalOpsGui.cmd` launches the compiled local controls app for stack, launcher, diagnostics, QA docs, and guarded state reset actions.
