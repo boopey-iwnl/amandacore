@@ -231,6 +231,7 @@ type MapExportDefinition struct {
 	StreamingCells   []StreamingCellDefinition      `json:"streaming_cells"`
 	Landmarks        []MapLandmarkDefinition        `json:"landmarks"`
 	AuthoringSource  string                         `json:"authoring_source"`
+	GeneratedBy      string                         `json:"generated_by,omitempty"`
 	Tags             []string                       `json:"tags"`
 }
 

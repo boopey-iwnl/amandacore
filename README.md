@@ -78,6 +78,7 @@ For Dawnwake map export and streaming hook validation:
 
 ```powershell
 cd Services
+go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps --check
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 

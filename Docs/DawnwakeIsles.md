@@ -12,7 +12,7 @@ This implementation uses original AmandaCore code and data. TrinityCore/AzerothC
 - `dawnwake_tideglass_shoal`
 - `dawnwake_windspur_rise`
 
-Each zone has original bounds, entry points, spawn groups, quest providers, runtime caps, transition metadata, and matching placeholder map export metadata. The package is intentionally small; it validates the runtime loader and traversal boundary before a terrain or asset pipeline exists.
+Each zone has original bounds, entry points, spawn groups, quest providers, runtime caps, transition metadata, and matching generated placeholder map export metadata. The package is intentionally small; it validates the runtime loader and traversal boundary before a terrain or asset pipeline exists.
 
 ## Map Exports
 
@@ -22,7 +22,15 @@ The package includes three AmandaCore-owned placeholder map export files:
 - `maps/dawnwake_tideglass_shoal.map.json`
 - `maps/dawnwake_windspur_rise.map.json`
 
-These files define map IDs, coordinate space, bounds, entry points, adjacent zones, transition hints, streaming cells, and landmarks. They are validation and runtime metadata only; they are not O3DE asset products, terrain data, or prefab data.
+These files define map IDs, coordinate space, bounds, entry points, adjacent zones, transition hints, streaming cells, and landmarks. They are generated from `Content/Authoring/DawnwakeIsles/*.authoring.json` by `Services/cmd/content-exporter`. They are validation and runtime metadata only; they are not O3DE asset products, terrain data, or prefab data.
+
+Regenerate and verify from the Go module root:
+
+```powershell
+cd Services
+go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps
+go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps --check
+```
 
 ## Zone Transitions
 
@@ -81,7 +89,7 @@ This scenario validates map exports, verifies active streaming metadata, travers
 ## Current Limitations
 
 - No O3DE terrain, prefab, asset, or world-partition data is loaded yet.
-- Map export files are hand-authored placeholder metadata, not generated O3DE exports.
+- Map export files are generated from AmandaCore-owned placeholder authoring metadata, not O3DE asset products.
 - Zone bounds and positions are placeholder server coordinates authored for this package only.
 - Transition handling is radius-based and immediate.
 - Combat and loot in the loadsim are deterministic validation summaries, not a full client session.
@@ -89,4 +97,4 @@ This scenario validates map exports, verifies active streaming metadata, travers
 
 ## Next Milestone
 
-Generate these placeholder map exports from AmandaCore-owned O3DE authoring metadata, then add client-side transition previews, cell prefetch decisions, and broader traversal coverage.
+Connect the exporter to real AmandaCore O3DE editor metadata or asset processor output, then add visible transition affordances and cell prefetch decisions in the client.

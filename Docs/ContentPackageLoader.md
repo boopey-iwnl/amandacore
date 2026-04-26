@@ -41,6 +41,15 @@ Content/Packs/dawnwake_isles/
   auras/dawnwake_auras.json
 ```
 
+Its map exports are generated from AmandaCore-owned authoring metadata:
+
+```text
+Content/Authoring/DawnwakeIsles/
+  dawnwake_landing.authoring.json
+  dawnwake_tideglass_shoal.authoring.json
+  dawnwake_windspur_rise.authoring.json
+```
+
 The loader default used by content tests and loadsim is `Content/Packs/dev_foundation/package.json`. The HTTP world service keeps the existing hardcoded starter world unless a package is explicitly selected, preserving current local startup behavior. Select a package with:
 
 ```powershell
@@ -112,9 +121,26 @@ A map export defines:
 - `streaming_cells`
 - `landmarks`
 - `authoring_source`
+- `generated_by`
 - `tags`
 
 Validation requires each map export to reference an existing zone, have bounds that contain the zone bounds, keep entry points, transition points, landmarks, and streaming cells inside map bounds, reference existing target zones and destination entries, and match transition metadata already declared by the zone. Adjacent zones can require reciprocal adjacency; Dawnwake uses that for its current transition loop.
+
+`generated_by` is currently `amandacore-content-exporter` for exports produced from `Content/Authoring`.
+
+Regenerate Dawnwake map exports from the Go module root:
+
+```powershell
+cd Services
+go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps
+```
+
+Check that committed map exports match source authoring metadata:
+
+```powershell
+cd Services
+go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps --check
+```
 
 ## Catalogs
 
@@ -159,7 +185,7 @@ For zones with map exports, `ZoneRuntime` includes:
 - transition hints
 - streaming cells
 
-World responses include a `streaming` payload for the active zone. It exposes map ID, bounds, adjacent zones, transition hints, and placeholder streaming cells for future client wiring while keeping Go authoritative over traversal.
+World responses include a `streaming` payload for the active zone. It exposes map ID, bounds, adjacent zones, transition hints, and placeholder streaming cells for future client wiring while keeping Go authoritative over traversal. The console world client now deserializes this payload and prints a nearest-transition preview.
 
 Existing hardcoded Stonewake and Brindlebrook flows remain as fallback. The content package is additive and does not replace the current starter content yet.
 
@@ -228,8 +254,9 @@ The report adds map exports loaded, streaming cells loaded, streaming hints obse
 - Runtime quest activation projects the first supported objective into the current single-objective quest shape while retaining the full objective graph in `RuntimeContentRegistry`.
 - Loot claiming in loadsim is deterministic and server-side; public world HTTP loot endpoints are not introduced in this milestone.
 - Dawnwake transition handling is a server-side runtime skeleton. It validates adjacency, attaches placeholder streaming hints, and moves sessions to destination entry points, but does not stream terrain, O3DE assets, or client-side world partitions yet.
-- This is not a content editor, O3DE export pipeline, terrain streamer, or compiled binary content format.
+- This is not a content editor, terrain streamer, or compiled binary content format.
+- The exporter consumes AmandaCore-authored placeholder metadata; it does not inspect O3DE asset products yet.
 
 ## Next Milestone
 
-The next milestone should turn the placeholder map metadata into a generated AmandaCore export path from O3DE-owned authoring data, then add client-facing transition previews and broader streamed-world handoff coverage.
+The next milestone should connect the exporter to real AmandaCore O3DE editor metadata or asset processor products, then use the client preview state for visible transition affordances and cell prefetch decisions.

@@ -3,6 +3,8 @@
   "zone_id": "dawnwake_windspur_rise",
   "display_name": "Windspur Rise Placeholder Map",
   "coordinate_space": "o3de_placeholder",
+  "authoring_source": "AmandaCore original O3DE placeholder authoring metadata.",
+  "source_scene": "DawnwakeWindspurRise.placeholder",
   "bounds": {
     "min_x": 0,
     "min_y": 0,
@@ -11,15 +13,21 @@
     "max_y": 240,
     "max_z": 36
   },
-  "entry_points": [
+  "entries": [
     {
+      "marker_id": "marker_windspur_from_tideglass",
+      "entity_name": "DW_Windspur_Entry_FromTideglassRidge",
       "entry_id": "from_tideglass_ridge",
       "position": {
         "x": 20,
         "y": 176,
         "z": 0.1
       },
-      "facing_yaw": 82
+      "facing_yaw": 82,
+      "tags": [
+        "entry",
+        "transition"
+      ]
     }
   ],
   "adjacent_zones": [
@@ -33,8 +41,10 @@
       ]
     }
   ],
-  "transition_points": [
+  "transitions": [
     {
+      "marker_id": "marker_windspur_to_tideglass",
+      "entity_name": "DW_Windspur_Transition_TideglassRidge",
       "transition_id": "to_tideglass_shoal",
       "display_name": "Tideglass Ridge Stream",
       "target_zone_id": "dawnwake_tideglass_shoal",
@@ -55,6 +65,8 @@
   ],
   "streaming_cells": [
     {
+      "marker_id": "cell_marker_windspur_ridge_gate",
+      "entity_name": "DW_Windspur_Cell_WesternRidgeGate",
       "cell_id": "dw_windspur_ridge_gate",
       "display_name": "Western Ridge Gate",
       "bounds": {
@@ -71,6 +83,8 @@
       ]
     },
     {
+      "marker_id": "cell_marker_windspur_upper_path",
+      "entity_name": "DW_Windspur_Cell_UpperPath",
       "cell_id": "dw_windspur_upper_path",
       "display_name": "Upper Wind Path",
       "bounds": {
@@ -87,6 +101,8 @@
       ]
     },
     {
+      "marker_id": "cell_marker_windspur_watch",
+      "entity_name": "DW_Windspur_Cell_WindspurWatch",
       "cell_id": "dw_windspur_watch",
       "display_name": "Windspur Watch",
       "bounds": {
@@ -105,6 +121,8 @@
   ],
   "landmarks": [
     {
+      "marker_id": "landmark_marker_windspur_marker",
+      "entity_name": "DW_Windspur_Landmark_Marker",
       "landmark_id": "dw_windspur_marker",
       "display_name": "Windspur Marker",
       "kind": "quest_provider",
@@ -118,6 +136,8 @@
       ]
     },
     {
+      "marker_id": "landmark_marker_windspur_overlook",
+      "entity_name": "DW_Windspur_Landmark_Overlook",
       "landmark_id": "dw_windspur_overlook",
       "display_name": "Windspur Overlook",
       "kind": "vista",
@@ -131,6 +151,8 @@
       ]
     },
     {
+      "marker_id": "landmark_marker_windspur_tideglass_gate",
+      "entity_name": "DW_Windspur_Landmark_TideglassGate",
       "landmark_id": "dw_windspur_tideglass_gate",
       "display_name": "Tideglass Gate",
       "kind": "transition",
@@ -144,8 +166,6 @@
       ]
     }
   ],
-  "authoring_source": "AmandaCore original O3DE placeholder authoring metadata.",
-  "generated_by": "amandacore-content-exporter",
   "tags": [
     "dawnwake",
     "placeholder_map"
