@@ -222,20 +222,24 @@ func normalizeAbilityID(abilityID string) string {
 func abilityIconKind(ability abilityDefinition) string {
 	switch ability.ID {
 	case platform.AutoAttackAbilityID:
-		return "weapon"
-	case platform.SteadyStrikeAbilityID,
-		platform.DrivingBlowAbilityID,
-		platform.HamperingStrikeAbilityID,
-		platform.OverhandCutAbilityID:
-		return "strike"
-	case platform.BraceAbilityID,
-		platform.GuardedFormAbilityID,
+		return "ability_auto_attack"
+	case platform.SteadyStrikeAbilityID:
+		return "ability_steady_strike"
+	case platform.BraceAbilityID:
+		return "ability_brace"
+	case platform.DrivingBlowAbilityID:
+		return "ability_driving_blow"
+	case platform.HamperingStrikeAbilityID:
+		return "ability_hampering_strike"
+	case platform.OverhandCutAbilityID:
+		return "ability_driving_blow"
+	case platform.GuardedFormAbilityID,
 		platform.IronResolveAbilityID:
-		return "defense"
+		return "ability_brace"
 	case platform.RallyingCallAbilityID:
-		return "utility"
+		return "ability_rallying_call"
 	default:
-		return "ability"
+		return "icon_missing"
 	}
 }
 

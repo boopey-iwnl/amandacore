@@ -66,25 +66,50 @@ type itemDefinition struct {
 }
 
 func itemIconKind(item itemDefinition) string {
+	switch item.ItemID {
+	case itemWornMilitiaBladeID:
+		return "ability_auto_attack"
+	case itemPaddedYardVestID:
+		return "item_padded_vest"
+	case itemFieldBootsID:
+		return "item_field_boots"
+	case itemTDSSluiceguardHandwrapsID:
+		return "item_handwraps"
+	case itemFieldDressingID:
+		return "item_field_dressing"
+	case itemRoadRationID, itemCampRationID, itemDevFieldRationID:
+		return "item_road_ration"
+	case itemOatBundleID:
+		return "item_oat_bundle"
+	case itemLooseKitID:
+		return "item_scroll_supplies"
+	case itemValeIronChipID, itemDevGlimmerShardID:
+		return "item_ore_chunk"
+	case itemMilitiaTokenID, itemDevCopperTokenID:
+		return "item_militia_token"
+	case itemTornClothID:
+		return "item_torn_cloth"
+	}
+
 	switch item.Type {
 	case itemTypeWeapon:
-		return "weapon"
+		return "ability_auto_attack"
 	case itemTypeArmor:
-		return "armor"
+		return "item_padded_vest"
 	case itemTypeConsumable:
-		return "consumable"
+		return "item_road_ration"
 	case itemTypeMaterial:
-		return "material"
+		return "item_ore_chunk"
 	case itemTypeQuest:
-		return "quest"
+		return "item_scroll_supplies"
 	case itemTypeJunk:
-		return "junk"
+		return "item_torn_cloth"
 	case itemTypeCurrency:
-		return "currency"
+		return "currency_copper"
 	case itemTypeEquipment:
-		return "equipment"
+		return "item_padded_vest"
 	default:
-		return "item"
+		return "icon_missing"
 	}
 }
 
