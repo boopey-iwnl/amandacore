@@ -32,6 +32,16 @@ internal sealed class ClientStreamingPreviewState
                 _sink.CellBecameHidden(cell);
             }
 
+            if (previous.CurrentCell is not null)
+            {
+                _sink.CurrentCellChanged(null);
+            }
+
+            if (previous.NearestTransition is not null)
+            {
+                _sink.TransitionHintChanged(null);
+            }
+
             return;
         }
 

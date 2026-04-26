@@ -81,3 +81,77 @@ internal sealed class NullWorldStreamingPreviewSink : IWorldStreamingPreviewSink
     {
     }
 }
+
+internal static class WorldStreamingPreviewSinkFactory
+{
+    public static IWorldStreamingPreviewSink Create(StreamingSinkMode mode)
+    {
+        return mode switch
+        {
+            StreamingSinkMode.Console => new ConsoleWorldStreamingPreviewSink(),
+            StreamingSinkMode.SceneCommands => new PlaceholderSceneStreamingAdapter(new ConsolePlaceholderSceneCommandSink()),
+            StreamingSinkMode.Both => new CompositeWorldStreamingPreviewSink(
+                new ConsoleWorldStreamingPreviewSink(),
+                new PlaceholderSceneStreamingAdapter(new ConsolePlaceholderSceneCommandSink())),
+            _ => new ConsoleWorldStreamingPreviewSink()
+        };
+    }
+}
+
+internal sealed class CompositeWorldStreamingPreviewSink : IWorldStreamingPreviewSink
+{
+    private readonly IWorldStreamingPreviewSink[] _sinks;
+
+    public CompositeWorldStreamingPreviewSink(params IWorldStreamingPreviewSink[] sinks)
+    {
+        _sinks = sinks;
+    }
+
+    public void ZoneEntered(ClientStreamingZone zone)
+    {
+        foreach (var sink in _sinks)
+        {
+            sink.ZoneEntered(zone);
+        }
+    }
+
+    public void CellBecameVisible(ClientStreamingCell cell)
+    {
+        foreach (var sink in _sinks)
+        {
+            sink.CellBecameVisible(cell);
+        }
+    }
+
+    public void CellBecameHidden(ClientStreamingCell cell)
+    {
+        foreach (var sink in _sinks)
+        {
+            sink.CellBecameHidden(cell);
+        }
+    }
+
+    public void CurrentCellChanged(ClientStreamingCell? cell)
+    {
+        foreach (var sink in _sinks)
+        {
+            sink.CurrentCellChanged(cell);
+        }
+    }
+
+    public void TransitionHintChanged(ClientTransitionHint? transition)
+    {
+        foreach (var sink in _sinks)
+        {
+            sink.TransitionHintChanged(transition);
+        }
+    }
+
+    public void MapBoundsChanged(ClientMapBounds bounds)
+    {
+        foreach (var sink in _sinks)
+        {
+            sink.MapBoundsChanged(bounds);
+        }
+    }
+}
