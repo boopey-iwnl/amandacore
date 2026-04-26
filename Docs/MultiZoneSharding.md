@@ -1,10 +1,8 @@
 # Multi-Zone Sharding Skeleton
 
-AmandaCore's first sharding layer is an in-process runtime ownership skeleton. It proves routing, zone isolation, capacity hints, queue backpressure, and load snapshots without introducing cross-process RPC.
+AmandaCore's first sharding layer is an in-process runtime ownership skeleton. It proves routing, zone isolation, capacity hints, queue backpressure, deterministic zone-to-shard assignment, and load snapshots without introducing cross-process RPC.
 
 ## Ownership Model
-
-The skeleton defines:
 
 | Concept | Role |
 | --- | --- |
@@ -15,6 +13,7 @@ The skeleton defines:
 | `ZoneShardBinding` | One zone to one shard owner. |
 | `ShardRouter` | Resolves character commands to the owning zone runtime. |
 | `ZoneRuntime` | Per-zone command queue, session set, tick samples, and queue metrics. |
+| `ZoneShardAssignment` | Deterministic Dawnwake loadsim zone-to-shard ownership record. |
 
 A `ZoneRuntime` is owned by exactly one shard runtime. Multiple zones can be assigned to one shard.
 
@@ -35,6 +34,25 @@ Capacity hints are local guardrails:
 
 The current skeleton records and reports capacity pressure but does not rebalance live zones.
 
+## Dawnwake Loadsim Scenario
+
+Run from the Go module root:
+
+```powershell
+cd Services
+go run ./cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario dawnwake-multizone-sharding-basic --transition-loops 3 --shards 2 --seed 42 --content ..\Content\Packs\dawnwake_isles\package.json
+```
+
+The scenario:
+
+- loads and validates `dawnwake_isles`
+- activates package zones into the world runtime
+- builds deterministic shard assignments
+- starts simulated players at the continent default entry
+- probes enabled transition gates repeatedly
+- rejects missing destination zones, missing destination entry points, disabled gates, and missing shard assignments
+- reports per-zone population, per-shard population, transition counts, queue pressure, and tick timing percentiles
+
 ## Isolation Rules
 
 Commands route through `ShardRouter.Submit`. The router rejects commands when:
@@ -48,6 +66,27 @@ Commands route through `ShardRouter.Submit`. The router rejects commands when:
 - the zone queue is full: `QueueFull`
 
 Combat and loot cannot occur across zones in this milestone. Quest progress can remain global to a character, but triggering events in this skeleton must originate from the owning zone runtime. Visibility is scoped to current zone ownership; future boundary streaming hints can be layered on top of this model.
+
+## Report Fields
+
+The Dawnwake loadsim report includes:
+
+- package and continent identifiers
+- validation errors
+- activated zones and catalogs
+- transition gates loaded
+- players attached
+- transition loops and deterministic seed
+- shard count and zone shard assignments
+- final zone population and final shard population
+- transition counts by transition and source zone
+- requested, completed, and rejected transition totals
+- visibility and streaming hint counters
+- spawned NPC and quest provider counts
+- average, p50, p95, p99, and max tick duration
+- max simulated queue depth
+- rejected command count
+- errors
 
 ## Backpressure
 
@@ -63,53 +102,18 @@ Loadsim reports:
 - per-zone queue metrics
 - per-shard load snapshots
 
-## Observability Events
-
-Stable event names added for this milestone include:
-
-- `loadsim.run_started`
-- `loadsim.run_completed`
-- `loadsim.run_failed`
-- `loadsim.scenario_started`
-- `loadsim.scenario_completed`
-- `loadsim.report_written`
-- `loadsim.zone_distribution_applied`
-- `loadsim.client_spawned`
-- `loadsim.command_sent`
-- `loadsim.command_rejected`
-- `loadsim.transition_requested`
-- `loadsim.transition_completed`
-- `loadsim.transition_rejected`
-- `loadsim.reconnect_attempted`
-- `loadsim.reconnect_completed`
-- `shard.registry.created`
-- `shard.registered`
-- `shard.zone.assigned`
-- `shard.zone.unassigned`
-- `shard.assignment.rejected`
-- `shard.route.resolved`
-- `shard.route.rejected`
-- `shard.load_snapshot.recorded`
-- `shard.capacity.warning`
-- `shard.backpressure.detected`
-- `world.queue.backpressure`
-- `world.command.rejected`
-- `world.command.wrong_zone_rejected`
-- `world.zone.isolation_violation_detected`
-
-High-volume events are reserved for verbose runs where practical.
-
 ## Clean-Room Reference Boundary
 
-This implementation uses original AmandaCore code and tooling. TrinityCore/AzerothCore were used only as high-level architectural reference. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, map formats, area tables, zone tables, spawn schemas, coordinates, worldserver configs, database structures, command systems, remote admin systems, playerbot systems, performance scripts, or benchmark tools were copied or adapted.
+This implementation uses original AmandaCore code and data. TrinityCore/AzerothCore were used only as high-level architectural reference. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, loot tables, quest tables, item IDs, creature IDs, spell IDs, quest text, reward tables, map formats, zone tables, spawn schemas, coordinates, worldserver configs, database structures, command systems, remote admin systems, playerbot systems, performance scripts, or benchmark tools were copied or adapted.
 
 ## Known Limitations
 
 - No networked cross-process shard RPC exists yet.
 - No live zone migration or load-based rebalance exists yet.
 - Entity counts are local skeleton counters, not full production ECS counts.
-- The route model is intentionally conservative and rejects cross-zone gameplay interactions.
+- Transition probes validate package topology and destination ownership, but do not perform production player handoff.
+- Queue depth is a simulated command pressure value, not a live gateway queue.
 
 ## Next Milestone
 
-Production persistence and database migration layer should come next, with clean-room schemas, migrations, transactional boundaries, recovery tests, and persistence latency/failure observability.
+The next recommended milestone is production zone handoff and shard coordinator design, followed by production persistence and database migration hardening.

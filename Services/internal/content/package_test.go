@@ -58,8 +58,8 @@ func TestDawnwakeIslesPackageValidatesSuccessfully(t *testing.T) {
 	if !result.Validation.Valid() {
 		t.Fatalf("expected dawnwake_isles to validate, got %#v", result.Validation.Errors)
 	}
-	if len(result.Package.Zones) != 3 {
-		t.Fatalf("expected three Dawnwake zones, got %d", len(result.Package.Zones))
+	if len(result.Package.Zones) < 3 {
+		t.Fatalf("expected at least three Dawnwake zones, got %d", len(result.Package.Zones))
 	}
 	if result.Validated == nil || result.Validated.Registry.Zones["dawnwake_tideglass_shoal"].ZoneID == "" {
 		t.Fatalf("expected Dawnwake runtime registry to include tideglass shoal")

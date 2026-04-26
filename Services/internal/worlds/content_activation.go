@@ -87,6 +87,7 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 		PackageID:      registry.PackageID,
 		PackageVersion: registry.Version,
 		CatalogsLoaded: map[string]int{
+			"continents":  len(registry.Continents),
 			"zones":       len(registry.Zones),
 			"map_exports": len(registry.MapExports),
 			"npcs":        len(registry.NPCs),

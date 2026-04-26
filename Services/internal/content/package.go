@@ -32,6 +32,9 @@ const (
 	EventZoneLoaded                  = "content.zone.loaded"
 	EventZonesRegistered             = "content.zones_registered"
 	EventZoneValidationFailed        = "content.zone.validation_failed"
+	EventContinentLoaded             = "content.continent.loaded"
+	EventContinentValidationFailed   = "content.continent.validation_failed"
+	EventZoneAdjacencyLoaded         = "content.zone.adjacency.loaded"
 	EventHandoffGateRegistered       = "content.handoff_gate.registered"
 	EventHandoffGatesRegistered      = "content.handoff_gates_registered"
 	EventZoneTransitionLoaded        = "content.zone.transition.loaded"
@@ -82,6 +85,7 @@ type ContentPackageManifest struct {
 	SchemaVersion   string   `json:"schema_version"`
 	Description     string   `json:"description"`
 	Authorship      string   `json:"authorship"`
+	ContinentFiles  []string `json:"continent_files"`
 	Zones           []string `json:"zones"`
 	MapExports      []string `json:"map_exports"`
 	NPCCatalogs     []string `json:"npc_catalogs"`
@@ -108,6 +112,7 @@ type ContentPackageLoadResult struct {
 type LoadedContentPackage struct {
 	Manifest      ContentPackageManifest `json:"manifest"`
 	Source        ContentPackageSource   `json:"source"`
+	Continents    []ContinentDefinition  `json:"continents"`
 	Zones         []ZoneDefinition       `json:"zones"`
 	MapExports    []MapExportDefinition  `json:"map_exports"`
 	NPCs          []NpcArchetype         `json:"npcs"`
@@ -128,6 +133,7 @@ type ValidatedContentPackage struct {
 type RuntimeContentRegistry struct {
 	PackageID       string
 	Version         string
+	Continents      map[string]ContinentDefinition
 	Zones           map[string]ZoneDefinition
 	MapExports      map[string]MapExportDefinition
 	MapExportByZone map[string]MapExportDefinition
@@ -204,21 +210,84 @@ type ZoneRuntimeConfig struct {
 	MaxEntities int `json:"max_entities"`
 }
 
+type ContinentDefinition struct {
+	ContinentID  string                   `json:"continent_id"`
+	DisplayName  string                   `json:"display_name"`
+	Description  string                   `json:"description"`
+	Origin       Position                 `json:"origin"`
+	Units        string                   `json:"units"`
+	Zones        []ContinentZoneRef       `json:"zones"`
+	Adjacency    []ZoneAdjacency          `json:"adjacency"`
+	DefaultEntry ContinentEntryRef        `json:"default_entry"`
+	Streaming    ContinentStreamingConfig `json:"streaming"`
+	Tags         []string                 `json:"tags"`
+	Metadata     map[string]any           `json:"metadata"`
+}
+
+type ContinentZoneRef struct {
+	ZoneID      string   `json:"zone_id"`
+	DisplayName string   `json:"display_name"`
+	Tags        []string `json:"tags"`
+}
+
+type ZoneAdjacency struct {
+	AdjacencyID   string   `json:"adjacency_id"`
+	FromZoneID    string   `json:"from_zone_id"`
+	ToZoneID      string   `json:"to_zone_id"`
+	TransitionIDs []string `json:"transition_ids"`
+	Kind          string   `json:"kind"`
+	Bidirectional bool     `json:"bidirectional"`
+	Tags          []string `json:"tags"`
+}
+
+type ContinentEntryRef struct {
+	ZoneID       string `json:"zone_id"`
+	EntryPointID string `json:"entry_point_id"`
+}
+
+type ContinentStreamingConfig struct {
+	ActivationPolicy      string  `json:"activation_policy"`
+	DefaultInterestRadius float64 `json:"default_interest_radius"`
+	GateHintRadius        float64 `json:"gate_hint_radius"`
+}
+
+type ZoneTransitionGate struct {
+	TransitionID          string     `json:"transition_id"`
+	FromZoneID            string     `json:"from_zone_id"`
+	ToZoneID              string     `json:"to_zone_id"`
+	Kind                  string     `json:"kind"`
+	GateBounds            ZoneBounds `json:"gate_bounds"`
+	EntryPointIDOnArrival string     `json:"entry_point_id_on_arrival"`
+	Disabled              bool       `json:"disabled"`
+	Tags                  []string   `json:"tags"`
+}
+
+type ZoneStreamingConfig struct {
+	InterestRadius          float64  `json:"interest_radius"`
+	AdjacentPreloadDistance float64  `json:"adjacent_preload_distance"`
+	Priority                string   `json:"priority"`
+	Notes                   []string `json:"notes"`
+}
+
 type ZoneDefinition struct {
-	ZoneID         string                     `json:"zone_id"`
-	DisplayName    string                     `json:"display_name"`
-	Description    string                     `json:"description"`
-	Bounds         ZoneBounds                 `json:"bounds"`
-	ShardHint      string                     `json:"shard_hint"`
-	MapRef         string                     `json:"map_ref"`
-	EntryPoints    []ZoneEntryPoint           `json:"entry_points"`
-	SpawnPoints    []ZoneSpawnPointDefinition `json:"spawn_points"`
-	SpawnGroups    []SpawnGroupDefinition     `json:"spawn_groups"`
-	HandoffGates   []HandoffGateDefinition    `json:"handoff_gates"`
-	QuestProviders []QuestProviderDefinition  `json:"quest_providers"`
-	Transitions    []ZoneTransitionDefinition `json:"transitions"`
-	Runtime        ZoneRuntimeConfig          `json:"runtime"`
-	Tags           []string                   `json:"tags"`
+	ZoneID          string                     `json:"zone_id"`
+	DisplayName     string                     `json:"display_name"`
+	Description     string                     `json:"description"`
+	ContinentID     string                     `json:"continent_id"`
+	Bounds          ZoneBounds                 `json:"bounds"`
+	ShardHint       string                     `json:"shard_hint"`
+	MapRef          string                     `json:"map_ref"`
+	EntryPoints     []ZoneEntryPoint           `json:"entry_points"`
+	SpawnPoints     []ZoneSpawnPointDefinition `json:"spawn_points"`
+	SpawnGroups     []SpawnGroupDefinition     `json:"spawn_groups"`
+	HandoffGates    []HandoffGateDefinition    `json:"handoff_gates"`
+	QuestProviders  []QuestProviderDefinition  `json:"quest_providers"`
+	TransitionGates []ZoneTransitionGate       `json:"transition_gates"`
+	Transitions     []ZoneTransitionDefinition `json:"transitions"`
+	Runtime         ZoneRuntimeConfig          `json:"runtime"`
+	Streaming       ZoneStreamingConfig        `json:"streaming"`
+	Tags            []string                   `json:"tags"`
+	Metadata        map[string]any             `json:"metadata"`
 }
 
 type ZoneTransitionDefinition struct {
@@ -572,6 +641,7 @@ func resolveRelativeFromParents(relative string) (string, bool) {
 }
 
 func loadFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
+	loadContinentFiles(loaded, report)
 	loadZoneFiles(loaded, report)
 	loadMapExportFiles(loaded, report)
 	loadCatalogFiles(loaded.Manifest.NPCCatalogs, loaded, report, "npc_catalogs", "npc", func(target *LoadedContentPackage, payload []byte) error {
@@ -640,6 +710,37 @@ func loadFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
 		target.CatalogCounts["auras"] += len(file.Auras)
 		return nil
 	})
+}
+
+func loadContinentFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
+	for index, relative := range loaded.Manifest.ContinentFiles {
+		path := filepath.Clean(filepath.Join(loaded.Source.RootDir, relative))
+		payload, err := os.ReadFile(path)
+		if err != nil {
+			report.Addf(ErrorMissingFile, fmt.Sprintf("continent_files[%d]", index), "continent file %q could not be read: %v", relative, err)
+			continue
+		}
+		var continent ContinentDefinition
+		if err := json.Unmarshal(payload, &continent); err != nil {
+			report.Addf(ErrorMalformedJSON, fmt.Sprintf("continent_files[%d]", index), "continent file %q is malformed: %v", relative, err)
+			continue
+		}
+		loaded.Continents = append(loaded.Continents, continent)
+		loaded.LoadedFiles = append(loaded.LoadedFiles, path)
+		loaded.CatalogCounts["continents"]++
+		observability.LogEvent("content-loader", EventContinentLoaded, map[string]any{
+			"continentId": continent.ContinentID,
+			"path":        relative,
+		})
+		for _, adjacency := range continent.Adjacency {
+			observability.LogEvent("content-loader", EventZoneAdjacencyLoaded, map[string]any{
+				"continentId": continent.ContinentID,
+				"adjacencyId": adjacency.AdjacencyID,
+				"fromZoneId":  adjacency.FromZoneID,
+				"toZoneId":    adjacency.ToZoneID,
+			})
+		}
+	}
 }
 
 func loadMapExportFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
@@ -713,6 +814,7 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	report := ContentValidationReport{}
 	validateManifest(loaded.Manifest, &report)
 
+	continentIDs := validateIDs("continents", loaded.Continents, func(continent ContinentDefinition) string { return continent.ContinentID }, &report)
 	zoneIDs := validateIDs("zones", loaded.Zones, func(zone ZoneDefinition) string { return zone.ZoneID }, &report)
 	validateIDs("map_exports", loaded.MapExports, func(export MapExportDefinition) string { return export.MapID }, &report)
 	npcIDs := validateIDs("npcs", loaded.NPCs, func(npc NpcArchetype) string { return npc.ArchetypeID }, &report)
@@ -730,8 +832,9 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	transitionIDs := map[string]struct{}{}
 	gateIDs := map[string]struct{}{}
 	for zoneIndex, zone := range loaded.Zones {
-		validateZone(zone, zoneIndex, zoneIDs, entryIDsByZone, npcIDs, lootIDs, questIDs, providerIDs, transitionIDs, spawnPointZones, gateIDs, &report)
+		validateZone(zone, zoneIndex, continentIDs, zoneIDs, entryIDsByZone, npcIDs, lootIDs, questIDs, providerIDs, transitionIDs, spawnPointZones, gateIDs, &report)
 	}
+	validateContinentTopology(loaded.Continents, loaded.Zones, zoneIDs, &report)
 	validateMapExports(loaded.MapExports, zoneIDs, zoneByID, entryIDsByZone, transitionsByZone, &report)
 	for index, npc := range loaded.NPCs {
 		validateNPC(npc, index, abilityIDs, len(loaded.Abilities) > 0, &report)
@@ -802,11 +905,15 @@ func collectPackageSpawnPointZones(zones []ZoneDefinition, report *ContentValida
 	return spawnPointZones
 }
 
-func validateZone(zone ZoneDefinition, index int, zoneIDs map[string]struct{}, entryIDsByZone map[string]map[string]struct{}, npcIDs map[string]struct{}, lootIDs map[string]struct{}, questIDs map[string]struct{}, providerIDs map[string]struct{}, transitionIDs map[string]struct{}, spawnPointZones map[string]string, gateIDs map[string]struct{}, report *ContentValidationReport) {
+func validateZone(zone ZoneDefinition, index int, continentIDs map[string]struct{}, zoneIDs map[string]struct{}, entryIDsByZone map[string]map[string]struct{}, npcIDs map[string]struct{}, lootIDs map[string]struct{}, questIDs map[string]struct{}, providerIDs map[string]struct{}, transitionIDs map[string]struct{}, spawnPointZones map[string]string, gateIDs map[string]struct{}, report *ContentValidationReport) {
 	path := fmt.Sprintf("zones[%d]", index)
 	requiredID(report, path+".zone_id", zone.ZoneID)
 	requiredString(report, path+".display_name", zone.DisplayName)
 	boundsValid := validateBounds(path+".bounds", zone.Bounds, report)
+	if zone.ContinentID != "" && !containsID(continentIDs, zone.ContinentID) {
+		report.Addf(ErrorBrokenReference, path+".continent_id", "zone %q references missing continent %q", zone.ZoneID, zone.ContinentID)
+		logBrokenReference("zone", zone.ZoneID, "continent", zone.ContinentID)
+	}
 	for entryIndex, entry := range zone.EntryPoints {
 		entryPath := fmt.Sprintf("%s.entry_points[%d]", path, entryIndex)
 		requiredID(report, entryPath+".entry_id", entry.EntryID)
@@ -890,6 +997,24 @@ func validateZone(zone ZoneDefinition, index int, zoneIDs map[string]struct{}, e
 		}
 		if arrivalFound && gate.DestinationZoneID != "" && arrivalZoneID != gate.DestinationZoneID {
 			report.Addf(ErrorBrokenReference, gatePath+".arrival_spawn_point_id", "handoff gate %q arrival spawn point %q belongs to zone %q, not destination zone %q", gate.GateID, gate.ArrivalSpawnPointID, arrivalZoneID, gate.DestinationZoneID)
+		}
+	}
+	for gateIndex, gate := range zone.TransitionGates {
+		gatePath := fmt.Sprintf("%s.transition_gates[%d]", path, gateIndex)
+		requiredID(report, gatePath+".transition_id", gate.TransitionID)
+		requiredID(report, gatePath+".from_zone_id", gate.FromZoneID)
+		requiredID(report, gatePath+".to_zone_id", gate.ToZoneID)
+		requiredID(report, gatePath+".entry_point_id_on_arrival", gate.EntryPointIDOnArrival)
+		if gate.FromZoneID != "" && zone.ZoneID != "" && gate.FromZoneID != zone.ZoneID {
+			report.Addf(ErrorBrokenReference, gatePath+".from_zone_id", "transition gate %q is declared in zone %q but uses source zone %q", gate.TransitionID, zone.ZoneID, gate.FromZoneID)
+		}
+		gateBoundsValid := validateBounds(gatePath+".gate_bounds", gate.GateBounds, report)
+		if boundsValid && gateBoundsValid && !boundsContain(zone.Bounds, gate.GateBounds) {
+			report.Addf(ErrorPositionOutOfBounds, gatePath+".gate_bounds", "transition gate %q bounds are outside source zone bounds", gate.TransitionID)
+		}
+		if gate.ToZoneID != "" && !containsID(zoneIDs, gate.ToZoneID) {
+			report.Addf(ErrorBrokenReference, gatePath+".to_zone_id", "transition gate %q references missing destination zone %q", gate.TransitionID, gate.ToZoneID)
+			logBrokenReference("zone_transition_gate", gate.TransitionID, "zone", gate.ToZoneID)
 		}
 	}
 	for providerIndex, provider := range zone.QuestProviders {
@@ -1158,6 +1283,93 @@ func validateRuntime(path string, runtime ZoneRuntimeConfig, report *ContentVali
 	}
 }
 
+func validateContinentTopology(continents []ContinentDefinition, zones []ZoneDefinition, zoneIDs map[string]struct{}, report *ContentValidationReport) {
+	zonesByID := map[string]ZoneDefinition{}
+	transitionGateIDs := map[string]struct{}{}
+	for _, zone := range zones {
+		zonesByID[zone.ZoneID] = zone
+		for _, gate := range zone.TransitionGates {
+			if gate.TransitionID == "" {
+				continue
+			}
+			if _, exists := transitionGateIDs[gate.TransitionID]; exists {
+				report.Addf(ErrorDuplicateID, "zones.transition_gates", "transition gate id %q is duplicated", gate.TransitionID)
+			}
+			transitionGateIDs[gate.TransitionID] = struct{}{}
+		}
+	}
+
+	for continentIndex, continent := range continents {
+		path := fmt.Sprintf("continents[%d]", continentIndex)
+		requiredID(report, path+".continent_id", continent.ContinentID)
+		requiredString(report, path+".display_name", continent.DisplayName)
+		for zoneIndex, zoneRef := range continent.Zones {
+			refPath := fmt.Sprintf("%s.zones[%d].zone_id", path, zoneIndex)
+			requiredID(report, refPath, zoneRef.ZoneID)
+			if zoneRef.ZoneID != "" && !containsID(zoneIDs, zoneRef.ZoneID) {
+				report.Addf(ErrorBrokenReference, refPath, "continent %q references missing zone %q", continent.ContinentID, zoneRef.ZoneID)
+				logBrokenReference("continent", continent.ContinentID, "zone", zoneRef.ZoneID)
+			}
+		}
+		requiredID(report, path+".default_entry.zone_id", continent.DefaultEntry.ZoneID)
+		requiredID(report, path+".default_entry.entry_point_id", continent.DefaultEntry.EntryPointID)
+		if continent.DefaultEntry.ZoneID != "" && !containsID(zoneIDs, continent.DefaultEntry.ZoneID) {
+			report.Addf(ErrorBrokenReference, path+".default_entry.zone_id", "continent %q default entry references missing zone %q", continent.ContinentID, continent.DefaultEntry.ZoneID)
+			logBrokenReference("continent", continent.ContinentID, "zone", continent.DefaultEntry.ZoneID)
+		} else if continent.DefaultEntry.EntryPointID != "" && !zoneHasEntryPoint(zonesByID[continent.DefaultEntry.ZoneID], continent.DefaultEntry.EntryPointID) {
+			report.Addf(ErrorBrokenReference, path+".default_entry.entry_point_id", "continent %q default entry references missing entry point %q", continent.ContinentID, continent.DefaultEntry.EntryPointID)
+			logBrokenReference("continent", continent.ContinentID, "zone_entry", continent.DefaultEntry.EntryPointID)
+		}
+		for adjacencyIndex, adjacency := range continent.Adjacency {
+			adjacencyPath := fmt.Sprintf("%s.adjacency[%d]", path, adjacencyIndex)
+			requiredID(report, adjacencyPath+".adjacency_id", adjacency.AdjacencyID)
+			requiredID(report, adjacencyPath+".from_zone_id", adjacency.FromZoneID)
+			requiredID(report, adjacencyPath+".to_zone_id", adjacency.ToZoneID)
+			if adjacency.FromZoneID != "" && !containsID(zoneIDs, adjacency.FromZoneID) {
+				report.Addf(ErrorBrokenReference, adjacencyPath+".from_zone_id", "adjacency %q references missing source zone %q", adjacency.AdjacencyID, adjacency.FromZoneID)
+				logBrokenReference("zone_adjacency", adjacency.AdjacencyID, "zone", adjacency.FromZoneID)
+			}
+			if adjacency.ToZoneID != "" && !containsID(zoneIDs, adjacency.ToZoneID) {
+				report.Addf(ErrorBrokenReference, adjacencyPath+".to_zone_id", "adjacency %q references missing destination zone %q", adjacency.AdjacencyID, adjacency.ToZoneID)
+				logBrokenReference("zone_adjacency", adjacency.AdjacencyID, "zone", adjacency.ToZoneID)
+			}
+			for transitionIndex, transitionID := range adjacency.TransitionIDs {
+				transitionPath := fmt.Sprintf("%s.transition_ids[%d]", adjacencyPath, transitionIndex)
+				requiredID(report, transitionPath, transitionID)
+				if transitionID != "" && !containsID(transitionGateIDs, transitionID) {
+					report.Addf(ErrorBrokenReference, transitionPath, "adjacency %q references missing transition gate %q", adjacency.AdjacencyID, transitionID)
+					logBrokenReference("zone_adjacency", adjacency.AdjacencyID, "zone_transition_gate", transitionID)
+				}
+			}
+		}
+	}
+
+	for zoneIndex, zone := range zones {
+		zonePath := fmt.Sprintf("zones[%d]", zoneIndex)
+		for gateIndex, gate := range zone.TransitionGates {
+			gatePath := fmt.Sprintf("%s.transition_gates[%d]", zonePath, gateIndex)
+			if gate.ToZoneID != "" && !containsID(zoneIDs, gate.ToZoneID) {
+				report.Addf(ErrorBrokenReference, gatePath+".to_zone_id", "transition gate %q references missing destination zone %q", gate.TransitionID, gate.ToZoneID)
+				logBrokenReference("zone_transition_gate", gate.TransitionID, "zone", gate.ToZoneID)
+				continue
+			}
+			if gate.ToZoneID != "" && gate.EntryPointIDOnArrival != "" && !zoneHasEntryPoint(zonesByID[gate.ToZoneID], gate.EntryPointIDOnArrival) {
+				report.Addf(ErrorBrokenReference, gatePath+".entry_point_id_on_arrival", "transition gate %q references missing destination entry point %q", gate.TransitionID, gate.EntryPointIDOnArrival)
+				logBrokenReference("zone_transition_gate", gate.TransitionID, "zone_entry", gate.EntryPointIDOnArrival)
+			}
+		}
+	}
+}
+
+func zoneHasEntryPoint(zone ZoneDefinition, entryPointID string) bool {
+	for _, entry := range zone.EntryPoints {
+		if entry.EntryID == entryPointID {
+			return true
+		}
+	}
+	return false
+}
+
 func validateNPC(npc NpcArchetype, index int, abilityIDs map[string]struct{}, requireAbilityRefs bool, report *ContentValidationReport) {
 	path := fmt.Sprintf("npcs[%d]", index)
 	requiredID(report, path+".archetype_id", npc.ArchetypeID)
@@ -1373,6 +1585,7 @@ func NewRuntimeContentRegistry(loaded LoadedContentPackage) RuntimeContentRegist
 	registry := RuntimeContentRegistry{
 		PackageID:       loaded.Manifest.PackageID,
 		Version:         loaded.Manifest.Version,
+		Continents:      map[string]ContinentDefinition{},
 		Zones:           map[string]ZoneDefinition{},
 		MapExports:      map[string]MapExportDefinition{},
 		MapExportByZone: map[string]MapExportDefinition{},
@@ -1385,6 +1598,9 @@ func NewRuntimeContentRegistry(loaded LoadedContentPackage) RuntimeContentRegist
 		QuestProvider:   map[string]QuestProviderDefinition{},
 		SpawnPoints:     map[string]ZoneSpawnPointDefinition{},
 		HandoffGates:    map[string]HandoffGateDefinition{},
+	}
+	for _, continent := range loaded.Continents {
+		registry.Continents[continent.ContinentID] = continent
 	}
 	for _, zone := range loaded.Zones {
 		registry.Zones[zone.ZoneID] = zone

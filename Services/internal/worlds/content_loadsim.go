@@ -2,6 +2,7 @@ package worlds
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	contentpkg "amandacore/services/internal/content"
@@ -299,6 +300,18 @@ func contentTransitionToZone(server *worldServer, zoneID string, targetZoneID st
 }
 
 func firstContentEntryPoint(registry contentpkg.RuntimeContentRegistry) (string, contentpkg.ZoneEntryPoint) {
+	for _, continentID := range contentpkg.SortedKeys(registry.Continents) {
+		entry := registry.Continents[continentID].DefaultEntry
+		if entry.ZoneID == "" || entry.EntryPointID == "" {
+			continue
+		}
+		zone := registry.Zones[entry.ZoneID]
+		for _, entryPoint := range zone.EntryPoints {
+			if entryPoint.EntryID == entry.EntryPointID {
+				return zone.ZoneID, entryPoint
+			}
+		}
+	}
 	for _, zoneID := range contentpkg.SortedKeys(registry.Zones) {
 		zone := registry.Zones[zoneID]
 		if len(zone.EntryPoints) > 0 {
@@ -374,6 +387,19 @@ func questObjectiveSatisfiedByReport(quest contentpkg.QuestDefinition, report Co
 }
 
 func runContentTickLoop(server *worldServer, duration time.Duration) (float64, float64) {
+	stats := runContentTickStats(server, duration)
+	return stats.AverageMs, stats.MaxMs
+}
+
+type contentTickStats struct {
+	AverageMs float64
+	P50Ms     float64
+	P95Ms     float64
+	P99Ms     float64
+	MaxMs     float64
+}
+
+func runContentTickStats(server *worldServer, duration time.Duration) contentTickStats {
 	tick := 50 * time.Millisecond
 	ticks := int(duration / tick)
 	if ticks <= 0 {
@@ -382,6 +408,7 @@ func runContentTickLoop(server *worldServer, duration time.Duration) (float64, f
 	now := time.Now().UTC()
 	totalMs := 0.0
 	maxMs := 0.0
+	samples := make([]float64, 0, ticks)
 	for index := 0; index < ticks; index++ {
 		startedAt := time.Now()
 		server.mutex.Lock()
@@ -389,11 +416,33 @@ func runContentTickLoop(server *worldServer, duration time.Duration) (float64, f
 		server.mutex.Unlock()
 		elapsedMs := float64(time.Since(startedAt).Microseconds()) / 1000.0
 		totalMs += elapsedMs
+		samples = append(samples, elapsedMs)
 		if elapsedMs > maxMs {
 			maxMs = elapsedMs
 		}
 	}
-	return totalMs / float64(ticks), maxMs
+	sort.Float64s(samples)
+	return contentTickStats{
+		AverageMs: totalMs / float64(ticks),
+		P50Ms:     percentileSample(samples, 0.50),
+		P95Ms:     percentileSample(samples, 0.95),
+		P99Ms:     percentileSample(samples, 0.99),
+		MaxMs:     maxMs,
+	}
+}
+
+func percentileSample(samples []float64, percentile float64) float64 {
+	if len(samples) == 0 {
+		return 0
+	}
+	if percentile <= 0 {
+		return samples[0]
+	}
+	if percentile >= 1 {
+		return samples[len(samples)-1]
+	}
+	index := int(percentile * float64(len(samples)-1))
+	return samples[index]
 }
 
 func cloneIntMap(source map[string]int) map[string]int {

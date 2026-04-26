@@ -41,6 +41,7 @@ type options struct {
 	TransitionLoops int
 	Shards          int
 	QueueCapacity   int
+	Seed            int64
 }
 
 func main() {
@@ -87,7 +88,7 @@ func runWorldLoadsim() {
 		})
 		printQuestReport(report)
 		exitOnReportError(err, report.Errors)
-	case "content-package-basic", "dawnwake-traversal-basic", "dawnwake-streaming-basic":
+	case "content-package-basic":
 		report, err := worlds.RunContentPackageLoadsim(worlds.ContentPackageLoadsimOptions{
 			Clients:     opts.Clients,
 			Duration:    opts.Duration,
@@ -97,6 +98,19 @@ func runWorldLoadsim() {
 		})
 		printContentPackageReport(report)
 		exitOnReportError(err, report.Errors)
+	case "dawnwake-streaming-basic", "dawnwake-traversal-basic", "dawnwake-multizone-sharding-basic":
+		report, err := worlds.RunDawnwakeStreamingLoadsim(worlds.DawnwakeStreamingLoadsimOptions{
+			Clients:         opts.Clients,
+			Duration:        opts.Duration,
+			CommandRate:     opts.CommandRate,
+			Scenario:        opts.Scenario,
+			ContentPath:     opts.ContentPath,
+			TransitionLoops: opts.TransitionLoops,
+			Seed:            opts.Seed,
+			ShardCount:      opts.Shards,
+		})
+		printDawnwakeReport(report)
+		exitOnReportError(err, append(report.Errors, report.ValidationErrors...))
 	case "zone-handoff-basic", "zone-package-handoff-basic":
 		report, err := worlds.RunZoneHandoffLoadsim(worlds.ZoneHandoffLoadsimOptions{
 			Clients:         opts.Clients,
@@ -140,6 +154,7 @@ func parseOptions() options {
 	flag.IntVar(&opts.TransitionLoops, "transition-loops", 2, "zone handoff transition loops per simulated player")
 	flag.IntVar(&opts.Shards, "shards", 2, "zone shard count for zone handoff loadsim")
 	flag.IntVar(&opts.QueueCapacity, "queue-capacity", 64, "per-zone command queue capacity for zone handoff loadsim")
+	flag.Int64Var(&opts.Seed, "seed", 42, "deterministic loadsim seed")
 	flag.Parse()
 
 	duration, err := time.ParseDuration(durationText)
@@ -299,6 +314,49 @@ func printZoneHandoffReport(report worlds.ZoneHandoffLoadsimReport) {
 	fmt.Printf("- average tick duration: %s\n", report.AverageTickDuration)
 	fmt.Printf("- max tick duration: %s\n", report.MaxTickDuration)
 	printErrors(report.Errors)
+}
+
+func printDawnwakeReport(report worlds.DawnwakeStreamingLoadsimReport) {
+	fmt.Println("Dawnwake streaming loadsim report")
+	fmt.Printf("- scenario: %s\n", report.Scenario)
+	fmt.Printf("- content package loaded: %v\n", report.ContentPackageLoaded)
+	fmt.Printf("- package id: %s\n", report.PackageID)
+	fmt.Printf("- continent id: %s\n", report.ContinentID)
+	fmt.Printf("- validation errors: %d\n", len(report.ValidationErrors))
+	for _, validationError := range report.ValidationErrors {
+		fmt.Printf("  - %s\n", validationError)
+	}
+	fmt.Printf("- zones activated: %d\n", report.ZonesActivated)
+	fmt.Printf("- catalogs loaded: %s\n", formatCounts(report.CatalogsLoaded))
+	fmt.Printf("- transition gates loaded: %d\n", report.TransitionGatesLoaded)
+	fmt.Printf("- players attached: %d\n", report.PlayersAttached)
+	fmt.Printf("- transition loops: %d\n", report.TransitionLoops)
+	fmt.Printf("- seed: %d\n", report.Seed)
+	fmt.Printf("- shard count: %d\n", report.ShardCount)
+	fmt.Printf("- shard assignments: %s\n", formatStringMap(report.ShardAssignments))
+	fmt.Printf("- shard population: %s\n", formatCounts(report.ShardPopulation))
+	fmt.Printf("- zone population: %s\n", formatCounts(report.ZonePopulation))
+	fmt.Printf("- transition counts: %s\n", formatCounts(report.TransitionCounts))
+	fmt.Printf("- zone transition counts: %s\n", formatCounts(report.ZoneTransitionCounts))
+	fmt.Printf("- zone transitions requested: %d\n", report.ZoneTransitionsRequested)
+	fmt.Printf("- zone transitions completed: %d\n", report.ZoneTransitionsCompleted)
+	fmt.Printf("- zone transitions rejected: %d\n", report.ZoneTransitionsRejected)
+	fmt.Printf("- visibility evaluations: %d\n", report.VisibilityEvaluations)
+	fmt.Printf("- streaming hints emitted: %d\n", report.StreamingHintsEmitted)
+	fmt.Printf("- NPCs spawned: %d\n", report.NPCsSpawned)
+	fmt.Printf("- quest providers registered: %d\n", report.QuestProvidersRegistered)
+	fmt.Printf("- average tick duration: %.3fms\n", report.AverageTickDurationMs)
+	fmt.Printf("- p50 tick duration: %.3fms\n", report.P50TickDurationMs)
+	fmt.Printf("- p95 tick duration: %.3fms\n", report.P95TickDurationMs)
+	fmt.Printf("- p99 tick duration: %.3fms\n", report.P99TickDurationMs)
+	fmt.Printf("- max tick duration: %.3fms\n", report.MaxTickDurationMs)
+	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	fmt.Printf("- rejected commands: %d\n", report.RejectedCommands)
+	printErrors(report.Errors)
+	encoded, err := json.Marshal(report)
+	if err == nil {
+		fmt.Printf("- json: %s\n", string(encoded))
+	}
 }
 
 func printErrors(errors []string) {
