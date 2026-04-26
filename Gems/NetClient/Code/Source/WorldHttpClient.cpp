@@ -298,6 +298,189 @@ namespace NetClient
             return escaped;
         }
 
+        AZStd::string FormatJsonScalar(const rapidjson::Value& value)
+        {
+            if (value.IsString())
+            {
+                return value.GetString();
+            }
+            if (value.IsBool())
+            {
+                return value.GetBool() ? "true" : "false";
+            }
+            if (value.IsInt())
+            {
+                return AZStd::string::format("%d", value.GetInt());
+            }
+            if (value.IsInt64())
+            {
+                return AZStd::string::format("%lld", static_cast<long long>(value.GetInt64()));
+            }
+            if (value.IsUint64())
+            {
+                return AZStd::string::format("%llu", static_cast<unsigned long long>(value.GetUint64()));
+            }
+            if (value.IsNumber())
+            {
+                return AZStd::string::format("%.1f", value.GetDouble());
+            }
+            return {};
+        }
+
+        void AppendSummaryField(AZStd::string& summary, const rapidjson::Value& fields, const char* fieldName, const char* label = nullptr)
+        {
+            if (!fields.IsObject() || !fields.HasMember(fieldName))
+            {
+                return;
+            }
+
+            const AZStd::string value = FormatJsonScalar(fields[fieldName]);
+            if (value.empty())
+            {
+                return;
+            }
+
+            if (!summary.empty())
+            {
+                summary += " ";
+            }
+            summary += label ? label : fieldName;
+            summary += "=";
+            summary += value;
+        }
+
+        AZStd::string BuildWorldEventSummary(const rapidjson::Value& eventValue)
+        {
+            const rapidjson::Value* fields = nullptr;
+            if (eventValue.HasMember("fields") && eventValue["fields"].IsObject())
+            {
+                fields = &eventValue["fields"];
+            }
+            else if (eventValue.HasMember("payload") && eventValue["payload"].IsObject())
+            {
+                fields = &eventValue["payload"];
+            }
+            if (!fields)
+            {
+                return {};
+            }
+
+            AZStd::string summary;
+            AppendSummaryField(summary, *fields, "abilityId", "ability");
+            AppendSummaryField(summary, *fields, "auraId", "aura");
+            AppendSummaryField(summary, *fields, "action");
+            AppendSummaryField(summary, *fields, "targetId", "target");
+            AppendSummaryField(summary, *fields, "targetEntityId", "target");
+            AppendSummaryField(summary, *fields, "sourceEntityId", "source");
+            AppendSummaryField(summary, *fields, "entityId", "entity");
+            AppendSummaryField(summary, *fields, "damage");
+            AppendSummaryField(summary, *fields, "amount");
+            AppendSummaryField(summary, *fields, "health");
+            AppendSummaryField(summary, *fields, "maxHealth", "max");
+            AppendSummaryField(summary, *fields, "alive");
+            AppendSummaryField(summary, *fields, "archetypeId", "credit");
+            AppendSummaryField(summary, *fields, "count");
+            AppendSummaryField(summary, *fields, "killCount", "kills");
+            AppendSummaryField(summary, *fields, "reason");
+            return summary;
+        }
+
+        void ParseAuraArray(const rapidjson::Value& source, AZStd::vector<AuraState>& outAuras)
+        {
+            outAuras.clear();
+            if (!source.IsArray())
+            {
+                return;
+            }
+
+            for (const rapidjson::Value& auraValue : source.GetArray())
+            {
+                if (!auraValue.IsObject())
+                {
+                    continue;
+                }
+
+                AuraState aura;
+                ReadString(auraValue, "auraId", aura.m_auraId);
+                ReadString(auraValue, "displayName", aura.m_displayName);
+                ReadString(auraValue, "kind", aura.m_kind);
+                ReadString(auraValue, "sourceEntityId", aura.m_sourceEntityId);
+                ReadString(auraValue, "targetEntityId", aura.m_targetEntityId);
+                ReadInt(auraValue, "stackCount", aura.m_stackCount);
+                ReadInt64(auraValue, "appliedAtMs", aura.m_appliedAtMs);
+                ReadInt64(auraValue, "expiresAtMs", aura.m_expiresAtMs);
+                ReadInt64(auraValue, "nextTickAtMs", aura.m_nextTickAtMs);
+                outAuras.push_back(AZStd::move(aura));
+            }
+        }
+
+        void ParseKillCreditArray(const rapidjson::Value& source, AZStd::vector<KillCreditState>& outCredits)
+        {
+            outCredits.clear();
+            if (!source.IsArray())
+            {
+                return;
+            }
+
+            for (const rapidjson::Value& creditValue : source.GetArray())
+            {
+                if (!creditValue.IsObject())
+                {
+                    continue;
+                }
+
+                KillCreditState credit;
+                ReadString(creditValue, "archetypeId", credit.m_archetypeId);
+                ReadString(creditValue, "reason", credit.m_reason);
+                ReadInt(creditValue, "count", credit.m_count);
+                ReadInt64(creditValue, "updatedAt", credit.m_updatedAt);
+                outCredits.push_back(AZStd::move(credit));
+            }
+        }
+
+        void ParseWorldEventArray(const rapidjson::Value& source, AZStd::vector<WorldEventEntry>& outEvents, bool preferDiffType)
+        {
+            outEvents.clear();
+            if (!source.IsArray())
+            {
+                return;
+            }
+
+            for (const rapidjson::Value& eventValue : source.GetArray())
+            {
+                if (!eventValue.IsObject())
+                {
+                    continue;
+                }
+
+                WorldEventEntry entry;
+                ReadInt64(eventValue, "sequence", entry.m_sequence);
+                ReadInt64(eventValue, "occurredAtMs", entry.m_occurredAtMs);
+                ReadString(eventValue, "characterId", entry.m_characterId);
+                ReadString(eventValue, "entityId", entry.m_entityId);
+                ReadString(eventValue, "zoneId", entry.m_zoneId);
+
+                if (preferDiffType)
+                {
+                    ReadString(eventValue, "diffType", entry.m_type);
+                }
+                if (entry.m_type.empty())
+                {
+                    ReadString(eventValue, "type", entry.m_type);
+                }
+                if (entry.m_type.empty())
+                {
+                    ReadString(eventValue, "eventName", entry.m_type);
+                }
+                if (entry.m_type.empty())
+                {
+                    ReadString(eventValue, "name", entry.m_type);
+                }
+                entry.m_summary = BuildWorldEventSummary(eventValue);
+                outEvents.push_back(AZStd::move(entry));
+            }
+        }
+
         void ParseQuestState(const rapidjson::Value& quest, QuestState& outQuest)
         {
             ReadString(quest, "id", outQuest.m_id);
@@ -656,6 +839,22 @@ namespace NetClient
             ReadInt64(document, "globalCooldownEndsAt", outResponse.m_globalCooldownEndsAt);
             ReadInt64(document, "castEndsAt", outResponse.m_castEndsAt);
             ReadString(document, "castingAbilityId", outResponse.m_castingAbilityId);
+            if (document.HasMember("auras"))
+            {
+                ParseAuraArray(document["auras"], outResponse.m_auras);
+            }
+            if (document.HasMember("killCredits"))
+            {
+                ParseKillCreditArray(document["killCredits"], outResponse.m_killCredits);
+            }
+            if (document.HasMember("domainEvents"))
+            {
+                ParseWorldEventArray(document["domainEvents"], outResponse.m_domainEvents, false);
+            }
+            if (document.HasMember("stateDiffs"))
+            {
+                ParseWorldEventArray(document["stateDiffs"], outResponse.m_stateDiffs, true);
+            }
             if (document.HasMember("quest") && document["quest"].IsObject())
             {
                 ParseQuestState(document["quest"], outResponse.m_quest);
@@ -849,6 +1048,10 @@ namespace NetClient
                     ReadBool(entityValue, "duelOpponent", entity.m_duelOpponent);
                     ReadString(entityValue, "aiState", entity.m_aiState);
                     ReadString(entityValue, "pvpState", entity.m_pvpState);
+                    if (entityValue.HasMember("auras"))
+                    {
+                        ParseAuraArray(entityValue["auras"], entity.m_auras);
+                    }
                     entity.m_services.clear();
                     if (entityValue.HasMember("npcServices") && entityValue["npcServices"].IsArray())
                     {

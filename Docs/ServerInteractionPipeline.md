@@ -105,6 +105,20 @@ The client then displays:
 
 This is intentionally a thin diagnostic UI. It proves the command/state/event shape the O3DE HUD can later consume without moving combat authority into the client.
 
+## O3DE HUD Consumption
+
+The O3DE `NetClient` now parses the protocol-neutral combat response fields from the world service: auras, kill credits, domain events, state diffs, target state, cooldowns, cast state, action bar slots, and visible entity health.
+
+`UiClient` consumes those fields as presentation data only. The HUD can display target selection, server-resolved ability outcomes, cooldown overlays, active auras, death state, kill credit, and recent authoritative event/diff summaries, but gameplay decisions stay in the world service.
+
+The client-side observability contract includes:
+
+- `client.combat_hud_ready`
+- `client.target_frame_updated`
+- `client.action_bar_cooldown_rendered`
+- `client.kill_credit_displayed`
+- `client.combat_hud_state_applied`
+
 ## Clean-room reference boundary
 
 This implementation uses original AmandaCore code and data.

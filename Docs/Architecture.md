@@ -68,12 +68,14 @@ Current Dawnwake coordinates are placeholder server-side rectangles pending map 
 
 This implementation uses original AmandaCore code and data. TrinityCore and AzerothCore were used only as high-level architectural reference. Dawnwake Isles is AmandaCore-original world content. No source code, SQL, packet layouts, opcodes, command names, schemas, content IDs, scripts, scripting APIs, assets, formulas, map formats, area tables, zone tables, spawn schemas, coordinates, quest tables, item tables, creature tables, spell tables, aura tables, reward schemas, or database structures were copied or adapted.
 
-## Recommended future O3DE wiring
+## O3DE wiring
 
 - Build `AmandaCoreShared` as a normal static library and link it into both client and server Gems.
 - Keep Atom, Terrain, Prefabs, and networking as engine services underneath project-owned gameplay systems.
 - Place O3DE serialization wrappers around the shared domain types instead of moving game rules into engine-specific components.
 - Use Prefab and asset metadata for presentation. Use project-owned JSON or generated asset products for authoritative gameplay data.
+
+The current O3DE client path keeps this boundary for combat. `NetClient` parses authoritative combat state from the world service, while `UiClient` renders target state, action bar cooldowns, active auras, kill credit, and recent combat state diffs/domain events. Targeting and ability input remain client intents; damage, cooldowns, aura lifecycle, death, respawn, and progression remain server decisions.
 
 ## Networking model
 
@@ -114,7 +116,7 @@ Aura runtime state is authoritative on the server and exposed to clients as prot
 
 `Client/Game/AmandaCore.WorldClient` now consumes the server combat response fields directly. The diagnostic client can select the nearest hostile target, submit `dev_basic_strike`, poll authoritative state, and render player health, target health, cooldowns, cast state, aura state, combat domain events, state diffs, NPC death, and kill credit.
 
-This remains a diagnostic client, not the final O3DE HUD. The important boundary is already in place: the client sends target and ability intents only, and all damage, death, aura, cooldown, and progression results come back from the world service.
+The O3DE HUD now consumes the same protocol-neutral response fields for player and target frames, cooldown overlays, aura lines, kill credit, and a compact combat feed. The important boundary remains unchanged: clients send target and ability intents only, and all damage, death, aura, cooldown, and progression results come back from the world service.
 
 ## Milestone one slice
 

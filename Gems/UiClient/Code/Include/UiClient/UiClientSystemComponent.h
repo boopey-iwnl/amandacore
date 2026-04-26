@@ -64,6 +64,8 @@ namespace UiClient
         int m_lastExperience = -1;
         int m_lastCurrencyCopper = -1;
         AZStd::string m_lastHudTargetId;
+        AZStd::string m_lastTargetFrameSummary;
+        AZStd::string m_lastKillCreditSummary;
         AZStd::string m_lastWorldSessionToken;
         AZStd::string m_lastErrorMessage;
         AZStd::string m_activeInteractionEntityId;
@@ -71,6 +73,8 @@ namespace UiClient
         AZStd::string m_questToast;
         AZStd::deque<AZStd::string> m_eventLog;
         AZ::u64 m_lastHandledInteractionSequence = 0;
+        AZ::s64 m_lastCombatDomainEventSequence = 0;
+        AZ::s64 m_lastCombatStateDiffSequence = 0;
         AZ::s64 m_questToastExpiresAt = 0;
         bool m_spellbookOpen = false;
         bool m_questGossipOpen = false;
@@ -91,6 +95,8 @@ namespace UiClient
         bool m_lastWorldConnected = false;
         bool m_lastNearCommandPoint = false;
         bool m_loggedActionBarVisible = false;
+        bool m_loggedActionBarCooldownRendered = false;
+        bool m_loggedCombatHudReady = false;
         bool m_loggedPlayableZoneReady = false;
         AZStd::string m_pendingActionAssignmentAbilityId;
         AZStd::string m_pendingKeybindActionId;

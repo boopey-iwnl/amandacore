@@ -153,17 +153,44 @@ Automated diagnostic command:
 dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --auto-combat-demo
 ```
 
+## O3DE Combat HUD Wiring
+
+The O3DE `NetClient` response model now parses the same authoritative combat fields used by the diagnostic client:
+
+- player and entity aura state
+- per-character kill credits
+- recent domain events
+- recent state diffs
+- current target, global cooldown, cast state, action bar cooldowns, and visible entity health
+
+`UiClient` renders those fields in the existing HUD surfaces:
+
+- the player frame shows health, resource, active cast state, and active auras
+- the target frame shows authoritative target health, death state, AI state, range, and target auras
+- the action bars render cooldown overlays from server timestamps
+- a compact combat feed shows kill credit plus recent authoritative combat events and state diffs
+
+The O3DE client still sends only intent: target selection, auto-attack toggle, ability activation, movement, and interaction requests. It does not calculate damage, aura ticks, death, cooldown readiness, or kill credit locally.
+
+Stable O3DE client log events include:
+
+- `client.combat_hud_ready`
+- `client.target_frame_updated`
+- `client.action_bar_cooldown_rendered`
+- `client.kill_credit_displayed`
+- `client.combat_hud_state_applied`
+
 ## Limitations And Next Steps
 
 - Only one dev hostile archetype is added.
 - Basic Strike remains fixed damage with no crit, dodge, miss, or mitigation.
-- The ability/effect/aura system is a skeleton. It supports deterministic direct damage, healing, aura apply/tick/expire, cooldown categories, and cast/channel timing, but does not yet include full stat scaling policies, interrupt rules, dispels, immunities, resistances, or O3DE combat HUD wiring.
+- The ability/effect/aura system is a skeleton. It supports deterministic direct damage, healing, aura apply/tick/expire, cooldown categories, and cast/channel timing, but does not yet include full stat scaling policies, interrupt rules, dispels, immunities, resistances, or richer authored ability content.
 - NPC movement is direct step movement, not navmesh pathing.
 - Player death has no full respawn flow.
 - Loot tables are intentionally not implemented.
 - Quest objective integration consumes the new kill-credit boundary later.
 
-Next recommended milestone: O3DE combat HUD wiring and richer ability content expansion.
+Next recommended milestone: richer ability content expansion.
 
 ## Clean-room reference boundary
 
