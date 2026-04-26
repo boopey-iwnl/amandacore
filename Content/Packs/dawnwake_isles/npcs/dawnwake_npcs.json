@@ -1,0 +1,21 @@
+{
+  "npcs": [
+    {
+      "archetype_id": "dawnwake_driftling",
+      "display_name": "Dawnwake Driftling",
+      "level": 2,
+      "max_health": 34,
+      "disposition": "hostile",
+      "attack_range": 3.5,
+      "aggro_range": 12,
+      "leash_range": 28,
+      "base_damage": 4,
+      "attack_interval_ms": 1800,
+      "default_ability_ids": [],
+      "tags": [
+        "dawnwake",
+        "validation"
+      ]
+    }
+  ]
+}

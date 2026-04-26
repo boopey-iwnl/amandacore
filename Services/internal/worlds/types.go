@@ -815,6 +815,8 @@ type worldServer struct {
 	zoneRuntimes           map[string]*ZoneRuntime
 	contentMobSpawns       []mobSpawnDefinition
 	contentActivation      ContentActivationResult
+	shardCoordinator       *ShardCoordinator
+	handoffGates           map[string]ZoneHandoffGateDefinition
 	chatMessages           []chatEnvelope
 	chatSequence           int64
 	partyInvites           map[string]partyInviteState
@@ -846,10 +848,12 @@ func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackage
 		},
 		zones:        map[string]zoneDefinition{},
 		zoneRuntimes: map[string]*ZoneRuntime{},
+		handoffGates: defaultZoneHandoffGateDefinitions(),
 		partyInvites: map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
 	server.loadConfiguredContentPackageLocked(contentPackagePath)
+	server.ensureShardCoordinatorLocked()
 	server.ensureMobsLocked()
 	server.ensureGatheringNodesLocked()
 	server.emitWorldEventLocked(eventItemCatalogLoaded, map[string]any{"itemCount": len(itemDefinitions)})

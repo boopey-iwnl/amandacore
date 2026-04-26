@@ -99,9 +99,13 @@ The new loadsim scenario is:
 
 ```powershell
 go run ./Services/cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario quest-basic
+go run ./Services/cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario zone-handoff-basic --transition-loops 3 --shards 2 --queue-capacity 64
+go run ./Services/cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario zone-package-handoff-basic --transition-loops 3 --shards 2 --queue-capacity 64 --content .\Content\Packs\dawnwake_isles\package.json
 ```
 
 It creates temporary test accounts and characters, accepts `dev_first_hunt`, defeats the dev hostile NPC through the server combat path, claims loot, completes the quest, and prints counts for accepted quests, NPC kills, kill credits, loot containers, claims, inventory grants, objective updates, ready quests, completed quests, rewards, rejected commands, tick duration, queue depth, and errors.
+
+The zone handoff scenario is documented separately in `Docs/ZoneHandoffShardCoordinator.md`.
 
 ## Current Limitations
 
@@ -109,22 +113,18 @@ It creates temporary test accounts and characters, accepts `dev_first_hunt`, def
 - Loot ownership supports one owner; eligible participant lists are future work.
 - Kill credit records killing-blow credit and does not yet implement group credit rules for the dev quest.
 - Quest graph support is intentionally minimal: dependencies and terminal completion exist, but optional branches and repeatable quests do not.
-- Loot tables and quests are in runtime dev definitions until the next content package loader milestone.
+- Built-in dev loot tables and quests remain as fallback, while validated package content can now register additional zones, handoff gates, spawn groups, loot tables, and quest provider references.
 - Recent event/diff response payloads are a temporary integration surface, not a final streaming protocol.
 
 ## Next Milestone
 
-The next recommended milestone is the zone content package loader:
+The next recommended milestone is NPC spawn scheduler plus archetype registry skeleton:
 
-- original AmandaCore content manifest format
-- zone definition loading
-- spawn point loading
-- NPC archetype references
-- loot table references
-- quest provider references
-- validation of authored content
-- compiled/runtime content package boundary
-- tests and loadsim coverage
+- package-authored NPC spawn groups consumed by a scheduler boundary
+- archetype registry separate from active mob instances
+- spawn enable/disable and respawn timing controls
+- debug/client exposure for package-spawned NPCs
+- tests and loadsim coverage without full AI expansion
 
 ## Clean-room reference boundary
 

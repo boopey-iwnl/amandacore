@@ -1,0 +1,37 @@
+{
+  "zone_id": "dawnwake_tideglass_shoal",
+  "display_name": "Tideglass Shoal",
+  "normalized_bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "max_x": 1,
+    "max_y": 1
+  },
+  "world_bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "max_x": 140,
+    "max_y": 100
+  },
+  "landmarks": [
+    {
+      "id": "lm_tideglass_west_path",
+      "display_name": "West Path",
+      "x": 0.08,
+      "y": 0.5
+    },
+    {
+      "id": "lm_tideglass_shoal_field",
+      "display_name": "Shoal Field",
+      "x": 0.58,
+      "y": 0.52
+    }
+  ],
+  "routes": [
+    {
+      "id": "route_tideglass_west_to_field",
+      "from": "lm_tideglass_west_path",
+      "to": "lm_tideglass_shoal_field"
+    }
+  ]
+}

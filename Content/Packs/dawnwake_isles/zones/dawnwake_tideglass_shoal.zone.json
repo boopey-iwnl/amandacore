@@ -1,0 +1,119 @@
+{
+  "zone_id": "dawnwake_tideglass_shoal",
+  "display_name": "Tideglass Shoal",
+  "description": "A compact original AmandaCore neighboring zone used for package-defined handoff validation.",
+  "bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "min_z": 0,
+    "max_x": 140,
+    "max_y": 100,
+    "max_z": 24
+  },
+  "shard_hint": "coastal-field",
+  "map_ref": "maps/dawnwake_tideglass_shoal.map.json",
+  "entry_points": [
+    {
+      "entry_id": "entry_tideglass_west",
+      "position": {
+        "x": 14,
+        "y": 50,
+        "z": 0.1
+      },
+      "facing_yaw": 90
+    }
+  ],
+  "spawn_points": [
+    {
+      "spawn_point_id": "sp_tideglass_west_arrival",
+      "purpose": "handoff_arrival",
+      "position": {
+        "x": 14,
+        "y": 50,
+        "z": 0.1
+      },
+      "facing_yaw": 90,
+      "tags": [
+        "handoff"
+      ]
+    },
+    {
+      "spawn_point_id": "sp_tideglass_field_entry",
+      "purpose": "test_spawn",
+      "position": {
+        "x": 40,
+        "y": 42,
+        "z": 0.1
+      },
+      "facing_yaw": 120,
+      "tags": [
+        "validation"
+      ]
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "sg_tideglass_driftling",
+      "npc_archetype_id": "dawnwake_driftling",
+      "loot_table_id": "lt_dawnwake_driftling_cache",
+      "respawn_seconds": 15,
+      "max_alive": 2,
+      "spawn_points": [
+        {
+          "spawn_point_id": "sp_tideglass_driftling_01",
+          "position": {
+            "x": 70,
+            "y": 44,
+            "z": 0.1
+          },
+          "facing_yaw": 200
+        },
+        {
+          "spawn_point_id": "sp_tideglass_driftling_02",
+          "position": {
+            "x": 84,
+            "y": 58,
+            "z": 0.1
+          },
+          "facing_yaw": 230
+        }
+      ],
+      "tags": [
+        "field",
+        "validation"
+      ]
+    }
+  ],
+  "handoff_gates": [
+    {
+      "gate_id": "gate_tideglass_to_dawnwake_landing",
+      "source_zone_id": "dawnwake_tideglass_shoal",
+      "destination_zone_id": "dawnwake_landing",
+      "trigger": {
+        "center": {
+          "x": 6,
+          "y": 50,
+          "z": 0.1
+        },
+        "radius": 10
+      },
+      "arrival_spawn_point_id": "sp_dawnwake_landing_east_arrival",
+      "enabled": true,
+      "retryable_when_unavailable": true,
+      "tags": [
+        "handoff",
+        "west-road"
+      ]
+    }
+  ],
+  "quest_providers": [],
+  "runtime": {
+    "tick_ms": 50,
+    "max_players": 24,
+    "max_entities": 128
+  },
+  "tags": [
+    "dawnwake",
+    "field"
+  ]
+}

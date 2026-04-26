@@ -58,13 +58,17 @@ The local stack waits for each service to report healthy before returning contro
 
 Milestone `0.1` hardening details, commands, and pass/fail behavior are documented in `Docs/Milestone01-AccountToWorld.md`.
 
-## Content package loadsim
+## Load simulators
 
-Run from the Go module root:
+Backend progression and handoff scenarios can run without the launcher or O3DE client:
 
 ```powershell
-cd Services
-go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
+go run ./Services/cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario quest-basic
+go run ./Services/cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content .\Content\Packs\dev_foundation\package.json
+go run ./Services/cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario zone-handoff-basic --transition-loops 3 --shards 2 --queue-capacity 64
+go run ./Services/cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario zone-package-handoff-basic --transition-loops 3 --shards 2 --queue-capacity 64 --content .\Content\Packs\dawnwake_isles\package.json
 ```
+
+`quest-basic` proves the early kill -> loot -> quest reward loop. `content-package-basic` validates and activates original package data. `zone-handoff-basic` proves deterministic shard ownership, zone handoff validation, an expected retryable rejection, queue counters, and final zone/shard population reporting. `zone-package-handoff-basic` proves package-loaded Dawnwake zones and handoff gates feed the same authoritative handoff path.
 
 The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`.

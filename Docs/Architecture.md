@@ -59,6 +59,12 @@ The data model is deliberately wider than the first slice so future work can sca
 
 The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones and catalogs before activation, and activates validated dev content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows.
 
+### Zone handoff and shard coordination
+
+The first server-authoritative handoff skeleton is documented in `Docs/ZoneHandoffShardCoordinator.md`. The Go world runtime now owns deterministic zone-to-shard assignments, in-process shard worker states, per-zone queue capacity, character zone ownership, handoff request/accept/reject/complete records, reconnect correction, and a `zone-handoff-basic` load simulator.
+
+The zone content package loader now feeds validated package-authored handoff gates into that runtime. This is not a distributed runtime yet. It keeps execution in one world process while shaping the contracts needed for future shard workers, durable handoff journals, and broader content-authored transition gates.
+
 ## Recommended future O3DE wiring
 
 - Build `AmandaCoreShared` as a normal static library and link it into both client and server Gems.

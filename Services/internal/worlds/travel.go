@@ -770,6 +770,7 @@ func (s *worldServer) persistTravelSessionLocked(session *worldSessionState) err
 	}
 	session.MountState = persistedMount
 	session.CurrencyCopper = character.CurrencyCopper
+	s.syncSessionZoneOwnershipLocked(session)
 	return nil
 }
 

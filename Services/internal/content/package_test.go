@@ -23,6 +23,28 @@ func TestContentPackageManifestLoadsSuccessfully(t *testing.T) {
 	}
 }
 
+func TestDawnwakePackageLoadsHandoffGatesAndSpawnPoints(t *testing.T) {
+	result := NewContentPackageLoader().Load(DawnwakePackagePath)
+	if !result.Validation.Valid() {
+		t.Fatalf("expected Dawnwake package to load, got errors: %#v", result.Validation.Errors)
+	}
+	if result.Validated == nil {
+		t.Fatalf("expected validated Dawnwake package")
+	}
+	if result.Package.Manifest.PackageID != "dawnwake_isles_foundation" {
+		t.Fatalf("unexpected package id %q", result.Package.Manifest.PackageID)
+	}
+	if len(result.Validated.Registry.Zones) != 2 {
+		t.Fatalf("expected two Dawnwake zones, got %d", len(result.Validated.Registry.Zones))
+	}
+	if _, found := result.Validated.Registry.HandoffGates["gate_dawnwake_landing_to_tideglass"]; !found {
+		t.Fatalf("expected Dawnwake landing handoff gate")
+	}
+	if _, found := result.Validated.Registry.SpawnPoints["sp_tideglass_west_arrival"]; !found {
+		t.Fatalf("expected Tideglass arrival spawn point")
+	}
+}
+
 func TestMissingManifestFileReturnsMissingFile(t *testing.T) {
 	missingPath := filepath.Join(t.TempDir(), "missing-package.json")
 	result := NewContentPackageLoader().Load(missingPath)
@@ -98,6 +120,38 @@ func TestSpawnPointOutsideZoneBoundsRejected(t *testing.T) {
 	assertValidationCode(t, report, ErrorPositionOutOfBounds)
 }
 
+func TestDuplicateHandoffGateIDsRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[1].HandoffGates[0].GateID = loaded.Zones[0].HandoffGates[0].GateID
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorDuplicateID)
+	assertValidationPathContains(t, report, "handoff_gates[0].gate_id")
+}
+
+func TestHandoffGateReferencingMissingDestinationZoneRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].HandoffGates[0].DestinationZoneID = "missing_zone"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "handoff_gates[0].destination_zone_id")
+}
+
+func TestHandoffGateReferencingMissingArrivalSpawnRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].HandoffGates[0].ArrivalSpawnPointID = "missing_spawn"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "handoff_gates[0].arrival_spawn_point_id")
+}
+
+func TestHandoffGateArrivalSpawnMustBelongToDestinationZone(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].HandoffGates[0].ArrivalSpawnPointID = "sp_dawnwake_landing_player"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "handoff_gates[0].arrival_spawn_point_id")
+}
+
 func TestQuestRewardReferencingMissingItemRejected(t *testing.T) {
 	loaded := mustLoadDevPackage(t)
 	loaded.Quests[0].Rewards[0].ItemID = "missing_item"
@@ -153,6 +207,15 @@ func mustLoadDevPackage(t *testing.T) LoadedContentPackage {
 	result := NewContentPackageLoader().Load(DefaultPackagePath)
 	if !result.Validation.Valid() {
 		t.Fatalf("expected dev package to load, got errors: %#v", result.Validation.Errors)
+	}
+	return result.Package
+}
+
+func mustLoadDawnwakePackage(t *testing.T) LoadedContentPackage {
+	t.Helper()
+	result := NewContentPackageLoader().Load(DawnwakePackagePath)
+	if !result.Validation.Valid() {
+		t.Fatalf("expected Dawnwake package to load, got errors: %#v", result.Validation.Errors)
 	}
 	return result.Package
 }

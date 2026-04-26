@@ -22,6 +22,20 @@ Content/Packs/dev_foundation/
   auras/dev_auras.json
 ```
 
+The Dawnwake handoff validation package lives at:
+
+```text
+Content/Packs/dawnwake_isles/
+  package.json
+  zones/dawnwake_landing.zone.json
+  zones/dawnwake_tideglass_shoal.zone.json
+  maps/*.map.json
+  npcs/dawnwake_npcs.json
+  items/dawnwake_items.json
+  loot/dawnwake_loot.json
+  quests/dawnwake_quests.json
+```
+
 The default local package is `Content/Packs/dev_foundation/package.json`. Override it with:
 
 ```powershell
@@ -47,6 +61,7 @@ Relative paths are resolved from the current working directory first, then by wa
 - `quest_catalogs`
 - `ability_catalogs`
 - `aura_catalogs`
+- `dependencies`
 - `tags`
 
 `schema_version` is currently `1`. Unsupported schema versions are rejected before runtime activation.
@@ -58,11 +73,30 @@ A zone file defines:
 - `zone_id`, `display_name`, `description`
 - `bounds` with `min_x`, `min_y`, `min_z`, `max_x`, `max_y`, `max_z`
 - `entry_points`
+- `spawn_points`
 - `spawn_groups`
+- `handoff_gates`
 - `quest_providers`
+- `map_ref`
+- `shard_hint`
 - `runtime` with `tick_ms`, `max_players`, `max_entities`
 
 Validation requires valid bounds, positions inside bounds, unique zone IDs, positive runtime limits, and a tick interval from 16ms to 250ms.
+
+`spawn_points` are package-level runtime anchors within a zone. Supported `purpose` values are `player_entry`, `handoff_arrival`, `npc_spawn`, and `test_spawn`. Spawn point IDs must be unique across the package.
+
+`handoff_gates` define package-authored transitions:
+
+- `gate_id`
+- `source_zone_id`
+- `destination_zone_id`
+- `trigger.center`
+- `trigger.radius`
+- `arrival_spawn_point_id`
+- `enabled`
+- `retryable_when_unavailable`
+
+Validation rejects duplicate gate IDs, missing source or destination zones, gates declared in the wrong source zone, malformed trigger radii, trigger centers outside source bounds, missing arrival spawn points, and arrival spawn points that do not belong to the destination zone.
 
 ## Catalogs
 
@@ -93,11 +127,11 @@ The loader reports all practical errors without panicking. Error codes include:
 - `ObjectiveGraphCycle`
 - `RuntimeConfigInvalid`
 
-Package-level validation catches duplicate IDs, missing files, malformed JSON, broken spawn/NPC/loot/item/quest/ability/aura references, invalid numeric ranges, positions outside zone bounds, invalid runtime config, and quest objective dependency cycles.
+Package-level validation catches duplicate IDs, missing files, malformed JSON, broken zone/spawn/handoff/NPC/loot/item/quest/ability/aura references, invalid numeric ranges, positions outside zone bounds, invalid runtime config, and quest objective dependency cycles.
 
 ## Runtime Activation
 
-Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones to current world zone definitions, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers content loot tables, and converts package quest objective graphs into the current server-authoritative quest graph model.
+Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones to current world zone definitions, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers content loot tables, registers package-authored handoff gates, and converts package quest objective graphs into the current server-authoritative quest graph model.
 
 Existing hardcoded Stonewake, Brindlebrook, and dev progression flows remain as fallback. The content package is additive and does not replace current starter content. If a package item, loot table, or quest ID already exists in built-in content, runtime activation preserves the built-in definition and keeps the package definition in the `RuntimeContentRegistry` for validation/reporting. Package-spawned NPC entity IDs use a content prefix so authored spawn points cannot collide with built-in dev spawn IDs.
 
@@ -106,12 +140,16 @@ Structured events include:
 - `content.package.load_started`
 - `content.package.load_completed`
 - `content.package.load_failed`
+- `content.package.loaded`
 - `content.package.validation_started`
 - `content.package.validation_completed`
 - `content.package.validation_failed`
 - `content.package.activated`
 - `content.package.activation_failed`
 - `content.zone.loaded`
+- `content.zones_registered`
+- `content.handoff_gate.registered`
+- `content.handoff_gates_registered`
 - `content.catalog.loaded`
 - `content.reference.resolved`
 - `content.reference.broken`
@@ -131,13 +169,30 @@ go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-
 
 The `content-package-basic` scenario loads and validates the package, activates zones, counts spawned NPCs, accepts `dev_first_hunt`, resolves a stalker kill, claims deterministic guaranteed loot, grants quest rewards, and reports tick timing.
 
+The package-authored handoff scenario uses Dawnwake package zones and gates:
+
+```powershell
+cd Services
+go run ./cmd/loadsim --clients 25 --duration 30s --cmd-rate 4 --scenario zone-package-handoff-basic --transition-loops 3 --shards 2 --queue-capacity 64 --content ..\Content\Packs\dawnwake_isles\package.json
+```
+
+It validates the package, activates Dawnwake zones, registers package handoff gates, assigns those zones to shards, runs handoffs through the same server-authoritative coordinator as built-in gates, and reports package validation and handoff metrics.
+
+The lightweight map exporter validates original Dawnwake authoring JSON and checks generated package map references:
+
+```powershell
+cd Services
+go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps --check
+```
+
 ## Current Limitations
 
 - Ability and aura package entries are validated and registered, but combat still resolves the existing hardcoded Warrior ability catalog.
 - Runtime quest activation supports kill, collect, and provider-interaction objective graph nodes. Broader branching, optional objectives, repeatable quests, and editor-authored quest UI are future work.
 - Loadsim loot claiming is deterministic and server-side. Client UI for package-authored loot windows and quest offers is future work.
-- This is not a content editor, O3DE export pipeline, terrain streamer, or compiled binary content format.
+- Handoff gates are loaded from packages for Dawnwake validation, but shard workers and journals remain in-process.
+- This is not a content editor, full O3DE export pipeline, terrain streamer, or compiled binary content format.
 
 ## Next Milestone
 
-Dawnwake Isles zone skeletons and streamed world expansion should add an original Dawnwake package, AmandaCore-owned zone IDs and boundaries, adjacency and transition metadata, loaded zone runtimes, entry and exit transition points, placeholder spawn groups and quest providers, world traversal validation, future O3DE streaming hooks, tests, and loadsim coverage.
+NPC spawn scheduler plus archetype registry skeleton. Package-authored zones now carry spawn points and NPC archetype references; the next step is proving package-authored NPCs can appear through a scheduler-owned runtime boundary and be exposed to the client/debug layer without implementing full AI.

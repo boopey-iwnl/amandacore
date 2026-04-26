@@ -1,0 +1,127 @@
+{
+  "zone_id": "dawnwake_landing",
+  "display_name": "Dawnwake Landing",
+  "description": "A compact original AmandaCore shore settlement zone used to validate package-loaded handoff gates.",
+  "bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "min_z": 0,
+    "max_x": 120,
+    "max_y": 96,
+    "max_z": 24
+  },
+  "shard_hint": "starter-settlement",
+  "map_ref": "maps/dawnwake_landing.map.json",
+  "entry_points": [
+    {
+      "entry_id": "entry_dawnwake_landing_player",
+      "position": {
+        "x": 16,
+        "y": 18,
+        "z": 0.1
+      },
+      "facing_yaw": 80
+    }
+  ],
+  "spawn_points": [
+    {
+      "spawn_point_id": "sp_dawnwake_landing_player",
+      "purpose": "player_entry",
+      "position": {
+        "x": 16,
+        "y": 18,
+        "z": 0.1
+      },
+      "facing_yaw": 80,
+      "tags": [
+        "entry"
+      ]
+    },
+    {
+      "spawn_point_id": "sp_dawnwake_landing_east_arrival",
+      "purpose": "handoff_arrival",
+      "position": {
+        "x": 96,
+        "y": 52,
+        "z": 0.1
+      },
+      "facing_yaw": 270,
+      "tags": [
+        "handoff"
+      ]
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "sg_dawnwake_landing_practice",
+      "npc_archetype_id": "dawnwake_driftling",
+      "loot_table_id": "lt_dawnwake_driftling_cache",
+      "respawn_seconds": 15,
+      "max_alive": 1,
+      "spawn_points": [
+        {
+          "spawn_point_id": "sp_dawnwake_landing_driftling_01",
+          "position": {
+            "x": 54,
+            "y": 44,
+            "z": 0.1
+          },
+          "facing_yaw": 180
+        }
+      ],
+      "tags": [
+        "starter",
+        "validation"
+      ]
+    }
+  ],
+  "handoff_gates": [
+    {
+      "gate_id": "gate_dawnwake_landing_to_tideglass",
+      "source_zone_id": "dawnwake_landing",
+      "destination_zone_id": "dawnwake_tideglass_shoal",
+      "trigger": {
+        "center": {
+          "x": 112,
+          "y": 52,
+          "z": 0.1
+        },
+        "radius": 10
+      },
+      "arrival_spawn_point_id": "sp_tideglass_west_arrival",
+      "enabled": true,
+      "retryable_when_unavailable": true,
+      "tags": [
+        "handoff",
+        "east-road"
+      ]
+    }
+  ],
+  "quest_providers": [
+    {
+      "provider_id": "qp_dawnwake_pathwarden",
+      "display_name": "Pathwarden Ila Venn",
+      "position": {
+        "x": 22,
+        "y": 20,
+        "z": 0.1
+      },
+      "offered_quest_ids": [
+        "quest_dawnwake_path_check"
+      ],
+      "tags": [
+        "quest",
+        "validation"
+      ]
+    }
+  ],
+  "runtime": {
+    "tick_ms": 50,
+    "max_players": 24,
+    "max_entities": 128
+  },
+  "tags": [
+    "dawnwake",
+    "starter"
+  ]
+}

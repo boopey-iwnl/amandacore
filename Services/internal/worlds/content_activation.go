@@ -28,6 +28,7 @@ type ContentActivationResult struct {
 	CatalogsLoaded           map[string]int
 	NPCsSpawned              int
 	QuestProvidersRegistered int
+	HandoffGatesRegistered   int
 	QuestsRegistered         int
 	Errors                   []contentpkg.ContentValidationError
 }
@@ -59,6 +60,7 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			"quests":      len(registry.Quests),
 			"abilities":   len(registry.Abilities),
 			"auras":       len(registry.Auras),
+			"handoff":     len(registry.HandoffGates),
 		},
 	}
 
@@ -139,6 +141,11 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			result.QuestProvidersRegistered++
 			zoneRuntime.RegisteredQuestProvider++
 		}
+		for _, gate := range zone.HandoffGates {
+			if s.registerContentHandoffGateLocked(gate, registry) {
+				result.HandoffGatesRegistered++
+			}
+		}
 		for _, spawnGroup := range zone.SpawnGroups {
 			spawned := s.registerContentSpawnGroupLocked(zone.ZoneID, spawnGroup, registry)
 			result.NPCsSpawned += spawned
@@ -165,9 +172,50 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 		"zonesActivated":           result.ZonesActivated,
 		"npcsSpawned":              result.NPCsSpawned,
 		"questProvidersRegistered": result.QuestProvidersRegistered,
+		"handoffGatesRegistered":   result.HandoffGatesRegistered,
 		"questsRegistered":         result.QuestsRegistered,
 	})
+	observability.LogEvent("world-service", contentpkg.EventZonesRegistered, map[string]any{
+		"packageId": result.PackageID,
+		"count":     result.ZonesActivated,
+	})
+	observability.LogEvent("world-service", contentpkg.EventHandoffGatesRegistered, map[string]any{
+		"packageId": result.PackageID,
+		"count":     result.HandoffGatesRegistered,
+	})
 	return result
+}
+
+func (s *worldServer) registerContentHandoffGateLocked(gate contentpkg.HandoffGateDefinition, registry contentpkg.RuntimeContentRegistry) bool {
+	arrival, found := findContentSpawnPoint(registry, gate.ArrivalSpawnPointID)
+	if !found {
+		return false
+	}
+	if s.handoffGates == nil {
+		s.handoffGates = defaultZoneHandoffGateDefinitions()
+	}
+	worldGate := ZoneHandoffGateDefinition{
+		TransitionID:       gate.GateID,
+		FromZoneID:         gate.SourceZoneID,
+		ToZoneID:           gate.DestinationZoneID,
+		GateX:              gate.Trigger.Center.X,
+		GateY:              gate.Trigger.Center.Y,
+		Radius:             gate.Trigger.Radius,
+		ArrivalX:           arrival.Position.X,
+		ArrivalY:           arrival.Position.Y,
+		ArrivalZ:           clampSpawnGroundZ(arrival.Position.Z),
+		Enabled:            gate.Enabled,
+		RetryableWhenFails: gate.RetryableWhenUnavailable,
+	}
+	s.handoffGates[worldGate.TransitionID] = worldGate
+	observability.LogEvent("world-service", contentpkg.EventHandoffGateRegistered, map[string]any{
+		"packageId":         registry.PackageID,
+		"gateId":            gate.GateID,
+		"sourceZoneId":      gate.SourceZoneID,
+		"destinationZoneId": gate.DestinationZoneID,
+		"arrivalSpawnId":    gate.ArrivalSpawnPointID,
+	})
+	return true
 }
 
 func (s *worldServer) registerContentQuestProviderLocked(zoneID string, provider contentpkg.QuestProviderDefinition) {
@@ -239,6 +287,32 @@ func (s *worldServer) registerContentSpawnGroupLocked(zoneID string, group conte
 		})
 	}
 	return spawned
+}
+
+func findContentSpawnPoint(registry contentpkg.RuntimeContentRegistry, spawnPointID string) (contentpkg.ZoneSpawnPointDefinition, bool) {
+	if spawn, found := registry.SpawnPoints[spawnPointID]; found {
+		return spawn, true
+	}
+	for _, zone := range registry.Zones {
+		for _, spawn := range zone.SpawnPoints {
+			if spawn.SpawnPointID == spawnPointID {
+				return spawn, true
+			}
+		}
+		for _, group := range zone.SpawnGroups {
+			for _, spawn := range group.SpawnPoints {
+				if spawn.SpawnPointID == spawnPointID {
+					return contentpkg.ZoneSpawnPointDefinition{
+						SpawnPointID: spawn.SpawnPointID,
+						Purpose:      "npc_spawn",
+						Position:     spawn.Position,
+						FacingYaw:    spawn.FacingYaw,
+					}, true
+				}
+			}
+		}
+	}
+	return contentpkg.ZoneSpawnPointDefinition{}, false
 }
 
 func (s *worldServer) contentQuestDefinition(registry contentpkg.RuntimeContentRegistry, quest contentpkg.QuestDefinition) questDefinition {

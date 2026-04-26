@@ -79,3 +79,27 @@ func TestQuestProviderRegistersLoadedDevFirstHunt(t *testing.T) {
 		t.Fatalf("expected quest target dev_isle_stalker, got %q", quest.TargetMobType)
 	}
 }
+
+func TestDawnwakePackageRegistersHandoffGates(t *testing.T) {
+	server := newWorldServerWithContentPackage(nil, contentpkg.DawnwakePackagePath)
+
+	if server.contentRegistry == nil {
+		t.Fatalf("expected runtime content registry")
+	}
+	if server.contentRegistry.PackageID != "dawnwake_isles_foundation" {
+		t.Fatalf("unexpected package id %q", server.contentRegistry.PackageID)
+	}
+	if server.contentActivation.HandoffGatesRegistered != 2 {
+		t.Fatalf("expected two handoff gates, got %d", server.contentActivation.HandoffGatesRegistered)
+	}
+	gate := server.handoffGateLocked("gate_dawnwake_landing_to_tideglass")
+	if gate.TransitionID == "" {
+		t.Fatalf("expected package handoff gate")
+	}
+	if gate.FromZoneID != "dawnwake_landing" || gate.ToZoneID != "dawnwake_tideglass_shoal" {
+		t.Fatalf("unexpected handoff route: %#v", gate)
+	}
+	if gate.ArrivalX != 14 || gate.ArrivalY != 50 {
+		t.Fatalf("expected arrival from package spawn point, got %#v", gate)
+	}
+}

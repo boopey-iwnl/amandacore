@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "item_id": "item_dawnwake_salt_chip",
+      "display_name": "Salt Chip",
+      "description": "A small original AmandaCore validation item from the Dawnwake shore.",
+      "kind": "material",
+      "quality": "common",
+      "max_stack": 99,
+      "tags": [
+        "dawnwake",
+        "material"
+      ]
+    },
+    {
+      "item_id": "item_dawnwake_path_token",
+      "display_name": "Path Token",
+      "description": "A placeholder token used by Dawnwake package validation quests.",
+      "kind": "currency",
+      "quality": "common",
+      "max_stack": 999,
+      "tags": [
+        "dawnwake",
+        "reward"
+      ]
+    }
+  ]
+}

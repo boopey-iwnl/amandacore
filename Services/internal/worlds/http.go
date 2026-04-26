@@ -57,6 +57,7 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	mux.HandleFunc("POST /v1/world/connect", server.instrumentEndpointFunc("connect", server.handleConnect))
 	mux.HandleFunc("POST /v1/world/reconnect", server.instrumentEndpointFunc("reconnect", server.handleReconnect))
 	mux.HandleFunc("POST /v1/world/move", server.instrumentEndpointFunc("move", server.handleMove))
+	mux.HandleFunc("POST /v1/world/zone/handoff", server.instrumentEndpointFunc("zone_handoff", server.handleZoneHandoff))
 	mux.HandleFunc("POST /v1/world/disconnect", server.instrumentEndpointFunc("disconnect", server.handleDisconnect))
 	mux.HandleFunc("POST /v1/world/target", server.instrumentEndpointFunc("target", server.handleTarget))
 	mux.HandleFunc("GET /v1/world/travel/state", server.instrumentEndpointFunc("travel_state", server.handleTravelState))
@@ -218,6 +219,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				s.reviveSessionLocked(session)
 			}
 			s.applyCharacterProgressionLocked(session, character)
+			s.syncSessionZoneOwnershipLocked(session)
 			observability.LogEvent("world-service", "world.player_spawned", map[string]any{
 				"worldSessionToken": session.Token,
 				"accountId":         session.AccountID,
@@ -259,6 +261,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	s.sessionsByToken[session.Token] = session
 	s.sessionTokenByChar[session.CharacterID] = session.Token
+	s.syncSessionZoneOwnershipLocked(session)
 	observability.LogEvent("world-service", "world.player_spawned", map[string]any{
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
@@ -338,6 +341,7 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 		s.reviveSessionLocked(session)
 	}
 	s.applyCharacterProgressionLocked(session, character)
+	s.syncSessionZoneOwnershipLocked(session)
 
 	observability.LogEvent("world-service", "world.reconnected", map[string]any{
 		"worldSessionToken": session.Token,
@@ -409,6 +413,7 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		"y":                 character.PositionY,
 		"z":                 character.PositionZ,
 	})
+	s.syncSessionZoneOwnershipLocked(session)
 
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 }
@@ -1264,6 +1269,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"housing":              s.buildHousingResponseLocked(session),
 		"instance":             s.buildDungeonInstanceResponse(session),
 		"travel":               s.buildTravelStateResponseLocked(session),
+		"zoneHandoff":          s.buildZoneHandoffResponseLocked(session),
 		"mounts":               s.buildMountCollectionResponseLocked(session),
 		"pvp":                  s.buildPvPResponseLocked(session),
 		"currentTargetId":      session.CurrentTargetID,

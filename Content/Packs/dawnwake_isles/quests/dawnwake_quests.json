@@ -1,0 +1,32 @@
+{
+  "quests": [
+    {
+      "quest_id": "quest_dawnwake_path_check",
+      "display_name": "Path Check",
+      "summary": "Confirm the eastern path from Dawnwake Landing is passable.",
+      "required_level": 1,
+      "prerequisite_quest_ids": [],
+      "objective_graph": {
+        "nodes": [
+          {
+            "node_id": "talk_pathwarden",
+            "kind": "talk_provider",
+            "target_id": "qp_dawnwake_pathwarden",
+            "required_count": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "rewards": [
+        {
+          "item_id": "item_dawnwake_path_token",
+          "quantity": 1
+        }
+      ],
+      "tags": [
+        "dawnwake",
+        "validation"
+      ]
+    }
+  ]
+}

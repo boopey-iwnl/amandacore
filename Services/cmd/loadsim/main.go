@@ -13,22 +13,24 @@ import (
 )
 
 type options struct {
-	Clients     int
-	Duration    time.Duration
-	CommandRate float64
-	Scenario    string
-	ContentPath string
+	Clients         int
+	Duration        time.Duration
+	CmdRate         int
+	Scenario        string
+	ContentPath     string
+	TransitionLoops int
+	Shards          int
+	QueueCapacity   int
 }
 
 func main() {
 	opts := parseOptions()
-
 	switch opts.Scenario {
 	case "quest-basic":
 		report, err := worlds.RunQuestBasicLoadsim(worlds.QuestBasicLoadsimOptions{
 			Clients:  opts.Clients,
 			Duration: opts.Duration,
-			CmdRate:  questCommandRate(opts.CommandRate),
+			CmdRate:  opts.CmdRate,
 		})
 		printQuestReport(report)
 		exitForQuestReport(report, err)
@@ -36,12 +38,25 @@ func main() {
 		report, err := worlds.RunContentPackageLoadsim(worlds.ContentPackageLoadsimOptions{
 			Clients:     opts.Clients,
 			Duration:    opts.Duration,
-			CommandRate: opts.CommandRate,
+			CommandRate: float64(opts.CmdRate),
 			Scenario:    opts.Scenario,
 			ContentPath: opts.ContentPath,
 		})
 		printContentReport(report)
 		exitForContentReport(report, err)
+	case "zone-handoff-basic", "zone-package-handoff-basic":
+		report, err := worlds.RunZoneHandoffLoadsim(worlds.ZoneHandoffLoadsimOptions{
+			Clients:         opts.Clients,
+			Duration:        opts.Duration,
+			CmdRate:         opts.CmdRate,
+			TransitionLoops: opts.TransitionLoops,
+			Shards:          opts.Shards,
+			QueueCapacity:   opts.QueueCapacity,
+			ContentPath:     opts.ContentPath,
+			Scenario:        opts.Scenario,
+		})
+		printZoneHandoffReport(report)
+		exitForZoneHandoffReport(report, err)
 	default:
 		exitf("unsupported scenario %q", opts.Scenario)
 	}
@@ -52,9 +67,12 @@ func parseOptions() options {
 	opts := options{}
 	flag.IntVar(&opts.Clients, "clients", 1, "number of simulated players")
 	flag.StringVar(&durationText, "duration", "30s", "scenario duration budget, for example 30s")
-	flag.Float64Var(&opts.CommandRate, "cmd-rate", 2, "nominal commands per second per player")
+	flag.IntVar(&opts.CmdRate, "cmd-rate", 2, "nominal commands per second per player")
 	flag.StringVar(&opts.Scenario, "scenario", "quest-basic", "scenario name")
 	flag.StringVar(&opts.ContentPath, "content", "", "content package manifest path")
+	flag.IntVar(&opts.TransitionLoops, "transition-loops", 2, "zone handoff transition loops per simulated player")
+	flag.IntVar(&opts.Shards, "shards", 2, "zone shard count for zone handoff loadsim")
+	flag.IntVar(&opts.QueueCapacity, "queue-capacity", 64, "per-zone command queue capacity for zone handoff loadsim")
 	flag.Parse()
 
 	duration, err := time.ParseDuration(durationText)
@@ -66,8 +84,17 @@ func parseOptions() options {
 	if opts.Clients <= 0 {
 		exitf("--clients must be greater than zero")
 	}
-	if opts.CommandRate <= 0 {
+	if opts.CmdRate <= 0 {
 		exitf("--cmd-rate must be greater than zero")
+	}
+	if opts.TransitionLoops < 0 {
+		exitf("--transition-loops must be zero or greater")
+	}
+	if opts.Shards <= 0 {
+		exitf("--shards must be greater than zero")
+	}
+	if opts.QueueCapacity <= 0 {
+		exitf("--queue-capacity must be greater than zero")
 	}
 	return opts
 }
@@ -98,14 +125,6 @@ func printQuestReport(report worlds.QuestBasicLoadsimReport) {
 	for _, errText := range report.Errors {
 		fmt.Printf("  - %s\n", errText)
 	}
-}
-
-func questCommandRate(commandRate float64) int {
-	rate := int(commandRate)
-	if rate < 1 {
-		return 1
-	}
-	return rate
 }
 
 func printContentReport(report worlds.ContentPackageLoadsimReport) {
@@ -140,6 +159,66 @@ func printContentReport(report worlds.ContentPackageLoadsimReport) {
 	}
 }
 
+func printZoneHandoffReport(report worlds.ZoneHandoffLoadsimReport) {
+	fmt.Println("Zone handoff loadsim report")
+	fmt.Printf("- scenario: %s\n", report.Scenario)
+	fmt.Printf("- simulated clients: %d\n", report.SimulatedClients)
+	if report.PackageID != "" || len(report.ValidationErrors) > 0 {
+		fmt.Printf("- content package loaded: %v\n", report.ContentPackageLoaded)
+		fmt.Printf("- package id: %s\n", report.PackageID)
+		fmt.Printf("- zones activated: %d\n", report.ZonesActivated)
+		fmt.Printf("- handoff gates registered: %d\n", report.HandoffGatesRegistered)
+		fmt.Printf("- validation errors: %d\n", len(report.ValidationErrors))
+		for _, validationError := range report.ValidationErrors {
+			fmt.Printf("  - %s\n", validationError)
+		}
+	}
+	fmt.Printf("- transition loops: %d\n", report.TransitionLoops)
+	fmt.Printf("- shard count: %d\n", report.ShardCount)
+	fmt.Printf("- queue capacity: %d\n", report.QueueCapacity)
+	fmt.Printf("- handoffs requested: %d\n", report.HandoffsRequested)
+	fmt.Printf("- handoffs accepted: %d\n", report.HandoffsAccepted)
+	fmt.Printf("- handoffs completed: %d\n", report.HandoffsCompleted)
+	fmt.Printf("- handoffs rejected: %d\n", report.HandoffsRejected)
+	fmt.Printf("- handoffs retried: %d\n", report.HandoffsRetried)
+	fmt.Printf("- expected rejections: %d\n", report.ExpectedRejections)
+	fmt.Printf("- journal entries: %d\n", report.JournalEntries)
+	fmt.Printf("- shard assignments: %s\n", formatStringMap(report.ShardAssignments))
+	fmt.Printf("- zone population: %s\n", formatCounts(report.ZonePopulation))
+	fmt.Printf("- shard population: %s\n", formatCounts(report.ShardPopulation))
+	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	fmt.Printf("- queue backpressure: %d\n", report.QueueBackpressure)
+	fmt.Printf("- average tick duration: %s\n", report.AverageTickDuration)
+	fmt.Printf("- max tick duration: %s\n", report.MaxTickDuration)
+	if len(report.Errors) == 0 {
+		fmt.Println("- errors: 0")
+		return
+	}
+	fmt.Printf("- errors: %d\n", len(report.Errors))
+	for _, errText := range report.Errors {
+		fmt.Printf("  - %s\n", errText)
+	}
+}
+
+func formatStringMap(values map[string]string) string {
+	if len(values) == 0 {
+		return "{}"
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := "{"
+	for index, key := range keys {
+		if index > 0 {
+			result += ", "
+		}
+		result += fmt.Sprintf("%s:%s", key, values[key])
+	}
+	return result + "}"
+}
+
 func formatCounts(counts map[string]int) string {
 	if len(counts) == 0 {
 		return "{}"
@@ -170,6 +249,16 @@ func exitForQuestReport(report worlds.QuestBasicLoadsimReport, err error) {
 }
 
 func exitForContentReport(report worlds.ContentPackageLoadsimReport, err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "loadsim failed: %v\n", err)
+		os.Exit(1)
+	}
+	if len(report.Errors) > 0 || len(report.ValidationErrors) > 0 {
+		os.Exit(1)
+	}
+}
+
+func exitForZoneHandoffReport(report worlds.ZoneHandoffLoadsimReport, err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "loadsim failed: %v\n", err)
 		os.Exit(1)

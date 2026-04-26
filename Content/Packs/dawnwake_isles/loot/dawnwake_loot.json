@@ -1,0 +1,23 @@
+{
+  "loot_tables": [
+    {
+      "loot_table_id": "lt_dawnwake_driftling_cache",
+      "entries": [
+        {
+          "item_id": "item_dawnwake_salt_chip",
+          "min_quantity": 1,
+          "max_quantity": 2,
+          "drop_chance_percent": 100,
+          "guaranteed": true,
+          "tags": [
+            "validation"
+          ]
+        }
+      ],
+      "allow_empty": false,
+      "tags": [
+        "dawnwake"
+      ]
+    }
+  ]
+}

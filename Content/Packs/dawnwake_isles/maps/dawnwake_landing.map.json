@@ -1,0 +1,39 @@
+{
+  "display_name": "Dawnwake Landing",
+  "landmarks": [
+    {
+      "id": "lm_dawnwake_landing_quay",
+      "display_name": "Landing Quay",
+      "x": 0.18,
+      "y": 0.22
+    },
+    {
+      "id": "lm_dawnwake_landing_east_path",
+      "display_name": "East Path",
+      "x": 0.93,
+      "y": 0.54
+    }
+  ],
+  "normalized_bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "max_x": 1,
+    "max_y": 1
+  },
+  "routes": [
+    {
+      "id": "route_landing_to_tideglass",
+      "from": "lm_dawnwake_landing_quay",
+      "to": "lm_dawnwake_landing_east_path"
+    }
+  ],
+  "schema_version": "1",
+  "source": "amandacore.content_exporter",
+  "world_bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "max_x": 120,
+    "max_y": 96
+  },
+  "zone_id": "dawnwake_landing"
+}
