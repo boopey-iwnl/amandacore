@@ -42,10 +42,10 @@ namespace MovementPhysics
         constexpr float EncounterAnchorY = 174.0f;
         constexpr float MoveSpeedUnitsPerSecond = 6.0f;
         constexpr float BackpedalSpeedFactor = 0.62f;
-        constexpr float SubmitIntervalSeconds = 0.10f;
-        constexpr float CorrectionSnapDistance = 1.25f;
-        constexpr float CorrectionBlendRate = 5.25f;
-        constexpr float CorrectionDeadZoneDistance = 0.045f;
+        constexpr float SubmitIntervalSeconds = 0.18f;
+        constexpr float CorrectionSnapDistance = 2.25f;
+        constexpr float CorrectionBlendRate = 2.85f;
+        constexpr float CorrectionDeadZoneDistance = 0.16f;
         constexpr float CorrectionEpsilon = 0.002f;
         constexpr float CharacterBaseSnapZ = 0.05f;
         constexpr float AvatarTurnRate = 2.75f;
@@ -1087,14 +1087,17 @@ namespace MovementPhysics
         const AZ::Color obstacleColor(0.38f, 0.39f, 0.43f, 1.0f);
         const AZ::Color encounterColor(0.90f, 0.42f, 0.22f, 1.0f);
         const AZ::Color groundBaseColor(0.24f, 0.33f, 0.23f, 1.0f);
-        const AZ::Color groundTileLight(0.34f, 0.47f, 0.25f, 1.0f);
-        const AZ::Color groundTileDark(0.24f, 0.36f, 0.22f, 1.0f);
+        const AZ::Color groundTileLight(0.31f, 0.43f, 0.25f, 1.0f);
+        const AZ::Color groundTileDark(0.22f, 0.32f, 0.21f, 1.0f);
+        const AZ::Color hearthwatchYardColor(0.42f, 0.39f, 0.31f, 1.0f);
+        const AZ::Color hearthwatchCobbleColor(0.52f, 0.49f, 0.39f, 1.0f);
         const AZ::Color mossColor(0.20f, 0.41f, 0.23f, 1.0f);
         const AZ::Color rockyGroundColor(0.34f, 0.36f, 0.34f, 1.0f);
         const AZ::Color ridgeColor(0.30f, 0.31f, 0.34f, 1.0f);
         const AZ::Color horizonColor(0.23f, 0.34f, 0.44f, 1.0f);
-        const AZ::Color roadColor(0.50f, 0.37f, 0.22f, 1.0f);
-        const AZ::Color roadPebbleColor(0.62f, 0.55f, 0.43f, 1.0f);
+        const AZ::Color roadEdgeColor(0.30f, 0.24f, 0.16f, 1.0f);
+        const AZ::Color roadColor(0.66f, 0.49f, 0.27f, 1.0f);
+        const AZ::Color roadPebbleColor(0.78f, 0.70f, 0.53f, 1.0f);
         const AZ::Color fieldColor(0.50f, 0.43f, 0.22f, 1.0f);
         const AZ::Color cropColor(0.74f, 0.62f, 0.25f, 1.0f);
         const AZ::Color plasterColor(0.78f, 0.70f, 0.58f, 1.0f);
@@ -1115,16 +1118,24 @@ namespace MovementPhysics
             groundBaseColor,
             AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
 
+        auto isHearthwatchHub = [](float x, float y) -> bool
+        {
+            return x >= 0.0f && x <= 92.0f && y >= 0.0f && y <= 58.0f;
+        };
+
         for (int tileY = 0; tileY < 25; ++tileY)
         {
             for (int tileX = 0; tileX < 40; ++tileX)
             {
                 const float centerX = (static_cast<float>(tileX) * 12.0f) + 6.0f;
                 const float centerY = (static_cast<float>(tileY) * 12.0f) + 6.0f;
+                const bool hubTile = isHearthwatchHub(centerX, centerY);
                 const int materialSelector = ((tileX * 17) + (tileY * 31)) % 9;
-                const AZ::Color tileColor = materialSelector == 0
-                    ? mossColor
-                    : (materialSelector == 1 ? rockyGroundColor : (materialSelector <= 4 ? groundTileLight : groundTileDark));
+                const AZ::Color tileColor = hubTile
+                    ? hearthwatchYardColor
+                    : (materialSelector == 0
+                        ? mossColor
+                        : (materialSelector == 1 ? rockyGroundColor : (materialSelector <= 4 ? groundTileLight : groundTileDark)));
                 auxGeom->DrawAabb(
                     AZ::Aabb::CreateCenterHalfExtents(
                         AZ::Vector3(centerX, centerY, -0.03f),
@@ -1132,7 +1143,21 @@ namespace MovementPhysics
                     tileColor,
                     AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
 
-                if (((tileX * 5) + tileY) % 11 == 0)
+                if (hubTile)
+                {
+                    if (((tileX + tileY) % 3) == 0)
+                    {
+                        auxGeom->DrawAabb(
+                            AZ::Aabb::CreateCenterHalfExtents(
+                                AZ::Vector3(centerX, centerY, 0.035f),
+                                AZ::Vector3(1.7f, 0.10f, 0.025f)),
+                            hearthwatchCobbleColor,
+                            AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+                    }
+                    continue;
+                }
+
+                if (((tileX * 5) + tileY) % 17 == 0)
                 {
                     auxGeom->DrawAabb(
                         AZ::Aabb::CreateCenterHalfExtents(
@@ -1171,39 +1196,45 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 roadCenters[] = {
-            AZ::Vector3(22.0f, 14.0f, 0.015f),
-            AZ::Vector3(55.0f, 26.0f, 0.015f),
-            AZ::Vector3(96.0f, 44.0f, 0.015f),
-            AZ::Vector3(154.0f, 82.0f, 0.015f),
-            AZ::Vector3(232.0f, 122.0f, 0.015f),
-            AZ::Vector3(314.0f, 172.0f, 0.015f),
-            AZ::Vector3(382.0f, 214.0f, 0.015f),
-            AZ::Vector3(438.0f, 246.0f, 0.015f),
+            AZ::Vector3(22.0f, 14.0f, 0.10f),
+            AZ::Vector3(55.0f, 26.0f, 0.10f),
+            AZ::Vector3(96.0f, 44.0f, 0.10f),
+            AZ::Vector3(154.0f, 82.0f, 0.10f),
+            AZ::Vector3(232.0f, 122.0f, 0.10f),
+            AZ::Vector3(314.0f, 172.0f, 0.10f),
+            AZ::Vector3(382.0f, 214.0f, 0.10f),
+            AZ::Vector3(438.0f, 246.0f, 0.10f),
         };
         const AZ::Vector3 roadExtents[] = {
-            AZ::Vector3(16.0f, 1.35f, 0.035f),
-            AZ::Vector3(24.0f, 1.45f, 0.035f),
-            AZ::Vector3(30.0f, 1.55f, 0.035f),
-            AZ::Vector3(34.0f, 1.70f, 0.035f),
-            AZ::Vector3(40.0f, 1.80f, 0.035f),
-            AZ::Vector3(38.0f, 1.90f, 0.035f),
-            AZ::Vector3(34.0f, 1.95f, 0.035f),
-            AZ::Vector3(18.0f, 2.05f, 0.035f),
+            AZ::Vector3(18.0f, 3.2f, 0.06f),
+            AZ::Vector3(26.0f, 3.3f, 0.06f),
+            AZ::Vector3(32.0f, 3.5f, 0.06f),
+            AZ::Vector3(36.0f, 3.7f, 0.06f),
+            AZ::Vector3(42.0f, 3.9f, 0.06f),
+            AZ::Vector3(40.0f, 4.0f, 0.06f),
+            AZ::Vector3(36.0f, 4.1f, 0.06f),
+            AZ::Vector3(22.0f, 4.2f, 0.06f),
         };
         for (size_t roadIndex = 0; roadIndex < AZ_ARRAY_SIZE(roadCenters); ++roadIndex)
         {
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    roadCenters[roadIndex] - AZ::Vector3(0.0f, 0.0f, 0.025f),
+                    roadExtents[roadIndex] + AZ::Vector3(0.0f, 0.85f, 0.02f)),
+                roadEdgeColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
             auxGeom->DrawAabb(
                 AZ::Aabb::CreateCenterHalfExtents(roadCenters[roadIndex], roadExtents[roadIndex]),
                 roadColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
 
-            for (int pebbleIndex = 0; pebbleIndex < 5; ++pebbleIndex)
+            for (int pebbleIndex = 0; pebbleIndex < 7; ++pebbleIndex)
             {
-                const float offsetX = (static_cast<float>(pebbleIndex) - 2.0f) * (roadExtents[roadIndex].GetX() * 0.34f);
-                const float offsetY = (pebbleIndex % 2 == 0 ? 0.75f : -0.75f);
+                const float offsetX = (static_cast<float>(pebbleIndex) - 3.0f) * (roadExtents[roadIndex].GetX() * 0.24f);
+                const float offsetY = (pebbleIndex % 2 == 0 ? 1.20f : -1.20f);
                 auxGeom->DrawSphere(
                     roadCenters[roadIndex] + AZ::Vector3(offsetX, offsetY, 0.08f),
-                    0.16f,
+                    0.22f,
                     roadPebbleColor);
             }
         }
@@ -1394,7 +1425,54 @@ namespace MovementPhysics
             AZ::Vector3(438.0f, 246.0f, ValidationMarkerZ)};
         for (const AZ::Vector3& marker : trailMarkers)
         {
-            auxGeom->DrawSphere(marker, 0.18f, pathColor);
+            auxGeom->DrawSphere(marker + AZ::Vector3(0.0f, 0.0f, 0.08f), 0.26f, pathColor);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    marker + AZ::Vector3(0.0f, 0.0f, 0.34f),
+                    AZ::Vector3(0.07f, 0.07f, 0.34f)),
+                roadPebbleColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+        }
+
+        struct LandmarkMarker
+        {
+            AZ::Vector3 m_position;
+            AZ::Color m_color;
+            float m_height;
+        };
+        const LandmarkMarker landmarkMarkers[] = {
+            {AZ::Vector3(13.0f, 10.0f, 0.0f), commandColor, 2.0f},
+            {AZ::Vector3(58.0f, 32.0f, 0.0f), trainingRingColor, 1.8f},
+            {AZ::Vector3(164.0f, 96.0f, 0.0f), cropColor, 1.7f},
+            {AZ::Vector3(232.0f, 118.0f, 0.0f), runeColor, 2.2f},
+            {AZ::Vector3(322.0f, 174.0f, 0.0f), encounterColor, 2.1f},
+            {AZ::Vector3(438.0f, 246.0f, 0.0f), waterColor, 1.9f},
+        };
+        for (const LandmarkMarker& landmark : landmarkMarkers)
+        {
+            const AZ::Vector3 base = landmark.m_position;
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    base + AZ::Vector3(0.0f, 0.0f, 0.08f),
+                    AZ::Vector3(1.25f, 1.25f, 0.08f)),
+                roadEdgeColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    base + AZ::Vector3(0.0f, 0.0f, landmark.m_height * 0.5f),
+                    AZ::Vector3(0.10f, 0.10f, landmark.m_height * 0.5f)),
+                woodColor,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawAabb(
+                AZ::Aabb::CreateCenterHalfExtents(
+                    base + AZ::Vector3(0.0f, 0.0f, landmark.m_height + 0.18f),
+                    AZ::Vector3(0.95f, 0.10f, 0.32f)),
+                landmark.m_color,
+                AZ::RPI::AuxGeomDraw::DrawStyle::Solid);
+            auxGeom->DrawSphere(
+                base + AZ::Vector3(0.0f, 0.0f, landmark.m_height + 0.62f),
+                0.22f,
+                landmark.m_color);
         }
 
         const AZ::Vector3 boulderCluster[] = {

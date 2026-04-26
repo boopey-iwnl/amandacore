@@ -58,6 +58,8 @@ namespace UiClient
         bool CloseNpcInteraction(const char* reason);
         bool CloseOpenGameplayPanel(const char* reason);
         bool SubmitChatInput(GameCore::IGameCoreRequests* gameCore, const AZStd::string& input);
+        void BeginChatInput();
+        void EndChatInput(bool clearBuffer);
 
         AZStd::string m_lastQuestState;
         int m_lastQuestCount = -1;
@@ -111,6 +113,7 @@ namespace UiClient
         AZStd::string m_targetHostileBinding;
         AZStd::string m_chatChannel = "say";
         bool m_chatFocusRequested = false;
+        bool m_chatInputActive = false;
         char m_chatInputBuffer[257]{};
         char m_chatWhisperTargetBuffer[65]{};
         char m_socialNameBuffer[65]{};

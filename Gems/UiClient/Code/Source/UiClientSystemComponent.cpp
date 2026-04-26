@@ -85,8 +85,9 @@ namespace UiClient
             int m_priority = 99;
         };
 
-        constexpr int PngIconSampleDimension = 12;
+        constexpr int PngIconSampleDimension = 32;
         constexpr int PngIconSamplePixelCount = PngIconSampleDimension * PngIconSampleDimension;
+        constexpr UINT MaxPngIconSourceDimension = 2048;
 
         struct PngIconSample
         {
@@ -469,7 +470,11 @@ namespace UiClient
 
             UINT width = 0;
             UINT height = 0;
-            if (FAILED(converter->GetSize(&width, &height)) || width == 0 || height == 0)
+            if (FAILED(converter->GetSize(&width, &height)) ||
+                width == 0 ||
+                height == 0 ||
+                width > MaxPngIconSourceDimension ||
+                height > MaxPngIconSourceDimension)
             {
                 return false;
             }
@@ -533,14 +538,19 @@ namespace UiClient
             bool muted)
         {
             const PngIconSample* sample = GetPngIconSample(kind);
-            if (!sample)
+            const float width = maxBounds.x - minBounds.x;
+            const float height = maxBounds.y - minBounds.y;
+            if (!sample || width <= 2.0f || height <= 2.0f)
             {
                 return false;
             }
 
             drawList->AddRectFilled(minBounds, maxBounds, ColorU32(13, 16, 20, 255), 7.0f);
-            const float width = maxBounds.x - minBounds.x;
-            const float height = maxBounds.y - minBounds.y;
+            drawList->AddRectFilled(
+                ImVec2(minBounds.x + 2.0f, minBounds.y + 2.0f),
+                ImVec2(maxBounds.x - 2.0f, maxBounds.y - 2.0f),
+                ColorU32(27, 32, 36, 220),
+                5.0f);
             const float cellWidth = width / static_cast<float>(PngIconSampleDimension);
             const float cellHeight = height / static_cast<float>(PngIconSampleDimension);
             for (int y = 0; y < PngIconSampleDimension; ++y)
@@ -548,9 +558,16 @@ namespace UiClient
                 for (int x = 0; x < PngIconSampleDimension; ++x)
                 {
                     const ImU32 pixel = sample->m_pixels[(y * PngIconSampleDimension) + x];
+                    const int alpha = (pixel >> IM_COL32_A_SHIFT) & 0xFF;
+                    if (alpha < 8)
+                    {
+                        continue;
+                    }
                     const ImU32 color = muted ? MutedIconColor(pixel) : pixel;
                     const ImVec2 cellMin(minBounds.x + (cellWidth * x), minBounds.y + (cellHeight * y));
-                    const ImVec2 cellMax(minBounds.x + (cellWidth * (x + 1)), minBounds.y + (cellHeight * (y + 1)));
+                    const ImVec2 cellMax(
+                        minBounds.x + (cellWidth * (x + 1)) + 0.35f,
+                        minBounds.y + (cellHeight * (y + 1)) + 0.35f);
                     drawList->AddRectFilled(cellMin, cellMax, color);
                 }
             }
@@ -1766,7 +1783,7 @@ namespace UiClient
             drawList->AddText(ImVec2(center.x - 6.0f, center.y - radius - 14.0f), ColorU32(224, 214, 189), "N");
 
             const float mapScale = radius / 140.0f;
-            auto plotWorldPoint = [&](float worldX, float worldY, ImU32 color, float pointRadius)
+            auto tryWorldPoint = [&](float worldX, float worldY, ImVec2& outPoint) -> bool
             {
                 const float deltaX = (worldX - playerX) * mapScale;
                 const float deltaY = (worldY - playerY) * mapScale;
@@ -1775,10 +1792,52 @@ namespace UiClient
                 const float pointDeltaY = point.y - center.y;
                 if ((pointDeltaX * pointDeltaX) + (pointDeltaY * pointDeltaY) <= (radius - 8.0f) * (radius - 8.0f))
                 {
+                    outPoint = point;
+                    return true;
+                }
+                return false;
+            };
+            auto plotWorldPoint = [&](float worldX, float worldY, ImU32 color, float pointRadius)
+            {
+                ImVec2 point;
+                if (tryWorldPoint(worldX, worldY, point))
+                {
                     drawList->AddCircleFilled(point, pointRadius, color, 24);
                 }
             };
 
+            for (const auto& road : worldState.m_session.m_zoneMap.m_roads)
+            {
+                for (size_t pointIndex = 1; pointIndex < road.m_points.size(); ++pointIndex)
+                {
+                    ImVec2 previous;
+                    ImVec2 current;
+                    if (tryWorldPoint(
+                            static_cast<float>(road.m_points[pointIndex - 1].m_x),
+                            static_cast<float>(road.m_points[pointIndex - 1].m_y),
+                            previous) &&
+                        tryWorldPoint(
+                            static_cast<float>(road.m_points[pointIndex].m_x),
+                            static_cast<float>(road.m_points[pointIndex].m_y),
+                            current))
+                    {
+                        drawList->AddLine(previous, current, ColorU32(92, 74, 42, 230), 5.5f);
+                        drawList->AddLine(previous, current, ColorU32(215, 176, 96, 240), 2.0f);
+                    }
+                }
+            }
+            for (const auto& landmark : worldState.m_session.m_zoneMap.m_landmarks)
+            {
+                ImVec2 point;
+                if (tryWorldPoint(static_cast<float>(landmark.m_x), static_cast<float>(landmark.m_y), point))
+                {
+                    drawList->AddRectFilled(
+                        ImVec2(point.x - 3.5f, point.y - 3.5f),
+                        ImVec2(point.x + 3.5f, point.y + 3.5f),
+                        ColorU32(229, 216, 166),
+                        1.5f);
+                }
+            }
             for (const auto& marker : worldState.m_session.m_mapMarkers)
             {
                 ImU32 color = ColorU32(226, 183, 74);
@@ -1988,8 +2047,8 @@ namespace UiClient
                 {
                     const ImVec2 previous = mapToScreen(road.m_points[pointIndex - 1].m_x, road.m_points[pointIndex - 1].m_y);
                     const ImVec2 current = mapToScreen(road.m_points[pointIndex].m_x, road.m_points[pointIndex].m_y);
-                    drawList->AddLine(previous, current, ColorU32(136, 112, 70), 4.0f);
-                    drawList->AddLine(previous, current, ColorU32(196, 169, 103), 1.5f);
+                    drawList->AddLine(previous, current, ColorU32(88, 65, 36), 7.0f);
+                    drawList->AddLine(previous, current, ColorU32(226, 184, 104), 3.0f);
                 }
             }
 
@@ -2020,7 +2079,18 @@ namespace UiClient
             for (const auto& landmark : zoneMap.m_landmarks)
             {
                 const ImVec2 point = mapToScreen(landmark.m_x, landmark.m_y);
-                drawList->AddCircleFilled(point, 3.5f, ColorU32(199, 211, 194), 16);
+                drawList->AddRectFilled(
+                    ImVec2(point.x - 5.5f, point.y - 5.5f),
+                    ImVec2(point.x + 5.5f, point.y + 5.5f),
+                    ColorU32(206, 198, 154),
+                    2.0f);
+                drawList->AddRect(
+                    ImVec2(point.x - 7.0f, point.y - 7.0f),
+                    ImVec2(point.x + 7.0f, point.y + 7.0f),
+                    ColorU32(35, 28, 18),
+                    2.0f,
+                    0,
+                    1.5f);
                 TryDrawMapLabel(
                     drawList,
                     placedLabels,
@@ -2125,6 +2195,56 @@ namespace UiClient
             }
 
             ImGui::TextUnformatted("Legend: white player, rust objective, gold available, green turn-in, blue trainer, violet vendor. Click markers to target or track.");
+        }
+
+        void DrawStonewakeLandmarkNameplates(
+            const GameCore::ClientWorldState& worldState,
+            const GameCore::ClientCameraState& cameraState,
+            const ImVec2& displaySize)
+        {
+            if (worldState.m_session.m_zoneMap.m_landmarks.empty())
+            {
+                return;
+            }
+
+            ImDrawList* drawList = ImGui::GetForegroundDrawList();
+            const float playerX = static_cast<float>(worldState.m_session.m_position.m_x);
+            const float playerY = static_cast<float>(worldState.m_session.m_position.m_y);
+            for (const auto& landmark : worldState.m_session.m_zoneMap.m_landmarks)
+            {
+                if (landmark.m_displayName.empty())
+                {
+                    continue;
+                }
+
+                const float landmarkX = static_cast<float>(landmark.m_x);
+                const float landmarkY = static_cast<float>(landmark.m_y);
+                const float distance = Distance2D(playerX, playerY, landmarkX, landmarkY);
+                if (distance > 96.0f && LandmarkPriority(landmark.m_kind) > 2)
+                {
+                    continue;
+                }
+
+                ImVec2 screenPosition;
+                if (!ProjectWorldPointToScreen(
+                        cameraState,
+                        AZ::Vector3(landmarkX, landmarkY, 4.1f),
+                        displaySize,
+                        screenPosition))
+                {
+                    continue;
+                }
+
+                const ImVec2 textSize = ImGui::CalcTextSize(landmark.m_displayName.c_str());
+                const ImVec2 panelMin(screenPosition.x - (textSize.x * 0.5f) - 9.0f, screenPosition.y - 10.0f);
+                const ImVec2 panelMax(screenPosition.x + (textSize.x * 0.5f) + 9.0f, screenPosition.y + textSize.y + 5.0f);
+                drawList->AddRectFilled(panelMin, panelMax, ColorU32(18, 20, 17, 206), 6.0f);
+                drawList->AddRect(panelMin, panelMax, ColorU32(226, 190, 103, 210), 6.0f, 0, 1.5f);
+                drawList->AddText(
+                    ImVec2(panelMin.x + 9.0f, panelMin.y + 3.0f),
+                    ColorU32(241, 229, 196),
+                    landmark.m_displayName.c_str());
+            }
         }
 
         void DrawFriendlyNpcNameplates(
@@ -3968,8 +4088,12 @@ namespace UiClient
             char* whisperTargetBuffer,
             size_t whisperTargetBufferSize,
             bool& focusRequested,
+            bool& inputActive,
             AZStd::string& outSubmittedInput)
         {
+            AZ_UNUSED(whisperTargetBuffer);
+            AZ_UNUSED(whisperTargetBufferSize);
+            selectedChannel = "say";
             ImGui::BeginChild("##chat_scrollback", ImVec2(0.0f, 158.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
             for (const auto& message : worldState.m_social.m_chatMessages)
             {
@@ -3997,44 +4121,7 @@ namespace UiClient
                 selectedChannel = "say";
             }
             ImGui::SameLine();
-            if (ImGui::Button("Whisper", ImVec2(82.0f, 24.0f)))
-            {
-                selectedChannel = "whisper";
-            }
-            if (worldState.m_social.m_hasParty)
-            {
-                ImGui::SameLine();
-                if (ImGui::Button("Party", ImVec2(66.0f, 24.0f)))
-                {
-                    selectedChannel = "party";
-                }
-            }
-            if (worldState.m_social.m_hasGuild)
-            {
-                ImGui::SameLine();
-                if (ImGui::Button("Guild", ImVec2(66.0f, 24.0f)))
-                {
-                    selectedChannel = "guild";
-                }
-            }
-            ImGui::SameLine();
             ImGui::Text("Channel: %s", ChatChannelLabel(selectedChannel));
-
-            if (selectedChannel == "party" && !worldState.m_social.m_hasParty)
-            {
-                selectedChannel = "say";
-            }
-            if (selectedChannel == "guild" && !worldState.m_social.m_hasGuild)
-            {
-                selectedChannel = "say";
-            }
-
-            if (selectedChannel == "whisper")
-            {
-                ImGui::SetNextItemWidth(138.0f);
-                ImGui::InputText("Target", whisperTargetBuffer, whisperTargetBufferSize);
-                ImGui::SameLine();
-            }
 
             if (focusRequested)
             {
@@ -4051,6 +4138,7 @@ namespace UiClient
                 inputBuffer,
                 inputBufferSize,
                 ImGuiInputTextFlags_EnterReturnsTrue);
+            inputActive = ImGui::IsItemActive();
             ImGui::SameLine();
             const bool submittedByButton = ImGui::Button("Send", ImVec2(sendButtonWidth, 0.0f));
             if (submittedByEnter || submittedByButton)
@@ -4507,6 +4595,8 @@ namespace UiClient
         m_auctionStackCount = 1;
         m_chatChannel = "say";
         m_chatFocusRequested = false;
+        m_chatInputActive = false;
+        m_chatInputBuffer[0] = '\0';
         m_auctionSearchBuffer[0] = '\0';
         m_auctionBuyoutBuffer[0] = '\0';
         LoadDefaultKeybindings();
@@ -4516,6 +4606,7 @@ namespace UiClient
     void UiClientSystemComponent::Deactivate()
     {
         SaveUiSettings();
+        ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, false);
         ImGui::ImGuiUpdateListenerBus::Handler::BusDisconnect();
         AzFramework::InputChannelEventListener::Disconnect();
     }
@@ -5216,6 +5307,26 @@ namespace UiClient
         return false;
     }
 
+    void UiClientSystemComponent::BeginChatInput()
+    {
+        m_chatChannel = "say";
+        m_chatInputActive = true;
+        m_chatFocusRequested = true;
+        ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, true);
+    }
+
+    void UiClientSystemComponent::EndChatInput(bool clearBuffer)
+    {
+        if (clearBuffer)
+        {
+            m_chatInputBuffer[0] = '\0';
+        }
+        m_chatInputActive = false;
+        m_chatFocusRequested = false;
+        ImGui::ClearActiveID();
+        ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, false);
+    }
+
     bool UiClientSystemComponent::OnInputChannelEventFiltered(const AzFramework::InputChannel& inputChannel)
     {
         const auto& channelId = inputChannel.GetInputChannelId();
@@ -5239,10 +5350,21 @@ namespace UiClient
         auto* gameCore = GameCore::IGameCoreRequests::Get();
         const AZStd::string keyName = channelId.GetName();
 
-        if (channelId == AzFramework::InputDeviceKeyboard::Key::EditEnter && !ImGui::GetIO().WantTextInput)
+        if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape && m_chatInputActive)
         {
-            m_chatFocusRequested = true;
+            EndChatInput(false);
+            AddHudEvent("Chat canceled.");
             return true;
+        }
+
+        if (channelId == AzFramework::InputDeviceKeyboard::Key::EditEnter)
+        {
+            if (!m_chatInputActive && !ImGui::GetIO().WantTextInput)
+            {
+                BeginChatInput();
+                return true;
+            }
+            return false;
         }
 
         if (!m_pendingKeybindActionId.empty())
@@ -5257,7 +5379,7 @@ namespace UiClient
             return true;
         }
 
-        if (ImGui::GetIO().WantTextInput)
+        if (m_chatInputActive || ImGui::GetIO().WantTextInput)
         {
             return false;
         }
@@ -5689,6 +5811,7 @@ namespace UiClient
         if (BeginHudPanel("##chat_window", "Chat", chatPos, chatSize))
         {
             AZStd::string submittedInput;
+            bool chatFieldActive = false;
             if (DrawChatWindow(
                     worldState,
                     m_chatChannel,
@@ -5697,22 +5820,31 @@ namespace UiClient
                     m_chatWhisperTargetBuffer,
                     AZ_ARRAY_SIZE(m_chatWhisperTargetBuffer),
                     m_chatFocusRequested,
+                    chatFieldActive,
                     submittedInput))
             {
                 const bool hasText = submittedInput.find_first_not_of(" \t\r\n") != AZStd::string::npos;
                 if (hasText && SubmitChatInput(gameCore, submittedInput))
                 {
-                    m_chatInputBuffer[0] = '\0';
+                    EndChatInput(true);
                 }
                 else if (hasText)
                 {
                     AddHudEvent("Chat message could not be sent.");
-                    m_chatFocusRequested = true;
+                    BeginChatInput();
                 }
                 else
                 {
-                    m_chatFocusRequested = true;
+                    EndChatInput(true);
                 }
+            }
+            else if (chatFieldActive && !m_chatInputActive)
+            {
+                BeginChatInput();
+            }
+            else if (m_chatInputActive && !chatFieldActive && !m_chatFocusRequested && !ImGui::IsAnyItemActive())
+            {
+                EndChatInput(false);
             }
         }
         ImGui::End();
@@ -5993,6 +6125,7 @@ namespace UiClient
         }
 
         DrawFriendlyNpcNameplates(worldState, cameraState, displaySize);
+        DrawStonewakeLandmarkNameplates(worldState, cameraState, displaySize);
 
         if (!m_questToast.empty() && nowMs < m_questToastExpiresAt)
         {
