@@ -43,28 +43,3 @@ var devProgressionQuestDefinitions = []questDefinition{
 		},
 	},
 }
-
-var devProgressionMobSpawns = []mobSpawnDefinition{
-	{
-		ID:              devIsleStalkerEntityID,
-		SpawnPointID:    devIsleStalkerSpawnID,
-		ZoneID:          defaultZoneID,
-		MobTypeID:       devIsleStalkerArchetypeID,
-		ArchetypeID:     devIsleStalkerArchetypeID,
-		DisplayName:     "Isle Stalker",
-		Level:           1,
-		Disposition:     string(NpcDispositionHostile),
-		LootTableID:     devIsleStalkerLootTableID,
-		X:               42.0,
-		Y:               18.0,
-		Z:               0.0,
-		MaxHealth:       30,
-		AggroRadius:     8.0,
-		AttackRange:     2.5,
-		AttackDamage:    3,
-		AttackCadenceMs: 1500,
-		MoveSpeedPerSec: 3.2,
-		LeashRadius:     18.0,
-		RespawnDelayMs:  10_000,
-	},
-}

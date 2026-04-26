@@ -135,7 +135,6 @@ func parseOptions() options {
 	if opts.CommandRate <= 0 {
 		exitf("--cmd-rate must be greater than zero")
 	}
-	opts.CommandRate = float64(opts.CmdRate)
 	return opts
 }
 

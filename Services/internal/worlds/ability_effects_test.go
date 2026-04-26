@@ -4,10 +4,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	contentpkg "amandacore/services/internal/content"
 )
 
 func TestContentAbilityAndAuraCatalogActivate(t *testing.T) {
-	server := newWorldServer(nil)
+	server := newWorldServerWithContentPackage(nil, contentpkg.DefaultPackagePath)
 
 	ability, found := server.findAbilityDefinitionLocked("dev_stalker_pressure")
 	if !found {
@@ -23,6 +25,7 @@ func TestContentAbilityAndAuraCatalogActivate(t *testing.T) {
 
 func TestAuraApplyTickAndExpire(t *testing.T) {
 	server, mob, session := newNPCCombatLoopTestServer()
+	server.loadConfiguredContentPackageLocked(contentpkg.DefaultPackagePath)
 	session.LearnedAbilityIDs = append(session.LearnedAbilityIDs, "dev_stalker_pressure")
 	session.X = mob.X - 1
 	session.Y = mob.Y

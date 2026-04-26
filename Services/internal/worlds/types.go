@@ -949,7 +949,6 @@ func (s *worldServer) ensureMobsLocked() {
 
 	allMobSpawns := append([]mobSpawnDefinition{}, stonewakeMobSpawns...)
 	allMobSpawns = append(allMobSpawns, brindlebrookMobSpawns...)
-	allMobSpawns = append(allMobSpawns, devProgressionMobSpawns...)
 	allMobSpawns = append(allMobSpawns, s.contentMobSpawns...)
 	s.mobOrder = make([]string, 0, len(allMobSpawns))
 	for _, spawn := range allMobSpawns {

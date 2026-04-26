@@ -35,8 +35,8 @@ func TestStonewakeStarterContentLoads(t *testing.T) {
 			stonewakeMobCount++
 		}
 	}
-	if stonewakeMobCount != 38 {
-		t.Fatalf("expected 38 Stonewake mob spawns, got %d", stonewakeMobCount)
+	if stonewakeMobCount != len(stonewakeMobSpawns) {
+		t.Fatalf("expected %d Stonewake mob spawns, got %d", len(stonewakeMobSpawns), stonewakeMobCount)
 	}
 
 	requiredQuests := []string{
