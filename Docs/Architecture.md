@@ -46,7 +46,7 @@ Each Gem has a single, durable responsibility:
 - `InventoryLoot`: inventory runtime, item equipment, vendors, and drop flows.
 - `QuestRuntime`: quest acceptance, tracking, completion, and UI feeds.
 - `NpcAi`: behavior trees/state machines, leash handling, and encounter ownership.
-- `ZoneStreaming`: outdoor cell streaming, world partitioning, and micro-instance handoff.
+- `ZoneStreaming`: outdoor cell streaming debug visualization, world partitioning hooks, and micro-instance handoff.
 - `UiClient`: HUD, chat, targeting, hotbars, and player feedback.
 - `NetClient`: transport, serialization, interpolation, and prediction feeds.
 - `NetServer`: authority, replication, interest management, and session hosting.
@@ -57,7 +57,7 @@ Each Gem has a single, durable responsibility:
 
 The data model is deliberately wider than the first slice so future work can scale without a rewrite. JSON Schema definitions live in `Content/Schemas/gameplay.schema.json`, and example authored content lives in `Content/GameData/ZoneSlice`.
 
-The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones, map exports, and catalogs before activation, and activates validated content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows. `Docs/DawnwakeIsles.md` documents the first original multi-zone package with server-side adjacency and transition metadata for future streamed-world expansion. `Docs/WorldStreaming.md` documents the current map export and streaming hint boundary, and `Docs/O3DEMapExportWorkflow.md` documents the deterministic authoring-to-map-export workflow. The console world client now reads the server `streaming` payload, maintains a client streaming preview frame, and emits either console preview events or O3DE-facing placeholder scene commands for zone, cell, bounds, and transition changes.
+The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones, map exports, and catalogs before activation, and activates validated content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows. `Docs/DawnwakeIsles.md` documents the first original multi-zone package with server-side adjacency and transition metadata for future streamed-world expansion. `Docs/WorldStreaming.md` documents the current map export and streaming hint boundary, and `Docs/O3DEMapExportWorkflow.md` documents the deterministic authoring-to-map-export workflow. The console world client now reads the server `streaming` payload, maintains a client streaming preview frame, and emits either console preview events or O3DE-facing placeholder scene commands for zone, cell, bounds, and transition changes. The `ZoneStreaming` Gem consumes the mirrored C++ command contract for debug-only AuxGeom volumes without moving authority into the client.
 
 ## Recommended future O3DE wiring
 

@@ -19,6 +19,7 @@ Content/Authoring/DawnwakeIsles/*.authoring.json
   -> world response streaming payload
   -> client streaming preview model
   -> O3DE-facing placeholder scene commands
+  -> ZoneStreaming Gem debug volumes
 ```
 
 ## Authoring Metadata
@@ -75,7 +76,7 @@ Generated map exports are checked in because they are runtime content consumed b
 
 `Client/Game/AmandaCore.WorldClient` consumes the world response streaming payload and builds a `ClientStreamingFrame`. The frame contains the active zone/map, map bounds, adjacent zones, sorted visible cells, the current cell under the authoritative player position, and the nearest transition hint.
 
-The client emits those changes through `IWorldStreamingPreviewSink`. The console sink remains the default, and `PlaceholderSceneStreamingAdapter` can translate the same callbacks into structured placeholder scene commands without changing the server contract.
+The client emits those changes through `IWorldStreamingPreviewSink`. The console sink remains the default, and `PlaceholderSceneStreamingAdapter` can translate the same callbacks into structured placeholder scene commands without changing the server contract. It can also write deterministic JSON Lines with `--streaming-command-file` for bridge testing.
 
 The scene-command sink is not an asset pipeline. It is a stable adapter contract for a future O3DE implementation to consume:
 
@@ -84,13 +85,16 @@ The scene-command sink is not an asset pipeline. It is a stable adapter contract
 - highlight the current cell
 - show or clear transition affordances
 
+`Gems/ZoneStreaming` now mirrors this contract as a C++ debug API. `ZoneStreamingSystemComponent` consumes `PlaceholderSceneCommand` records through `IZoneStreamingDebugRequests::ApplyPlaceholderSceneCommand` and draws zone bounds, streaming cells, highlighted cells, and transition markers through AuxGeom.
+
 ## Current Limits
 
 - The source authoring files are JSON placeholders, not O3DE asset products.
 - The exporter does not inspect `.prefab`, terrain, world partition, or asset processor output.
 - The client retains streaming preview frames and emits placeholder scene commands; it does not prefetch cells or load assets yet.
+- The first O3DE binding draws debug volumes only and does not parse map exports or stream O3DE products.
 - Server traversal remains immediate and radius-based.
 
 ## Next Step
 
-Bind the placeholder scene command stream to the O3DE `ZoneStreaming` Gem, then replace the placeholder JSON source with AmandaCore-owned O3DE editor metadata or asset processor output while preserving the generated map export validation boundary.
+Connect the live launcher/O3DE client bridge to the `ZoneStreaming` Gem command API, then replace the placeholder JSON source with AmandaCore-owned O3DE editor metadata or asset processor output while preserving the generated map export validation boundary.

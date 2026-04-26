@@ -1,4 +1,9 @@
-internal sealed record ClientOptions(string JoinTicketId, string WorldEndpoint, bool AutoDemo, StreamingSinkMode StreamingSinkMode)
+internal sealed record ClientOptions(
+    string JoinTicketId,
+    string WorldEndpoint,
+    bool AutoDemo,
+    StreamingSinkMode StreamingSinkMode,
+    string? StreamingCommandFilePath)
 {
     public static ClientOptions Parse(string[] args)
     {
@@ -6,6 +11,7 @@ internal sealed record ClientOptions(string JoinTicketId, string WorldEndpoint, 
         var worldEndpoint = "http://localhost:8085";
         var autoDemo = false;
         var streamingSinkMode = StreamingSinkMode.Console;
+        string? streamingCommandFilePath = null;
 
         for (var index = 0; index < args.Length; index++)
         {
@@ -23,6 +29,9 @@ internal sealed record ClientOptions(string JoinTicketId, string WorldEndpoint, 
                 case "--streaming-sink":
                     streamingSinkMode = ParseStreamingSinkMode(GetValue(args, ++index, "--streaming-sink"));
                     break;
+                case "--streaming-command-file":
+                    streamingCommandFilePath = GetValue(args, ++index, "--streaming-command-file");
+                    break;
             }
         }
 
@@ -31,7 +40,7 @@ internal sealed record ClientOptions(string JoinTicketId, string WorldEndpoint, 
             throw new InvalidOperationException("A --join-ticket value is required.");
         }
 
-        return new ClientOptions(joinTicket, worldEndpoint, autoDemo, streamingSinkMode);
+        return new ClientOptions(joinTicket, worldEndpoint, autoDemo, streamingSinkMode, streamingCommandFilePath);
     }
 
     private static string GetValue(string[] args, int index, string name)

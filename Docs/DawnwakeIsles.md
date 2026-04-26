@@ -77,12 +77,18 @@ The minimal world client now consumes Dawnwake streaming metadata through a dedi
 - current cell computed from the server-authoritative player position
 - nearest transition hint and ready state
 
-`IWorldStreamingPreviewSink` is the first O3DE-facing adapter boundary. The console client uses `ConsoleWorldStreamingPreviewSink` by default, and `PlaceholderSceneStreamingAdapter` can emit structured placeholder commands for zone bounds, streaming cells, current-cell highlighting, and transition affordances.
+`IWorldStreamingPreviewSink` is the first O3DE-facing adapter boundary. The console client uses `ConsoleWorldStreamingPreviewSink` by default, and `PlaceholderSceneStreamingAdapter` can emit structured placeholder commands for zone bounds, streaming cells, current-cell highlighting, and transition affordances. `Gems/ZoneStreaming` now consumes the mirrored C++ command contract through `IZoneStreamingDebugRequests` and draws debug-only in-engine volumes.
 
 Run the client with placeholder scene commands:
 
 ```powershell
 dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands
+```
+
+Write deterministic JSON Lines for bridge testing:
+
+```powershell
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands --streaming-command-file "$env:TEMP\amandacore\dawnwake-streaming.commands.jsonl"
 ```
 
 ## Loadsim
@@ -108,7 +114,7 @@ This scenario validates map exports, verifies active streaming metadata, travers
 ## Current Limitations
 
 - No O3DE terrain, prefab, asset, or world-partition data is loaded yet.
-- The client streaming hook emits console preview events or placeholder scene commands only; it does not instantiate O3DE entities.
+- The client streaming hook emits console preview events or placeholder scene commands only; the `ZoneStreaming` Gem currently renders debug AuxGeom volumes from the mirrored command contract.
 - Map export files are generated from AmandaCore-owned placeholder authoring metadata, not O3DE asset products.
 - Zone bounds and positions are placeholder server coordinates authored for this package only.
 - Transition handling is radius-based and immediate.
@@ -117,4 +123,4 @@ This scenario validates map exports, verifies active streaming metadata, travers
 
 ## Next Milestone
 
-Bind the placeholder scene command stream to the O3DE `ZoneStreaming` Gem so Dawnwake can display in-engine zone/cell volumes and transition affordances, then connect the exporter to real AmandaCore O3DE editor metadata or asset processor output.
+Connect the launcher/O3DE client bridge so live Dawnwake streaming callbacks feed the `ZoneStreaming` Gem in-engine, then connect the exporter to real AmandaCore O3DE editor metadata or asset processor output.

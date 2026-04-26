@@ -1,6 +1,6 @@
 var options = ClientOptions.Parse(args);
 var client = new WorldClient(options.WorldEndpoint);
-var streamingPreview = new ClientStreamingPreviewState(WorldStreamingPreviewSinkFactory.Create(options.StreamingSinkMode));
+var streamingPreview = new ClientStreamingPreviewState(WorldStreamingPreviewSinkFactory.Create(options.StreamingSinkMode, options.StreamingCommandFilePath));
 
 var session = await client.ConnectAsync(options.JoinTicketId);
 PrintState("Connected", session, streamingPreview);

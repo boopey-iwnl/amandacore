@@ -82,6 +82,6 @@ go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --outpu
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 
-`Client/Game/AmandaCore.WorldClient` consumes the same streaming payload through a client preview model and `IWorldStreamingPreviewSink`, which is the placeholder O3DE adapter boundary for future visual zone/cell streaming. Use `--streaming-sink scene-commands` to emit structured placeholder scene commands.
+`Client/Game/AmandaCore.WorldClient` consumes the same streaming payload through a client preview model and `IWorldStreamingPreviewSink`, which is the placeholder O3DE adapter boundary for visual zone/cell streaming. Use `--streaming-sink scene-commands` to emit structured placeholder scene commands, or add `--streaming-command-file "$env:TEMP\amandacore\streaming.commands.jsonl"` to write deterministic JSON Lines for bridge testing. `Gems/ZoneStreaming` mirrors the same command contract as a C++ debug API and draws in-engine AuxGeom zone bounds, streaming cells, current-cell highlights, and transition affordances.
 
 The loadsim uses the loader default when `--content` is omitted. The HTTP world service loads package content when `AMANDACORE_CONTENT_PACKAGE` is set; otherwise it keeps the existing starter world.

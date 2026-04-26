@@ -102,6 +102,24 @@ internal interface IPlaceholderSceneCommandSink
     void Emit(PlaceholderSceneCommand command);
 }
 
+internal sealed class CompositePlaceholderSceneCommandSink : IPlaceholderSceneCommandSink
+{
+    private readonly IReadOnlyList<IPlaceholderSceneCommandSink> _sinks;
+
+    public CompositePlaceholderSceneCommandSink(IReadOnlyList<IPlaceholderSceneCommandSink> sinks)
+    {
+        _sinks = sinks;
+    }
+
+    public void Emit(PlaceholderSceneCommand command)
+    {
+        foreach (var sink in _sinks)
+        {
+            sink.Emit(command);
+        }
+    }
+}
+
 internal sealed class ConsolePlaceholderSceneCommandSink : IPlaceholderSceneCommandSink
 {
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
@@ -109,6 +127,28 @@ internal sealed class ConsolePlaceholderSceneCommandSink : IPlaceholderSceneComm
     public void Emit(PlaceholderSceneCommand command)
     {
         Console.WriteLine($"[scene-command] {JsonSerializer.Serialize(command, _jsonOptions)}");
+    }
+}
+
+internal sealed class JsonLinesPlaceholderSceneCommandSink : IPlaceholderSceneCommandSink
+{
+    private readonly string _path;
+    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
+
+    public JsonLinesPlaceholderSceneCommandSink(string path)
+    {
+        _path = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(_path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+        File.WriteAllText(_path, string.Empty);
+    }
+
+    public void Emit(PlaceholderSceneCommand command)
+    {
+        File.AppendAllText(_path, JsonSerializer.Serialize(command, _jsonOptions) + Environment.NewLine);
     }
 }
 

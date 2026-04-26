@@ -84,17 +84,43 @@ internal sealed class NullWorldStreamingPreviewSink : IWorldStreamingPreviewSink
 
 internal static class WorldStreamingPreviewSinkFactory
 {
-    public static IWorldStreamingPreviewSink Create(StreamingSinkMode mode)
+    public static IWorldStreamingPreviewSink Create(StreamingSinkMode mode, string? commandFilePath = null)
     {
-        return mode switch
+        var commandSinks = new List<IPlaceholderSceneCommandSink>();
+        if (mode is StreamingSinkMode.SceneCommands or StreamingSinkMode.Both)
+        {
+            commandSinks.Add(new ConsolePlaceholderSceneCommandSink());
+        }
+        if (!string.IsNullOrWhiteSpace(commandFilePath))
+        {
+            commandSinks.Add(new JsonLinesPlaceholderSceneCommandSink(commandFilePath));
+        }
+
+        var sceneCommandSink = commandSinks.Count switch
+        {
+            0 => null,
+            1 => commandSinks[0],
+            _ => new CompositePlaceholderSceneCommandSink(commandSinks)
+        };
+
+        IWorldStreamingPreviewSink primarySink = mode switch
         {
             StreamingSinkMode.Console => new ConsoleWorldStreamingPreviewSink(),
-            StreamingSinkMode.SceneCommands => new PlaceholderSceneStreamingAdapter(new ConsolePlaceholderSceneCommandSink()),
+            StreamingSinkMode.SceneCommands => new PlaceholderSceneStreamingAdapter(sceneCommandSink ?? new ConsolePlaceholderSceneCommandSink()),
             StreamingSinkMode.Both => new CompositeWorldStreamingPreviewSink(
                 new ConsoleWorldStreamingPreviewSink(),
-                new PlaceholderSceneStreamingAdapter(new ConsolePlaceholderSceneCommandSink())),
+                new PlaceholderSceneStreamingAdapter(sceneCommandSink ?? new ConsolePlaceholderSceneCommandSink())),
             _ => new ConsoleWorldStreamingPreviewSink()
         };
+
+        if (sceneCommandSink is not null && mode == StreamingSinkMode.Console)
+        {
+            return new CompositeWorldStreamingPreviewSink(
+                primarySink,
+                new PlaceholderSceneStreamingAdapter(sceneCommandSink));
+        }
+
+        return primarySink;
     }
 }
 

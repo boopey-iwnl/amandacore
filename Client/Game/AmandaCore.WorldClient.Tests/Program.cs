@@ -3,6 +3,7 @@ tests.InitialFrameEmitsStablePlaceholderCommands();
 tests.CellChangesEmitHideAndHighlightCommands();
 tests.DisabledStreamingClearsPlaceholderState();
 tests.StreamingSinkModeParsesSceneCommands();
+tests.StreamingCommandFileWritesDeterministicJsonLines();
 Console.WriteLine("AmandaCore.WorldClient streaming adapter tests passed.");
 
 internal sealed class StreamingPreviewAdapterTests
@@ -74,10 +75,42 @@ internal sealed class StreamingPreviewAdapterTests
             "--join-ticket",
             "ticket",
             "--streaming-sink",
-            "scene-commands"
+            "scene-commands",
+            "--streaming-command-file",
+            "streaming.commands.jsonl"
         ]);
 
         AssertEqual(StreamingSinkMode.SceneCommands, options.StreamingSinkMode, "streaming sink mode");
+        AssertEqual("streaming.commands.jsonl", options.StreamingCommandFilePath, "streaming command file");
+    }
+
+    public void StreamingCommandFileWritesDeterministicJsonLines()
+    {
+        var commandPath = Path.Combine(Path.GetTempPath(), $"amandacore-streaming-{Guid.NewGuid():N}.jsonl");
+        try
+        {
+            var preview = new ClientStreamingPreviewState(new PlaceholderSceneStreamingAdapter(new JsonLinesPlaceholderSceneCommandSink(commandPath)));
+
+            preview.Update(TestWorldSessionResponses.Create(zoneId: "dawnwake_landing", playerX: 5, playerY: 5));
+
+            var lines = File.ReadAllLines(commandPath);
+            AssertEqual(5, lines.Length, "command line count");
+            if (!lines[0].Contains("\"Command\":\"CreateZoneBoundsVolume\"", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"Expected first command line to create zone bounds, got {lines[0]}.");
+            }
+            if (!lines[3].Contains("\"Command\":\"HighlightCurrentCell\"", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"Expected fourth command line to highlight current cell, got {lines[3]}.");
+            }
+        }
+        finally
+        {
+            if (File.Exists(commandPath))
+            {
+                File.Delete(commandPath);
+            }
+        }
     }
 
     private static void AssertCommands(IReadOnlyList<PlaceholderSceneCommand> commands, params string[] expected)
