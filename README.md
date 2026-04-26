@@ -67,3 +67,14 @@ go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizon
 ```
 
 Scale tiers, scenarios, reports, and sharding behavior are documented in `Docs/LoadTesting.md` and `Docs/MultiZoneSharding.md`.
+
+## Local persistence migrations
+
+Validate or apply the local durable-store migrations:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\run-db-migrations.ps1 -DryRun
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\run-db-migrations.ps1
+```
+
+Persistence domains, transaction policy, recovery state, and migration rules are documented in `Docs/Persistence.md` and `Docs/DatabaseMigrations.md`.
