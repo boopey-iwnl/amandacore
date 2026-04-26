@@ -145,7 +145,7 @@ func WriteMapExports(outputDir string, exports []MapExportDefinition) (MapExport
 			return result, err
 		}
 		existing, readErr := os.ReadFile(path)
-		if readErr != nil || !bytes.Equal(existing, payload) {
+		if readErr != nil || !sameGeneratedJSON(existing, payload) {
 			result.Changed = append(result.Changed, path)
 		}
 		if err := os.WriteFile(path, payload, 0o644); err != nil {
@@ -171,7 +171,7 @@ func CheckMapExports(outputDir string, exports []MapExportDefinition) (MapExport
 			continue
 		}
 		result.Compared = append(result.Compared, path)
-		if !bytes.Equal(actual, expected) {
+		if !sameGeneratedJSON(actual, expected) {
 			result.Drift = append(result.Drift, path)
 		}
 	}
@@ -185,6 +185,14 @@ func EncodeMapExport(export MapExportDefinition) ([]byte, error) {
 		return nil, err
 	}
 	return append(payload, '\n'), nil
+}
+
+func sameGeneratedJSON(actual []byte, expected []byte) bool {
+	return bytes.Equal(normalizeGeneratedLineEndings(actual), normalizeGeneratedLineEndings(expected))
+}
+
+func normalizeGeneratedLineEndings(payload []byte) []byte {
+	return bytes.ReplaceAll(payload, []byte("\r\n"), []byte("\n"))
 }
 
 func mapAuthoringToExport(authoring MapAuthoringDefinition) MapExportDefinition {

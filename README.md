@@ -82,4 +82,6 @@ go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --outpu
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 
+`Client/Game/AmandaCore.WorldClient` consumes the same streaming payload through a client preview model and `IWorldStreamingPreviewSink`, which is the placeholder O3DE adapter boundary for future visual zone/cell streaming.
+
 The loadsim uses the loader default when `--content` is omitted. The HTTP world service loads package content when `AMANDACORE_CONTENT_PACKAGE` is set; otherwise it keeps the existing starter world.

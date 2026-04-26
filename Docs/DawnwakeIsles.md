@@ -66,6 +66,19 @@ When the package is loaded, the world runtime:
 
 Existing Stonewake and Brindlebrook hardcoded flows remain available for current tests and local play.
 
+## Client Streaming Preview
+
+The minimal world client now consumes Dawnwake streaming metadata through a dedicated client preview model:
+
+- active zone and map ID
+- map bounds
+- adjacent zone IDs
+- visible streaming cells
+- current cell computed from the server-authoritative player position
+- nearest transition hint and ready state
+
+`IWorldStreamingPreviewSink` is the first O3DE-facing adapter boundary. The console client uses `ConsoleWorldStreamingPreviewSink` today, but the same callbacks can later drive placeholder scene nodes, transition affordances, and cell prefetch decisions inside the O3DE client.
+
 ## Loadsim
 
 Run from the Go module root:
@@ -89,6 +102,7 @@ This scenario validates map exports, verifies active streaming metadata, travers
 ## Current Limitations
 
 - No O3DE terrain, prefab, asset, or world-partition data is loaded yet.
+- The client streaming hook emits console preview events only; it does not instantiate O3DE entities.
 - Map export files are generated from AmandaCore-owned placeholder authoring metadata, not O3DE asset products.
 - Zone bounds and positions are placeholder server coordinates authored for this package only.
 - Transition handling is radius-based and immediate.
@@ -97,4 +111,4 @@ This scenario validates map exports, verifies active streaming metadata, travers
 
 ## Next Milestone
 
-Connect the exporter to real AmandaCore O3DE editor metadata or asset processor output, then add visible transition affordances and cell prefetch decisions in the client.
+Bind the client preview sink to an O3DE adapter that displays placeholder zone/cell volumes and transition affordances, then connect the exporter to real AmandaCore O3DE editor metadata or asset processor output.

@@ -17,7 +17,8 @@ Content/Authoring/DawnwakeIsles/*.authoring.json
   -> ContentPackageLoader validation
   -> ZoneRuntime streaming hints
   -> world response streaming payload
-  -> client transition preview state
+  -> client streaming preview model
+  -> O3DE-facing preview sink
 ```
 
 ## Authoring Metadata
@@ -70,13 +71,19 @@ Generated map exports are checked in because they are runtime content consumed b
 - no machine-local paths
 - `generated_by: amandacore-content-exporter`
 
+## Client Hook Boundary
+
+`Client/Game/AmandaCore.WorldClient` consumes the world response streaming payload and builds a `ClientStreamingFrame`. The frame contains the active zone/map, map bounds, adjacent zones, sorted visible cells, the current cell under the authoritative player position, and the nearest transition hint.
+
+The client emits those changes through `IWorldStreamingPreviewSink`. The console sink is the current implementation; a future O3DE sink should translate the same callbacks into placeholder scene volumes or asset prefetch requests without changing the server contract.
+
 ## Current Limits
 
 - The source authoring files are JSON placeholders, not O3DE asset products.
 - The exporter does not inspect `.prefab`, terrain, world partition, or asset processor output.
-- The client only retains and prints transition preview state; it does not prefetch cells or load assets yet.
+- The client retains streaming preview frames and emits sink callbacks; it does not prefetch cells or load assets yet.
 - Server traversal remains immediate and radius-based.
 
 ## Next Step
 
-Replace the placeholder JSON source with AmandaCore-owned O3DE editor metadata or asset processor output while preserving the same generated map export format and validation boundary.
+Bind the preview sink to an O3DE adapter, then replace the placeholder JSON source with AmandaCore-owned O3DE editor metadata or asset processor output while preserving the generated map export validation boundary.

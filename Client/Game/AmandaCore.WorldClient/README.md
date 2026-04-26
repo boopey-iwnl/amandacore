@@ -10,6 +10,8 @@ It is intentionally thin and not an O3DE scene yet. Its job is to prove the live
 - disconnect and reconnect
 - retain persisted state
 
+It also hosts the first Dawnwake streaming preview hook. The client reads the world service `streaming` payload, builds a `ClientStreamingFrame`, computes the current cell from server-provided bounds, and emits changes through `IWorldStreamingPreviewSink`. `ConsoleWorldStreamingPreviewSink` prints those events today; a future O3DE adapter can bind the same callbacks to placeholder scene volumes or asset prefetch behavior.
+
 Example:
 
 ```powershell
