@@ -48,6 +48,7 @@ func (s *worldServer) loadConfiguredContentPackageLocked(contentPackagePath stri
 func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.ValidatedContentPackage) ContentActivationResult {
 	registry := pkg.Registry
 	s.contentRegistry = &registry
+	s.registerContentAbilityCatalogLocked(registry)
 	result := ContentActivationResult{
 		PackageID:      registry.PackageID,
 		PackageVersion: registry.Version,

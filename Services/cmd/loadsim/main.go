@@ -26,9 +26,10 @@ import (
 )
 
 const (
-	scenarioCombatBasic = "combat-basic"
-	devBasicStrikeID    = "dev_basic_strike"
-	devStalkerArchetype = "dev_isle_stalker"
+	scenarioCombatBasic      = "combat-basic"
+	scenarioAbilityAuraBasic = "ability-aura-basic"
+	devBasicStrikeID         = "dev_basic_strike"
+	devStalkerArchetype      = "dev_isle_stalker"
 )
 
 type options struct {
@@ -95,6 +96,18 @@ func runWorldLoadsim() {
 		exitOnReportError(err, report.Errors)
 	case scenarioCombatBasic:
 		runCombatBasicLoadsim(opts)
+	case scenarioAbilityAuraBasic:
+		cmdRate := int(opts.CommandRate)
+		if cmdRate <= 0 {
+			exitf("--cmd-rate must be at least 1 for ability-aura-basic")
+		}
+		report, err := worlds.RunAbilityAuraLoadsim(worlds.AbilityAuraLoadsimOptions{
+			Clients:  opts.Clients,
+			Duration: opts.Duration,
+			CmdRate:  cmdRate,
+		})
+		printAbilityAuraReport(report)
+		exitOnReportError(err, report.Errors)
 	default:
 		exitf("unsupported scenario %q", opts.Scenario)
 	}
@@ -199,6 +212,25 @@ func printContentPackageReport(report worlds.ContentPackageLoadsimReport) {
 	if err == nil {
 		fmt.Printf("- json: %s\n", string(encoded))
 	}
+}
+
+func printAbilityAuraReport(report worlds.AbilityAuraLoadsimReport) {
+	fmt.Println("Ability aura loadsim report")
+	fmt.Printf("- simulated clients: %d\n", report.SimulatedClients)
+	fmt.Printf("- ability commands sent: %d\n", report.AbilityCommandsSent)
+	fmt.Printf("- ability commands accepted: %d\n", report.AbilityCommandsAccepted)
+	fmt.Printf("- ability commands rejected: %d\n", report.AbilityCommandsRejected)
+	fmt.Printf("- effect events: %d\n", report.EffectEvents)
+	fmt.Printf("- auras applied: %d\n", report.AurasApplied)
+	fmt.Printf("- aura ticks: %d\n", report.AuraTicks)
+	fmt.Printf("- auras expired: %d\n", report.AuraExpired)
+	fmt.Printf("- casts started: %d\n", report.CastsStarted)
+	fmt.Printf("- casts completed: %d\n", report.CastsCompleted)
+	fmt.Printf("- cooldowns started: %d\n", report.CooldownsStarted)
+	fmt.Printf("- average tick duration: %s\n", report.AverageTickDuration)
+	fmt.Printf("- max tick duration: %s\n", report.MaxTickDuration)
+	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	printErrors(report.Errors)
 }
 
 func printErrors(errors []string) {

@@ -278,13 +278,19 @@ func (s *worldServer) activateAbilityLocked(session *worldSessionState, abilityI
 		return fmt.Errorf("ability is not learned")
 	}
 
-	ability, found := findAbilityDefinition(abilityID)
+	ability, found := s.findAbilityDefinitionLocked(abilityID)
 	if !found {
 		return fmt.Errorf("ability is not available")
 	}
 
 	targetMob := s.findMobForSessionLocked(session, session.CurrentTargetID)
 	targetPlayer := s.findPlayerTargetForSessionLocked(session, session.CurrentTargetID)
+	if abilityCastDurationMs(ability) > 0 {
+		if err := s.validateAbilityUseLocked(session, targetMob, targetPlayer, ability); err != nil {
+			return err
+		}
+		return s.startAbilityCastLocked(session, ability)
+	}
 	return s.applyAbilityEffectLocked(session, targetMob, targetPlayer, ability)
 }
 
@@ -314,13 +320,18 @@ func (s *worldServer) advanceWorldLocked(now time.Time) error {
 	}
 
 	nowMs := now.UnixMilli()
+	if err := s.advanceAurasLocked(nowMs); err != nil {
+		return err
+	}
 	for _, session := range s.sessionsByToken {
 		if session.Resource < session.MaxResource {
 			session.Resource = minFloat(session.MaxResource, session.Resource+(playerResourceRegenPerSec*deltaSeconds))
 		}
 
 		if session.CastingAbilityID != "" && session.CastEndsAtMs > 0 && nowMs >= session.CastEndsAtMs {
-			s.cancelCastLocked(session)
+			if err := s.completeCastLocked(session); err != nil {
+				s.cancelCastLocked(session)
+			}
 		}
 
 		if !session.AutoAttackActive || !session.Alive {
@@ -488,6 +499,7 @@ func (s *worldServer) advanceMobLocked(mob *mobState, deltaSeconds float64, nowM
 
 	if targetSession.Health <= 0.0 {
 		targetSession.Alive = false
+		s.clearAurasForTargetLocked(auraTarget{EntityID: targetSession.CharacterID, Kind: "player", Session: targetSession}, "entity_dead")
 		s.resetSessionCombatStateLocked(targetSession, "player_dead")
 		mob.CurrentTargetCharacter = ""
 		s.setMobAIStateLocked(mob, mobAIStateIdle, "target_dead")
@@ -619,6 +631,7 @@ func (s *worldServer) applyDamageToMobLocked(session *worldSessionState, mob *mo
 
 	mob.Alive = false
 	mob.Targetable = false
+	s.clearAurasForTargetLocked(auraTarget{EntityID: mob.ID, Kind: "npc", Mob: mob}, "entity_dead")
 	mob.DeathTick = nowMillis()
 	s.setMobAIStateLocked(mob, mobAIStateDead, "killed")
 	if mob.RespawnDelayMs > 0 {

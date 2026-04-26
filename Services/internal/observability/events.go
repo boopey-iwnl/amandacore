@@ -28,6 +28,16 @@ const (
 	EventWorldEntityDespawned     = "world.entity.despawned"
 	EventCombatIntentSubmitted    = "combat.intent_submitted"
 	EventCombatAbilityResolved    = "combat.ability_resolved"
+	EventAbilityCastStarted       = "ability.cast_started"
+	EventAbilityCastCompleted     = "ability.cast_completed"
+	EventAbilityCastInterrupted   = "ability.cast_interrupted"
+	EventAbilityEffectResolved    = "ability.effect_resolved"
+	EventAuraApplied              = "aura.applied"
+	EventAuraRefreshed            = "aura.refreshed"
+	EventAuraTicked               = "aura.ticked"
+	EventAuraExpired              = "aura.expired"
+	EventCooldownStarted          = "cooldown.started"
+	EventCooldownReady            = "cooldown.ready"
 	EventNPCSpawned               = "npc.spawned"
 	EventAdminActionRequested     = "admin.action_requested"
 	EventAdminActionApplied       = "admin.action_applied"
@@ -56,6 +66,16 @@ func StableEventNames() []string {
 		EventWorldEntityDespawned,
 		EventCombatIntentSubmitted,
 		EventCombatAbilityResolved,
+		EventAbilityCastStarted,
+		EventAbilityCastCompleted,
+		EventAbilityCastInterrupted,
+		EventAbilityEffectResolved,
+		EventAuraApplied,
+		EventAuraRefreshed,
+		EventAuraTicked,
+		EventAuraExpired,
+		EventCooldownStarted,
+		EventCooldownReady,
 		EventNPCSpawned,
 		EventAdminActionRequested,
 		EventAdminActionApplied,

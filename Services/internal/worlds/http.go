@@ -1233,6 +1233,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 			DeathTick:       mob.DeathTick,
 			RespawnTick:     mob.RespawnTick,
 			AIState:         mob.AIState,
+			Auras:           buildAuraResponses(mob.ActiveAuras),
 		})
 	}
 
@@ -1258,6 +1259,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 			Targetable:   true,
 			PvPState:     pvpState,
 			DuelOpponent: duelOpponent,
+			Auras:        buildAuraResponses(candidate.ActiveAuras),
 		})
 	}
 
@@ -1279,6 +1281,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"maxResource":    session.MaxResource,
 		"resourceName":   "Grit",
 		"alive":          session.Alive,
+		"auras":          buildAuraResponses(session.ActiveAuras),
 		"experience":     session.Experience,
 		"currencyCopper": session.CurrencyCopper,
 		"currency":       breakdownCurrency(session.CurrencyCopper),

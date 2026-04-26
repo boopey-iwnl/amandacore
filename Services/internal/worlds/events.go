@@ -25,6 +25,16 @@ const (
 	EventCombatDamageApplied       = "combat.damage_applied"
 	EventCombatCooldownStarted     = "combat.cooldown_started"
 	EventCombatTargetDefeated      = "combat.target_defeated"
+	EventAbilityCastStarted        = "ability.cast_started"
+	EventAbilityCastCompleted      = "ability.cast_completed"
+	EventAbilityCastInterrupted    = "ability.cast_interrupted"
+	EventAbilityEffectResolved     = "ability.effect_resolved"
+	EventAuraApplied               = "aura.applied"
+	EventAuraRefreshed             = "aura.refreshed"
+	EventAuraTicked                = "aura.ticked"
+	EventAuraExpired               = "aura.expired"
+	EventCooldownStarted           = "cooldown.started"
+	EventCooldownReady             = "cooldown.ready"
 	EventEntityHealthChanged       = "entity.health_changed"
 	EventEntityDied                = "entity.died"
 	EventPlayerDied                = "player.died"
@@ -37,6 +47,8 @@ const (
 	EventLoadsimQuestCompleted     = "loadsim.quest.completed"
 	EventLoadsimCombatStarted      = "loadsim.combat.started"
 	EventLoadsimCombatCompleted    = "loadsim.combat.completed"
+	EventLoadsimAbilityStarted     = "loadsim.ability.started"
+	EventLoadsimAbilityCompleted   = "loadsim.ability.completed"
 	eventItemCatalogLoaded         = "item.catalog.loaded"
 	eventInventoryGrantRequested   = "inventory.item_grant_requested"
 	eventInventoryItemGranted      = "inventory.item_granted"
@@ -89,6 +101,16 @@ const (
 	eventCombatDamageApplied       = EventCombatDamageApplied
 	eventCombatCooldownStarted     = EventCombatCooldownStarted
 	eventCombatTargetDefeated      = EventCombatTargetDefeated
+	eventAbilityCastStarted        = EventAbilityCastStarted
+	eventAbilityCastCompleted      = EventAbilityCastCompleted
+	eventAbilityCastInterrupted    = EventAbilityCastInterrupted
+	eventAbilityEffectResolved     = EventAbilityEffectResolved
+	eventAuraApplied               = EventAuraApplied
+	eventAuraRefreshed             = EventAuraRefreshed
+	eventAuraTicked                = EventAuraTicked
+	eventAuraExpired               = EventAuraExpired
+	eventCooldownStarted           = EventCooldownStarted
+	eventCooldownReady             = EventCooldownReady
 	eventEntityHealthChanged       = EventEntityHealthChanged
 	eventEntityDied                = EventEntityDied
 	eventPlayerDied                = EventPlayerDied
@@ -97,6 +119,8 @@ const (
 	eventWorldStateDiffEmitted     = EventWorldStateDiffEmitted
 	eventLoadsimCombatStarted      = EventLoadsimCombatStarted
 	eventLoadsimCombatCompleted    = EventLoadsimCombatCompleted
+	eventLoadsimAbilityStarted     = EventLoadsimAbilityStarted
+	eventLoadsimAbilityCompleted   = EventLoadsimAbilityCompleted
 )
 
 const (
@@ -107,6 +131,9 @@ const (
 	DiffAbilityResult           = "AbilityResultDelta"
 	DiffEntityDeath             = "EntityDeathDelta"
 	DiffProgression             = "ProgressionDelta"
+	DiffAuraState               = "AuraStateDelta"
+	DiffCooldown                = "CooldownDelta"
+	DiffCastState               = "CastStateDelta"
 	diffEntitySpawn             = DiffEntitySpawn
 	diffEntityHealth            = DiffEntityHealth
 	diffEntityCombatState       = DiffEntityCombatState
@@ -114,6 +141,9 @@ const (
 	diffAbilityResult           = DiffAbilityResult
 	diffEntityDeath             = DiffEntityDeath
 	diffProgression             = DiffProgression
+	diffAuraState               = DiffAuraState
+	diffCooldown                = DiffCooldown
+	diffCastState               = DiffCastState
 	diffInventoryDelta          = "InventoryDelta"
 	diffLootContainerCreated    = "LootContainerCreatedDelta"
 	diffLootContainerUpdated    = "LootContainerUpdatedDelta"
@@ -392,6 +422,39 @@ func abilityResultDelta(sourceID string, targetID string, abilityID string, dama
 		"abilityId":      abilityID,
 		"damage":         damage,
 		"accepted":       accepted,
+	})
+}
+
+func auraStateDelta(entityID string, aura auraInstance, action string) StateDiff {
+	return newStateDiff(DiffAuraState, entityID, map[string]any{
+		"action":         action,
+		"auraId":         aura.AuraID,
+		"displayName":    aura.DisplayName,
+		"kind":           aura.Kind,
+		"sourceEntityId": aura.SourceEntityID,
+		"targetEntityId": aura.TargetEntityID,
+		"stackCount":     aura.StackCount,
+		"expiresAtMs":    aura.ExpiresAtMs,
+		"nextTickAtMs":   aura.NextTickAtMs,
+	})
+}
+
+func cooldownDelta(characterID string, abilityID string, category string, endsAtMs int64, action string) StateDiff {
+	return newStateDiff(DiffCooldown, characterID, map[string]any{
+		"action":    action,
+		"abilityId": abilityID,
+		"category":  category,
+		"endsAtMs":  endsAtMs,
+		"readyAtMs": endsAtMs,
+	})
+}
+
+func castStateDelta(characterID string, abilityID string, targetID string, endsAtMs int64, action string) StateDiff {
+	return newStateDiff(DiffCastState, characterID, map[string]any{
+		"action":    action,
+		"abilityId": abilityID,
+		"targetId":  targetID,
+		"endsAtMs":  endsAtMs,
 	})
 }
 

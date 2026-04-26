@@ -56,6 +56,29 @@ Successful hostile target selection emits `combat.target.selected` and `TargetSe
 
 Damage is fixed and deterministic. The client never supplies damage. The server validates player state, target state, range, and cooldown before applying the result.
 
+## Ability, Effect, And Aura Skeleton
+
+Ability execution now passes through an AmandaCore-owned resolver:
+
+```text
+UseAbilityIntent -> ability lookup -> target/range/resource/cooldown validation -> timing gate -> effect expansion -> authoritative state mutation -> domain events/state diffs
+```
+
+The resolver supports:
+
+- instant effects
+- cast/channel timing placeholders through `ability.cast_started`, `ability.cast_completed`, and `ability.cast_interrupted`
+- direct damage effects
+- heal effects
+- aura application effects
+- per-ability cooldowns
+- shared cooldown categories through `cooldown.started` and `cooldown.ready`
+- aura lifecycle events: `aura.applied`, `aura.refreshed`, `aura.ticked`, and `aura.expired`
+
+The dev content package defines `dev_stalker_pressure`, which applies `dev_pressure_mark`. `dev_pressure_mark` is a short server-side debuff with a deterministic periodic damage tick. It exists only to validate the original AmandaCore effect/aura path.
+
+Future client protocol work should consume the state diffs instead of implementing any combat math locally.
+
 ## Hostile NPC Behavior
 
 Hostile NPC AI is deliberately minimal:
@@ -104,16 +127,27 @@ Pop-Location
 
 The report includes simulated clients, NPC spawns, command counts, accepted/rejected combat commands, damage events, NPC deaths, kill credits, respawns, tick duration, queue depth placeholder, and errors.
 
+Run the ability/effect/aura simulator from the Services module:
+
+```powershell
+Push-Location Services
+go run ./cmd/loadsim --clients 3 --duration 10s --cmd-rate 2 --scenario ability-aura-basic
+Pop-Location
+```
+
+The report includes ability commands, effect events, aura application/tick/expiry counts, cast start/completion counts, cooldown events, tick duration, queue depth placeholder, and errors.
+
 ## Limitations And Next Steps
 
 - Only one dev hostile archetype is added.
-- Basic Strike is fixed damage with no crit, dodge, miss, mitigation, cast time, or effect graph.
+- Basic Strike remains fixed damage with no crit, dodge, miss, or mitigation.
+- The ability/effect/aura system is a skeleton. It supports deterministic direct damage, healing, aura apply/tick/expire, cooldown categories, and cast/channel timing, but does not yet include full stat scaling policies, interrupt rules, dispels, immunities, resistances, or client UI.
 - NPC movement is direct step movement, not navmesh pathing.
 - Player death has no full respawn flow.
 - Loot tables are intentionally not implemented.
 - Quest objective integration consumes the new kill-credit boundary later.
 
-Next recommended milestone: ability/effect/aura skeleton.
+Next recommended milestone: ability content expansion and client-facing combat UI wiring.
 
 ## Clean-room reference boundary
 

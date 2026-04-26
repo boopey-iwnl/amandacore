@@ -358,38 +358,51 @@ type npcService struct {
 }
 
 type sessionEntity struct {
-	ID               string       `json:"id"`
-	ArchetypeID      string       `json:"archetypeId,omitempty"`
-	SpawnPointID     string       `json:"spawnPointId,omitempty"`
-	DisplayName      string       `json:"displayName"`
-	Kind             string       `json:"kind"`
-	MobTypeID        string       `json:"mobTypeId,omitempty"`
-	Disposition      string       `json:"disposition,omitempty"`
-	Classification   string       `json:"classification,omitempty"`
-	Elite            bool         `json:"elite,omitempty"`
-	GatherNodeTypeID string       `json:"gatherNodeTypeId,omitempty"`
-	ProfessionID     string       `json:"professionId,omitempty"`
-	RequiredSkill    int          `json:"requiredSkill,omitempty"`
-	Ready            bool         `json:"ready,omitempty"`
-	ReadyAt          int64        `json:"readyAt,omitempty"`
-	InteractionLabel string       `json:"interactionLabel,omitempty"`
-	X                float64      `json:"x"`
-	Y                float64      `json:"y"`
-	Z                float64      `json:"z"`
-	Health           float64      `json:"health"`
-	MaxHealth        float64      `json:"maxHealth"`
-	Alive            bool         `json:"alive"`
-	Targetable       bool         `json:"targetable"`
-	IsInCombat       bool         `json:"isInCombat"`
-	CurrentTargetID  string       `json:"currentTargetEntityId,omitempty"`
-	LastDamagedByID  string       `json:"lastDamagedByEntityId,omitempty"`
-	RespawnDelayMs   int64        `json:"respawnDelayMs,omitempty"`
-	DeathTick        int64        `json:"deathTick,omitempty"`
-	RespawnTick      int64        `json:"respawnTick,omitempty"`
-	AIState          string       `json:"aiState,omitempty"`
-	PvPState         string       `json:"pvpState,omitempty"`
-	DuelOpponent     bool         `json:"duelOpponent,omitempty"`
-	Services         []npcService `json:"npcServices,omitempty"`
+	ID               string         `json:"id"`
+	ArchetypeID      string         `json:"archetypeId,omitempty"`
+	SpawnPointID     string         `json:"spawnPointId,omitempty"`
+	DisplayName      string         `json:"displayName"`
+	Kind             string         `json:"kind"`
+	MobTypeID        string         `json:"mobTypeId,omitempty"`
+	Disposition      string         `json:"disposition,omitempty"`
+	Classification   string         `json:"classification,omitempty"`
+	Elite            bool           `json:"elite,omitempty"`
+	GatherNodeTypeID string         `json:"gatherNodeTypeId,omitempty"`
+	ProfessionID     string         `json:"professionId,omitempty"`
+	RequiredSkill    int            `json:"requiredSkill,omitempty"`
+	Ready            bool           `json:"ready,omitempty"`
+	ReadyAt          int64          `json:"readyAt,omitempty"`
+	InteractionLabel string         `json:"interactionLabel,omitempty"`
+	X                float64        `json:"x"`
+	Y                float64        `json:"y"`
+	Z                float64        `json:"z"`
+	Health           float64        `json:"health"`
+	MaxHealth        float64        `json:"maxHealth"`
+	Alive            bool           `json:"alive"`
+	Targetable       bool           `json:"targetable"`
+	IsInCombat       bool           `json:"isInCombat"`
+	CurrentTargetID  string         `json:"currentTargetEntityId,omitempty"`
+	LastDamagedByID  string         `json:"lastDamagedByEntityId,omitempty"`
+	RespawnDelayMs   int64          `json:"respawnDelayMs,omitempty"`
+	DeathTick        int64          `json:"deathTick,omitempty"`
+	RespawnTick      int64          `json:"respawnTick,omitempty"`
+	AIState          string         `json:"aiState,omitempty"`
+	PvPState         string         `json:"pvpState,omitempty"`
+	DuelOpponent     bool           `json:"duelOpponent,omitempty"`
+	Services         []npcService   `json:"npcServices,omitempty"`
+	Auras            []auraResponse `json:"auras,omitempty"`
+}
+
+type auraResponse struct {
+	AuraID         string `json:"auraId"`
+	DisplayName    string `json:"displayName"`
+	Kind           string `json:"kind"`
+	SourceEntityID string `json:"sourceEntityId"`
+	TargetEntityID string `json:"targetEntityId"`
+	StackCount     int    `json:"stackCount"`
+	AppliedAtMs    int64  `json:"appliedAtMs"`
+	ExpiresAtMs    int64  `json:"expiresAtMs,omitempty"`
+	NextTickAtMs   int64  `json:"nextTickAtMs,omitempty"`
 }
 
 type itemRewardDefinition struct {
@@ -639,6 +652,7 @@ type worldSessionState struct {
 	CastingAbilityID   string
 	CastingTargetID    string
 	AbilityCooldowns   map[string]int64
+	ActiveAuras        map[string]auraInstance
 	Experience         int
 	CurrencyCopper     int
 	Inventory          []platform.CharacterInventorySlot
@@ -698,6 +712,7 @@ type mobState struct {
 	DeathTick              int64
 	RespawnAtMs            int64
 	RespawnTick            int64
+	ActiveAuras            map[string]auraInstance
 }
 
 type mobSpawnDefinition struct {
@@ -824,6 +839,8 @@ type worldServer struct {
 	lootContainerOrder     []string
 	lootContainerCounter   int64
 	killCreditLedger       KillCreditLedger
+	abilityCatalog         map[string]abilityDefinition
+	auraCatalog            map[string]auraDefinition
 	zones                  map[string]zoneDefinition
 	contentRegistry        *contentpkg.RuntimeContentRegistry
 	zoneRuntimes           map[string]*ContentZoneRuntime
@@ -856,6 +873,8 @@ func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackage
 		friendlyNPCs:       map[string]friendlyNPCDefinition{},
 		gatheringNodes:     map[string]*gatheringNodeState{},
 		lootContainers:     map[string]*lootContainerState{},
+		abilityCatalog:     defaultAbilityCatalog(),
+		auraCatalog:        defaultAuraCatalog(),
 		killCreditLedger: KillCreditLedger{
 			CreditsByCharacter: map[string]map[string]int{},
 		},

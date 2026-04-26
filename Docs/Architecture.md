@@ -104,6 +104,12 @@ The current server slice includes an original dev hostile NPC archetype, `dev_is
 
 The world response exposes protocol-neutral state diffs for entity spawn, health, combat state, target selection, ability results, death, and progression. These are internal AmandaCore contracts, not copied packet or emulator surfaces.
 
+## Ability, effect, and aura skeleton
+
+The world server now owns an original typed ability resolver. Ability definitions expand into effect operations after session, target, range, resource, cooldown, and timing validation. The first supported primitives are direct damage, healing, aura application, aura periodic ticks, cast/channel timing placeholders, per-ability cooldowns, and shared cooldown categories.
+
+Aura runtime state is authoritative on the server and exposed to clients as protocol-neutral state. The dev content package uses `dev_stalker_pressure` and `dev_pressure_mark` only as AmandaCore-owned validation data for aura apply/tick/expire behavior. Future ability work should add richer effect categories behind this same resolver rather than moving combat decisions into clients or transport adapters.
+
 ## Milestone one slice
 
 - One outdoor zone with two streamable cells and one micro-instance hook.

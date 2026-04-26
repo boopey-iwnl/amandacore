@@ -287,19 +287,21 @@ type QuestReward struct {
 }
 
 type AbilityDefinition struct {
-	AbilityID   string          `json:"ability_id"`
-	DisplayName string          `json:"display_name"`
-	School      string          `json:"school"`
-	TargetRule  string          `json:"target_rule"`
-	Range       float64         `json:"range"`
-	Timing      AbilityTiming   `json:"timing"`
-	CooldownMS  int             `json:"cooldown_ms"`
-	Effects     []AbilityEffect `json:"effects"`
-	Tags        []string        `json:"tags"`
+	AbilityID        string          `json:"ability_id"`
+	DisplayName      string          `json:"display_name"`
+	School           string          `json:"school"`
+	TargetRule       string          `json:"target_rule"`
+	Range            float64         `json:"range"`
+	Timing           AbilityTiming   `json:"timing"`
+	CooldownMS       int             `json:"cooldown_ms"`
+	CooldownCategory string          `json:"cooldown_category,omitempty"`
+	Effects          []AbilityEffect `json:"effects"`
+	Tags             []string        `json:"tags"`
 }
 
 type AbilityTiming struct {
-	CastMS int `json:"cast_ms"`
+	CastMS    int `json:"cast_ms"`
+	ChannelMS int `json:"channel_ms,omitempty"`
 }
 
 type AbilityEffect struct {
@@ -309,15 +311,17 @@ type AbilityEffect struct {
 }
 
 type AuraDefinition struct {
-	AuraID      string         `json:"aura_id"`
-	DisplayName string         `json:"display_name"`
-	Kind        string         `json:"kind"`
-	DurationMS  int            `json:"duration_ms"`
-	MaxStacks   int            `json:"max_stacks"`
-	StackRule   string         `json:"stack_rule"`
-	TickRule    string         `json:"tick_rule"`
-	Modifiers   []AuraModifier `json:"modifiers"`
-	Tags        []string       `json:"tags"`
+	AuraID         string          `json:"aura_id"`
+	DisplayName    string          `json:"display_name"`
+	Kind           string          `json:"kind"`
+	DurationMS     int             `json:"duration_ms"`
+	MaxStacks      int             `json:"max_stacks"`
+	StackRule      string          `json:"stack_rule"`
+	TickRule       string          `json:"tick_rule"`
+	TickIntervalMS int             `json:"tick_interval_ms,omitempty"`
+	TickEffects    []AbilityEffect `json:"tick_effects,omitempty"`
+	Modifiers      []AuraModifier  `json:"modifiers"`
+	Tags           []string        `json:"tags"`
 }
 
 type AuraModifier struct {
@@ -877,8 +881,8 @@ func validateAbility(ability AbilityDefinition, index int, auraIDs map[string]st
 	if !validEnum(ability.TargetRule, "self", "enemy", "ally", "none") {
 		report.Addf(ErrorInvalidEnum, path+".target_rule", "target_rule %q is not valid", ability.TargetRule)
 	}
-	if ability.Range < 0 || ability.CooldownMS < 0 || ability.Timing.CastMS < 0 {
-		report.Add(ErrorInvalidNumberRange, path, "ability range, cooldown_ms, and timing.cast_ms must be non-negative")
+	if ability.Range < 0 || ability.CooldownMS < 0 || ability.Timing.CastMS < 0 || ability.Timing.ChannelMS < 0 {
+		report.Add(ErrorInvalidNumberRange, path, "ability range, cooldown_ms, timing.cast_ms, and timing.channel_ms must be non-negative")
 	}
 	for effectIndex, effect := range ability.Effects {
 		effectPath := fmt.Sprintf("%s.effects[%d]", path, effectIndex)
@@ -910,6 +914,20 @@ func validateAura(aura AuraDefinition, index int, report *ContentValidationRepor
 	}
 	if !validEnum(aura.TickRule, "none", "interval") {
 		report.Addf(ErrorInvalidEnum, path+".tick_rule", "tick_rule %q is not valid", aura.TickRule)
+	}
+	if validEnum(aura.TickRule, "interval") {
+		if aura.TickIntervalMS <= 0 {
+			report.Add(ErrorInvalidNumberRange, path+".tick_interval_ms", "tick_interval_ms must be positive when tick_rule is interval")
+		}
+		if len(aura.TickEffects) == 0 {
+			report.Add(ErrorMissingRequiredField, path+".tick_effects", "interval auras must define at least one tick effect")
+		}
+	}
+	for effectIndex, effect := range aura.TickEffects {
+		effectPath := fmt.Sprintf("%s.tick_effects[%d]", path, effectIndex)
+		if !validEnum(effect.Kind, "direct_damage", "heal") {
+			report.Addf(ErrorInvalidEnum, effectPath+".kind", "aura tick effect kind %q is not valid", effect.Kind)
+		}
 	}
 }
 

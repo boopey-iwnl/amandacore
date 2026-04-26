@@ -30,14 +30,18 @@ type abilityDefinition struct {
 	ActionBarLabel     string
 	RequiresTarget     bool
 	RangeMeters        float64
+	TargetRule         string
+	Timing             abilityTiming
 	ResourceCost       float64
 	ResourceGeneration float64
 	CooldownMs         int64
+	CooldownCategory   string
 	TriggersGCD        bool
 	TargetDisposition  string
 	Damage             float64
 	AttackPowerScale   float64
 	HealAmount         float64
+	Effects            []abilityEffectDefinition
 }
 
 var warriorAbilityCatalog = []abilityDefinition{
@@ -513,67 +517,11 @@ func (s *worldServer) sessionKnowsAbilityLocked(session *worldSessionState, abil
 }
 
 func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targetMob *mobState, targetPlayer *worldSessionState, ability abilityDefinition) error {
-	nowMs := nowMillis()
-	if session.Resource < ability.ResourceCost {
-		return fmt.Errorf("not enough resource")
+	ability = normalizeAbilityDefinition(ability)
+	if err := s.validateAbilityUseLocked(session, targetMob, targetPlayer, ability); err != nil {
+		return err
 	}
-	if cooldownEndsAt := session.abilityCooldownEndsAt(ability.ID); cooldownEndsAt > nowMs {
-		return fmt.Errorf("ability is cooling down")
-	}
-
-	if ability.RequiresTarget {
-		if session.CurrentTargetID == "" {
-			return fmt.Errorf("no target")
-		}
-		if targetMob == nil && targetPlayer == nil {
-			return fmt.Errorf("target is invalid")
-		}
-		if ability.TargetDisposition == npcDispositionHostile && targetMob == nil {
-			return fmt.Errorf("target is not hostile")
-		}
-		if targetMob != nil {
-			if !targetMob.Alive || !targetMob.Targetable {
-				return fmt.Errorf("target is invalid")
-			}
-			if ability.TargetDisposition != "" && targetMob.Disposition != ability.TargetDisposition {
-				return fmt.Errorf("target disposition is invalid")
-			}
-			if distance2D(session.X, session.Y, targetMob.X, targetMob.Y) > ability.RangeMeters {
-				return fmt.Errorf("target is out of range")
-			}
-		} else {
-			if ability.TargetDisposition == string(NpcDispositionHostile) {
-				return fmt.Errorf("target is invalid")
-			}
-			if err := s.validatePvPDamageLocked(session, targetPlayer); err != nil {
-				return err
-			}
-			if distance2D(session.X, session.Y, targetPlayer.X, targetPlayer.Y) > ability.RangeMeters {
-				return fmt.Errorf("target is out of range")
-			}
-		}
-	}
-
-	session.Resource -= ability.ResourceCost
-	if ability.ResourceGeneration > 0 {
-		generation := ability.ResourceGeneration
-		if ability.ID == platform.RallyingCallAbilityID {
-			generation += float64(session.Talents[rallyRhythmTalentID] * 6)
-		}
-		session.Resource = minFloat(session.MaxResource, session.Resource+generation)
-	}
-	if ability.TriggersGCD {
-		session.GlobalCooldownEnds = nowMs + playerGlobalCooldownMs
-	}
-	if ability.CooldownMs > 0 {
-		session.ensureAbilityCooldowns()[ability.ID] = nowMs + ability.CooldownMs
-		s.emitWorldEventLocked(EventCombatCooldownStarted, map[string]any{
-			"worldSessionToken": session.Token,
-			"characterId":       session.CharacterID,
-			"abilityId":         ability.ID,
-			"cooldownEndsAt":    session.abilityCooldownEndsAt(ability.ID),
-		})
-	}
+	s.commitAbilityUseLocked(session, ability)
 
 	observability.LogEvent("world-service", "world.ability_requested", map[string]any{
 		"worldSessionToken": session.Token,
@@ -582,61 +530,7 @@ func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targe
 		"targetId":          session.CurrentTargetID,
 	})
 
-	if ability.Damage > 0 && targetMob != nil {
-		damage := s.abilityDamage(session, ability)
-		s.emitWorldEventLocked(EventCombatAbilityResolved, map[string]any{
-			"worldSessionToken": session.Token,
-			"characterId":       session.CharacterID,
-			"abilityId":         ability.ID,
-			"targetId":          targetMob.ID,
-			"damage":            damage,
-		}, abilityResultDelta(session.CharacterID, targetMob.ID, ability.ID, damage, true))
-		if err := s.applyDamageToMobLocked(session, targetMob, damage, ability.ID); err != nil {
-			return err
-		}
-		s.emitStateDiffLocked(diffAbilityResult, targetMob.ID, map[string]any{
-			"characterId": session.CharacterID,
-			"abilityId":   ability.ID,
-			"targetId":    targetMob.ID,
-			"damage":      damage,
-		})
-	}
-	if ability.Damage > 0 && targetPlayer != nil {
-		damage := s.abilityDamage(session, ability)
-		s.emitWorldEventLocked(EventCombatAbilityResolved, map[string]any{
-			"worldSessionToken": session.Token,
-			"characterId":       session.CharacterID,
-			"abilityId":         ability.ID,
-			"targetId":          targetPlayer.CharacterID,
-			"damage":            damage,
-		}, abilityResultDelta(session.CharacterID, targetPlayer.CharacterID, ability.ID, damage, true))
-		if err := s.applyDamageToPlayerLocked(session, targetPlayer, damage, ability.ID); err != nil {
-			return err
-		}
-		s.emitStateDiffLocked(diffAbilityResult, targetPlayer.CharacterID, map[string]any{
-			"characterId": session.CharacterID,
-			"abilityId":   ability.ID,
-			"targetId":    targetPlayer.CharacterID,
-			"damage":      damage,
-		})
-	}
-	if ability.HealAmount > 0 {
-		session.Health = minFloat(session.MaxHealth, session.Health+ability.HealAmount)
-		observability.LogEvent("world-service", "world.ability_self_applied", map[string]any{
-			"worldSessionToken": session.Token,
-			"characterId":       session.CharacterID,
-			"abilityId":         ability.ID,
-			"health":            session.Health,
-		})
-	}
-
-	s.emitDomainEventLocked(eventCombatAbilityResolved, map[string]any{
-		"worldSessionToken": session.Token,
-		"characterId":       session.CharacterID,
-		"abilityId":         ability.ID,
-		"targetId":          session.CurrentTargetID,
-	})
-	return nil
+	return s.resolveAbilityEffectsLocked(session, targetMob, targetPlayer, ability)
 }
 
 func abilityTooltip(ability abilityDefinition) string {

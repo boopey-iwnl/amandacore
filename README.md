@@ -86,6 +86,14 @@ go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizon
 
 Scale tiers, scenarios, reports, and sharding behavior are documented in `Docs/LoadTesting.md` and `Docs/MultiZoneSharding.md`.
 
+Run the server-authoritative ability/effect/aura harness from `Services`:
+
+```powershell
+go run ./cmd/loadsim --clients 3 --duration 10s --cmd-rate 2 --scenario ability-aura-basic
+```
+
+The scenario exercises the original AmandaCore effect resolver, aura apply/tick/expire lifecycle, cast completion, and cooldown events without requiring O3DE.
+
 The Dawnwake Isles multi-zone skeleton can be exercised without O3DE:
 
 ```powershell

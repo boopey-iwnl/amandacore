@@ -47,7 +47,25 @@ The current server interaction path is:
 
 Target selection uses the existing target endpoint and now emits `combat.target.selected` or `combat.target.rejected`.
 
-Ability use goes through the existing ability endpoint and now supports `dev_basic_strike`, an original AmandaCore fixed-damage hostile-NPC strike. The server owns damage, cooldown, death, and kill credit.
+Ability use goes through the existing ability endpoint. `dev_basic_strike` remains the original fixed-damage hostile-NPC strike, but resolution now flows through the AmandaCore effect resolver.
+
+The resolver keeps the command protocol semantic and server-authoritative:
+
+```text
+ability request -> ability definition -> target validation -> cooldown/category gate -> cast/channel gate -> effect resolver -> aura lifecycle -> state diffs
+```
+
+Current supported effect primitives:
+
+- direct damage
+- healing
+- aura application
+- periodic aura ticks
+- cast/channel timing placeholders
+- per-ability cooldowns
+- shared cooldown categories
+
+The first authored aura test path is `dev_stalker_pressure -> dev_pressure_mark`, defined in the AmandaCore dev content package. The server applies the aura, ticks deterministic damage, expires the aura, and exposes aura state in the world response.
 
 ## State Diffs
 
@@ -58,6 +76,9 @@ The world response includes protocol-neutral deltas for future clients:
 - `EntityCombatStateDelta`
 - `TargetSelectionDelta`
 - `AbilityResultDelta`
+- `AuraStateDelta`
+- `CooldownDelta`
+- `CastStateDelta`
 - `EntityDeathDelta`
 - `ProgressionDelta`
 
