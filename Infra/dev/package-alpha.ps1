@@ -94,7 +94,9 @@ function Test-ExcludedPackagePath {
     if ($path -match '^Client/Portal/') { return $true }
     if ($path -match '^Infra/dev/(local-processes\.json|platform-state\.json|logs/)') { return $true }
     if ($path -match '(^|/)dist(/|$)') { return $true }
-    if ($fileName -match '(?i)\.(log|tmp|png|jpg|jpeg|pdb|ilk|lock)$') { return $true }
+    $isContentArtAsset = $path -match '^Content/Art/'
+    if ($fileName -match '(?i)\.(log|tmp|pdb|ilk|lock)$') { return $true }
+    if ($fileName -match '(?i)\.(png|jpg|jpeg)$' -and -not $isContentArtAsset) { return $true }
     if ($fileName -match '(?i)^(m2_|milestone2_|milestone3_)') { return $true }
     if ($fileName -match '(?i)(^required-go-test-output\.txt$|^combat-test-output\.txt$|^worlds-compile-output.*\.txt$|^e2e-.*\.(txt|json|log)$|^milestone.*_runtime_ticket\.txt$|^imgui\.ini$)') { return $true }
 
@@ -264,7 +266,9 @@ foreach ($relativePath in @("project.json")) {
 $releaseDirectories = @(
     @{ Source = Join-Path $repoRoot "Docs\QA"; Relative = "Docs\QA" },
     @{ Source = Join-Path $repoRoot "Docs\Config"; Relative = "Docs\Config" },
+    @{ Source = Join-Path $repoRoot "Content\Art"; Relative = "Content\Art" },
     @{ Source = Join-Path $repoRoot "Content\GameData"; Relative = "Content\GameData" },
+    @{ Source = Join-Path $repoRoot "Content\Packs"; Relative = "Content\Packs" },
     @{ Source = Join-Path $repoRoot "Content\Schemas"; Relative = "Content\Schemas" },
     @{ Source = Join-Path $repoRoot "Infra\dev"; Relative = "Infra\dev" },
     @{ Source = Join-Path $repoRoot "Infra\qa"; Relative = "Infra\qa" },
