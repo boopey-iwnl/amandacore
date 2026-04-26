@@ -385,6 +385,7 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
         "Content\Art\Icons\UI\icon_missing.png",
         "Content\Art\Materials\mat_stonewake_grass_lush.material",
         "Content\Packs\dev_foundation\package.json",
+        "Client\Tools\AmandaCore.LocalControls\bin\Debug\net8.0-windows\AmandaCore.LocalControls.exe",
         "release-package-manifest.json",
         "Infra\dev\package-alpha.ps1",
         "Infra\dev\version-manifest.json",

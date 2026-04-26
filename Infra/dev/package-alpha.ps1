@@ -285,6 +285,7 @@ $runtimePaths = @(
     @{ Source = Join-Path $repoRoot "Services\bin"; Relative = "Services\bin" },
     @{ Source = Join-Path $repoRoot "Client\Launcher\AmandaCore.Launcher\bin\Debug\net8.0-windows"; Relative = "Client\Launcher\AmandaCore.Launcher\bin\Debug\net8.0-windows" },
     @{ Source = Join-Path $repoRoot "Client\Game\AmandaCore.WorldClient\bin\Debug\net8.0"; Relative = "Client\Game\AmandaCore.WorldClient\bin\Debug\net8.0" },
+    @{ Source = Join-Path $repoRoot "Client\Tools\AmandaCore.LocalControls\bin\Debug\net8.0-windows"; Relative = "Client\Tools\AmandaCore.LocalControls\bin\Debug\net8.0-windows" },
     @{ Source = Join-Path $repoRoot "build\windows\bin\profile"; Relative = "build\windows\bin\profile" },
     @{ Source = Join-Path $repoRoot "build\o3de-windows\bin\profile"; Relative = "build\o3de-windows\bin\profile" },
     @{ Source = Join-Path $repoRoot "Cache\pc"; Relative = "Cache\pc" }
