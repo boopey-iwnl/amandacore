@@ -9,7 +9,7 @@ import (
 	"amandacore/services/internal/observability"
 )
 
-type ZoneRuntime struct {
+type ContentZoneRuntime struct {
 	ZoneID                  string
 	DisplayName             string
 	RuntimeConfig           contentpkg.ZoneRuntimeConfig
@@ -75,6 +75,24 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			RequiredLevel: 1,
 		}
 	}
+	for _, lootTableID := range contentpkg.SortedKeys(registry.LootTables) {
+		lootTable := registry.LootTables[lootTableID]
+		worldTable := LootTableDefinition{
+			LootTableID: lootTable.LootTableID,
+			Entries:     make([]LootEntry, 0, len(lootTable.Entries)),
+		}
+		for _, entry := range lootTable.Entries {
+			worldTable.Entries = append(worldTable.Entries, LootEntry{
+				ItemID:            entry.ItemID,
+				MinQuantity:       entry.MinQuantity,
+				MaxQuantity:       entry.MaxQuantity,
+				DropChancePercent: entry.DropChancePercent,
+				IsGuaranteed:      entry.Guaranteed,
+				Tags:              append([]string(nil), entry.Tags...),
+			})
+		}
+		devLootTables[worldTable.LootTableID] = worldTable
+	}
 
 	for _, zoneID := range contentpkg.SortedKeys(registry.Zones) {
 		zone := registry.Zones[zoneID]
@@ -90,7 +108,7 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			},
 			Landmarks: contentZoneLandmarks(zone),
 		}
-		zoneRuntime := &ZoneRuntime{
+		zoneRuntime := &ContentZoneRuntime{
 			ZoneID:             zone.ZoneID,
 			DisplayName:        zone.DisplayName,
 			RuntimeConfig:      zone.Runtime,
@@ -125,9 +143,11 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 		if worldQuest.ID == "" {
 			continue
 		}
-		s.quests[worldQuest.ID] = worldQuest
-		s.questOrder = appendUniqueString(s.questOrder, worldQuest.ID)
-		result.QuestsRegistered++
+		if _, exists := s.quests[worldQuest.ID]; !exists {
+			s.quests[worldQuest.ID] = worldQuest
+			s.questOrder = appendUniqueString(s.questOrder, worldQuest.ID)
+			result.QuestsRegistered++
+		}
 	}
 
 	s.contentActivation = result
@@ -321,9 +341,9 @@ func zoneForQuest(registry contentpkg.RuntimeContentRegistry, questID string) st
 func contentSpawnEntityID(spawnPointID string) string {
 	trimmed := strings.TrimSpace(spawnPointID)
 	if strings.HasPrefix(trimmed, "spawn_") {
-		return "npc_" + strings.TrimPrefix(trimmed, "spawn_")
+		return "npc_content_" + strings.TrimPrefix(trimmed, "spawn_")
 	}
-	return "npc_" + trimmed
+	return "npc_content_" + trimmed
 }
 
 func contentItemKind(kind string) string {

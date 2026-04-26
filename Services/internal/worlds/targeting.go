@@ -93,11 +93,23 @@ func (s *worldServer) setTargetLocked(session *worldSessionState, targetID strin
 			"targetId":          targetID,
 			"reason":            "target_missing",
 		})
+		s.emitDomainEventLocked(eventCombatTargetRejected, map[string]any{
+			"worldSessionToken": session.Token,
+			"characterId":       session.CharacterID,
+			"targetId":          targetID,
+			"reason":            "target_missing",
+		})
 		return fmt.Errorf("target is not available")
 	}
 
 	if !targetMob.Alive || !targetMob.Targetable || targetMob.AIState == mobAIStateRespawning {
 		observability.LogEvent("world-service", "world.target_rejected", map[string]any{
+			"worldSessionToken": session.Token,
+			"characterId":       session.CharacterID,
+			"targetId":          targetID,
+			"reason":            "target_invalid",
+		})
+		s.emitDomainEventLocked(eventCombatTargetRejected, map[string]any{
 			"worldSessionToken": session.Token,
 			"characterId":       session.CharacterID,
 			"targetId":          targetID,
@@ -113,6 +125,12 @@ func (s *worldServer) setTargetLocked(session *worldSessionState, targetID strin
 			"targetId":          targetID,
 			"reason":            "out_of_range",
 		})
+		s.emitDomainEventLocked(eventCombatTargetRejected, map[string]any{
+			"worldSessionToken": session.Token,
+			"characterId":       session.CharacterID,
+			"targetId":          targetID,
+			"reason":            "out_of_range",
+		})
 		return fmt.Errorf("target is out of range")
 	}
 
@@ -122,6 +140,17 @@ func (s *worldServer) setTargetLocked(session *worldSessionState, targetID strin
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
 		"targetId":          targetID,
+	})
+	s.emitDomainEventLocked(eventCombatTargetSelected, map[string]any{
+		"worldSessionToken": session.Token,
+		"accountId":         session.AccountID,
+		"characterId":       session.CharacterID,
+		"targetId":          targetID,
+		"targetArchetypeId": targetMob.ArchetypeID,
+	})
+	s.emitStateDiffLocked(diffTargetSelection, session.CharacterID, map[string]any{
+		"characterId": session.CharacterID,
+		"targetId":    targetID,
 	})
 	return nil
 }

@@ -2,11 +2,12 @@
 
 ## Goals
 
-- Preserve mechanically faithful `3.3.5a`-structured MMO behavior through shared simulation rules.
+- Build original AmandaCore MMO behavior through shared, server-authoritative simulation rules.
 - Keep engine integration thin so gameplay logic remains project-owned and portable.
 - Support server-authoritative multiplayer from the beginning.
-- Use replacement content and black-box reference captures instead of copied internals.
+- Use original AmandaCore content and clean-room architecture notes instead of copied internals or compatibility artifacts.
 - Support a real login flow with launcher, account services, character selection, realm routing, and world join tickets.
+- Keep all gameplay protocols, schemas, command names, content IDs, formulas, and assets AmandaCore-original.
 
 ## High-level split
 
@@ -95,7 +96,13 @@ The backend foundation adds AmandaCore-native scaffolding for:
 - a lightweight migration runner convention for local file-store and future database state
 - original content package manifest skeletons in `Services/internal/contentpkg`
 
-This foundation is intentionally not a gameplay-heavy rewrite. NPC spawn loops, hostile AI, combat resolution, ability/effect execution, kill credit, loot, quest objective tracking, zone package loading, and Dawnwake Isles zone skeletons from authored maps should build on these boundaries in future milestones.
+Gameplay systems build on these boundaries through AmandaCore-owned entities, commands, events, state diffs, content packages, and persistence models.
+
+## Server-authoritative NPC combat loop
+
+The current server slice includes an original dev hostile NPC archetype, `dev_isle_stalker`, spawned as `Isle Stalker` for combat validation. Players can select the NPC, use the original `dev_basic_strike` ability, receive authoritative damage and cooldown results, kill the NPC, receive persisted kill credit, and observe server-scheduled respawn.
+
+The world response exposes protocol-neutral state diffs for entity spawn, health, combat state, target selection, ability results, death, and progression. These are internal AmandaCore contracts, not copied packet or emulator surfaces.
 
 ## Milestone one slice
 

@@ -2,6 +2,7 @@ package worlds
 
 import (
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,10 @@ const (
 	playerAutoAttackGrit      = 12.0
 	playerAutoAttackCadenceMs = int64(1800)
 	playerGlobalCooldownMs    = int64(1500)
+
+	devBasicStrikeDamage     = 10.0
+	devBasicStrikeRange      = 3.0
+	devBasicStrikeCooldownMs = int64(1500)
 
 	hostileMobKind           = "hostile_mob"
 	gatheringNodeKind        = "gathering_node"
@@ -44,6 +49,10 @@ const (
 	mobAIStateReturning  = "returning"
 	mobAIStateDead       = "dead"
 	mobAIStateRespawning = "respawning"
+
+	npcDispositionNeutral  = "Neutral"
+	npcDispositionHostile  = "Hostile"
+	npcDispositionFriendly = "Friendly"
 
 	defaultZoneID       = "stonewake_vale"
 	secondZoneID        = "brindlebrook_roadlands"
@@ -371,7 +380,7 @@ type sessionEntity struct {
 	MaxHealth        float64      `json:"maxHealth"`
 	Alive            bool         `json:"alive"`
 	Targetable       bool         `json:"targetable"`
-	IsInCombat       bool         `json:"isInCombat,omitempty"`
+	IsInCombat       bool         `json:"isInCombat"`
 	CurrentTargetID  string       `json:"currentTargetEntityId,omitempty"`
 	LastDamagedByID  string       `json:"lastDamagedByEntityId,omitempty"`
 	RespawnDelayMs   int64        `json:"respawnDelayMs,omitempty"`
@@ -639,6 +648,7 @@ type worldSessionState struct {
 	LearnedAbilityIDs  []string
 	ActionBarSlots     []platform.CharacterActionBarSlot
 	QuestProgress      map[string]platform.CharacterQuestProgress
+	KillCredits        map[string]platform.CharacterKillCredit
 	TrackedQuestIDs    []string
 	PvPStats           platform.CharacterPvPStats
 	LastDuelResult     *duelResultState
@@ -657,9 +667,9 @@ type mobState struct {
 	ArchetypeID            string
 	DisplayName            string
 	Kind                   string
+	Disposition            string
 	ZoneID                 string
 	Level                  int
-	Disposition            string
 	LootTableID            string
 	X                      float64
 	Y                      float64
@@ -683,6 +693,7 @@ type mobState struct {
 	AIState                string
 	CurrentTargetCharacter string
 	LastDamagedByCharacter string
+	LastDamagedByEntityID  string
 	LastAttackAtMs         int64
 	DeathTick              int64
 	RespawnAtMs            int64
@@ -696,6 +707,7 @@ type mobSpawnDefinition struct {
 	MobTypeID       string
 	ArchetypeID     string
 	DisplayName     string
+	Disposition     string
 	Level           int
 	LootTableID     string
 	X               float64
@@ -709,7 +721,6 @@ type mobSpawnDefinition struct {
 	MoveSpeedPerSec float64
 	LeashRadius     float64
 	RespawnDelayMs  int64
-	Disposition     string
 	Classification  string
 	Elite           bool
 }
@@ -799,6 +810,9 @@ type worldServer struct {
 	instanceByParty        map[string]string
 	instanceCounter        int64
 	housingInstanceCounter int64
+	eventSequence          int64
+	domainEvents           []DomainEvent
+	stateDiffs             []StateDiff
 	quests                 map[string]questDefinition
 	questOrder             []string
 	quest                  questDefinition
@@ -809,12 +823,10 @@ type worldServer struct {
 	lootContainers         map[string]*lootContainerState
 	lootContainerOrder     []string
 	lootContainerCounter   int64
-	domainEvents           []DomainEvent
-	stateDiffs             []StateDiff
 	killCreditLedger       KillCreditLedger
 	zones                  map[string]zoneDefinition
 	contentRegistry        *contentpkg.RuntimeContentRegistry
-	zoneRuntimes           map[string]*ZoneRuntime
+	zoneRuntimes           map[string]*ContentZoneRuntime
 	contentMobSpawns       []mobSpawnDefinition
 	contentActivation      ContentActivationResult
 	chatMessages           []chatEnvelope
@@ -848,7 +860,7 @@ func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackage
 			CreditsByCharacter: map[string]map[string]int{},
 		},
 		zones:        map[string]zoneDefinition{},
-		zoneRuntimes: map[string]*ZoneRuntime{},
+		zoneRuntimes: map[string]*ContentZoneRuntime{},
 		partyInvites: map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
@@ -917,79 +929,113 @@ func (s *worldServer) ensureMobsLocked() {
 
 	allMobSpawns := append([]mobSpawnDefinition{}, stonewakeMobSpawns...)
 	allMobSpawns = append(allMobSpawns, brindlebrookMobSpawns...)
-	allMobSpawns = append(allMobSpawns, devProgressionMobSpawns...)
 	allMobSpawns = append(allMobSpawns, s.contentMobSpawns...)
 	s.mobOrder = make([]string, 0, len(allMobSpawns))
 	for _, spawn := range allMobSpawns {
-		zoneID := spawn.ZoneID
-		if zoneID == "" {
-			zoneID = defaultZoneID
+		if spawn.ZoneID == "" {
+			spawn.ZoneID = defaultZoneID
 		}
-		archetypeID := spawn.ArchetypeID
-		if archetypeID == "" {
-			archetypeID = spawn.MobTypeID
+		if spawn.ArchetypeID == "" {
+			spawn.ArchetypeID = spawn.MobTypeID
 		}
-		spawnPointID := spawn.SpawnPointID
-		if spawnPointID == "" {
-			spawnPointID = spawn.ID
+		if spawn.SpawnPointID == "" {
+			spawn.SpawnPointID = spawn.ID
 		}
-		disposition := spawn.Disposition
-		if disposition == "" {
-			disposition = string(NpcDispositionHostile)
+		if spawn.Disposition == "" {
+			spawn.Disposition = string(NpcDispositionHostile)
 		}
 		spawn.Z = clampSpawnGroundZ(spawn.Z)
 		s.mobOrder = append(s.mobOrder, spawn.ID)
-		mob := &mobState{
-			ID:              spawn.ID,
-			InstanceID:      "",
-			SpawnPointID:    spawnPointID,
-			MobTypeID:       spawn.MobTypeID,
-			ArchetypeID:     archetypeID,
-			DisplayName:     spawn.DisplayName,
-			Kind:            hostileMobKind,
-			ZoneID:          zoneID,
-			Level:           spawn.Level,
-			Disposition:     disposition,
-			LootTableID:     spawn.LootTableID,
-			X:               spawn.X,
-			Y:               spawn.Y,
-			Z:               spawn.Z,
-			SpawnX:          spawn.X,
-			SpawnY:          spawn.Y,
-			SpawnZ:          spawn.Z,
-			Health:          spawn.MaxHealth,
-			MaxHealth:       spawn.MaxHealth,
-			AggroRadius:     spawn.AggroRadius,
-			AttackRange:     spawn.AttackRange,
-			AttackDamage:    spawn.AttackDamage,
-			AttackCadenceMs: spawn.AttackCadenceMs,
-			MoveSpeedPerSec: spawn.MoveSpeedPerSec,
-			LeashRadius:     spawn.LeashRadius,
-			RespawnDelayMs:  spawn.RespawnDelayMs,
-			Classification:  spawn.Classification,
-			Elite:           spawn.Elite,
-			Alive:           true,
-			Targetable:      true,
-			AIState:         mobAIStateIdle,
-		}
+		mob := newMobStateFromSpawn(spawn, "")
 		s.mobs[spawn.ID] = mob
-		s.emitWorldEventLocked(EventNPCSpawnPointLoaded, map[string]any{
-			"spawnPointId": spawnPointID,
-			"entityId":     spawn.ID,
-			"archetypeId":  archetypeID,
-			"zoneId":       zoneID,
-		})
-		s.emitWorldEventLocked(EventNPCSpawned, map[string]any{
-			"entityId":     mob.ID,
-			"archetypeId":  mob.ArchetypeID,
-			"spawnPointId": mob.SpawnPointID,
-			"zoneId":       mob.ZoneID,
-		}, entitySpawnDelta(mob))
-		s.emitWorldEventLocked(EventWorldEntitySpawned, map[string]any{
-			"entityId": mob.ID,
-			"kind":     mob.Kind,
-			"zoneId":   mob.ZoneID,
-		})
+		s.emitWorldEventLocked(eventNPCSpawnPointLoaded, mobSpawnPayload(mob))
+		s.emitWorldEventLocked(eventNPCSpawned, mobSpawnPayload(mob), entitySpawnDelta(mob))
+		s.emitWorldEventLocked(eventWorldEntitySpawned, mobSpawnPayload(mob))
+	}
+}
+
+func newMobStateFromSpawn(spawn mobSpawnDefinition, instanceID string) *mobState {
+	archetypeID := spawn.ArchetypeID
+	if archetypeID == "" {
+		archetypeID = spawn.MobTypeID
+	}
+	spawnPointID := spawn.SpawnPointID
+	if spawnPointID == "" {
+		spawnPointID = spawn.ID
+	}
+	disposition := spawn.Disposition
+	if disposition == "" {
+		disposition = npcDispositionHostile
+	}
+	disposition = normalizeNpcDisposition(disposition)
+	return &mobState{
+		ID:              spawn.ID,
+		InstanceID:      instanceID,
+		ArchetypeID:     archetypeID,
+		SpawnPointID:    spawnPointID,
+		MobTypeID:       spawn.MobTypeID,
+		DisplayName:     spawn.DisplayName,
+		Kind:            hostileMobKind,
+		Disposition:     disposition,
+		ZoneID:          spawn.ZoneID,
+		Level:           spawn.Level,
+		LootTableID:     spawn.LootTableID,
+		X:               spawn.X,
+		Y:               spawn.Y,
+		Z:               spawn.Z,
+		SpawnX:          spawn.X,
+		SpawnY:          spawn.Y,
+		SpawnZ:          spawn.Z,
+		Health:          spawn.MaxHealth,
+		MaxHealth:       spawn.MaxHealth,
+		AggroRadius:     spawn.AggroRadius,
+		AttackRange:     spawn.AttackRange,
+		AttackDamage:    spawn.AttackDamage,
+		AttackCadenceMs: spawn.AttackCadenceMs,
+		MoveSpeedPerSec: spawn.MoveSpeedPerSec,
+		LeashRadius:     spawn.LeashRadius,
+		RespawnDelayMs:  spawn.RespawnDelayMs,
+		Classification:  spawn.Classification,
+		Elite:           spawn.Elite,
+		Alive:           true,
+		Targetable:      true,
+		AIState:         mobAIStateIdle,
+	}
+}
+
+func normalizeNpcDisposition(disposition string) string {
+	switch strings.ToLower(strings.TrimSpace(disposition)) {
+	case strings.ToLower(npcDispositionFriendly):
+		return npcDispositionFriendly
+	case strings.ToLower(npcDispositionNeutral):
+		return npcDispositionNeutral
+	case strings.ToLower(npcDispositionHostile):
+		return npcDispositionHostile
+	default:
+		return disposition
+	}
+}
+
+func mobSpawnPayload(mob *mobState) map[string]any {
+	if mob == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"entityId":     mob.ID,
+		"archetypeId":  mob.ArchetypeID,
+		"spawnPointId": mob.SpawnPointID,
+		"displayName":  mob.DisplayName,
+		"zoneId":       mob.ZoneID,
+		"instanceId":   mob.InstanceID,
+		"disposition":  mob.Disposition,
+		"x":            mob.X,
+		"y":            mob.Y,
+		"z":            mob.Z,
+		"level":        mob.Level,
+		"maxHealth":    mob.MaxHealth,
+		"health":       mob.Health,
+		"alive":        mob.Alive,
+		"targetable":   mob.Targetable,
 	}
 }
 

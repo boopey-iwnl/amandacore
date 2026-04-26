@@ -95,6 +95,21 @@ var warriorAbilityCatalog = []abilityDefinition{
 		HealAmount:       14.0,
 	},
 	{
+		ID:                platform.DevBasicStrikeAbilityID,
+		DisplayName:       "Basic Strike",
+		ClassID:           platform.DefaultClassID,
+		Description:       "A deterministic server-authoritative test strike against hostile NPCs.",
+		TooltipText:       "Strike a hostile target for fixed damage.",
+		RequirementText:   "Known by default for dev combat validation.",
+		RequiredLevel:     1,
+		LearnedByDefault:  true,
+		RequiresTarget:    true,
+		RangeMeters:       devBasicStrikeRange,
+		CooldownMs:        devBasicStrikeCooldownMs,
+		Damage:            devBasicStrikeDamage,
+		TargetDisposition: npcDispositionHostile,
+	},
+	{
 		ID:                platform.DrivingBlowAbilityID,
 		DisplayName:       "Driving Blow",
 		ClassID:           platform.DefaultClassID,
@@ -223,6 +238,8 @@ func abilityIconKind(ability abilityDefinition) string {
 	switch ability.ID {
 	case platform.AutoAttackAbilityID:
 		return "weapon"
+	case platform.DevBasicStrikeAbilityID:
+		return "strike"
 	case platform.SteadyStrikeAbilityID,
 		platform.DrivingBlowAbilityID,
 		platform.HamperingStrikeAbilityID,
@@ -511,6 +528,9 @@ func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targe
 		if targetMob == nil && targetPlayer == nil {
 			return fmt.Errorf("target is invalid")
 		}
+		if ability.TargetDisposition == npcDispositionHostile && targetMob == nil {
+			return fmt.Errorf("target is not hostile")
+		}
 		if targetMob != nil {
 			if !targetMob.Alive || !targetMob.Targetable {
 				return fmt.Errorf("target is invalid")
@@ -574,6 +594,12 @@ func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targe
 		if err := s.applyDamageToMobLocked(session, targetMob, damage, ability.ID); err != nil {
 			return err
 		}
+		s.emitStateDiffLocked(diffAbilityResult, targetMob.ID, map[string]any{
+			"characterId": session.CharacterID,
+			"abilityId":   ability.ID,
+			"targetId":    targetMob.ID,
+			"damage":      damage,
+		})
 	}
 	if ability.Damage > 0 && targetPlayer != nil {
 		damage := s.abilityDamage(session, ability)
@@ -587,6 +613,12 @@ func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targe
 		if err := s.applyDamageToPlayerLocked(session, targetPlayer, damage, ability.ID); err != nil {
 			return err
 		}
+		s.emitStateDiffLocked(diffAbilityResult, targetPlayer.CharacterID, map[string]any{
+			"characterId": session.CharacterID,
+			"abilityId":   ability.ID,
+			"targetId":    targetPlayer.CharacterID,
+			"damage":      damage,
+		})
 	}
 	if ability.HealAmount > 0 {
 		session.Health = minFloat(session.MaxHealth, session.Health+ability.HealAmount)
@@ -598,6 +630,12 @@ func (s *worldServer) applyAbilityEffectLocked(session *worldSessionState, targe
 		})
 	}
 
+	s.emitDomainEventLocked(eventCombatAbilityResolved, map[string]any{
+		"worldSessionToken": session.Token,
+		"characterId":       session.CharacterID,
+		"abilityId":         ability.ID,
+		"targetId":          session.CurrentTargetID,
+	})
 	return nil
 }
 

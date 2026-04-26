@@ -303,8 +303,8 @@ func assertAbilityPayloadWithoutDefaultBarLayout(t *testing.T, response map[stri
 	if !ok {
 		t.Fatalf("world session response missing learnedAbilityIds: %#v", response["learnedAbilityIds"])
 	}
-	if len(learnedAbilityIds) != 3 {
-		t.Fatalf("expected 3 learned abilities in session payload, got %d", len(learnedAbilityIds))
+	if len(learnedAbilityIds) != len(platform.DefaultStartingLearnedAbilityIDs()) {
+		t.Fatalf("expected %d learned abilities in session payload, got %d", len(platform.DefaultStartingLearnedAbilityIDs()), len(learnedAbilityIds))
 	}
 
 	spellbook, ok := response["spellbook"].([]any)
