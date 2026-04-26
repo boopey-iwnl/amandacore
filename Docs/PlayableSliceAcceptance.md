@@ -5,7 +5,7 @@ Use this checklist to verify the Alpha 0.1 `stonewake_vale` slice end to end.
 ## Local Controls, Launcher, and World Entry
 
 - Open `C:\Users\forwo\OneDrive\Desktop\Local Playable Slice Controls.lnk`.
-- Confirm the GUI paths point at `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration`.
+- Confirm the local controls app resolves the expected repo root.
 - Start the local stack from the GUI and wait until all services are healthy.
 - Open the launcher and confirm it resolves `build/o3de-windows/bin/profile/amandacore.GameLauncher.exe`.
 - Register or log in, load the local realm, create/select a character, and click `Join World`.
