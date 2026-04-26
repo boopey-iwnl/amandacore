@@ -85,31 +85,34 @@ Milestone `0.1` hardening details, commands, and pass/fail behavior are document
 
 ## Local load simulation
 
-Run the in-process content package harness from `Services`:
+Run from the Go module root:
 
 ```powershell
+cd Services
 go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
 ```
 
 The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`.
 
-Run the in-process multi-zone load harness from `Services`:
+Run the in-process multi-zone load harness:
 
 ```powershell
-go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizone-pressure --content ../Content/Packs/dawnwake_isles/package.json --seed 42
+cd Services
+go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizone-pressure --content ..\Content\Packs\dawnwake_isles\package.json --seed 42
 ```
 
 Scale tiers, scenarios, reports, and sharding behavior are documented in `Docs/LoadTesting.md` and `Docs/MultiZoneSharding.md`.
 
-Run the server-authoritative ability/effect/aura harness from `Services`:
+Run the server-authoritative ability/effect/aura harness:
 
 ```powershell
+cd Services
 go run ./cmd/loadsim --clients 3 --duration 10s --cmd-rate 2 --scenario ability-aura-basic
 ```
 
 The scenario exercises the original AmandaCore effect resolver, aura apply/tick/expire lifecycle, cast completion, and cooldown events without requiring O3DE.
 
-The fallback world client can also drive a live combat diagnostic after a join ticket is issued:
+The fallback world client can drive a live combat diagnostic after a join ticket is issued:
 
 ```powershell
 dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --auto-combat-demo
@@ -117,12 +120,21 @@ dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket
 
 The diagnostic client sends target and ability intents only. It renders target health, cooldowns, aura state, combat events, state diffs, NPC death, and kill credit from the authoritative world response.
 
-The Dawnwake Isles multi-zone skeleton can be exercised without O3DE:
+For the first multi-zone Dawnwake traversal package:
 
 ```powershell
-Push-Location Services
-go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-traversal-basic --content ../Content/Packs/dawnwake_isles/package.json
-Pop-Location
+cd Services
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-traversal-basic --content ..\Content\Packs\dawnwake_isles\package.json
 ```
 
-The scenario loads `dawnwake_isles`, activates its continent runtime, spawns simulated players at the default entry, transfers through the first zone gate, and reports transition and visibility counts.
+For Dawnwake map export and streaming hook validation:
+
+```powershell
+cd Services
+go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps --check
+go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
+```
+
+`Client/Game/AmandaCore.WorldClient` consumes the same streaming payload through a client preview model and `IWorldStreamingPreviewSink`, which is the placeholder O3DE adapter boundary for visual zone/cell streaming. Use `--streaming-sink scene-commands` to emit structured placeholder scene commands, or add `--streaming-command-file "$env:TEMP\amandacore\streaming.commands.jsonl"` to write deterministic JSON Lines for bridge testing. `Gems/ZoneStreaming` mirrors the same command contract as a C++ debug API, can tail the same path through `AMANDACORE_STREAMING_COMMAND_FILE`, and draws in-engine AuxGeom zone bounds, streaming cells, current-cell highlights, and transition affordances.
+
+The loadsim uses the loader default when `--content` is omitted. The HTTP world service loads package content when `AMANDACORE_CONTENT_PACKAGE` is set; otherwise it keeps the existing starter world.

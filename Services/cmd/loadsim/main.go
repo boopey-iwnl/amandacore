@@ -84,7 +84,7 @@ func runWorldLoadsim() {
 		})
 		printQuestReport(report)
 		exitOnReportError(err, report.Errors)
-	case "content-package-basic":
+	case "content-package-basic", "dawnwake-traversal-basic", "dawnwake-streaming-basic":
 		report, err := worlds.RunContentPackageLoadsim(worlds.ContentPackageLoadsimOptions{
 			Clients:     opts.Clients,
 			Duration:    opts.Duration,
@@ -135,6 +135,7 @@ func parseOptions() options {
 	if opts.CommandRate <= 0 {
 		exitf("--cmd-rate must be greater than zero")
 	}
+	opts.CommandRate = float64(opts.CmdRate)
 	return opts
 }
 
@@ -197,6 +198,12 @@ func printContentPackageReport(report worlds.ContentPackageLoadsimReport) {
 	fmt.Printf("- catalogs loaded: %s\n", formatCounts(report.CatalogsLoaded))
 	fmt.Printf("- NPCs spawned: %d\n", report.NPCsSpawned)
 	fmt.Printf("- quest providers registered: %d\n", report.QuestProvidersRegistered)
+	fmt.Printf("- transitions loaded: %d\n", report.TransitionsLoaded)
+	fmt.Printf("- transitions completed: %d\n", report.TransitionsCompleted)
+	fmt.Printf("- map exports loaded: %d\n", report.MapExportsLoaded)
+	fmt.Printf("- streaming cells loaded: %d\n", report.StreamingCellsLoaded)
+	fmt.Printf("- streaming hints observed: %d\n", report.StreamingHintsObserved)
+	fmt.Printf("- zones entered: %s\n", strings.Join(report.ZonesEntered, " -> "))
 	fmt.Printf("- quests accepted: %d\n", report.QuestsAccepted)
 	fmt.Printf("- NPC kills: %d\n", report.NPCKills)
 	fmt.Printf("- loot containers created: %d\n", report.LootContainersCreated)

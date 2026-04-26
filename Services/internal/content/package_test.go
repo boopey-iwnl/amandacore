@@ -53,6 +53,99 @@ func TestDevFoundationPackageValidatesSuccessfully(t *testing.T) {
 	}
 }
 
+func TestDawnwakeIslesPackageValidatesSuccessfully(t *testing.T) {
+	result := NewContentPackageLoader().Load("Content/Packs/dawnwake_isles/package.json")
+	if !result.Validation.Valid() {
+		t.Fatalf("expected dawnwake_isles to validate, got %#v", result.Validation.Errors)
+	}
+	if len(result.Package.Zones) != 3 {
+		t.Fatalf("expected three Dawnwake zones, got %d", len(result.Package.Zones))
+	}
+	if result.Validated == nil || result.Validated.Registry.Zones["dawnwake_tideglass_shoal"].ZoneID == "" {
+		t.Fatalf("expected Dawnwake runtime registry to include tideglass shoal")
+	}
+	if len(result.Package.MapExports) != 3 {
+		t.Fatalf("expected three Dawnwake map exports, got %d", len(result.Package.MapExports))
+	}
+	if result.Validated.Registry.MapExportByZone["dawnwake_landing"].MapID == "" {
+		t.Fatalf("expected Dawnwake runtime registry to include landing map export")
+	}
+}
+
+func TestMapExportReferencingMissingZoneRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[0].ZoneID = "missing_zone"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "map_exports[0].zone_id")
+}
+
+func TestMapExportMissingFileRejected(t *testing.T) {
+	manifestPath := filepath.Join(t.TempDir(), "package.json")
+	manifest := `{
+  "package_id": "missing_map_test",
+  "display_name": "Missing Map Test",
+  "version": "0.1.0",
+  "schema_version": "1",
+  "zones": ["zones/missing.zone.json"],
+  "map_exports": ["maps/missing.map.json"]
+}`
+	if err := os.WriteFile(manifestPath, []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	result := NewContentPackageLoader().Load(manifestPath)
+	assertValidationCode(t, result.Validation, ErrorMissingFile)
+	assertValidationPathContains(t, result.Validation, "map_exports[0]")
+}
+
+func TestMapExportMissingStreamingCellRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[0].TransitionPoints[0].StreamingCellID = "missing_cell"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "transition_points[0].streaming_cell_id")
+}
+
+func TestMapExportStreamingCellOutsideBoundsRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[0].StreamingCells[0].Bounds.MaxX = 999
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorPositionOutOfBounds)
+	assertValidationPathContains(t, report, "streaming_cells[0].bounds")
+}
+
+func TestMapExportReciprocalAdjacencyRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[1].AdjacentZones = loaded.MapExports[1].AdjacentZones[1:]
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "adjacent_zones[0]")
+}
+
+func TestZoneTransitionReferencingMissingZoneRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].Transitions[0].TargetZoneID = "missing_zone"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "transitions[0].target_zone_id")
+}
+
+func TestZoneTransitionReferencingMissingEntryRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].Transitions[0].DestinationEntryID = "missing_entry"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "transitions[0].destination_entry_id")
+}
+
+func TestZoneTransitionOutsideBoundsRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].Transitions[0].Position.X = 999
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorPositionOutOfBounds)
+	assertValidationPathContains(t, report, "transitions[0].position")
+}
+
 func TestDuplicateItemIDsRejected(t *testing.T) {
 	loaded := mustLoadDevPackage(t)
 	loaded.Items = append(loaded.Items, loaded.Items[0])
@@ -153,6 +246,15 @@ func mustLoadDevPackage(t *testing.T) LoadedContentPackage {
 	result := NewContentPackageLoader().Load(DefaultPackagePath)
 	if !result.Validation.Valid() {
 		t.Fatalf("expected dev package to load, got errors: %#v", result.Validation.Errors)
+	}
+	return result.Package
+}
+
+func mustLoadDawnwakePackage(t *testing.T) LoadedContentPackage {
+	t.Helper()
+	result := NewContentPackageLoader().Load("Content/Packs/dawnwake_isles/package.json")
+	if !result.Validation.Valid() {
+		t.Fatalf("expected dawnwake package to load, got errors: %#v", result.Validation.Errors)
 	}
 	return result.Package
 }

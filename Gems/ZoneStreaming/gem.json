@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "license": "Apache-2.0",
   "origin": "amandacore",
+  "type": "Code",
   "summary": "Outdoor cell streaming, world partitioning, and micro-instance transition seams.",
   "canonical_tags": ["MMO", "World", "Streaming"],
   "dependencies": ["GameCore", "NetClient"]

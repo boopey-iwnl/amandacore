@@ -19,24 +19,35 @@ const (
 )
 
 const (
-	EventPackageLoadStarted         = "content.package.load_started"
-	EventPackageLoadCompleted       = "content.package.load_completed"
-	EventPackageLoadFailed          = "content.package.load_failed"
-	EventPackageValidationStarted   = "content.package.validation_started"
-	EventPackageValidationCompleted = "content.package.validation_completed"
-	EventPackageValidationFailed    = "content.package.validation_failed"
-	EventPackageActivated           = "content.package.activated"
-	EventPackageActivationFailed    = "content.package.activation_failed"
-	EventZoneLoaded                 = "content.zone.loaded"
-	EventZoneValidationFailed       = "content.zone.validation_failed"
-	EventCatalogLoaded              = "content.catalog.loaded"
-	EventCatalogValidationFailed    = "content.catalog.validation_failed"
-	EventReferenceResolved          = "content.reference.resolved"
-	EventReferenceBroken            = "content.reference.broken"
-	EventQuestProviderRegistered    = "content.quest_provider.registered"
-	EventWorldZoneRuntimeCreated    = "world.zone.runtime_created"
-	EventLoadsimContentStarted      = "loadsim.content.started"
-	EventLoadsimContentCompleted    = "loadsim.content.completed"
+	EventPackageLoadStarted          = "content.package.load_started"
+	EventPackageLoadCompleted        = "content.package.load_completed"
+	EventPackageLoadFailed           = "content.package.load_failed"
+	EventPackageValidationStarted    = "content.package.validation_started"
+	EventPackageValidationCompleted  = "content.package.validation_completed"
+	EventPackageValidationFailed     = "content.package.validation_failed"
+	EventPackageActivated            = "content.package.activated"
+	EventPackageActivationFailed     = "content.package.activation_failed"
+	EventZoneLoaded                  = "content.zone.loaded"
+	EventZoneValidationFailed        = "content.zone.validation_failed"
+	EventZoneTransitionLoaded        = "content.zone.transition.loaded"
+	EventZoneTransitionFailed        = "content.zone.transition.validation_failed"
+	EventMapExportLoaded             = "content.map_export.loaded"
+	EventMapExportValidationFailed   = "content.map_export.validation_failed"
+	EventCatalogLoaded               = "content.catalog.loaded"
+	EventCatalogValidationFailed     = "content.catalog.validation_failed"
+	EventReferenceResolved           = "content.reference.resolved"
+	EventReferenceBroken             = "content.reference.broken"
+	EventQuestProviderRegistered     = "content.quest_provider.registered"
+	EventWorldZoneRuntimeCreated     = "world.zone.runtime_created"
+	EventWorldZoneTransitionStarted  = "world.zone.transition_started"
+	EventWorldZoneTransitionDone     = "world.zone.transition_completed"
+	EventWorldZoneTransitionRejected = "world.zone.transition_rejected"
+	EventLoadsimContentStarted       = "loadsim.content.started"
+	EventLoadsimContentCompleted     = "loadsim.content.completed"
+	EventLoadsimDawnwakeStarted      = "loadsim.dawnwake.started"
+	EventLoadsimDawnwakeCompleted    = "loadsim.dawnwake.completed"
+	EventLoadsimStreamingStarted     = "loadsim.streaming.started"
+	EventLoadsimStreamingCompleted   = "loadsim.streaming.completed"
 )
 
 type ContentPackageID string
@@ -67,6 +78,7 @@ type ContentPackageManifest struct {
 	Description     string   `json:"description"`
 	Authorship      string   `json:"authorship"`
 	Zones           []string `json:"zones"`
+	MapExports      []string `json:"map_exports"`
 	NPCCatalogs     []string `json:"npc_catalogs"`
 	ItemCatalogs    []string `json:"item_catalogs"`
 	LootCatalogs    []string `json:"loot_catalogs"`
@@ -91,6 +103,7 @@ type LoadedContentPackage struct {
 	Manifest      ContentPackageManifest `json:"manifest"`
 	Source        ContentPackageSource   `json:"source"`
 	Zones         []ZoneDefinition       `json:"zones"`
+	MapExports    []MapExportDefinition  `json:"map_exports"`
 	NPCs          []NpcArchetype         `json:"npcs"`
 	Items         []ItemDefinition       `json:"items"`
 	LootTables    []LootTableDefinition  `json:"loot_tables"`
@@ -107,16 +120,18 @@ type ValidatedContentPackage struct {
 }
 
 type RuntimeContentRegistry struct {
-	PackageID     string
-	Version       string
-	Zones         map[string]ZoneDefinition
-	NPCs          map[string]NpcArchetype
-	Items         map[string]ItemDefinition
-	LootTables    map[string]LootTableDefinition
-	Quests        map[string]QuestDefinition
-	Abilities     map[string]AbilityDefinition
-	Auras         map[string]AuraDefinition
-	QuestProvider map[string]QuestProviderDefinition
+	PackageID       string
+	Version         string
+	Zones           map[string]ZoneDefinition
+	MapExports      map[string]MapExportDefinition
+	MapExportByZone map[string]MapExportDefinition
+	NPCs            map[string]NpcArchetype
+	Items           map[string]ItemDefinition
+	LootTables      map[string]LootTableDefinition
+	Quests          map[string]QuestDefinition
+	Abilities       map[string]AbilityDefinition
+	Auras           map[string]AuraDefinition
+	QuestProvider   map[string]QuestProviderDefinition
 }
 
 type ContentValidationReport struct {
@@ -182,15 +197,78 @@ type ZoneRuntimeConfig struct {
 }
 
 type ZoneDefinition struct {
-	ZoneID         string                    `json:"zone_id"`
-	DisplayName    string                    `json:"display_name"`
-	Description    string                    `json:"description"`
-	Bounds         ZoneBounds                `json:"bounds"`
-	EntryPoints    []ZoneEntryPoint          `json:"entry_points"`
-	SpawnGroups    []SpawnGroupDefinition    `json:"spawn_groups"`
-	QuestProviders []QuestProviderDefinition `json:"quest_providers"`
-	Runtime        ZoneRuntimeConfig         `json:"runtime"`
-	Tags           []string                  `json:"tags"`
+	ZoneID         string                     `json:"zone_id"`
+	DisplayName    string                     `json:"display_name"`
+	Description    string                     `json:"description"`
+	Bounds         ZoneBounds                 `json:"bounds"`
+	EntryPoints    []ZoneEntryPoint           `json:"entry_points"`
+	SpawnGroups    []SpawnGroupDefinition     `json:"spawn_groups"`
+	QuestProviders []QuestProviderDefinition  `json:"quest_providers"`
+	Transitions    []ZoneTransitionDefinition `json:"transitions"`
+	Runtime        ZoneRuntimeConfig          `json:"runtime"`
+	Tags           []string                   `json:"tags"`
+}
+
+type ZoneTransitionDefinition struct {
+	TransitionID       string   `json:"transition_id"`
+	DisplayName        string   `json:"display_name"`
+	TargetZoneID       string   `json:"target_zone_id"`
+	DestinationEntryID string   `json:"destination_entry_id"`
+	Position           Position `json:"position"`
+	Radius             float64  `json:"radius"`
+	Tags               []string `json:"tags"`
+}
+
+type MapExportDefinition struct {
+	MapID            string                         `json:"map_id"`
+	ZoneID           string                         `json:"zone_id"`
+	DisplayName      string                         `json:"display_name"`
+	CoordinateSpace  string                         `json:"coordinate_space"`
+	Bounds           ZoneBounds                     `json:"bounds"`
+	EntryPoints      []ZoneEntryPoint               `json:"entry_points"`
+	AdjacentZones    []MapAdjacentZoneDefinition    `json:"adjacent_zones"`
+	TransitionPoints []MapTransitionPointDefinition `json:"transition_points"`
+	StreamingCells   []StreamingCellDefinition      `json:"streaming_cells"`
+	Landmarks        []MapLandmarkDefinition        `json:"landmarks"`
+	AuthoringSource  string                         `json:"authoring_source"`
+	GeneratedBy      string                         `json:"generated_by,omitempty"`
+	Tags             []string                       `json:"tags"`
+}
+
+type MapAdjacentZoneDefinition struct {
+	ZoneID             string   `json:"zone_id"`
+	TransitionID       string   `json:"transition_id"`
+	Direction          string   `json:"direction"`
+	RequiresReciprocal bool     `json:"requires_reciprocal"`
+	Tags               []string `json:"tags"`
+}
+
+type MapTransitionPointDefinition struct {
+	TransitionID       string   `json:"transition_id"`
+	DisplayName        string   `json:"display_name"`
+	TargetZoneID       string   `json:"target_zone_id"`
+	DestinationEntryID string   `json:"destination_entry_id"`
+	StreamingCellID    string   `json:"streaming_cell_id"`
+	Hint               string   `json:"hint"`
+	Position           Position `json:"position"`
+	Radius             float64  `json:"radius"`
+	Tags               []string `json:"tags"`
+}
+
+type StreamingCellDefinition struct {
+	CellID      string     `json:"cell_id"`
+	DisplayName string     `json:"display_name"`
+	Bounds      ZoneBounds `json:"bounds"`
+	Priority    int        `json:"priority"`
+	Tags        []string   `json:"tags"`
+}
+
+type MapLandmarkDefinition struct {
+	LandmarkID  string   `json:"landmark_id"`
+	DisplayName string   `json:"display_name"`
+	Kind        string   `json:"kind"`
+	Position    Position `json:"position"`
+	Tags        []string `json:"tags"`
 }
 
 type SpawnGroupDefinition struct {
@@ -388,12 +466,13 @@ func (ContentPackageLoader) Load(manifestPath string) ContentPackageLoadResult {
 			"errorCount": 0,
 		})
 		observability.LogEvent("content-loader", EventPackageLoadCompleted, map[string]any{
-			"packageId": manifest.PackageID,
-			"zones":     len(loaded.Zones),
-			"npcs":      len(loaded.NPCs),
-			"items":     len(loaded.Items),
-			"loot":      len(loaded.LootTables),
-			"quests":    len(loaded.Quests),
+			"packageId":  manifest.PackageID,
+			"zones":      len(loaded.Zones),
+			"mapExports": len(loaded.MapExports),
+			"npcs":       len(loaded.NPCs),
+			"items":      len(loaded.Items),
+			"loot":       len(loaded.LootTables),
+			"quests":     len(loaded.Quests),
 		})
 		return result
 	}
@@ -453,6 +532,7 @@ func resolveRelativeFromParents(relative string) (string, bool) {
 
 func loadFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
 	loadZoneFiles(loaded, report)
+	loadMapExportFiles(loaded, report)
 	loadCatalogFiles(loaded.Manifest.NPCCatalogs, loaded, report, "npc_catalogs", "npc", func(target *LoadedContentPackage, payload []byte) error {
 		var file struct {
 			NPCs []NpcArchetype `json:"npcs"`
@@ -521,6 +601,30 @@ func loadFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
 	})
 }
 
+func loadMapExportFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
+	for index, relative := range loaded.Manifest.MapExports {
+		path := filepath.Clean(filepath.Join(loaded.Source.RootDir, relative))
+		payload, err := os.ReadFile(path)
+		if err != nil {
+			report.Addf(ErrorMissingFile, fmt.Sprintf("map_exports[%d]", index), "map export file %q could not be read: %v", relative, err)
+			continue
+		}
+		var export MapExportDefinition
+		if err := json.Unmarshal(payload, &export); err != nil {
+			report.Addf(ErrorMalformedJSON, fmt.Sprintf("map_exports[%d]", index), "map export file %q is malformed: %v", relative, err)
+			continue
+		}
+		loaded.MapExports = append(loaded.MapExports, export)
+		loaded.LoadedFiles = append(loaded.LoadedFiles, path)
+		loaded.CatalogCounts["map_exports"]++
+		observability.LogEvent("content-loader", EventMapExportLoaded, map[string]any{
+			"mapId":  export.MapID,
+			"zoneId": export.ZoneID,
+			"path":   relative,
+		})
+	}
+}
+
 func loadZoneFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
 	for index, relative := range loaded.Manifest.Zones {
 		path := filepath.Clean(filepath.Join(loaded.Source.RootDir, relative))
@@ -569,6 +673,7 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	validateManifest(loaded.Manifest, &report)
 
 	validateIDs("zones", loaded.Zones, func(zone ZoneDefinition) string { return zone.ZoneID }, &report)
+	validateIDs("map_exports", loaded.MapExports, func(export MapExportDefinition) string { return export.MapID }, &report)
 	npcIDs := validateIDs("npcs", loaded.NPCs, func(npc NpcArchetype) string { return npc.ArchetypeID }, &report)
 	itemIDs := validateIDs("items", loaded.Items, func(item ItemDefinition) string { return item.ItemID }, &report)
 	lootIDs := validateIDs("loot_tables", loaded.LootTables, func(loot LootTableDefinition) string { return loot.LootTableID }, &report)
@@ -576,10 +681,16 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	abilityIDs := validateIDs("abilities", loaded.Abilities, func(ability AbilityDefinition) string { return ability.AbilityID }, &report)
 	auraIDs := validateIDs("auras", loaded.Auras, func(aura AuraDefinition) string { return aura.AuraID }, &report)
 
+	zoneIDs := idsFromValues(loaded.Zones, func(zone ZoneDefinition) string { return zone.ZoneID })
+	zoneByID := collectZonesByID(loaded.Zones)
+	entryIDsByZone := collectEntryIDsByZone(loaded.Zones)
+	transitionsByZone := collectTransitionsByZone(loaded.Zones)
 	providerIDs := map[string]struct{}{}
+	transitionIDs := map[string]struct{}{}
 	for zoneIndex, zone := range loaded.Zones {
-		validateZone(zone, zoneIndex, npcIDs, lootIDs, questIDs, providerIDs, &report)
+		validateZone(zone, zoneIndex, zoneIDs, entryIDsByZone, npcIDs, lootIDs, questIDs, providerIDs, transitionIDs, &report)
 	}
+	validateMapExports(loaded.MapExports, zoneIDs, zoneByID, entryIDsByZone, transitionsByZone, &report)
 	for index, npc := range loaded.NPCs {
 		validateNPC(npc, index, abilityIDs, len(loaded.Abilities) > 0, &report)
 	}
@@ -618,7 +729,7 @@ func validateManifest(manifest ContentPackageManifest, report *ContentValidation
 	}
 }
 
-func validateZone(zone ZoneDefinition, index int, npcIDs map[string]struct{}, lootIDs map[string]struct{}, questIDs map[string]struct{}, providerIDs map[string]struct{}, report *ContentValidationReport) {
+func validateZone(zone ZoneDefinition, index int, zoneIDs map[string]struct{}, entryIDsByZone map[string]map[string]struct{}, npcIDs map[string]struct{}, lootIDs map[string]struct{}, questIDs map[string]struct{}, providerIDs map[string]struct{}, transitionIDs map[string]struct{}, report *ContentValidationReport) {
 	path := fmt.Sprintf("zones[%d]", index)
 	requiredID(report, path+".zone_id", zone.ZoneID)
 	requiredString(report, path+".display_name", zone.DisplayName)
@@ -682,7 +793,213 @@ func validateZone(zone ZoneDefinition, index int, npcIDs map[string]struct{}, lo
 			}
 		}
 	}
+	for transitionIndex, transition := range zone.Transitions {
+		transitionPath := fmt.Sprintf("%s.transitions[%d]", path, transitionIndex)
+		requiredID(report, transitionPath+".transition_id", transition.TransitionID)
+		requiredString(report, transitionPath+".display_name", transition.DisplayName)
+		requiredID(report, transitionPath+".target_zone_id", transition.TargetZoneID)
+		requiredID(report, transitionPath+".destination_entry_id", transition.DestinationEntryID)
+		if transition.TransitionID != "" {
+			globalID := zone.ZoneID + "." + transition.TransitionID
+			if _, exists := transitionIDs[globalID]; exists {
+				report.Addf(ErrorDuplicateID, transitionPath+".transition_id", "transition id %q is duplicated in zone %q", transition.TransitionID, zone.ZoneID)
+			}
+			transitionIDs[globalID] = struct{}{}
+		}
+		if boundsValid && !positionInBounds(transition.Position, zone.Bounds) {
+			report.Addf(ErrorPositionOutOfBounds, transitionPath+".position", "transition %q is outside zone bounds", transition.TransitionID)
+			observability.LogEvent("content-loader", EventZoneTransitionFailed, map[string]any{
+				"zoneId":       zone.ZoneID,
+				"transitionId": transition.TransitionID,
+				"reason":       "position_out_of_bounds",
+			})
+		}
+		if transition.Radius <= 0 {
+			report.Add(ErrorInvalidNumberRange, transitionPath+".radius", "transition radius must be positive")
+		}
+		if transition.TargetZoneID != "" && !containsID(zoneIDs, transition.TargetZoneID) {
+			report.Addf(ErrorBrokenReference, transitionPath+".target_zone_id", "transition %q references missing zone %q", transition.TransitionID, transition.TargetZoneID)
+			logBrokenReference("zone_transition", transition.TransitionID, "zone", transition.TargetZoneID)
+		}
+		if transition.TargetZoneID != "" && transition.DestinationEntryID != "" {
+			targetEntryIDs := entryIDsByZone[transition.TargetZoneID]
+			if targetEntryIDs == nil || !containsID(targetEntryIDs, transition.DestinationEntryID) {
+				report.Addf(ErrorBrokenReference, transitionPath+".destination_entry_id", "transition %q references missing entry %q in zone %q", transition.TransitionID, transition.DestinationEntryID, transition.TargetZoneID)
+				logBrokenReference("zone_transition", transition.TransitionID, "zone_entry", transition.TargetZoneID+"."+transition.DestinationEntryID)
+			}
+		}
+		observability.LogEvent("content-loader", EventZoneTransitionLoaded, map[string]any{
+			"zoneId":             zone.ZoneID,
+			"transitionId":       transition.TransitionID,
+			"targetZoneId":       transition.TargetZoneID,
+			"destinationEntryId": transition.DestinationEntryID,
+		})
+	}
 	validateRuntime(path+".runtime", zone.Runtime, report)
+}
+
+func validateMapExports(exports []MapExportDefinition, zoneIDs map[string]struct{}, zoneByID map[string]ZoneDefinition, entryIDsByZone map[string]map[string]struct{}, transitionsByZone map[string]map[string]ZoneTransitionDefinition, report *ContentValidationReport) {
+	mapByZone := map[string]MapExportDefinition{}
+	for index, export := range exports {
+		path := fmt.Sprintf("map_exports[%d]", index)
+		if export.ZoneID != "" {
+			if existing, exists := mapByZone[export.ZoneID]; exists {
+				report.Addf(ErrorDuplicateID, path+".zone_id", "zone %q has multiple map exports: %q and %q", export.ZoneID, existing.MapID, export.MapID)
+			}
+			mapByZone[export.ZoneID] = export
+		}
+	}
+
+	for index, export := range exports {
+		path := fmt.Sprintf("map_exports[%d]", index)
+		errorCountBefore := len(report.Errors)
+		requiredID(report, path+".map_id", export.MapID)
+		requiredID(report, path+".zone_id", export.ZoneID)
+		requiredString(report, path+".display_name", export.DisplayName)
+		requiredString(report, path+".coordinate_space", export.CoordinateSpace)
+		if export.CoordinateSpace != "" && !validEnum(export.CoordinateSpace, "amandacore_server", "o3de_placeholder") {
+			report.Addf(ErrorInvalidEnum, path+".coordinate_space", "coordinate_space %q is not valid", export.CoordinateSpace)
+		}
+		boundsValid := validateBounds(path+".bounds", export.Bounds, report)
+		zone, zoneFound := zoneByID[export.ZoneID]
+		if export.ZoneID != "" && !containsID(zoneIDs, export.ZoneID) {
+			report.Addf(ErrorBrokenReference, path+".zone_id", "map export %q references missing zone %q", export.MapID, export.ZoneID)
+			logBrokenReference("map_export", export.MapID, "zone", export.ZoneID)
+		}
+		if zoneFound && boundsValid && !boundsContain(export.Bounds, zone.Bounds) {
+			report.Addf(ErrorInvalidNumberRange, path+".bounds", "map export %q bounds must contain zone %q bounds", export.MapID, export.ZoneID)
+		}
+
+		cellIDs := map[string]struct{}{}
+		for cellIndex, cell := range export.StreamingCells {
+			cellPath := fmt.Sprintf("%s.streaming_cells[%d]", path, cellIndex)
+			requiredID(report, cellPath+".cell_id", cell.CellID)
+			requiredString(report, cellPath+".display_name", cell.DisplayName)
+			if cell.CellID != "" {
+				if _, exists := cellIDs[cell.CellID]; exists {
+					report.Addf(ErrorDuplicateID, cellPath+".cell_id", "streaming cell id %q is duplicated in map export %q", cell.CellID, export.MapID)
+				}
+				cellIDs[cell.CellID] = struct{}{}
+			}
+			cellBoundsValid := validateBounds(cellPath+".bounds", cell.Bounds, report)
+			if boundsValid && cellBoundsValid && !boundsContain(export.Bounds, cell.Bounds) {
+				report.Addf(ErrorPositionOutOfBounds, cellPath+".bounds", "streaming cell %q is outside map export bounds", cell.CellID)
+			}
+			if cell.Priority < 0 {
+				report.Add(ErrorInvalidNumberRange, cellPath+".priority", "streaming cell priority must be non-negative")
+			}
+		}
+
+		for entryIndex, entry := range export.EntryPoints {
+			entryPath := fmt.Sprintf("%s.entry_points[%d]", path, entryIndex)
+			requiredID(report, entryPath+".entry_id", entry.EntryID)
+			if export.ZoneID != "" && entry.EntryID != "" {
+				if entryIDsByZone[export.ZoneID] == nil || !containsID(entryIDsByZone[export.ZoneID], entry.EntryID) {
+					report.Addf(ErrorBrokenReference, entryPath+".entry_id", "map export %q references missing entry point %q in zone %q", export.MapID, entry.EntryID, export.ZoneID)
+				}
+			}
+			if boundsValid && !positionInBounds(entry.Position, export.Bounds) {
+				report.Addf(ErrorPositionOutOfBounds, entryPath+".position", "map entry point %q is outside map export bounds", entry.EntryID)
+			}
+		}
+
+		for adjacentIndex, adjacent := range export.AdjacentZones {
+			adjacentPath := fmt.Sprintf("%s.adjacent_zones[%d]", path, adjacentIndex)
+			requiredID(report, adjacentPath+".zone_id", adjacent.ZoneID)
+			requiredID(report, adjacentPath+".transition_id", adjacent.TransitionID)
+			requiredString(report, adjacentPath+".direction", adjacent.Direction)
+			if adjacent.Direction != "" && !validEnum(adjacent.Direction, "north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest", "interior") {
+				report.Addf(ErrorInvalidEnum, adjacentPath+".direction", "adjacent zone direction %q is not valid", adjacent.Direction)
+			}
+			if adjacent.ZoneID != "" && !containsID(zoneIDs, adjacent.ZoneID) {
+				report.Addf(ErrorBrokenReference, adjacentPath+".zone_id", "map export %q references missing adjacent zone %q", export.MapID, adjacent.ZoneID)
+			}
+			if adjacent.TransitionID != "" {
+				if transitionsByZone[export.ZoneID] == nil || transitionsByZone[export.ZoneID][adjacent.TransitionID].TransitionID == "" {
+					report.Addf(ErrorBrokenReference, adjacentPath+".transition_id", "map export %q references missing zone transition %q", export.MapID, adjacent.TransitionID)
+				}
+			}
+		}
+
+		for transitionIndex, transition := range export.TransitionPoints {
+			transitionPath := fmt.Sprintf("%s.transition_points[%d]", path, transitionIndex)
+			requiredID(report, transitionPath+".transition_id", transition.TransitionID)
+			requiredString(report, transitionPath+".display_name", transition.DisplayName)
+			requiredID(report, transitionPath+".target_zone_id", transition.TargetZoneID)
+			requiredID(report, transitionPath+".destination_entry_id", transition.DestinationEntryID)
+			requiredID(report, transitionPath+".streaming_cell_id", transition.StreamingCellID)
+			if transition.Radius <= 0 {
+				report.Add(ErrorInvalidNumberRange, transitionPath+".radius", "transition point radius must be positive")
+			}
+			if transition.TargetZoneID != "" && !containsID(zoneIDs, transition.TargetZoneID) {
+				report.Addf(ErrorBrokenReference, transitionPath+".target_zone_id", "map transition %q references missing target zone %q", transition.TransitionID, transition.TargetZoneID)
+			}
+			if transition.TargetZoneID != "" && transition.DestinationEntryID != "" {
+				targetEntryIDs := entryIDsByZone[transition.TargetZoneID]
+				if targetEntryIDs == nil || !containsID(targetEntryIDs, transition.DestinationEntryID) {
+					report.Addf(ErrorBrokenReference, transitionPath+".destination_entry_id", "map transition %q references missing entry %q in zone %q", transition.TransitionID, transition.DestinationEntryID, transition.TargetZoneID)
+				}
+			}
+			if transition.StreamingCellID != "" && !containsID(cellIDs, transition.StreamingCellID) {
+				report.Addf(ErrorBrokenReference, transitionPath+".streaming_cell_id", "map transition %q references missing streaming cell %q", transition.TransitionID, transition.StreamingCellID)
+			}
+			if boundsValid && !positionInBounds(transition.Position, export.Bounds) {
+				report.Addf(ErrorPositionOutOfBounds, transitionPath+".position", "map transition %q is outside map export bounds", transition.TransitionID)
+			}
+			if zoneTransition, found := transitionsByZone[export.ZoneID][transition.TransitionID]; found {
+				if zoneTransition.TargetZoneID != transition.TargetZoneID {
+					report.Addf(ErrorBrokenReference, transitionPath+".target_zone_id", "map transition %q target zone %q does not match zone transition target %q", transition.TransitionID, transition.TargetZoneID, zoneTransition.TargetZoneID)
+				}
+				if zoneTransition.DestinationEntryID != transition.DestinationEntryID {
+					report.Addf(ErrorBrokenReference, transitionPath+".destination_entry_id", "map transition %q destination entry %q does not match zone transition destination %q", transition.TransitionID, transition.DestinationEntryID, zoneTransition.DestinationEntryID)
+				}
+			} else if transition.TransitionID != "" {
+				report.Addf(ErrorBrokenReference, transitionPath+".transition_id", "map export %q references missing zone transition %q", export.MapID, transition.TransitionID)
+			}
+		}
+
+		for landmarkIndex, landmark := range export.Landmarks {
+			landmarkPath := fmt.Sprintf("%s.landmarks[%d]", path, landmarkIndex)
+			requiredID(report, landmarkPath+".landmark_id", landmark.LandmarkID)
+			requiredString(report, landmarkPath+".display_name", landmark.DisplayName)
+			if !validEnum(landmark.Kind, "entry", "transition", "quest_provider", "vista", "streaming_anchor") {
+				report.Addf(ErrorInvalidEnum, landmarkPath+".kind", "landmark kind %q is not valid", landmark.Kind)
+			}
+			if boundsValid && !positionInBounds(landmark.Position, export.Bounds) {
+				report.Addf(ErrorPositionOutOfBounds, landmarkPath+".position", "map landmark %q is outside map export bounds", landmark.LandmarkID)
+			}
+		}
+
+		if len(report.Errors) > errorCountBefore {
+			observability.LogEvent("content-loader", EventMapExportValidationFailed, map[string]any{
+				"mapId":      export.MapID,
+				"zoneId":     export.ZoneID,
+				"errorCount": len(report.Errors) - errorCountBefore,
+			})
+		}
+	}
+
+	for _, export := range exports {
+		for adjacentIndex, adjacent := range export.AdjacentZones {
+			if !adjacent.RequiresReciprocal || adjacent.ZoneID == "" {
+				continue
+			}
+			targetMap, found := mapByZone[adjacent.ZoneID]
+			if !found {
+				continue
+			}
+			reciprocalFound := false
+			for _, targetAdjacent := range targetMap.AdjacentZones {
+				if targetAdjacent.ZoneID == export.ZoneID {
+					reciprocalFound = true
+					break
+				}
+			}
+			if !reciprocalFound {
+				report.Addf(ErrorBrokenReference, fmt.Sprintf("map_exports.%s.adjacent_zones[%d]", export.MapID, adjacentIndex), "adjacent zone %q does not reciprocate zone %q", adjacent.ZoneID, export.ZoneID)
+			}
+		}
+	}
 }
 
 func validateBounds(path string, bounds ZoneBounds, report *ContentValidationReport) bool {
@@ -933,22 +1250,28 @@ func validateAura(aura AuraDefinition, index int, report *ContentValidationRepor
 
 func NewRuntimeContentRegistry(loaded LoadedContentPackage) RuntimeContentRegistry {
 	registry := RuntimeContentRegistry{
-		PackageID:     loaded.Manifest.PackageID,
-		Version:       loaded.Manifest.Version,
-		Zones:         map[string]ZoneDefinition{},
-		NPCs:          map[string]NpcArchetype{},
-		Items:         map[string]ItemDefinition{},
-		LootTables:    map[string]LootTableDefinition{},
-		Quests:        map[string]QuestDefinition{},
-		Abilities:     map[string]AbilityDefinition{},
-		Auras:         map[string]AuraDefinition{},
-		QuestProvider: map[string]QuestProviderDefinition{},
+		PackageID:       loaded.Manifest.PackageID,
+		Version:         loaded.Manifest.Version,
+		Zones:           map[string]ZoneDefinition{},
+		MapExports:      map[string]MapExportDefinition{},
+		MapExportByZone: map[string]MapExportDefinition{},
+		NPCs:            map[string]NpcArchetype{},
+		Items:           map[string]ItemDefinition{},
+		LootTables:      map[string]LootTableDefinition{},
+		Quests:          map[string]QuestDefinition{},
+		Abilities:       map[string]AbilityDefinition{},
+		Auras:           map[string]AuraDefinition{},
+		QuestProvider:   map[string]QuestProviderDefinition{},
 	}
 	for _, zone := range loaded.Zones {
 		registry.Zones[zone.ZoneID] = zone
 		for _, provider := range zone.QuestProviders {
 			registry.QuestProvider[provider.ProviderID] = provider
 		}
+	}
+	for _, export := range loaded.MapExports {
+		registry.MapExports[export.MapID] = export
+		registry.MapExportByZone[export.ZoneID] = export
 	}
 	for _, npc := range loaded.NPCs {
 		registry.NPCs[npc.ArchetypeID] = npc
@@ -998,6 +1321,70 @@ func validateIDs[T any](path string, values []T, id func(T) string, report *Cont
 		seen[valueID] = struct{}{}
 	}
 	return seen
+}
+
+func idsFromValues[T any](values []T, id func(T) string) map[string]struct{} {
+	result := map[string]struct{}{}
+	for _, value := range values {
+		valueID := strings.TrimSpace(id(value))
+		if valueID != "" {
+			result[valueID] = struct{}{}
+		}
+	}
+	return result
+}
+
+func collectEntryIDsByZone(zones []ZoneDefinition) map[string]map[string]struct{} {
+	result := map[string]map[string]struct{}{}
+	for _, zone := range zones {
+		if zone.ZoneID == "" {
+			continue
+		}
+		entries := map[string]struct{}{}
+		for _, entry := range zone.EntryPoints {
+			if entry.EntryID != "" {
+				entries[entry.EntryID] = struct{}{}
+			}
+		}
+		result[zone.ZoneID] = entries
+	}
+	return result
+}
+
+func collectZonesByID(zones []ZoneDefinition) map[string]ZoneDefinition {
+	result := map[string]ZoneDefinition{}
+	for _, zone := range zones {
+		if zone.ZoneID != "" {
+			result[zone.ZoneID] = zone
+		}
+	}
+	return result
+}
+
+func collectTransitionsByZone(zones []ZoneDefinition) map[string]map[string]ZoneTransitionDefinition {
+	result := map[string]map[string]ZoneTransitionDefinition{}
+	for _, zone := range zones {
+		if zone.ZoneID == "" {
+			continue
+		}
+		transitions := map[string]ZoneTransitionDefinition{}
+		for _, transition := range zone.Transitions {
+			if transition.TransitionID != "" {
+				transitions[transition.TransitionID] = transition
+			}
+		}
+		result[zone.ZoneID] = transitions
+	}
+	return result
+}
+
+func boundsContain(outer ZoneBounds, inner ZoneBounds) bool {
+	return inner.MinX >= outer.MinX &&
+		inner.MinY >= outer.MinY &&
+		inner.MinZ >= outer.MinZ &&
+		inner.MaxX <= outer.MaxX &&
+		inner.MaxY <= outer.MaxY &&
+		inner.MaxZ <= outer.MaxZ
 }
 
 var stableIDPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$`)

@@ -24,6 +24,12 @@ type ContentPackageLoadsimReport struct {
 	CatalogsLoaded           map[string]int `json:"catalogsLoaded"`
 	NPCsSpawned              int            `json:"npcsSpawned"`
 	QuestProvidersRegistered int            `json:"questProvidersRegistered"`
+	TransitionsLoaded        int            `json:"transitionsLoaded"`
+	TransitionsCompleted     int            `json:"transitionsCompleted"`
+	MapExportsLoaded         int            `json:"mapExportsLoaded"`
+	StreamingCellsLoaded     int            `json:"streamingCellsLoaded"`
+	StreamingHintsObserved   int            `json:"streamingHintsObserved"`
+	ZonesEntered             []string       `json:"zonesEntered"`
 	QuestsAccepted           int            `json:"questsAccepted"`
 	NPCKills                 int            `json:"npcKills"`
 	LootContainersCreated    int            `json:"lootContainersCreated"`
@@ -51,11 +57,20 @@ func RunContentPackageLoadsim(opts ContentPackageLoadsimOptions) (ContentPackage
 	if opts.Scenario == "" {
 		opts.Scenario = "content-package-basic"
 	}
-	if opts.Scenario != "content-package-basic" {
+	if opts.Scenario != "content-package-basic" && opts.Scenario != "dawnwake-traversal-basic" && opts.Scenario != "dawnwake-streaming-basic" {
 		return report, fmt.Errorf("unsupported loadsim scenario %q", opts.Scenario)
 	}
 
-	observability.LogEvent("loadsim", contentpkg.EventLoadsimContentStarted, map[string]any{
+	startEvent := contentpkg.EventLoadsimContentStarted
+	completeEvent := contentpkg.EventLoadsimContentCompleted
+	if opts.Scenario == "dawnwake-traversal-basic" {
+		startEvent = contentpkg.EventLoadsimDawnwakeStarted
+		completeEvent = contentpkg.EventLoadsimDawnwakeCompleted
+	} else if opts.Scenario == "dawnwake-streaming-basic" {
+		startEvent = contentpkg.EventLoadsimStreamingStarted
+		completeEvent = contentpkg.EventLoadsimStreamingCompleted
+	}
+	observability.LogEvent("loadsim", startEvent, map[string]any{
 		"scenario": opts.Scenario,
 		"clients":  opts.Clients,
 		"content":  opts.ContentPath,
@@ -77,6 +92,9 @@ func RunContentPackageLoadsim(opts ContentPackageLoadsimOptions) (ContentPackage
 	server := newWorldServerWithContentPackage(nil, opts.ContentPath)
 	report.ZonesActivated = server.contentActivation.ZonesActivated
 	report.QuestProvidersRegistered = server.contentActivation.QuestProvidersRegistered
+	report.TransitionsLoaded = server.contentActivation.TransitionsLoaded
+	report.MapExportsLoaded = server.contentActivation.MapExportsLoaded
+	report.StreamingCellsLoaded = server.contentActivation.StreamingCellsLoaded
 	report.NPCsSpawned = countContentMobs(server)
 
 	entryZone, entryPoint := firstContentEntryPoint(loadResult.Validated.Registry)
@@ -86,13 +104,36 @@ func RunContentPackageLoadsim(opts ContentPackageLoadsimOptions) (ContentPackage
 	}
 
 	questID := "dev_first_hunt"
+	if opts.Scenario == "dawnwake-traversal-basic" || opts.Scenario == "dawnwake-streaming-basic" {
+		questID = "dw_tideglass_sparks"
+	}
 	quest, questFound := loadResult.Validated.Registry.Quests[questID]
 	if !questFound {
-		report.Errors = append(report.Errors, "dev_first_hunt is not loaded")
-		return report, fmt.Errorf("dev_first_hunt is not loaded")
+		report.Errors = append(report.Errors, fmt.Sprintf("%s is not loaded", questID))
+		return report, fmt.Errorf("%s is not loaded", questID)
 	}
 	if providerForQuest(loadResult.Validated.Registry, questID) != "" {
 		report.QuestsAccepted = opts.Clients
+	}
+
+	if opts.Scenario == "dawnwake-traversal-basic" {
+		completed, err := runDawnwakeTraversalStep(server, entryZone, entryPoint)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report, err
+		}
+		if completed {
+			report.TransitionsCompleted = opts.Clients
+		}
+	} else if opts.Scenario == "dawnwake-streaming-basic" {
+		completed, zonesEntered, hintsObserved, err := runDawnwakeStreamingTraversal(server, entryZone, entryPoint)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return report, err
+		}
+		report.TransitionsCompleted = completed * opts.Clients
+		report.StreamingHintsObserved = hintsObserved
+		report.ZonesEntered = zonesEntered
 	}
 
 	targetArchetypeID := firstQuestKillTarget(quest)
@@ -126,17 +167,135 @@ func RunContentPackageLoadsim(opts ContentPackageLoadsimOptions) (ContentPackage
 
 	report.AverageTickDurationMs, report.MaxTickDurationMs = runContentTickLoop(server, opts.Duration)
 	report.MaxQueueDepth = 0
-	observability.LogEvent("loadsim", contentpkg.EventLoadsimContentCompleted, map[string]any{
-		"packageId":             report.PackageID,
-		"zonesActivated":        report.ZonesActivated,
-		"npcsSpawned":           report.NPCsSpawned,
-		"questsCompleted":       report.QuestsCompleted,
-		"lootClaimsCompleted":   report.LootClaimsCompleted,
-		"averageTickDurationMs": report.AverageTickDurationMs,
-		"maxTickDurationMs":     report.MaxTickDurationMs,
-		"errorCount":            len(report.Errors),
+	observability.LogEvent("loadsim", completeEvent, map[string]any{
+		"packageId":              report.PackageID,
+		"zonesActivated":         report.ZonesActivated,
+		"transitionsCompleted":   report.TransitionsCompleted,
+		"mapExportsLoaded":       report.MapExportsLoaded,
+		"streamingCellsLoaded":   report.StreamingCellsLoaded,
+		"streamingHintsObserved": report.StreamingHintsObserved,
+		"npcsSpawned":            report.NPCsSpawned,
+		"questsCompleted":        report.QuestsCompleted,
+		"lootClaimsCompleted":    report.LootClaimsCompleted,
+		"averageTickDurationMs":  report.AverageTickDurationMs,
+		"maxTickDurationMs":      report.MaxTickDurationMs,
+		"errorCount":             len(report.Errors),
 	})
 	return report, nil
+}
+
+func runDawnwakeTraversalStep(server *worldServer, entryZone string, entryPoint contentpkg.ZoneEntryPoint) (bool, error) {
+	session := &worldSessionState{
+		Token:       "loadsim_dawnwake_001",
+		CharacterID: "loadsim_dawnwake_character",
+		DisplayName: "DawnwakeSim",
+		ZoneID:      entryZone,
+		X:           entryPoint.Position.X,
+		Y:           entryPoint.Position.Y,
+		Z:           entryPoint.Position.Z,
+		Connected:   true,
+		Alive:       true,
+		Health:      playerMaxHealth,
+		MaxHealth:   playerMaxHealth,
+	}
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	zone := server.contentRegistry.Zones[entryZone]
+	if len(zone.Transitions) == 0 {
+		return false, fmt.Errorf("entry zone %s has no transition", entryZone)
+	}
+	transition := zone.Transitions[0]
+	session.X = transition.Position.X
+	session.Y = transition.Position.Y
+	session.Z = transition.Position.Z
+	result, err := server.applyContentZoneTransitionsLocked(session)
+	if err != nil {
+		return false, err
+	}
+	if !result.Completed {
+		return false, fmt.Errorf("transition %s did not complete", transition.TransitionID)
+	}
+	return true, nil
+}
+
+func runDawnwakeStreamingTraversal(server *worldServer, entryZone string, entryPoint contentpkg.ZoneEntryPoint) (int, []string, int, error) {
+	session := &worldSessionState{
+		Token:       "loadsim_dawnwake_streaming_001",
+		CharacterID: "loadsim_dawnwake_streaming_character",
+		DisplayName: "DawnwakeStreamingSim",
+		ZoneID:      entryZone,
+		X:           entryPoint.Position.X,
+		Y:           entryPoint.Position.Y,
+		Z:           entryPoint.Position.Z,
+		Connected:   true,
+		Alive:       true,
+		Health:      playerMaxHealth,
+		MaxHealth:   playerMaxHealth,
+	}
+	targetZones := []string{
+		"dawnwake_tideglass_shoal",
+		"dawnwake_windspur_rise",
+		"dawnwake_tideglass_shoal",
+		"dawnwake_landing",
+	}
+	zonesEntered := []string{entryZone}
+	hintsObserved := 0
+	completed := 0
+
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	for _, targetZoneID := range targetZones {
+		runtime := server.zoneRuntimes[session.ZoneID]
+		if runtime == nil || runtime.MapID == "" {
+			return completed, zonesEntered, hintsObserved, fmt.Errorf("zone %s has no active map export runtime", session.ZoneID)
+		}
+		if len(runtime.StreamingCells) == 0 {
+			return completed, zonesEntered, hintsObserved, fmt.Errorf("zone %s has no active streaming cells", session.ZoneID)
+		}
+		if len(runtime.TransitionHints) == 0 {
+			return completed, zonesEntered, hintsObserved, fmt.Errorf("zone %s has no transition hints", session.ZoneID)
+		}
+		hintsObserved += len(runtime.TransitionHints)
+
+		transition, found := contentTransitionToZone(server, session.ZoneID, targetZoneID)
+		if !found {
+			return completed, zonesEntered, hintsObserved, fmt.Errorf("zone %s has no transition to %s", session.ZoneID, targetZoneID)
+		}
+		session.X = transition.Position.X
+		session.Y = transition.Position.Y
+		session.Z = transition.Position.Z
+		result, err := server.applyContentZoneTransitionsLocked(session)
+		if err != nil {
+			return completed, zonesEntered, hintsObserved, err
+		}
+		if !result.Completed || result.ToZoneID != targetZoneID {
+			return completed, zonesEntered, hintsObserved, fmt.Errorf("transition to %s did not complete", targetZoneID)
+		}
+		completed++
+		zonesEntered = append(zonesEntered, session.ZoneID)
+	}
+
+	runtime := server.zoneRuntimes[session.ZoneID]
+	if runtime != nil {
+		hintsObserved += len(runtime.TransitionHints)
+	}
+	return completed, zonesEntered, hintsObserved, nil
+}
+
+func contentTransitionToZone(server *worldServer, zoneID string, targetZoneID string) (contentpkg.ZoneTransitionDefinition, bool) {
+	if server == nil || server.contentRegistry == nil {
+		return contentpkg.ZoneTransitionDefinition{}, false
+	}
+	zone, found := server.contentRegistry.Zones[zoneID]
+	if !found {
+		return contentpkg.ZoneTransitionDefinition{}, false
+	}
+	for _, transition := range zone.Transitions {
+		if transition.TargetZoneID == targetZoneID {
+			return transition, true
+		}
+	}
+	return contentpkg.ZoneTransitionDefinition{}, false
 }
 
 func firstContentEntryPoint(registry contentpkg.RuntimeContentRegistry) (string, contentpkg.ZoneEntryPoint) {

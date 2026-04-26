@@ -13,6 +13,8 @@ It is intentionally thin and not an O3DE scene yet. Its job is to prove the live
 - disconnect and reconnect
 - retain persisted state
 
+It also hosts the first Dawnwake streaming preview hook. The client reads the world service `streaming` payload, builds a `ClientStreamingFrame`, computes the current cell from server-provided bounds, and emits changes through `IWorldStreamingPreviewSink`. `ConsoleWorldStreamingPreviewSink` prints those events, and `PlaceholderSceneStreamingAdapter` emits structured placeholder scene commands for the O3DE `ZoneStreaming` Gem debug binding.
+
 Example:
 
 ```powershell
@@ -35,4 +37,33 @@ Automated diagnostic run:
 
 ```powershell
 dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --auto-combat-demo
+```
+
+Scene-command preview:
+
+```powershell
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands
+```
+
+Deterministic command-file preview:
+
+```powershell
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands --streaming-command-file "$env:TEMP\amandacore\streaming.commands.jsonl"
+```
+
+The command file is JSON Lines with one placeholder scene command per line and no timestamps. It is meant for local bridge/debug validation; the O3DE Gem consumes the same command contract through `ZoneStreaming::IZoneStreamingDebugRequests`.
+
+Live O3DE debug bridge:
+
+```powershell
+$env:AMANDACORE_STREAMING_COMMAND_FILE="$env:TEMP\amandacore\streaming.commands.jsonl"
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands --streaming-command-file "$env:AMANDACORE_STREAMING_COMMAND_FILE"
+```
+
+Run the O3DE client with the same `AMANDACORE_STREAMING_COMMAND_FILE` value. The `ZoneStreaming` Gem tails that file and renders debug volumes from the streamed commands.
+
+Adapter checks:
+
+```powershell
+dotnet run --project Client/Game/AmandaCore.WorldClient.Tests/AmandaCore.WorldClient.Tests.csproj
 ```

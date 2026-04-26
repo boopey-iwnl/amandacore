@@ -1,14 +1,69 @@
 {
   "quests": [
     {
-      "quest_id": "dawnwake_first_steps",
-      "display_name": "First Steps on Dawnwake",
-      "provider_id": "dawnwake_landing_pathfinder",
-      "objective_graph": [
-        { "objective_id": "reach_amberglass_road_placeholder", "kind": "ReachLocationPlaceholder", "zone_id": "dawnwake_landing", "target": "landing_to_amberglass_road" }
+      "quest_id": "dw_first_survey",
+      "display_name": "First Dawnwake Survey",
+      "summary": "Check in with the lantern pier guide before walking the isle routes.",
+      "required_level": 1,
+      "prerequisite_quest_ids": [],
+      "objective_graph": {
+        "nodes": [
+          {
+            "node_id": "speak_with_lantern_pier",
+            "kind": "talk_provider",
+            "target_id": "dw_provider_lantern_pier",
+            "required_count": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "rewards": [
+        {
+          "item_id": "dw_survey_ribbon",
+          "quantity": 1
+        }
       ],
-      "rewards": [],
-      "tags": ["starter", "placeholder"]
+      "tags": [
+        "dawnwake",
+        "traversal"
+      ]
+    },
+    {
+      "quest_id": "dw_tideglass_sparks",
+      "display_name": "Tideglass Sparks",
+      "summary": "Cross to the shoal and recover a tideglass splinter from the motes near the bright pools.",
+      "required_level": 1,
+      "prerequisite_quest_ids": [],
+      "objective_graph": {
+        "nodes": [
+          {
+            "node_id": "break_tideglass_mote",
+            "kind": "kill_npc",
+            "target_id": "dw_tideglass_mote",
+            "required_count": 1,
+            "depends_on": []
+          },
+          {
+            "node_id": "recover_tideglass_splinter",
+            "kind": "collect_item",
+            "target_id": "dw_tideglass_splinter",
+            "required_count": 1,
+            "depends_on": [
+              "break_tideglass_mote"
+            ]
+          }
+        ]
+      },
+      "rewards": [
+        {
+          "item_id": "dw_survey_ribbon",
+          "quantity": 2
+        }
+      ],
+      "tags": [
+        "dawnwake",
+        "loadsim"
+      ]
     }
   ]
 }

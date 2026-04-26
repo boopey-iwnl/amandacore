@@ -1,0 +1,162 @@
+{
+  "map_id": "dw_map_landing",
+  "zone_id": "dawnwake_landing",
+  "display_name": "Dawnwake Landing Placeholder Map",
+  "coordinate_space": "o3de_placeholder",
+  "bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "min_z": 0,
+    "max_x": 220,
+    "max_y": 180,
+    "max_z": 24
+  },
+  "entry_points": [
+    {
+      "entry_id": "arrival_skiff",
+      "position": {
+        "x": 18,
+        "y": 22,
+        "z": 0.1
+      },
+      "facing_yaw": 70
+    },
+    {
+      "entry_id": "from_tideglass_causeway",
+      "position": {
+        "x": 205,
+        "y": 94,
+        "z": 0.1
+      },
+      "facing_yaw": 250
+    }
+  ],
+  "adjacent_zones": [
+    {
+      "zone_id": "dawnwake_tideglass_shoal",
+      "transition_id": "to_tideglass_shoal",
+      "direction": "east",
+      "requires_reciprocal": true,
+      "tags": [
+        "causeway"
+      ]
+    }
+  ],
+  "transition_points": [
+    {
+      "transition_id": "to_tideglass_shoal",
+      "display_name": "Tideglass Causeway Stream",
+      "target_zone_id": "dawnwake_tideglass_shoal",
+      "destination_entry_id": "from_landing_causeway",
+      "streaming_cell_id": "dw_landing_causeway",
+      "hint": "prepare dawnwake_tideglass_shoal near the eastern causeway",
+      "position": {
+        "x": 210,
+        "y": 96,
+        "z": 0.1
+      },
+      "radius": 8,
+      "tags": [
+        "causeway",
+        "streaming_hint"
+      ]
+    }
+  ],
+  "streaming_cells": [
+    {
+      "cell_id": "dw_landing_arrival",
+      "display_name": "Arrival Shelf",
+      "bounds": {
+        "min_x": 0,
+        "min_y": 0,
+        "min_z": 0,
+        "max_x": 74,
+        "max_y": 90,
+        "max_z": 24
+      },
+      "priority": 1,
+      "tags": [
+        "entry"
+      ]
+    },
+    {
+      "cell_id": "dw_landing_causeway",
+      "display_name": "Causeway Edge",
+      "bounds": {
+        "min_x": 150,
+        "min_y": 70,
+        "min_z": 0,
+        "max_x": 220,
+        "max_y": 126,
+        "max_z": 24
+      },
+      "priority": 3,
+      "tags": [
+        "transition"
+      ]
+    },
+    {
+      "cell_id": "dw_landing_shore",
+      "display_name": "Saltglade Shore",
+      "bounds": {
+        "min_x": 60,
+        "min_y": 20,
+        "min_z": 0,
+        "max_x": 154,
+        "max_y": 118,
+        "max_z": 24
+      },
+      "priority": 2,
+      "tags": [
+        "spawn"
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "landmark_id": "dw_landing_arrival_skiff",
+      "display_name": "Arrival Skiff",
+      "kind": "entry",
+      "position": {
+        "x": 18,
+        "y": 22,
+        "z": 0.1
+      },
+      "tags": [
+        "entry"
+      ]
+    },
+    {
+      "landmark_id": "dw_landing_lantern_pier",
+      "display_name": "Lantern Pier",
+      "kind": "quest_provider",
+      "position": {
+        "x": 24,
+        "y": 26,
+        "z": 0.1
+      },
+      "tags": [
+        "quest"
+      ]
+    },
+    {
+      "landmark_id": "dw_landing_tideglass_gate",
+      "display_name": "Tideglass Gate",
+      "kind": "transition",
+      "position": {
+        "x": 210,
+        "y": 96,
+        "z": 0.1
+      },
+      "tags": [
+        "transition"
+      ]
+    }
+  ],
+  "authoring_source": "AmandaCore original O3DE placeholder authoring metadata.",
+  "generated_by": "amandacore-content-exporter",
+  "tags": [
+    "dawnwake",
+    "placeholder_map"
+  ]
+}

@@ -93,6 +93,7 @@ const (
 	secondZoneEntryY      = 148.0
 	secondZoneMaxX        = 720.0
 	secondZoneMaxY        = 420.0
+	noContentPackagePath  = "__amandacore_no_content_package__"
 )
 
 type NpcDisposition string
@@ -854,7 +855,7 @@ type worldServer struct {
 }
 
 func newWorldServer(fileStore *store.FileStore) *worldServer {
-	return newWorldServerWithContentPackage(fileStore, "")
+	return newWorldServerWithContentPackage(fileStore, noContentPackagePath)
 }
 
 func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackagePath string) *worldServer {
@@ -948,6 +949,7 @@ func (s *worldServer) ensureMobsLocked() {
 
 	allMobSpawns := append([]mobSpawnDefinition{}, stonewakeMobSpawns...)
 	allMobSpawns = append(allMobSpawns, brindlebrookMobSpawns...)
+	allMobSpawns = append(allMobSpawns, devProgressionMobSpawns...)
 	allMobSpawns = append(allMobSpawns, s.contentMobSpawns...)
 	s.mobOrder = make([]string, 0, len(allMobSpawns))
 	for _, spawn := range allMobSpawns {

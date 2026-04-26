@@ -1,0 +1,109 @@
+{
+  "zone_id": "dawnwake_windspur_rise",
+  "display_name": "Windspur Rise",
+  "description": "A high-path placeholder zone for streamed-world expansion hooks.",
+  "bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "min_z": 0,
+    "max_x": 240,
+    "max_y": 240,
+    "max_z": 36
+  },
+  "entry_points": [
+    {
+      "entry_id": "from_tideglass_ridge",
+      "position": {
+        "x": 20,
+        "y": 176,
+        "z": 0.1
+      },
+      "facing_yaw": 82
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "dw_windspur_sentinels",
+      "npc_archetype_id": "dw_rise_sentinel",
+      "loot_table_id": "dw_rise_guard_cache",
+      "respawn_seconds": 24,
+      "max_alive": 3,
+      "spawn_points": [
+        {
+          "spawn_point_id": "spawn_dw_sentinel_01",
+          "position": {
+            "x": 88,
+            "y": 164,
+            "z": 0.1
+          },
+          "facing_yaw": 180
+        },
+        {
+          "spawn_point_id": "spawn_dw_sentinel_02",
+          "position": {
+            "x": 116,
+            "y": 188,
+            "z": 0.1
+          },
+          "facing_yaw": 200
+        },
+        {
+          "spawn_point_id": "spawn_dw_sentinel_03",
+          "position": {
+            "x": 148,
+            "y": 166,
+            "z": 0.1
+          },
+          "facing_yaw": 220
+        }
+      ],
+      "tags": [
+        "rise"
+      ]
+    }
+  ],
+  "quest_providers": [
+    {
+      "provider_id": "dw_provider_windspur_marker",
+      "display_name": "Windspur Marker Post",
+      "position": {
+        "x": 28,
+        "y": 178,
+        "z": 0.1
+      },
+      "offered_quest_ids": [
+        "dw_first_survey"
+      ],
+      "tags": [
+        "dawnwake",
+        "route-marker"
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "transition_id": "to_tideglass_shoal",
+      "display_name": "Ridge Path to Tideglass",
+      "target_zone_id": "dawnwake_tideglass_shoal",
+      "destination_entry_id": "from_windspur_ridge",
+      "position": {
+        "x": 10,
+        "y": 176,
+        "z": 0.1
+      },
+      "radius": 8,
+      "tags": [
+        "ridge"
+      ]
+    }
+  ],
+  "runtime": {
+    "tick_ms": 50,
+    "max_players": 16,
+    "max_entities": 96
+  },
+  "tags": [
+    "dawnwake",
+    "future-streaming"
+  ]
+}

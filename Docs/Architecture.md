@@ -47,7 +47,7 @@ Each Gem has a single, durable responsibility:
 - `InventoryLoot`: inventory runtime, item equipment, vendors, and drop flows.
 - `QuestRuntime`: quest acceptance, tracking, completion, and UI feeds.
 - `NpcAi`: behavior trees/state machines, leash handling, and encounter ownership.
-- `ZoneStreaming`: outdoor cell streaming, world partitioning, and micro-instance handoff.
+- `ZoneStreaming`: outdoor cell streaming debug visualization, world partitioning hooks, and micro-instance handoff.
 - `UiClient`: HUD, chat, targeting, hotbars, and player feedback.
 - `NetClient`: transport, serialization, interpolation, and prediction feeds.
 - `NetServer`: authority, replication, interest management, and session hosting.
@@ -58,9 +58,11 @@ Each Gem has a single, durable responsibility:
 
 The data model is deliberately wider than the first slice so future work can scale without a rewrite. JSON Schema definitions live in `Content/Schemas/gameplay.schema.json`, and example authored content lives in `Content/GameData/ZoneSlice`.
 
-The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones and catalogs before activation, and activates validated dev content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows.
+The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones, map exports, and catalogs before activation, and activates validated content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows.
 
-`Content/Packs/dawnwake_isles` adds the first original multi-zone continent package. The Go content package loader validates the package manifest, continent topology, zone bounds, transition gates, spawn placement, and quest provider placement before activating a `ContinentRuntime`. Runtime ownership is single-zone for now: each character is owned by exactly one `ZoneRuntime`, and transfer gates move ownership between zone runtimes with state diffs and visibility deltas.
+`Content/Packs/dawnwake_isles` adds the first original multi-zone package with server-side adjacency, transition metadata, map exports, streaming cells, quest providers, hostile spawns, and placeholder traversal content. Runtime ownership is single-zone for now: each character is owned by exactly one content zone runtime, and transfer gates move ownership between zone runtimes with state diffs and visibility deltas.
+
+`Docs/DawnwakeIsles.md` documents the package, `Docs/WorldStreaming.md` documents the current map export and streaming hint boundary, and `Docs/O3DEMapExportWorkflow.md` documents the deterministic authoring-to-map-export workflow. The console world client reads the server `streaming` payload, maintains a client streaming preview frame, and emits either console preview events or O3DE-facing placeholder scene commands for zone, cell, bounds, and transition changes. The `ZoneStreaming` Gem consumes the mirrored C++ command contract and can tail the live JSONL debug bridge for debug-only AuxGeom volumes without moving authority into the client.
 
 Current Dawnwake coordinates are placeholder server-side rectangles pending map tracing from the owner-supplied Dawnwake Isles and Kingsfall Harbor images. O3DE mapping remains a separate transform layer; the server package is the authoritative runtime input.
 
