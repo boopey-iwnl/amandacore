@@ -10,6 +10,8 @@
     "max_y": 180,
     "max_z": 24
   },
+  "shard_hint": "starter-settlement",
+  "map_ref": "maps/dawnwake_landing.map.json",
   "entry_points": [
     {
       "entry_id": "arrival_skiff",
@@ -28,6 +30,35 @@
         "z": 0.1
       },
       "facing_yaw": 250
+    }
+  ],
+  "spawn_points": [
+    {
+      "spawn_point_id": "sp_dawnwake_landing_player",
+      "purpose": "player_entry",
+      "position": {
+        "x": 18,
+        "y": 22,
+        "z": 0.1
+      },
+      "facing_yaw": 70,
+      "tags": [
+        "entry"
+      ]
+    },
+    {
+      "spawn_point_id": "sp_dawnwake_landing_east_arrival",
+      "purpose": "handoff_arrival",
+      "position": {
+        "x": 205,
+        "y": 94,
+        "z": 0.1
+      },
+      "facing_yaw": 250,
+      "tags": [
+        "handoff",
+        "causeway"
+      ]
     }
   ],
   "spawn_groups": [
@@ -69,6 +100,28 @@
       "tags": [
         "landing",
         "shore"
+      ]
+    }
+  ],
+  "handoff_gates": [
+    {
+      "gate_id": "gate_dawnwake_landing_to_tideglass",
+      "source_zone_id": "dawnwake_landing",
+      "destination_zone_id": "dawnwake_tideglass_shoal",
+      "trigger": {
+        "center": {
+          "x": 210,
+          "y": 96,
+          "z": 0.1
+        },
+        "radius": 8
+      },
+      "arrival_spawn_point_id": "sp_tideglass_west_arrival",
+      "enabled": true,
+      "retryable_when_unavailable": true,
+      "tags": [
+        "handoff",
+        "causeway"
       ]
     }
   ],

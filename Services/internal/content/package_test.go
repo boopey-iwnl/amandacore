@@ -70,6 +70,36 @@ func TestDawnwakeIslesPackageValidatesSuccessfully(t *testing.T) {
 	if result.Validated.Registry.MapExportByZone["dawnwake_landing"].MapID == "" {
 		t.Fatalf("expected Dawnwake runtime registry to include landing map export")
 	}
+	if _, found := result.Validated.Registry.HandoffGates["gate_dawnwake_landing_to_tideglass"]; !found {
+		t.Fatalf("expected Dawnwake landing handoff gate")
+	}
+	if _, found := result.Validated.Registry.SpawnPoints["sp_tideglass_west_arrival"]; !found {
+		t.Fatalf("expected Dawnwake tideglass handoff arrival spawn point")
+	}
+}
+
+func TestDuplicateHandoffGateIDsRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[1].HandoffGates[0].GateID = loaded.Zones[0].HandoffGates[0].GateID
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorDuplicateID)
+	assertValidationPathContains(t, report, "handoff_gates[0].gate_id")
+}
+
+func TestHandoffGateReferencingMissingDestinationZoneRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].HandoffGates[0].DestinationZoneID = "missing_zone"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "handoff_gates[0].destination_zone_id")
+}
+
+func TestHandoffGateReferencingMissingArrivalSpawnRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].HandoffGates[0].ArrivalSpawnPointID = "missing_spawn"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "handoff_gates[0].arrival_spawn_point_id")
 }
 
 func TestMapExportReferencingMissingZoneRejected(t *testing.T) {

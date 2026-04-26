@@ -37,6 +37,7 @@ type ContentActivationResult struct {
 	TransitionsLoaded        int
 	MapExportsLoaded         int
 	StreamingCellsLoaded     int
+	HandoffGatesRegistered   int
 	QuestsRegistered         int
 	Errors                   []contentpkg.ContentValidationError
 }
@@ -94,24 +95,34 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			"quests":      len(registry.Quests),
 			"abilities":   len(registry.Abilities),
 			"auras":       len(registry.Auras),
+			"handoff":     len(registry.HandoffGates),
 		},
 	}
 
 	for _, itemID := range contentpkg.SortedKeys(registry.Items) {
 		item := registry.Items[itemID]
+		if _, exists := itemDefinitions[item.ItemID]; exists {
+			continue
+		}
 		itemDefinitions[item.ItemID] = itemDefinition{
 			ItemID:        item.ItemID,
 			DisplayName:   item.DisplayName,
+			Description:   item.Description,
+			Kind:          contentItemKind(item.Kind),
 			Type:          contentItemKind(item.Kind),
 			Subtype:       "content_package",
 			Quality:       contentItemQuality(item.Quality),
 			Stackable:     item.MaxStack > 1,
 			MaxStack:      item.MaxStack,
 			RequiredLevel: 1,
+			Tags:          append([]string(nil), item.Tags...),
 		}
 	}
 	for _, lootTableID := range contentpkg.SortedKeys(registry.LootTables) {
 		lootTable := registry.LootTables[lootTableID]
+		if _, exists := devLootTables[lootTable.LootTableID]; exists {
+			continue
+		}
 		worldTable := LootTableDefinition{
 			LootTableID: lootTable.LootTableID,
 			Entries:     make([]LootEntry, 0, len(lootTable.Entries)),
@@ -182,6 +193,11 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			result.QuestProvidersRegistered++
 			zoneRuntime.RegisteredQuestProvider++
 		}
+		for _, gate := range zone.HandoffGates {
+			if s.registerContentHandoffGateLocked(gate, registry) {
+				result.HandoffGatesRegistered++
+			}
+		}
 		for _, spawnGroup := range zone.SpawnGroups {
 			spawned := s.registerContentSpawnGroupLocked(zone.ZoneID, spawnGroup, registry)
 			result.NPCsSpawned += spawned
@@ -211,9 +227,50 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 		"transitionsLoaded":        result.TransitionsLoaded,
 		"mapExportsLoaded":         result.MapExportsLoaded,
 		"streamingCellsLoaded":     result.StreamingCellsLoaded,
+		"handoffGatesRegistered":   result.HandoffGatesRegistered,
 		"questsRegistered":         result.QuestsRegistered,
 	})
+	observability.LogEvent("world-service", contentpkg.EventZonesRegistered, map[string]any{
+		"packageId": result.PackageID,
+		"count":     result.ZonesActivated,
+	})
+	observability.LogEvent("world-service", contentpkg.EventHandoffGatesRegistered, map[string]any{
+		"packageId": result.PackageID,
+		"count":     result.HandoffGatesRegistered,
+	})
 	return result
+}
+
+func (s *worldServer) registerContentHandoffGateLocked(gate contentpkg.HandoffGateDefinition, registry contentpkg.RuntimeContentRegistry) bool {
+	arrival, found := findContentSpawnPoint(registry, gate.ArrivalSpawnPointID)
+	if !found {
+		return false
+	}
+	if s.handoffGates == nil {
+		s.handoffGates = defaultZoneHandoffGateDefinitions()
+	}
+	worldGate := ZoneHandoffGateDefinition{
+		TransitionID:       gate.GateID,
+		FromZoneID:         gate.SourceZoneID,
+		ToZoneID:           gate.DestinationZoneID,
+		GateX:              gate.Trigger.Center.X,
+		GateY:              gate.Trigger.Center.Y,
+		Radius:             gate.Trigger.Radius,
+		ArrivalX:           arrival.Position.X,
+		ArrivalY:           arrival.Position.Y,
+		ArrivalZ:           clampSpawnGroundZ(arrival.Position.Z),
+		Enabled:            gate.Enabled,
+		RetryableWhenFails: gate.RetryableWhenUnavailable,
+	}
+	s.handoffGates[worldGate.TransitionID] = worldGate
+	observability.LogEvent("world-service", contentpkg.EventHandoffGateRegistered, map[string]any{
+		"packageId":         registry.PackageID,
+		"gateId":            gate.GateID,
+		"sourceZoneId":      gate.SourceZoneID,
+		"destinationZoneId": gate.DestinationZoneID,
+		"arrivalSpawnId":    gate.ArrivalSpawnPointID,
+	})
+	return true
 }
 
 func (s *worldServer) registerContentQuestProviderLocked(zoneID string, provider contentpkg.QuestProviderDefinition) {
@@ -287,12 +344,39 @@ func (s *worldServer) registerContentSpawnGroupLocked(zoneID string, group conte
 	return spawned
 }
 
+func findContentSpawnPoint(registry contentpkg.RuntimeContentRegistry, spawnPointID string) (contentpkg.ZoneSpawnPointDefinition, bool) {
+	if spawn, found := registry.SpawnPoints[spawnPointID]; found {
+		return spawn, true
+	}
+	for _, zone := range registry.Zones {
+		for _, spawn := range zone.SpawnPoints {
+			if spawn.SpawnPointID == spawnPointID {
+				return spawn, true
+			}
+		}
+		for _, group := range zone.SpawnGroups {
+			for _, spawn := range group.SpawnPoints {
+				if spawn.SpawnPointID == spawnPointID {
+					return contentpkg.ZoneSpawnPointDefinition{
+						SpawnPointID: spawn.SpawnPointID,
+						Purpose:      "npc_spawn",
+						Position:     spawn.Position,
+						FacingYaw:    spawn.FacingYaw,
+					}, true
+				}
+			}
+		}
+	}
+	return contentpkg.ZoneSpawnPointDefinition{}, false
+}
+
 func (s *worldServer) contentQuestDefinition(registry contentpkg.RuntimeContentRegistry, quest contentpkg.QuestDefinition) questDefinition {
 	providerID := providerForQuest(registry, quest.QuestID)
 	worldQuest := questDefinition{
 		ID:              quest.QuestID,
 		ZoneID:          zoneForQuest(registry, quest.QuestID),
 		Title:           quest.DisplayName,
+		Summary:         quest.Summary,
 		ObjectiveText:   quest.Summary,
 		GiverNPCID:      providerID,
 		TurnInNPCID:     providerID,
@@ -300,6 +384,8 @@ func (s *worldServer) contentQuestDefinition(registry contentpkg.RuntimeContentR
 		RewardItems:     contentQuestRewards(quest, registry),
 		LevelBand:       fmt.Sprintf("%d", contentMaxInt(quest.RequiredLevel, 1)),
 		PrerequisiteIDs: append([]string(nil), quest.PrerequisiteQuestIDs...),
+		Tags:            append([]string(nil), quest.Tags...),
+		ObjectiveGraph:  contentObjectiveGraph(quest.ObjectiveGraph),
 	}
 	for _, node := range quest.ObjectiveGraph.Nodes {
 		switch node.Kind {
@@ -340,6 +426,46 @@ func contentQuestRewards(quest contentpkg.QuestDefinition, registry contentpkg.R
 		})
 	}
 	return rewards
+}
+
+func contentObjectiveGraph(graph contentpkg.QuestObjectiveGraph) questObjectiveGraph {
+	nodes := make([]questObjectiveNode, 0, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		worldNode := questObjectiveNode{
+			NodeID:      node.NodeID,
+			TargetCount: contentMaxInt(node.RequiredCount, 1),
+			DependsOn:   append([]string(nil), node.DependsOn...),
+		}
+		switch node.Kind {
+		case "kill_npc":
+			worldNode.Kind = objectiveKindKillNPC
+			worldNode.TargetNpcArchetype = node.TargetID
+		case "collect_item":
+			worldNode.Kind = objectiveKindCollectItem
+			worldNode.TargetItemID = node.TargetID
+		case "talk_provider":
+			worldNode.Kind = objectiveKindInteractWithEntity
+			worldNode.TargetEntityID = node.TargetID
+		default:
+			worldNode.Kind = objectiveKindInteractWithEntity
+			worldNode.TargetEntityID = node.TargetID
+		}
+		nodes = append(nodes, worldNode)
+	}
+	if len(nodes) > 0 {
+		dependents := map[string]bool{}
+		for _, node := range nodes {
+			for _, dependency := range node.DependsOn {
+				dependents[dependency] = true
+			}
+		}
+		for index := range nodes {
+			if !dependents[nodes[index].NodeID] {
+				nodes[index].Terminal = true
+			}
+		}
+	}
+	return questObjectiveGraph{Nodes: nodes}
 }
 
 func contentZoneLandmarks(zone contentpkg.ZoneDefinition) []zonePointDefinition {
@@ -468,10 +594,16 @@ func contentItemKind(kind string) string {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case itemTypeWeapon, itemTypeArmor, itemTypeConsumable, itemTypeMaterial, itemTypeQuest, itemTypeJunk:
 		return strings.ToLower(strings.TrimSpace(kind))
-	case "currency":
+	case itemTypeCurrency, "currency", "currencytoken":
+		return itemTypeCurrency
+	case itemTypeEquipment, "equipment", "equipmentplaceholder":
+		return itemTypeEquipment
+	case "craftingmaterial":
 		return itemTypeMaterial
-	case "equipment":
-		return itemTypeArmor
+	case "questitem":
+		return itemTypeQuest
+	case "misc":
+		return itemTypeJunk
 	default:
 		return itemTypeMaterial
 	}
@@ -479,8 +611,10 @@ func contentItemKind(kind string) string {
 
 func contentItemQuality(quality string) string {
 	switch strings.ToLower(strings.TrimSpace(quality)) {
-	case itemQualityPoor, itemQualityCommon:
+	case itemQualityPoor, itemQualityCommon, itemQualityUncommon, itemQualityRare:
 		return strings.ToLower(strings.TrimSpace(quality))
+	case itemQualityEpicPlaceholder, "epicplaceholder":
+		return itemQualityEpicPlaceholder
 	default:
 		return itemQualityCommon
 	}

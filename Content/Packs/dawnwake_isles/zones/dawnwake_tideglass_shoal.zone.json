@@ -10,6 +10,8 @@
     "max_y": 210,
     "max_z": 24
   },
+  "shard_hint": "shoal-crossroads",
+  "map_ref": "maps/dawnwake_tideglass_shoal.map.json",
   "entry_points": [
     {
       "entry_id": "from_landing_causeway",
@@ -28,6 +30,36 @@
         "z": 0.1
       },
       "facing_yaw": 245
+    }
+  ],
+  "spawn_points": [
+    {
+      "spawn_point_id": "sp_tideglass_west_arrival",
+      "purpose": "handoff_arrival",
+      "position": {
+        "x": 18,
+        "y": 102,
+        "z": 0.1
+      },
+      "facing_yaw": 80,
+      "tags": [
+        "handoff",
+        "causeway"
+      ]
+    },
+    {
+      "spawn_point_id": "sp_tideglass_ridge_arrival",
+      "purpose": "handoff_arrival",
+      "position": {
+        "x": 238,
+        "y": 174,
+        "z": 0.1
+      },
+      "facing_yaw": 245,
+      "tags": [
+        "handoff",
+        "ridge"
+      ]
     }
   ],
   "spawn_groups": [
@@ -78,6 +110,28 @@
       "tags": [
         "shoal",
         "loadsim"
+      ]
+    }
+  ],
+  "handoff_gates": [
+    {
+      "gate_id": "gate_tideglass_to_dawnwake_landing",
+      "source_zone_id": "dawnwake_tideglass_shoal",
+      "destination_zone_id": "dawnwake_landing",
+      "trigger": {
+        "center": {
+          "x": 8,
+          "y": 102,
+          "z": 0.1
+        },
+        "radius": 8
+      },
+      "arrival_spawn_point_id": "sp_dawnwake_landing_east_arrival",
+      "enabled": true,
+      "retryable_when_unavailable": true,
+      "tags": [
+        "handoff",
+        "causeway"
       ]
     }
   ],

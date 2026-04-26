@@ -16,19 +16,24 @@ import (
 const (
 	SupportedSchemaVersion = "1"
 	DefaultPackagePath     = "Content/Packs/dev_foundation/package.json"
+	DawnwakePackagePath    = "Content/Packs/dawnwake_isles/package.json"
 )
 
 const (
 	EventPackageLoadStarted          = "content.package.load_started"
 	EventPackageLoadCompleted        = "content.package.load_completed"
 	EventPackageLoadFailed           = "content.package.load_failed"
+	EventPackageLoaded               = "content.package.loaded"
 	EventPackageValidationStarted    = "content.package.validation_started"
 	EventPackageValidationCompleted  = "content.package.validation_completed"
 	EventPackageValidationFailed     = "content.package.validation_failed"
 	EventPackageActivated            = "content.package.activated"
 	EventPackageActivationFailed     = "content.package.activation_failed"
 	EventZoneLoaded                  = "content.zone.loaded"
+	EventZonesRegistered             = "content.zones_registered"
 	EventZoneValidationFailed        = "content.zone.validation_failed"
+	EventHandoffGateRegistered       = "content.handoff_gate.registered"
+	EventHandoffGatesRegistered      = "content.handoff_gates_registered"
 	EventZoneTransitionLoaded        = "content.zone.transition.loaded"
 	EventZoneTransitionFailed        = "content.zone.transition.validation_failed"
 	EventMapExportLoaded             = "content.map_export.loaded"
@@ -85,6 +90,7 @@ type ContentPackageManifest struct {
 	QuestCatalogs   []string `json:"quest_catalogs"`
 	AbilityCatalogs []string `json:"ability_catalogs"`
 	AuraCatalogs    []string `json:"aura_catalogs"`
+	Dependencies    []string `json:"dependencies"`
 	Tags            []string `json:"tags"`
 }
 
@@ -132,6 +138,8 @@ type RuntimeContentRegistry struct {
 	Abilities       map[string]AbilityDefinition
 	Auras           map[string]AuraDefinition
 	QuestProvider   map[string]QuestProviderDefinition
+	SpawnPoints     map[string]ZoneSpawnPointDefinition
+	HandoffGates    map[string]HandoffGateDefinition
 }
 
 type ContentValidationReport struct {
@@ -201,8 +209,12 @@ type ZoneDefinition struct {
 	DisplayName    string                     `json:"display_name"`
 	Description    string                     `json:"description"`
 	Bounds         ZoneBounds                 `json:"bounds"`
+	ShardHint      string                     `json:"shard_hint"`
+	MapRef         string                     `json:"map_ref"`
 	EntryPoints    []ZoneEntryPoint           `json:"entry_points"`
+	SpawnPoints    []ZoneSpawnPointDefinition `json:"spawn_points"`
 	SpawnGroups    []SpawnGroupDefinition     `json:"spawn_groups"`
+	HandoffGates   []HandoffGateDefinition    `json:"handoff_gates"`
 	QuestProviders []QuestProviderDefinition  `json:"quest_providers"`
 	Transitions    []ZoneTransitionDefinition `json:"transitions"`
 	Runtime        ZoneRuntimeConfig          `json:"runtime"`
@@ -269,6 +281,30 @@ type MapLandmarkDefinition struct {
 	Kind        string   `json:"kind"`
 	Position    Position `json:"position"`
 	Tags        []string `json:"tags"`
+}
+
+type ZoneSpawnPointDefinition struct {
+	SpawnPointID string   `json:"spawn_point_id"`
+	Purpose      string   `json:"purpose"`
+	Position     Position `json:"position"`
+	FacingYaw    float64  `json:"facing_yaw"`
+	Tags         []string `json:"tags"`
+}
+
+type HandoffGateDefinition struct {
+	GateID                   string             `json:"gate_id"`
+	SourceZoneID             string             `json:"source_zone_id"`
+	DestinationZoneID        string             `json:"destination_zone_id"`
+	Trigger                  HandoffGateTrigger `json:"trigger"`
+	ArrivalSpawnPointID      string             `json:"arrival_spawn_point_id"`
+	Enabled                  bool               `json:"enabled"`
+	RetryableWhenUnavailable bool               `json:"retryable_when_unavailable"`
+	Tags                     []string           `json:"tags"`
+}
+
+type HandoffGateTrigger struct {
+	Center Position `json:"center"`
+	Radius float64  `json:"radius"`
 }
 
 type SpawnGroupDefinition struct {
@@ -474,6 +510,11 @@ func (ContentPackageLoader) Load(manifestPath string) ContentPackageLoadResult {
 			"loot":       len(loaded.LootTables),
 			"quests":     len(loaded.Quests),
 		})
+		observability.LogEvent("content-loader", EventPackageLoaded, map[string]any{
+			"packageId": manifest.PackageID,
+			"version":   manifest.Version,
+			"schema":    manifest.SchemaVersion,
+		})
 		return result
 	}
 
@@ -672,7 +713,7 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	report := ContentValidationReport{}
 	validateManifest(loaded.Manifest, &report)
 
-	validateIDs("zones", loaded.Zones, func(zone ZoneDefinition) string { return zone.ZoneID }, &report)
+	zoneIDs := validateIDs("zones", loaded.Zones, func(zone ZoneDefinition) string { return zone.ZoneID }, &report)
 	validateIDs("map_exports", loaded.MapExports, func(export MapExportDefinition) string { return export.MapID }, &report)
 	npcIDs := validateIDs("npcs", loaded.NPCs, func(npc NpcArchetype) string { return npc.ArchetypeID }, &report)
 	itemIDs := validateIDs("items", loaded.Items, func(item ItemDefinition) string { return item.ItemID }, &report)
@@ -680,15 +721,16 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	questIDs := validateIDs("quests", loaded.Quests, func(quest QuestDefinition) string { return quest.QuestID }, &report)
 	abilityIDs := validateIDs("abilities", loaded.Abilities, func(ability AbilityDefinition) string { return ability.AbilityID }, &report)
 	auraIDs := validateIDs("auras", loaded.Auras, func(aura AuraDefinition) string { return aura.AuraID }, &report)
+	spawnPointZones := collectPackageSpawnPointZones(loaded.Zones, &report)
 
-	zoneIDs := idsFromValues(loaded.Zones, func(zone ZoneDefinition) string { return zone.ZoneID })
 	zoneByID := collectZonesByID(loaded.Zones)
 	entryIDsByZone := collectEntryIDsByZone(loaded.Zones)
 	transitionsByZone := collectTransitionsByZone(loaded.Zones)
 	providerIDs := map[string]struct{}{}
 	transitionIDs := map[string]struct{}{}
+	gateIDs := map[string]struct{}{}
 	for zoneIndex, zone := range loaded.Zones {
-		validateZone(zone, zoneIndex, zoneIDs, entryIDsByZone, npcIDs, lootIDs, questIDs, providerIDs, transitionIDs, &report)
+		validateZone(zone, zoneIndex, zoneIDs, entryIDsByZone, npcIDs, lootIDs, questIDs, providerIDs, transitionIDs, spawnPointZones, gateIDs, &report)
 	}
 	validateMapExports(loaded.MapExports, zoneIDs, zoneByID, entryIDsByZone, transitionsByZone, &report)
 	for index, npc := range loaded.NPCs {
@@ -729,7 +771,38 @@ func validateManifest(manifest ContentPackageManifest, report *ContentValidation
 	}
 }
 
-func validateZone(zone ZoneDefinition, index int, zoneIDs map[string]struct{}, entryIDsByZone map[string]map[string]struct{}, npcIDs map[string]struct{}, lootIDs map[string]struct{}, questIDs map[string]struct{}, providerIDs map[string]struct{}, transitionIDs map[string]struct{}, report *ContentValidationReport) {
+func collectPackageSpawnPointZones(zones []ZoneDefinition, report *ContentValidationReport) map[string]string {
+	spawnPointZones := map[string]string{}
+	for zoneIndex, zone := range zones {
+		for spawnIndex, spawn := range zone.SpawnPoints {
+			if strings.TrimSpace(spawn.SpawnPointID) == "" {
+				continue
+			}
+			path := fmt.Sprintf("zones[%d].spawn_points[%d].spawn_point_id", zoneIndex, spawnIndex)
+			if existingZone, exists := spawnPointZones[spawn.SpawnPointID]; exists {
+				report.Addf(ErrorDuplicateID, path, "spawn point id %q is duplicated in zones %q and %q", spawn.SpawnPointID, existingZone, zone.ZoneID)
+				continue
+			}
+			spawnPointZones[spawn.SpawnPointID] = zone.ZoneID
+		}
+		for groupIndex, group := range zone.SpawnGroups {
+			for spawnIndex, spawn := range group.SpawnPoints {
+				if strings.TrimSpace(spawn.SpawnPointID) == "" {
+					continue
+				}
+				path := fmt.Sprintf("zones[%d].spawn_groups[%d].spawn_points[%d].spawn_point_id", zoneIndex, groupIndex, spawnIndex)
+				if existingZone, exists := spawnPointZones[spawn.SpawnPointID]; exists {
+					report.Addf(ErrorDuplicateID, path, "spawn point id %q is duplicated in zones %q and %q", spawn.SpawnPointID, existingZone, zone.ZoneID)
+					continue
+				}
+				spawnPointZones[spawn.SpawnPointID] = zone.ZoneID
+			}
+		}
+	}
+	return spawnPointZones
+}
+
+func validateZone(zone ZoneDefinition, index int, zoneIDs map[string]struct{}, entryIDsByZone map[string]map[string]struct{}, npcIDs map[string]struct{}, lootIDs map[string]struct{}, questIDs map[string]struct{}, providerIDs map[string]struct{}, transitionIDs map[string]struct{}, spawnPointZones map[string]string, gateIDs map[string]struct{}, report *ContentValidationReport) {
 	path := fmt.Sprintf("zones[%d]", index)
 	requiredID(report, path+".zone_id", zone.ZoneID)
 	requiredString(report, path+".display_name", zone.DisplayName)
@@ -739,6 +812,16 @@ func validateZone(zone ZoneDefinition, index int, zoneIDs map[string]struct{}, e
 		requiredID(report, entryPath+".entry_id", entry.EntryID)
 		if boundsValid && !positionInBounds(entry.Position, zone.Bounds) {
 			report.Addf(ErrorPositionOutOfBounds, entryPath+".position", "entry point %q is outside zone bounds", entry.EntryID)
+		}
+	}
+	for spawnIndex, spawn := range zone.SpawnPoints {
+		spawnPath := fmt.Sprintf("%s.spawn_points[%d]", path, spawnIndex)
+		requiredID(report, spawnPath+".spawn_point_id", spawn.SpawnPointID)
+		if !validEnum(spawn.Purpose, "player_entry", "handoff_arrival", "npc_spawn", "test_spawn") {
+			report.Addf(ErrorInvalidEnum, spawnPath+".purpose", "spawn point purpose %q is not valid", spawn.Purpose)
+		}
+		if boundsValid && !positionInBounds(spawn.Position, zone.Bounds) {
+			report.Addf(ErrorPositionOutOfBounds, spawnPath+".position", "spawn point %q is outside zone bounds", spawn.SpawnPointID)
 		}
 	}
 	for groupIndex, group := range zone.SpawnGroups {
@@ -769,6 +852,44 @@ func validateZone(zone ZoneDefinition, index int, zoneIDs map[string]struct{}, e
 			if boundsValid && !positionInBounds(spawn.Position, zone.Bounds) {
 				report.Addf(ErrorPositionOutOfBounds, spawnPath+".position", "spawn point %q is outside zone bounds", spawn.SpawnPointID)
 			}
+		}
+	}
+	for gateIndex, gate := range zone.HandoffGates {
+		gatePath := fmt.Sprintf("%s.handoff_gates[%d]", path, gateIndex)
+		requiredID(report, gatePath+".gate_id", gate.GateID)
+		if gate.GateID != "" {
+			if _, exists := gateIDs[gate.GateID]; exists {
+				report.Addf(ErrorDuplicateID, gatePath+".gate_id", "handoff gate id %q is duplicated", gate.GateID)
+			}
+			gateIDs[gate.GateID] = struct{}{}
+		}
+		requiredID(report, gatePath+".source_zone_id", gate.SourceZoneID)
+		requiredID(report, gatePath+".destination_zone_id", gate.DestinationZoneID)
+		requiredID(report, gatePath+".arrival_spawn_point_id", gate.ArrivalSpawnPointID)
+		if gate.SourceZoneID != "" && !containsID(zoneIDs, gate.SourceZoneID) {
+			report.Addf(ErrorBrokenReference, gatePath+".source_zone_id", "handoff gate %q references missing source zone %q", gate.GateID, gate.SourceZoneID)
+			logBrokenReference("handoff_gate", gate.GateID, "zone", gate.SourceZoneID)
+		}
+		if gate.DestinationZoneID != "" && !containsID(zoneIDs, gate.DestinationZoneID) {
+			report.Addf(ErrorBrokenReference, gatePath+".destination_zone_id", "handoff gate %q references missing destination zone %q", gate.GateID, gate.DestinationZoneID)
+			logBrokenReference("handoff_gate", gate.GateID, "zone", gate.DestinationZoneID)
+		}
+		if gate.SourceZoneID != "" && zone.ZoneID != "" && gate.SourceZoneID != zone.ZoneID {
+			report.Addf(ErrorBrokenReference, gatePath+".source_zone_id", "handoff gate %q is declared in zone %q but uses source zone %q", gate.GateID, zone.ZoneID, gate.SourceZoneID)
+		}
+		if gate.Trigger.Radius <= 0 {
+			report.Add(ErrorInvalidNumberRange, gatePath+".trigger.radius", "handoff gate trigger radius must be positive")
+		}
+		if boundsValid && !positionInBounds(gate.Trigger.Center, zone.Bounds) {
+			report.Addf(ErrorPositionOutOfBounds, gatePath+".trigger.center", "handoff gate %q trigger center is outside source zone bounds", gate.GateID)
+		}
+		arrivalZoneID, arrivalFound := spawnPointZones[gate.ArrivalSpawnPointID]
+		if gate.ArrivalSpawnPointID != "" && !arrivalFound {
+			report.Addf(ErrorBrokenReference, gatePath+".arrival_spawn_point_id", "handoff gate %q references missing arrival spawn point %q", gate.GateID, gate.ArrivalSpawnPointID)
+			logBrokenReference("handoff_gate", gate.GateID, "spawn_point", gate.ArrivalSpawnPointID)
+		}
+		if arrivalFound && gate.DestinationZoneID != "" && arrivalZoneID != gate.DestinationZoneID {
+			report.Addf(ErrorBrokenReference, gatePath+".arrival_spawn_point_id", "handoff gate %q arrival spawn point %q belongs to zone %q, not destination zone %q", gate.GateID, gate.ArrivalSpawnPointID, arrivalZoneID, gate.DestinationZoneID)
 		}
 	}
 	for providerIndex, provider := range zone.QuestProviders {
@@ -1262,9 +1383,27 @@ func NewRuntimeContentRegistry(loaded LoadedContentPackage) RuntimeContentRegist
 		Abilities:       map[string]AbilityDefinition{},
 		Auras:           map[string]AuraDefinition{},
 		QuestProvider:   map[string]QuestProviderDefinition{},
+		SpawnPoints:     map[string]ZoneSpawnPointDefinition{},
+		HandoffGates:    map[string]HandoffGateDefinition{},
 	}
 	for _, zone := range loaded.Zones {
 		registry.Zones[zone.ZoneID] = zone
+		for _, spawn := range zone.SpawnPoints {
+			registry.SpawnPoints[spawn.SpawnPointID] = spawn
+		}
+		for _, group := range zone.SpawnGroups {
+			for _, spawn := range group.SpawnPoints {
+				registry.SpawnPoints[spawn.SpawnPointID] = ZoneSpawnPointDefinition{
+					SpawnPointID: spawn.SpawnPointID,
+					Purpose:      "npc_spawn",
+					Position:     spawn.Position,
+					FacingYaw:    spawn.FacingYaw,
+				}
+			}
+		}
+		for _, gate := range zone.HandoffGates {
+			registry.HandoffGates[gate.GateID] = gate
+		}
 		for _, provider := range zone.QuestProviders {
 			registry.QuestProvider[provider.ProviderID] = provider
 		}

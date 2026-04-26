@@ -314,7 +314,7 @@ func countContentMobs(server *worldServer) int {
 		return count
 	}
 	for _, mob := range server.mobs {
-		if _, found := server.contentRegistry.NPCs[mob.ArchetypeID]; found {
+		if _, found := server.contentRegistry.NPCs[mob.ArchetypeID]; found && contentMobZone(server, mob.ZoneID) {
 			count++
 		}
 	}
@@ -324,7 +324,7 @@ func countContentMobs(server *worldServer) int {
 func firstContentMob(server *worldServer, archetypeID string) *mobState {
 	for _, mobID := range server.mobOrder {
 		mob := server.mobs[mobID]
-		if mob != nil && mob.ArchetypeID == archetypeID && mob.Alive {
+		if mob != nil && mob.ArchetypeID == archetypeID && mob.Alive && contentMobZone(server, mob.ZoneID) {
 			return mob
 		}
 	}
@@ -342,11 +342,19 @@ func firstQuestKillTarget(quest contentpkg.QuestDefinition) string {
 
 func lootTableForArchetype(server *worldServer, archetypeID string) string {
 	for _, mob := range server.mobs {
-		if mob.ArchetypeID == archetypeID {
+		if mob.ArchetypeID == archetypeID && contentMobZone(server, mob.ZoneID) {
 			return mob.LootTableID
 		}
 	}
 	return ""
+}
+
+func contentMobZone(server *worldServer, zoneID string) bool {
+	if server == nil || server.contentRegistry == nil {
+		return false
+	}
+	_, found := server.contentRegistry.Zones[zoneID]
+	return found
 }
 
 func questObjectiveSatisfiedByReport(quest contentpkg.QuestDefinition, report ContentPackageLoadsimReport) bool {

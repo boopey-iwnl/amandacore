@@ -59,6 +59,7 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 
 	mux.HandleFunc("POST /v1/world/connect", server.instrumentEndpointFunc("connect", server.handleConnect))
 	mux.HandleFunc("POST /v1/world/reconnect", server.instrumentEndpointFunc("reconnect", server.handleReconnect))
+	mux.HandleFunc("POST /v1/world/zone/handoff", server.instrumentEndpointFunc("zone_handoff", server.handleZoneHandoff))
 	mux.HandleFunc("POST /v1/world/move", server.instrumentEndpointFunc("move", server.handleMove))
 	mux.HandleFunc("POST /v1/world/disconnect", server.instrumentEndpointFunc("disconnect", server.handleDisconnect))
 	mux.HandleFunc("POST /v1/world/target", server.instrumentEndpointFunc("target", server.handleTarget))
@@ -1323,6 +1324,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
 		"zoneMap":              s.buildZoneMapResponse(session),
 		"streaming":            s.buildStreamingHintsResponse(session),
+		"zoneHandoff":          s.buildZoneHandoffResponseLocked(session),
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"housing":              s.buildHousingResponseLocked(session),

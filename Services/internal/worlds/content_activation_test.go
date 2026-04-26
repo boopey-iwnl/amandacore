@@ -107,6 +107,16 @@ func TestDawnwakePackageActivatesMultipleZoneRuntimes(t *testing.T) {
 	if provider := server.friendlyNPCs["dw_provider_lantern_pier"]; provider.ID == "" || provider.ZoneID != "dawnwake_landing" {
 		t.Fatalf("expected Dawnwake quest provider in landing, got %#v", provider)
 	}
+	if server.contentActivation.HandoffGatesRegistered != 2 {
+		t.Fatalf("expected two handoff gates, got %d", server.contentActivation.HandoffGatesRegistered)
+	}
+	gate := server.handoffGateLocked("gate_dawnwake_landing_to_tideglass")
+	if gate.TransitionID == "" {
+		t.Fatalf("expected package handoff gate")
+	}
+	if gate.FromZoneID != "dawnwake_landing" || gate.ToZoneID != "dawnwake_tideglass_shoal" {
+		t.Fatalf("unexpected handoff route: %#v", gate)
+	}
 }
 
 func TestDawnwakeMapExportActivatesStreamingHints(t *testing.T) {
