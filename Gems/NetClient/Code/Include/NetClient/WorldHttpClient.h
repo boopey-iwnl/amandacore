@@ -20,6 +20,38 @@ namespace NetClient
         AZStd::string m_label;
     };
 
+    struct AuraState
+    {
+        AZStd::string m_auraId;
+        AZStd::string m_displayName;
+        AZStd::string m_kind;
+        AZStd::string m_sourceEntityId;
+        AZStd::string m_targetEntityId;
+        int m_stackCount = 0;
+        AZ::s64 m_appliedAtMs = 0;
+        AZ::s64 m_expiresAtMs = 0;
+        AZ::s64 m_nextTickAtMs = 0;
+    };
+
+    struct KillCreditState
+    {
+        AZStd::string m_archetypeId;
+        AZStd::string m_reason;
+        int m_count = 0;
+        AZ::s64 m_updatedAt = 0;
+    };
+
+    struct WorldEventEntry
+    {
+        AZ::s64 m_sequence = 0;
+        AZ::s64 m_occurredAtMs = 0;
+        AZStd::string m_type;
+        AZStd::string m_characterId;
+        AZStd::string m_entityId;
+        AZStd::string m_zoneId;
+        AZStd::string m_summary;
+    };
+
     struct VisibleEntity
     {
         AZStd::string m_id;
@@ -38,6 +70,7 @@ namespace NetClient
         AZStd::string m_aiState;
         AZStd::string m_pvpState;
         AZStd::vector<NpcServiceState> m_services;
+        AZStd::vector<AuraState> m_auras;
     };
 
     struct QuestState
@@ -421,6 +454,10 @@ namespace NetClient
         AZ::s64 m_globalCooldownEndsAt = 0;
         AZ::s64 m_castEndsAt = 0;
         AZStd::string m_castingAbilityId;
+        AZStd::vector<AuraState> m_auras;
+        AZStd::vector<KillCreditState> m_killCredits;
+        AZStd::vector<WorldEventEntry> m_domainEvents;
+        AZStd::vector<WorldEventEntry> m_stateDiffs;
         AZStd::vector<VisibleEntity> m_entities;
     };
 

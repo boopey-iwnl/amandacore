@@ -1,0 +1,276 @@
+{
+    "zone_id":  "dawnwake_landing",
+    "display_name":  "Dawnwake Landing",
+    "description":  "A provisional coastal starter zone for AmandaCore-original Dawnwake Isles onboarding.",
+    "bounds":  {
+                   "min_x":  0,
+                   "min_y":  0,
+                   "min_z":  0,
+                   "max_x":  220,
+                   "max_y":  180,
+                   "max_z":  24
+               },
+    "shard_hint":  "starter-settlement",
+    "map_ref":  "maps/dawnwake_landing.map.json",
+    "entry_points":  [
+                         {
+                             "entry_id":  "arrival_skiff",
+                             "position":  {
+                                              "x":  18,
+                                              "y":  22,
+                                              "z":  0.1
+                                          },
+                             "facing_yaw":  70
+                         },
+                         {
+                             "entry_id":  "from_tideglass_causeway",
+                             "position":  {
+                                              "x":  205,
+                                              "y":  94,
+                                              "z":  0.1
+                                          },
+                             "facing_yaw":  250
+                         },
+                         {
+                             "entry_id":  "landing_shore",
+                             "position":  {
+                                              "x":  20,
+                                              "y":  80,
+                                              "z":  0
+                                          },
+                             "facing_yaw":  90
+                         },
+                         {
+                             "entry_id":  "landing_east_road",
+                             "position":  {
+                                              "x":  190,
+                                              "y":  82,
+                                              "z":  0
+                                          },
+                             "facing_yaw":  270
+                         }
+                     ],
+    "spawn_points":  [
+                         {
+                             "spawn_point_id":  "sp_dawnwake_landing_player",
+                             "purpose":  "player_entry",
+                             "position":  {
+                                              "x":  18,
+                                              "y":  22,
+                                              "z":  0.1
+                                          },
+                             "facing_yaw":  70,
+                             "tags":  [
+                                          "entry"
+                                      ]
+                         },
+                         {
+                             "spawn_point_id":  "sp_dawnwake_landing_east_arrival",
+                             "purpose":  "handoff_arrival",
+                             "position":  {
+                                              "x":  205,
+                                              "y":  94,
+                                              "z":  0.1
+                                          },
+                             "facing_yaw":  250,
+                             "tags":  [
+                                          "handoff",
+                                          "causeway"
+                                      ]
+                         }
+                     ],
+    "spawn_groups":  [
+                         {
+                             "spawn_group_id":  "dw_landing_striders",
+                             "npc_archetype_id":  "dw_saltglade_strider",
+                             "loot_table_id":  "dw_strider_found",
+                             "respawn_seconds":  18,
+                             "max_alive":  3,
+                             "spawn_points":  [
+                                                  {
+                                                      "spawn_point_id":  "spawn_dw_strider_01",
+                                                      "position":  {
+                                                                       "x":  78,
+                                                                       "y":  48,
+                                                                       "z":  0.1
+                                                                   },
+                                                      "facing_yaw":  110
+                                                  },
+                                                  {
+                                                      "spawn_point_id":  "spawn_dw_strider_02",
+                                                      "position":  {
+                                                                       "x":  96,
+                                                                       "y":  68,
+                                                                       "z":  0.1
+                                                                   },
+                                                      "facing_yaw":  140
+                                                  },
+                                                  {
+                                                      "spawn_point_id":  "spawn_dw_strider_03",
+                                                      "position":  {
+                                                                       "x":  118,
+                                                                       "y":  42,
+                                                                       "z":  0.1
+                                                                   },
+                                                      "facing_yaw":  95
+                                                  }
+                                              ],
+                             "tags":  [
+                                          "landing",
+                                          "shore"
+                                      ]
+                         },
+                         {
+                             "spawn_group_id":  "landing_tide_scavengers",
+                             "npc_archetype_id":  "dawnwake_tide_scavenger",
+                             "loot_table_id":  "dawnwake_tide_scavenger_scraps",
+                             "respawn_seconds":  12,
+                             "max_alive":  2,
+                             "spawn_points":  [
+                                                  {
+                                                      "spawn_point_id":  "landing_tide_scavenger_01",
+                                                      "position":  {
+                                                                       "x":  68,
+                                                                       "y":  42,
+                                                                       "z":  0
+                                                                   },
+                                                      "facing_yaw":  120
+                                                  },
+                                                  {
+                                                      "spawn_point_id":  "landing_tide_scavenger_02",
+                                                      "position":  {
+                                                                       "x":  88,
+                                                                       "y":  55,
+                                                                       "z":  0
+                                                                   },
+                                                      "facing_yaw":  160
+                                                  }
+                                              ],
+                             "tags":  [
+                                          "placeholder",
+                                          "hostile"
+                                      ]
+                         }
+                     ],
+    "handoff_gates":  [
+                          {
+                              "gate_id":  "gate_dawnwake_landing_to_tideglass",
+                              "source_zone_id":  "dawnwake_landing",
+                              "destination_zone_id":  "dawnwake_tideglass_shoal",
+                              "trigger":  {
+                                              "center":  {
+                                                             "x":  210,
+                                                             "y":  96,
+                                                             "z":  0.1
+                                                         },
+                                              "radius":  8
+                                          },
+                              "arrival_spawn_point_id":  "sp_tideglass_west_arrival",
+                              "enabled":  true,
+                              "retryable_when_unavailable":  true,
+                              "tags":  [
+                                           "handoff",
+                                           "causeway"
+                                       ]
+                          }
+                      ],
+    "quest_providers":  [
+                            {
+                                "provider_id":  "dw_provider_lantern_pier",
+                                "display_name":  "Mara Cale of Lantern Pier",
+                                "position":  {
+                                                 "x":  24,
+                                                 "y":  26,
+                                                 "z":  0.1
+                                             },
+                                "offered_quest_ids":  [
+                                                          "dw_first_survey",
+                                                          "dw_tideglass_sparks"
+                                                      ],
+                                "tags":  [
+                                             "dawnwake",
+                                             "quest"
+                                         ]
+                            },
+                            {
+                                "provider_id":  "dawnwake_landing_pathfinder",
+                                "display_name":  "Dawnwake Landing Pathfinder",
+                                "position":  {
+                                                 "x":  28,
+                                                 "y":  84,
+                                                 "z":  0
+                                             },
+                                "offered_quest_ids":  [
+                                                          "dawnwake_first_steps"
+                                                      ],
+                                "tags":  [
+                                             "starter",
+                                             "quest"
+                                         ]
+                            }
+                        ],
+    "transitions":  [
+                        {
+                            "transition_id":  "to_tideglass_shoal",
+                            "display_name":  "Tideglass Causeway",
+                            "target_zone_id":  "dawnwake_tideglass_shoal",
+                            "destination_entry_id":  "from_landing_causeway",
+                            "position":  {
+                                             "x":  210,
+                                             "y":  96,
+                                             "z":  0.1
+                                         },
+                            "radius":  8,
+                            "tags":  [
+                                         "causeway",
+                                         "streaming-hook"
+                                     ]
+                        }
+                    ],
+    "runtime":  {
+                    "tick_ms":  50,
+                    "max_players":  24,
+                    "max_entities":  120
+                },
+    "tags":  [
+                 "dawnwake",
+                 "entry-zone",
+                 "starter",
+                 "coastal",
+                 "placeholder-bounds"
+             ],
+    "continent_id":  "dawnwake_isles",
+    "transition_gates":  [
+                             {
+                                 "transition_id":  "landing_to_amberglass_road",
+                                 "from_zone_id":  "dawnwake_landing",
+                                 "to_zone_id":  "amberglass_fields",
+                                 "kind":  "road",
+                                 "gate_bounds":  {
+                                                     "min_x":  194,
+                                                     "min_y":  62,
+                                                     "min_z":  0,
+                                                     "max_x":  200,
+                                                     "max_y":  102,
+                                                     "max_z":  24
+                                                 },
+                                 "entry_point_id_on_arrival":  "amberglass_west_road",
+                                 "tags":  [
+                                              "walk",
+                                              "starter-route"
+                                          ]
+                             }
+                         ],
+    "streaming":  {
+                      "interest_radius":  70,
+                      "adjacent_preload_distance":  42,
+                      "priority":  "starter",
+                      "notes":  [
+                                    "Provisional rectangular bounds; replace with map-traced Dawnwake Landing shape."
+                                ]
+                  },
+    "metadata":  {
+                     "accuracy":  "placeholder",
+                     "source":  "pending_map_trace"
+                 }
+}

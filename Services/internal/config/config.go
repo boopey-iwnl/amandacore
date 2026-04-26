@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 type ServiceConfig struct {
 	ServiceName       string
+	Host              string
 	Port              string
 	Environment       string
 	StorePath         string
@@ -26,6 +28,7 @@ func Load(serviceName string, defaultPort string) ServiceConfig {
 
 	return ServiceConfig{
 		ServiceName:       serviceName,
+		Host:              valueOrDefault("AMANDACORE_SERVICE_HOST", "127.0.0.1"),
 		Port:              valueOrDefault("AMANDACORE_SERVICE_PORT", defaultPort),
 		Environment:       valueOrDefault("AMANDACORE_ENVIRONMENT", "development"),
 		StorePath:         valueOrDefault("AMANDACORE_STORE_PATH", defaultStorePath()),
@@ -34,8 +37,18 @@ func Load(serviceName string, defaultPort string) ServiceConfig {
 		AdminSeedPassword: os.Getenv("AMANDACORE_ADMIN_SEED_PASSWORD"),
 		AdminToolsEnabled: adminToolsEnabled(valueOrDefault("AMANDACORE_ENVIRONMENT", "development")),
 		BuildID:           valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-alpha-0.1-local"),
-		WorldEndpoint:     valueOrDefault("AMANDACORE_WORLD_ENDPOINT", "http://localhost:8085"),
+		WorldEndpoint:     valueOrDefault("AMANDACORE_WORLD_ENDPOINT", "http://127.0.0.1:8085"),
 	}
+}
+
+func (c ServiceConfig) ListenAddress() string {
+	host := strings.TrimSpace(c.Host)
+	port := strings.TrimSpace(c.Port)
+	if host == "" {
+		return ":" + port
+	}
+
+	return net.JoinHostPort(host, port)
 }
 
 func adminToolsEnabled(environment string) bool {

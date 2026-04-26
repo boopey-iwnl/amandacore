@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "item_id": "dev_glimmer_shard",
+      "display_name": "Glimmer Shard",
+      "description": "A small reflective shard used by AmandaCore development scenarios.",
+      "kind": "material",
+      "quality": "common",
+      "max_stack": 99,
+      "tags": [
+        "dev",
+        "crafting-placeholder"
+      ]
+    },
+    {
+      "item_id": "dev_stalker_fang",
+      "display_name": "Stalker Fang",
+      "description": "A proof token recovered from a Dev Isle stalker.",
+      "kind": "quest",
+      "quality": "common",
+      "max_stack": 20,
+      "tags": [
+        "dev",
+        "quest"
+      ]
+    },
+    {
+      "item_id": "dev_field_ration",
+      "display_name": "Field Ration",
+      "description": "A compact ration for early AmandaCore survival tests.",
+      "kind": "consumable",
+      "quality": "common",
+      "max_stack": 10,
+      "tags": [
+        "dev",
+        "reward"
+      ]
+    }
+  ]
+}

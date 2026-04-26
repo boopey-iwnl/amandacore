@@ -26,6 +26,7 @@ ly_add_target(
             Gem::ImGui.imguilib
             Gem::PhysX5.Static
             Gem::Atom_Component_DebugCamera.Static
+            Gem::AtomLyIntegration_CommonFeatures.Public
 )
 
 ly_add_target(

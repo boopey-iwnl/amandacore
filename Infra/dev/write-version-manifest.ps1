@@ -1,7 +1,7 @@
 param(
     [string]$OutputPath = (Join-Path $PSScriptRoot "version-manifest.json"),
     [string]$Channel = "development",
-    [string]$WorldEndpoint = "http://localhost:8085",
+    [string]$WorldEndpoint = "http://127.0.0.1:8085",
     [string]$ProtocolVersion = "local-dev-1",
     [string]$ApiVersion = "local-api-1"
 )

@@ -2,50 +2,52 @@
 
 Use this runbook to drive the current Alpha 0.1 `stonewake_vale` slice through the Local Playable Slice Controls desktop shortcut, the real launcher, and the O3DE client.
 
-## Local Ops GUI
+## Local Controls App
 
 - Desktop shortcut: `C:\Users\forwo\OneDrive\Desktop\Local Playable Slice Controls.lnk`
-- GUI source: `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\LocalOpsGui.ps1`
-- Double-click wrapper: `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\Launch-LocalOpsGui.cmd`
-- PowerShell launch command:
+- App project: `<repo root>\Client\Tools\AmandaCore.LocalControls\AmandaCore.LocalControls.csproj`
+- Double-click wrapper: `<repo root>\Infra\dev\Launch-LocalOpsGui.cmd`
+- Direct launch command:
 
 ```powershell
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\LocalOpsGui.ps1"
+dotnet run --project "<repo root>\Client\Tools\AmandaCore.LocalControls\AmandaCore.LocalControls.csproj"
 ```
 
-The GUI wraps the existing local scripts instead of replacing them:
+The compiled app wraps the existing local scripts instead of replacing them:
 
-- `Build + Restart Stack` runs `start-local.ps1` with `-BuildFirst`.
-- `Start Services` runs `start-local.ps1` with `-BuildFirst:$false`.
-- `Stop Local Stack` runs `stop-local.ps1` and then closes any lingering launcher/client/service processes.
-- `Open Launcher` builds the latest playable client binaries and starts `Client\Launcher\AmandaCore.Launcher\bin\Debug\net8.0-windows\AmandaCore.Launcher.exe`.
-- `Open Logs Folder` opens:
-  - `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\logs`
-  - `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\user\log`
+- `Start local stack` runs `start-local.ps1 -BuildFirst`.
+- `Stop local stack` runs `stop-local.ps1`.
+- `Build local` runs `build-local.ps1`.
+- `Build O3DE client` runs `build-o3de-client.ps1`.
+- `Verify O3DE client` runs `verify-o3de-client.ps1`.
+- `Launch AmandaCore Launcher` builds the latest playable client binaries and starts `Client\Launcher\AmandaCore.Launcher\bin\Debug\net8.0-windows\AmandaCore.Launcher.exe`.
+- `Open logs/output folder` opens the first available local logs or output folder.
+- `Collect diagnostics` runs `Infra\qa\Collect-Diagnostics.ps1`.
+- `Open QA docs` opens `Docs\QA`.
+- `Reset test state` confirms first, then runs `Infra\qa\Reset-LocalTestState.ps1 -All -ConfirmReset`.
+- `Open admin portal` opens `Client\Portal\admin-portal.html`.
 
 ## Main Logs and Local State
 
-- Service logs folder: `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\logs`
-- Game client log: `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\user\log\Game.log`
-- User log folder: `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\user\log`
-- Process manifest: `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\local-processes.json`
+- Service logs folder: `<repo root>\Infra\dev\logs`
+- Game client log: `<repo root>\user\log\Game.log`
+- User log folder: `<repo root>\user\log`
+- Process manifest: `<repo root>\Infra\dev\local-processes.json`
 - Local persisted state: `C:\Users\forwo\AppData\Local\amandacore\platform-state.json`
-- Load-test output: `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\load-tests`
+- Load-test output: `<repo root>\Infra\dev\load-tests`
 
 ## Human Test Flow
 
 ### 1. Start the stack
 
 1. Double-click `Local Playable Slice Controls` on the desktop.
-2. Click `Build + Restart Stack` when you want the latest binaries, or `Start Services` when the build is already current.
-3. Wait until the GUI shows:
-   - `Stack: Running`
-   - all six services as `Healthy`
+2. Click `Start local stack` to build current binaries and start the stack.
+3. Wait until the command output reports `Local amandacore stack started.`; `start-local.ps1` waits for all six services to become healthy before returning.
 
 ### 2. Open the launcher
 
-1. Click `Open Launcher`.
-2. Confirm the GUI shows `Launcher: Running`.
+1. Click `Launch AmandaCore Launcher`.
+2. Confirm the command output reports `Launcher opened`.
 3. In the launcher:
    - register a new account or log in with an existing local account
    - select the local realm
@@ -91,8 +93,8 @@ The GUI wraps the existing local scripts instead of replacing them:
 4. Confirm rewards are granted exactly once.
 5. Check:
    - the in-client HUD/state
-   - `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\user\log\Game.log`
-   - the relevant world-service log in `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\logs`
+   - `<repo root>\user\log\Game.log`
+   - the relevant world-service log in `<repo root>\Infra\dev\logs`
 
 ### 7. Verify reconnect behavior
 
@@ -104,10 +106,10 @@ The GUI wraps the existing local scripts instead of replacing them:
 ### 8. Verify full restart persistence
 
 1. Close the game client.
-2. In the Local Ops GUI, click `Stop Local Stack`.
-3. Wait until the GUI shows `Stack: Stopped`.
-4. Click `Start Services` or `Build + Restart Stack`.
-5. Click `Open Launcher`, log back in, and `Join World`.
+2. In the local controls app, click `Stop local stack`.
+3. Wait until the command finishes with exit code `0`.
+4. Click `Start local stack`.
+5. Click `Launch AmandaCore Launcher`, log back in, and `Join World`.
 6. Confirm completed quest state and rewards persisted across the full restart.
 7. Confirm no duplicate reward was granted after re-entry.
 
@@ -117,17 +119,17 @@ The GUI wraps the existing local scripts instead of replacing them:
 2. Run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\run-load-test.ps1" -Clients 2 -Scenario mixed -DurationMinutes 5
+powershell -ExecutionPolicy Bypass -File "<repo root>\Infra\dev\run-load-test.ps1" -Clients 2 -Scenario mixed -DurationMinutes 5
 ```
 
-3. Inspect the generated `summary.md`, `summary.json`, and `events.jsonl` under `C:\Users\forwo\OneDrive\Desktop\Code Project - Alpha Integration\Infra\dev\load-tests`.
+3. Inspect the generated `summary.md`, `summary.json`, and `events.jsonl` under `<repo root>\Infra\dev\load-tests`.
 4. Confirm the world service stayed running and the summary shows endpoint timings, error counts, session counts, and desync count.
 
 ## Expected In-Client Acceptance
 
 The slice is considered ready for manual acceptance only if a human can confirm all of the following from the real client window:
 
-- desktop `Local Playable Slice Controls` opens the integration GUI
+- desktop `Local Playable Slice Controls` opens the compiled local controls app
 - launcher `Join World` path works
 - third-person character is visible and the camera is attached to it
 - grounded movement works

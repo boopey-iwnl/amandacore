@@ -106,13 +106,66 @@ func (s *worldServer) persistSessionEconomyLocked(session *worldSessionState) er
 	return nil
 }
 
+type inventoryChange struct {
+	SlotIndex int
+	ItemID    string
+	Before    int
+	After     int
+	Delta     int
+	StackFull bool
+}
+
+type inventoryMutationResult struct {
+	CharacterID string
+	ItemID      string
+	Quantity    int
+	Changes     []inventoryChange
+}
+
+type inventoryGrant struct {
+	ItemID   string
+	Quantity int
+	Reason   string
+}
+
+type CharacterInventory struct {
+	CharacterID string
+	Slots       []InventoryStack
+	Capacity    int
+}
+
+type InventoryStack struct {
+	SlotIndex int
+	ItemID    string
+	Quantity  int
+}
+
+type InventoryChange = inventoryChange
+type InventoryGrant = inventoryGrant
+type InventoryCapacity struct {
+	MaxStacks int
+}
+type InventoryMutationResult = inventoryMutationResult
+type ItemGrantResult struct {
+	ItemID   string
+	Quantity int
+	Accepted bool
+	Reason   string
+}
+
 func addDefinedItemToInventory(inventory *[]platform.CharacterInventorySlot, item itemDefinition, stackCount int) error {
+	_, err := grantDefinedItemToInventory(inventory, item, stackCount)
+	return err
+}
+
+func grantDefinedItemToInventory(inventory *[]platform.CharacterInventorySlot, item itemDefinition, stackCount int) ([]inventoryChange, error) {
 	if item.ItemID == "" || stackCount <= 0 {
-		return nil
+		return nil, nil
 	}
 
 	slots := platform.NormalizeInventorySlots(*inventory)
 	remaining := stackCount
+	changes := []inventoryChange{}
 	maxStack := item.MaxStack
 	if maxStack <= 0 {
 		maxStack = 1
@@ -126,13 +179,22 @@ func addDefinedItemToInventory(inventory *[]platform.CharacterInventorySlot, ite
 			if slots[index].ItemID != item.ItemID || slots[index].StackCount >= maxStack {
 				continue
 			}
+			before := slots[index].StackCount
 			available := maxStack - slots[index].StackCount
 			added := minInt(remaining, available)
 			slots[index].StackCount += added
 			remaining -= added
+			changes = append(changes, inventoryChange{
+				SlotIndex: index,
+				ItemID:    item.ItemID,
+				Before:    before,
+				After:     slots[index].StackCount,
+				Delta:     added,
+				StackFull: slots[index].StackCount >= maxStack,
+			})
 			if remaining <= 0 {
 				*inventory = slots
-				return nil
+				return changes, nil
 			}
 		}
 	}
@@ -153,13 +215,185 @@ func addDefinedItemToInventory(inventory *[]platform.CharacterInventorySlot, ite
 			StackCount:  added,
 		}
 		remaining -= added
+		changes = append(changes, inventoryChange{
+			SlotIndex: index,
+			ItemID:    item.ItemID,
+			Before:    0,
+			After:     added,
+			Delta:     added,
+			StackFull: added >= maxStack,
+		})
 		if remaining <= 0 {
 			*inventory = slots
-			return nil
+			return changes, nil
 		}
 	}
 
-	return fmt.Errorf("inventory is full")
+	return changes, fmt.Errorf("inventory is full")
+}
+
+func (s *worldServer) grantItemStackToSessionLocked(session *worldSessionState, grant inventoryGrant) (inventoryMutationResult, error) {
+	result := inventoryMutationResult{
+		CharacterID: sessionCharacterID(session),
+		ItemID:      grant.ItemID,
+		Quantity:    grant.Quantity,
+	}
+	s.emitWorldEventLocked(eventInventoryGrantRequested, map[string]any{
+		"characterId": result.CharacterID,
+		"itemId":      grant.ItemID,
+		"quantity":    grant.Quantity,
+		"reason":      grant.Reason,
+	})
+	if session == nil {
+		err := fmt.Errorf("SessionInvalid")
+		s.emitWorldEventLocked(eventInventoryGrantRejected, map[string]any{
+			"characterId": result.CharacterID,
+			"itemId":      grant.ItemID,
+			"quantity":    grant.Quantity,
+			"reason":      err.Error(),
+		})
+		return result, err
+	}
+	item, found := findItemDefinition(grant.ItemID)
+	if !found {
+		err := fmt.Errorf("InvalidItem")
+		s.emitWorldEventLocked(eventInventoryGrantRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"itemId":      grant.ItemID,
+			"quantity":    grant.Quantity,
+			"reason":      err.Error(),
+		})
+		return result, err
+	}
+	changes, err := grantDefinedItemToInventory(&session.Inventory, item, grant.Quantity)
+	if err != nil {
+		reason := "InventoryFull"
+		s.emitWorldEventLocked(eventInventoryGrantRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"itemId":      grant.ItemID,
+			"quantity":    grant.Quantity,
+			"reason":      reason,
+		})
+		s.emitWorldEventLocked(eventInventoryFull, map[string]any{
+			"characterId": session.CharacterID,
+			"itemId":      grant.ItemID,
+		})
+		return result, fmt.Errorf("%s", reason)
+	}
+	result.Changes = changes
+	if err := s.persistSessionProgressionLocked(session); err != nil {
+		return result, err
+	}
+	s.emitInventoryGrantedLocked(session, grant.ItemID, grant.Quantity, grant.Reason)
+	return result, nil
+}
+
+func (s *worldServer) grantInventoryItemsLocked(session *worldSessionState, grants []InventoryGrant, reason string) error {
+	if session == nil {
+		s.emitWorldEventLocked(eventInventoryGrantRejected, map[string]any{
+			"reason": "SessionInvalid",
+		})
+		return fmt.Errorf("SessionInvalid")
+	}
+	if len(grants) == 0 {
+		return nil
+	}
+	if reason == "" {
+		reason = "server_grant"
+	}
+
+	nextInventory := platform.NormalizeInventorySlots(session.Inventory)
+	applied := make([]InventoryGrant, 0, len(grants))
+	for _, grant := range grants {
+		if grant.ItemID == "" || grant.Quantity <= 0 {
+			continue
+		}
+		if grant.Reason == "" {
+			grant.Reason = reason
+		}
+		s.emitWorldEventLocked(eventInventoryGrantRequested, map[string]any{
+			"characterId": session.CharacterID,
+			"itemId":      grant.ItemID,
+			"quantity":    grant.Quantity,
+			"reason":      grant.Reason,
+		})
+		item, found := findItemDefinition(grant.ItemID)
+		if !found {
+			s.emitWorldEventLocked(eventInventoryGrantRejected, map[string]any{
+				"characterId": session.CharacterID,
+				"itemId":      grant.ItemID,
+				"quantity":    grant.Quantity,
+				"reason":      "InvalidItem",
+			})
+			return fmt.Errorf("InvalidItem")
+		}
+		if _, err := grantDefinedItemToInventory(&nextInventory, item, grant.Quantity); err != nil {
+			s.emitWorldEventLocked(eventInventoryGrantRejected, map[string]any{
+				"characterId": session.CharacterID,
+				"itemId":      grant.ItemID,
+				"quantity":    grant.Quantity,
+				"reason":      "InventoryFull",
+			})
+			s.emitWorldEventLocked(eventInventoryFull, map[string]any{
+				"characterId": session.CharacterID,
+				"itemId":      grant.ItemID,
+			})
+			return fmt.Errorf("InventoryFull")
+		}
+		applied = append(applied, grant)
+	}
+
+	if len(applied) == 0 {
+		return nil
+	}
+	session.Inventory = nextInventory
+	for _, grant := range applied {
+		s.emitInventoryGrantedLocked(session, grant.ItemID, grant.Quantity, grant.Reason)
+		if err := s.applyQuestItemGrantedLocked(session, grant.ItemID, grant.Quantity); err != nil {
+			return err
+		}
+	}
+	if err := s.persistSessionProgressionLocked(session); err != nil {
+		return err
+	}
+	s.emitWorldEventLocked(eventInventoryPersisted, map[string]any{
+		"characterId": session.CharacterID,
+		"reason":      reason,
+	})
+	return nil
+}
+
+func (s *worldServer) emitInventoryGrantedLocked(session *worldSessionState, itemID string, quantity int, reason string) {
+	if session == nil || itemID == "" || quantity <= 0 {
+		return
+	}
+	s.emitWorldEventLocked(eventInventoryItemGranted, map[string]any{
+		"characterId": session.CharacterID,
+		"itemId":      itemID,
+		"quantity":    quantity,
+		"reason":      reason,
+	}, inventoryDelta(session.CharacterID, itemID, quantity, reason))
+	s.emitWorldEventLocked(eventInventoryStackUpdated, map[string]any{
+		"characterId": session.CharacterID,
+		"itemId":      itemID,
+		"quantity":    inventoryItemCount(session.Inventory, itemID),
+	})
+	s.emitWorldEventLocked(eventInventoryPersisted, map[string]any{
+		"characterId": session.CharacterID,
+		"itemId":      itemID,
+	})
+}
+
+func inventoryDelta(characterID string, itemID string, quantity int, reason string) stateDiff {
+	return stateDiff{
+		Type:     diffInventoryDelta,
+		EntityID: characterID,
+		Fields: map[string]any{
+			"itemId":   itemID,
+			"quantity": quantity,
+			"reason":   reason,
+		},
+	}
 }
 
 func removeInventorySlotCount(

@@ -1,6 +1,7 @@
 #include <UiClient/UiClientSystemComponent.h>
 
 #include <AzCore/Console/IConsole.h>
+#include <AzCore/std/containers/unordered_map.h>
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Vector2.h>
 #include <AzCore/Math/Vector3.h>
@@ -16,13 +17,20 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <Windows.h>
+#include <wincodec.h>
+#include <wrl/client.h>
+
+#pragma comment(lib, "windowscodecs.lib")
 
 namespace UiClient
 {
@@ -75,6 +83,18 @@ namespace UiClient
             ImVec2 m_min;
             ImVec2 m_max;
             int m_priority = 99;
+        };
+
+        constexpr int PngIconSampleDimension = 32;
+        constexpr int PngIconSamplePixelCount = PngIconSampleDimension * PngIconSampleDimension;
+        constexpr UINT MaxPngIconSourceDimension = 2048;
+
+        struct PngIconSample
+        {
+            bool m_attempted = false;
+            bool m_loaded = false;
+            AZStd::string m_path;
+            std::array<ImU32, PngIconSamplePixelCount> m_pixels{};
         };
 
         AZStd::string SlotActionId(int slotIndex)
@@ -209,6 +229,354 @@ namespace UiClient
         float Clamp01(float value)
         {
             return AZ::GetClamp(value, 0.0f, 1.0f);
+        }
+
+        bool FileExists(const AZStd::string& path)
+        {
+            const DWORD attributes = GetFileAttributesA(path.c_str());
+            return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+        }
+
+        AZStd::string JoinPath(const AZStd::string& left, const char* right)
+        {
+            if (left.empty())
+            {
+                return right;
+            }
+
+            const char last = left[left.size() - 1];
+            if (last == '\\' || last == '/')
+            {
+                return left + right;
+            }
+            return left + "\\" + right;
+        }
+
+        AZStd::string ParentPath(const AZStd::string& path)
+        {
+            const size_t separator = path.find_last_of("\\/");
+            if (separator == AZStd::string::npos || separator == 0)
+            {
+                return {};
+            }
+            return path.substr(0, separator);
+        }
+
+        AZStd::string FindRepoRootForIcons()
+        {
+            char currentDirectory[MAX_PATH]{};
+            const DWORD length = GetCurrentDirectoryA(MAX_PATH, currentDirectory);
+            if (length == 0 || length >= MAX_PATH)
+            {
+                return {};
+            }
+
+            AZStd::string candidate(currentDirectory);
+            for (int depth = 0; depth < 9 && !candidate.empty(); ++depth)
+            {
+                if (FileExists(JoinPath(candidate, "Content\\Art\\Icons\\UI\\icon_missing.png")))
+                {
+                    return candidate;
+                }
+                candidate = ParentPath(candidate);
+            }
+
+            return {};
+        }
+
+        AZStd::string IconPathForKind(const AZStd::string& kind)
+        {
+            if (kind == "ability_auto_attack")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_auto_attack.png";
+            }
+            if (kind == "ability_steady_strike")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_steady_strike.png";
+            }
+            if (kind == "ability_driving_blow")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_driving_blow.png";
+            }
+            if (kind == "ability_hampering_strike")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_hampering_strike.png";
+            }
+            if (kind == "ability_brace")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_brace.png";
+            }
+            if (kind == "ability_rallying_call")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_rallying_call.png";
+            }
+            if (kind == "item_road_ration")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_road_ration.png";
+            }
+            if (kind == "item_oat_bundle")
+            {
+                return "Content\\Art\\Icons\\Items\\item_oat_bundle.png";
+            }
+            if (kind == "currency_copper")
+            {
+                return "Content\\Art\\Icons\\Inventory\\currency_copper.png";
+            }
+            if (kind == "item_militia_token")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_militia_token.png";
+            }
+            if (kind == "item_padded_vest")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_padded_vest.png";
+            }
+            if (kind == "item_handwraps")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_handwraps.png";
+            }
+            if (kind == "item_scroll_supplies")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_scroll_supplies.png";
+            }
+            if (kind == "item_ore_chunk")
+            {
+                return "Content\\Art\\Icons\\Items\\item_ore_chunk.png";
+            }
+            if (kind == "item_torn_cloth")
+            {
+                return "Content\\Art\\Icons\\Items\\item_torn_cloth.png";
+            }
+            if (kind == "item_field_boots")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_field_boots.png";
+            }
+            if (kind == "item_field_dressing")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_field_dressing.png";
+            }
+            if (kind == "menu_spellbook")
+            {
+                return "Content\\Art\\Icons\\UI\\menu_spellbook.png";
+            }
+            return "Content\\Art\\Icons\\UI\\icon_missing.png";
+        }
+
+        AZStd::string ResolveIconPath(const AZStd::string& kind)
+        {
+            static const AZStd::string repoRoot = FindRepoRootForIcons();
+            if (repoRoot.empty())
+            {
+                return {};
+            }
+
+            const AZStd::string requested = JoinPath(repoRoot, IconPathForKind(kind).c_str());
+            if (FileExists(requested))
+            {
+                return requested;
+            }
+
+            const AZStd::string fallback = JoinPath(repoRoot, "Content\\Art\\Icons\\UI\\icon_missing.png");
+            return FileExists(fallback) ? fallback : AZStd::string{};
+        }
+
+        bool ToWidePath(const AZStd::string& path, std::wstring& outPath)
+        {
+            const int required = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, nullptr, 0);
+            if (required <= 0)
+            {
+                return false;
+            }
+
+            outPath.assign(static_cast<size_t>(required), L'\0');
+            const int written = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, outPath.data(), required);
+            if (written <= 0)
+            {
+                outPath.clear();
+                return false;
+            }
+            if (!outPath.empty() && outPath.back() == L'\0')
+            {
+                outPath.pop_back();
+            }
+            return true;
+        }
+
+        Microsoft::WRL::ComPtr<IWICImagingFactory> CreateWicFactory()
+        {
+            const HRESULT initResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+            if (FAILED(initResult) && initResult != RPC_E_CHANGED_MODE)
+            {
+                return {};
+            }
+
+            Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+            if (FAILED(CoCreateInstance(
+                    CLSID_WICImagingFactory,
+                    nullptr,
+                    CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(factory.GetAddressOf()))))
+            {
+                return {};
+            }
+            return factory;
+        }
+
+        bool LoadPngIconSample(const AZStd::string& path, PngIconSample& outSample)
+        {
+            std::wstring widePath;
+            if (!ToWidePath(path, widePath))
+            {
+                return false;
+            }
+
+            static Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
+            if (!factory)
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+            if (FAILED(factory->CreateDecoderFromFilename(
+                    widePath.c_str(),
+                    nullptr,
+                    GENERIC_READ,
+                    WICDecodeMetadataCacheOnLoad,
+                    decoder.GetAddressOf())))
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+            if (FAILED(decoder->GetFrame(0, frame.GetAddressOf())))
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+            if (FAILED(factory->CreateFormatConverter(converter.GetAddressOf())))
+            {
+                return false;
+            }
+            if (FAILED(converter->Initialize(
+                    frame.Get(),
+                    GUID_WICPixelFormat32bppRGBA,
+                    WICBitmapDitherTypeNone,
+                    nullptr,
+                    0.0,
+                    WICBitmapPaletteTypeCustom)))
+            {
+                return false;
+            }
+
+            UINT width = 0;
+            UINT height = 0;
+            if (FAILED(converter->GetSize(&width, &height)) ||
+                width == 0 ||
+                height == 0 ||
+                width > MaxPngIconSourceDimension ||
+                height > MaxPngIconSourceDimension)
+            {
+                return false;
+            }
+
+            const UINT stride = width * 4;
+            const UINT byteCount = stride * height;
+            std::vector<unsigned char> rgba(byteCount);
+            if (FAILED(converter->CopyPixels(nullptr, stride, byteCount, rgba.data())))
+            {
+                return false;
+            }
+
+            outSample.m_path = path;
+            for (int y = 0; y < PngIconSampleDimension; ++y)
+            {
+                const UINT sampledY = static_cast<UINT>(((y * 2 + 1) * height) / (PngIconSampleDimension * 2));
+                const UINT sourceY = sampledY < height ? sampledY : height - 1;
+                for (int x = 0; x < PngIconSampleDimension; ++x)
+                {
+                    const UINT sampledX = static_cast<UINT>(((x * 2 + 1) * width) / (PngIconSampleDimension * 2));
+                    const UINT sourceX = sampledX < width ? sampledX : width - 1;
+                    const size_t sourceIndex = (static_cast<size_t>(sourceY) * stride) + (static_cast<size_t>(sourceX) * 4);
+                    outSample.m_pixels[(y * PngIconSampleDimension) + x] =
+                        IM_COL32(rgba[sourceIndex], rgba[sourceIndex + 1], rgba[sourceIndex + 2], rgba[sourceIndex + 3]);
+                }
+            }
+            return true;
+        }
+
+        const PngIconSample* GetPngIconSample(const AZStd::string& kind)
+        {
+            static AZStd::unordered_map<AZStd::string, PngIconSample> iconCache;
+            PngIconSample& sample = iconCache[kind];
+            if (!sample.m_attempted)
+            {
+                sample.m_attempted = true;
+                const AZStd::string path = ResolveIconPath(kind);
+                sample.m_loaded = !path.empty() && LoadPngIconSample(path, sample);
+            }
+            return sample.m_loaded ? &sample : nullptr;
+        }
+
+        ImU32 MutedIconColor(ImU32 color)
+        {
+            const int red = (color >> IM_COL32_R_SHIFT) & 0xFF;
+            const int green = (color >> IM_COL32_G_SHIFT) & 0xFF;
+            const int blue = (color >> IM_COL32_B_SHIFT) & 0xFF;
+            const int alpha = (color >> IM_COL32_A_SHIFT) & 0xFF;
+            return IM_COL32(
+                (red + 66) / 2,
+                (green + 62) / 2,
+                (blue + 58) / 2,
+                AZ::GetMin(alpha, 165));
+        }
+
+        bool DrawPngIcon(
+            ImDrawList* drawList,
+            const ImVec2& minBounds,
+            const ImVec2& maxBounds,
+            const AZStd::string& kind,
+            bool muted)
+        {
+            const PngIconSample* sample = GetPngIconSample(kind);
+            const float width = maxBounds.x - minBounds.x;
+            const float height = maxBounds.y - minBounds.y;
+            if (!sample || width <= 2.0f || height <= 2.0f)
+            {
+                return false;
+            }
+
+            drawList->AddRectFilled(minBounds, maxBounds, ColorU32(13, 16, 20, 255), 7.0f);
+            drawList->AddRectFilled(
+                ImVec2(minBounds.x + 2.0f, minBounds.y + 2.0f),
+                ImVec2(maxBounds.x - 2.0f, maxBounds.y - 2.0f),
+                ColorU32(27, 32, 36, 220),
+                5.0f);
+            const float cellWidth = width / static_cast<float>(PngIconSampleDimension);
+            const float cellHeight = height / static_cast<float>(PngIconSampleDimension);
+            for (int y = 0; y < PngIconSampleDimension; ++y)
+            {
+                for (int x = 0; x < PngIconSampleDimension; ++x)
+                {
+                    const ImU32 pixel = sample->m_pixels[(y * PngIconSampleDimension) + x];
+                    const int alpha = (pixel >> IM_COL32_A_SHIFT) & 0xFF;
+                    if (alpha < 8)
+                    {
+                        continue;
+                    }
+                    const ImU32 color = muted ? MutedIconColor(pixel) : pixel;
+                    const ImVec2 cellMin(minBounds.x + (cellWidth * x), minBounds.y + (cellHeight * y));
+                    const ImVec2 cellMax(
+                        minBounds.x + (cellWidth * (x + 1)) + 0.35f,
+                        minBounds.y + (cellHeight * (y + 1)) + 0.35f);
+                    drawList->AddRectFilled(cellMin, cellMax, color);
+                }
+            }
+            if (muted)
+            {
+                drawList->AddRectFilled(minBounds, maxBounds, ColorU32(8, 10, 12, 78), 7.0f);
+            }
+            drawList->AddRect(minBounds, maxBounds, ColorU32(201, 159, 78, muted ? 120 : 220), 7.0f, 0, 1.5f);
+            return true;
         }
 
         bool ProjectWorldPointToScreen(
@@ -367,6 +735,161 @@ namespace UiClient
             }
 
             return AZStd::string::format("Range %.1fm  |  out of range", distanceToTarget);
+        }
+
+        AZStd::string FormatRemainingTime(AZ::s64 endsAtMs, AZ::s64 nowMs)
+        {
+            if (endsAtMs <= nowMs)
+            {
+                return {};
+            }
+
+            const AZ::s64 remainingMs = endsAtMs - nowMs;
+            if (remainingMs >= 10000)
+            {
+                return AZStd::string::format("%llds", static_cast<long long>((remainingMs + 999) / 1000));
+            }
+            return AZStd::string::format("%.1fs", static_cast<double>(remainingMs) / 1000.0);
+        }
+
+        AZStd::string GetAbilityDisplayName(const NetClient::WorldSessionResponse& session, const AZStd::string& abilityId)
+        {
+            if (abilityId.empty())
+            {
+                return {};
+            }
+
+            for (const auto& slot : session.m_actionBarSlots)
+            {
+                if (slot.m_abilityId == abilityId && !slot.m_displayName.empty())
+                {
+                    return slot.m_displayName;
+                }
+            }
+            for (const auto& entry : session.m_spellbookEntries)
+            {
+                if (entry.m_id == abilityId && !entry.m_displayName.empty())
+                {
+                    return entry.m_displayName;
+                }
+            }
+            if (abilityId == AutoAttackAbilityId)
+            {
+                return "Auto Attack";
+            }
+            if (abilityId == SteadyStrikeAbilityId)
+            {
+                return "Steady Strike";
+            }
+            return abilityId;
+        }
+
+        AZStd::string FormatAuraLabel(const NetClient::AuraState& aura, AZ::s64 nowMs)
+        {
+            AZStd::string label = aura.m_displayName.empty() ? aura.m_auraId : aura.m_displayName;
+            if (label.empty())
+            {
+                label = "Aura";
+            }
+            if (aura.m_stackCount > 1)
+            {
+                label += AZStd::string::format(" x%d", aura.m_stackCount);
+            }
+            const AZStd::string remaining = FormatRemainingTime(aura.m_expiresAtMs, nowMs);
+            if (!remaining.empty())
+            {
+                label += AZStd::string::format(" %s", remaining.c_str());
+            }
+            return label;
+        }
+
+        AZStd::string FormatAuraLine(const AZStd::vector<NetClient::AuraState>& auras, AZ::s64 nowMs, size_t maxAuras)
+        {
+            if (auras.empty())
+            {
+                return {};
+            }
+
+            AZStd::string line;
+            const size_t auraCount = std::min(auras.size(), maxAuras);
+            for (size_t index = 0; index < auraCount; ++index)
+            {
+                if (!line.empty())
+                {
+                    line += ", ";
+                }
+                line += FormatAuraLabel(auras[index], nowMs);
+            }
+            if (auras.size() > auraCount)
+            {
+                line += AZStd::string::format(", +%zu", auras.size() - auraCount);
+            }
+            return line;
+        }
+
+        AZStd::string FormatKillCreditSummary(const AZStd::vector<NetClient::KillCreditState>& credits)
+        {
+            if (credits.empty())
+            {
+                return {};
+            }
+
+            const auto& credit = credits.back();
+            AZStd::string summary = AZStd::string::format("%s x%d", credit.m_archetypeId.c_str(), credit.m_count);
+            if (!credit.m_reason.empty())
+            {
+                summary += AZStd::string::format(" (%s)", credit.m_reason.c_str());
+            }
+            return summary;
+        }
+
+        bool IsCombatEventType(const AZStd::string& type)
+        {
+            return type.rfind("combat.", 0) == 0 ||
+                type.rfind("npc.", 0) == 0 ||
+                type.rfind("ability.", 0) == 0 ||
+                type.rfind("aura.", 0) == 0 ||
+                type.rfind("cooldown.", 0) == 0 ||
+                type == "entity.health_changed" ||
+                type == "entity.died" ||
+                type == "player.died" ||
+                type == "progression.kill_credit_awarded" ||
+                type == "progression.kill_credit_persisted" ||
+                type == "EntityHealthDelta" ||
+                type == "EntityCombatStateDelta" ||
+                type == "TargetSelectionDelta" ||
+                type == "AbilityResultDelta" ||
+                type == "EntityDeathDelta" ||
+                type == "AuraStateDelta" ||
+                type == "CooldownDelta" ||
+                type == "CastStateDelta" ||
+                type == "ProgressionDelta";
+        }
+
+        AZ::s64 MaxEventSequence(const AZStd::vector<NetClient::WorldEventEntry>& events)
+        {
+            AZ::s64 sequence = 0;
+            for (const auto& event : events)
+            {
+                sequence = AZ::GetMax(sequence, event.m_sequence);
+            }
+            return sequence;
+        }
+
+        bool HasVisibleCooldown(const NetClient::WorldSessionResponse& session, AZ::s64 nowMs)
+        {
+            if (session.m_globalCooldownEndsAt > nowMs)
+            {
+                return true;
+            }
+            for (const auto& slot : session.m_actionBarSlots)
+            {
+                if (slot.m_cooldownRemainingMs > 0 || slot.m_cooldownEndsAt > nowMs)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         const NetClient::VisibleEntity* FindTargetEntity(const GameCore::ClientWorldState& worldState)
@@ -688,7 +1211,20 @@ namespace UiClient
             }
         }
 
-        bool BeginHudPanel(const char* identifier, const char* title, const ImVec2& position, const ImVec2& size, bool compact = false)
+        constexpr float HudButtonHeight = 30.0f;
+
+        ImVec2 HudButtonSize(float width)
+        {
+            return ImVec2(width, HudButtonHeight);
+        }
+
+        bool BeginHudPanel(
+            const char* identifier,
+            const char* title,
+            const ImVec2& position,
+            const ImVec2& size,
+            bool compact = false,
+            bool allowScroll = false)
         {
             ImGui::SetNextWindowPos(position, ImGuiCond_Always);
             ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -696,12 +1232,15 @@ namespace UiClient
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, compact ? ImVec2(7.0f, 7.0f) : ImVec2(14.0f, 14.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, compact ? 8.0f : 16.0f);
-            const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
                 ImGuiWindowFlags_NoResize |
                 ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoScrollbar |
                 ImGuiWindowFlags_NoTitleBar |
                 ImGuiWindowFlags_NoSavedSettings;
+            if (!allowScroll)
+            {
+                flags |= ImGuiWindowFlags_NoScrollbar;
+            }
             const bool visible = ImGui::Begin(identifier, nullptr, flags);
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor(2);
@@ -780,22 +1319,29 @@ namespace UiClient
         {
             if (abilityId == AutoAttackAbilityId)
             {
-                return "weapon";
+                return "ability_auto_attack";
             }
-            if (abilityId == SteadyStrikeAbilityId || abilityId == DrivingBlowAbilityId ||
-                abilityId == HamperingStrikeAbilityId || abilityId == OverhandCutAbilityId)
+            if (abilityId == SteadyStrikeAbilityId)
             {
-                return "strike";
+                return "ability_steady_strike";
+            }
+            if (abilityId == DrivingBlowAbilityId || abilityId == OverhandCutAbilityId)
+            {
+                return "ability_driving_blow";
+            }
+            if (abilityId == HamperingStrikeAbilityId)
+            {
+                return "ability_hampering_strike";
             }
             if (abilityId == BraceAbilityId || abilityId == GuardedFormAbilityId || abilityId == IronResolveAbilityId)
             {
-                return "defense";
+                return "ability_brace";
             }
             if (abilityId == RallyingCallAbilityId)
             {
-                return "utility";
+                return "ability_rallying_call";
             }
-            return "ability";
+            return "icon_missing";
         }
 
         AZStd::string ItemIconKind(const NetClient::InventorySlotState& slot)
@@ -806,29 +1352,70 @@ namespace UiClient
             }
             if (slot.m_itemType == "weapon")
             {
-                return "weapon";
+                return "ability_auto_attack";
             }
             if (slot.m_itemType == "armor")
             {
-                return "armor";
+                return "item_padded_vest";
             }
             if (slot.m_itemType == "consumable")
             {
-                return "consumable";
+                return "item_road_ration";
             }
             if (slot.m_itemType == "material")
             {
-                return "material";
+                return "item_ore_chunk";
             }
             if (slot.m_itemType == "quest")
             {
-                return "quest";
+                return "item_scroll_supplies";
             }
             if (slot.m_itemType == "junk")
             {
-                return "junk";
+                return "item_torn_cloth";
             }
-            return "item";
+            return "icon_missing";
+        }
+
+        AZStd::string IconFamily(const AZStd::string& kind)
+        {
+            if (kind == "ability_auto_attack" || kind == "ability_steady_strike" ||
+                kind == "ability_driving_blow" || kind == "ability_hampering_strike" ||
+                kind == "weapon" || kind == "strike")
+            {
+                return "strike";
+            }
+            if (kind == "ability_brace" || kind == "item_padded_vest" || kind == "item_handwraps" ||
+                kind == "armor" || kind == "defense")
+            {
+                return "defense";
+            }
+            if (kind == "ability_rallying_call" || kind == "item_road_ration" || kind == "item_field_dressing" ||
+                kind == "consumable" || kind == "utility")
+            {
+                return "utility";
+            }
+            if (kind == "item_oat_bundle" || kind == "menu_spellbook")
+            {
+                return "nature";
+            }
+            if (kind == "item_ore_chunk" || kind == "material")
+            {
+                return "material";
+            }
+            if (kind == "item_scroll_supplies" || kind == "item_militia_token" || kind == "quest")
+            {
+                return "quest";
+            }
+            if (kind == "currency_copper")
+            {
+                return "currency";
+            }
+            if (kind == "item_torn_cloth" || kind == "junk")
+            {
+                return "cloth";
+            }
+            return "missing";
         }
 
         void DrawProceduralIcon(
@@ -838,32 +1425,94 @@ namespace UiClient
             const AZStd::string& kind,
             bool muted = false)
         {
-            const ImU32 baseColor = muted
-                ? ColorU32(55, 52, 49, 255)
-                : (kind == "weapon" || kind == "strike"
-                    ? ColorU32(94, 58, 44, 255)
-                    : (kind == "defense" || kind == "armor"
-                        ? ColorU32(43, 73, 88, 255)
-                        : (kind == "consumable" || kind == "utility"
-                            ? ColorU32(50, 91, 68, 255)
-                            : (kind == "material"
-                                ? ColorU32(76, 67, 49, 255)
-                                : (kind == "quest"
-                                    ? ColorU32(91, 73, 35, 255)
-                                    : ColorU32(58, 62, 72, 255))))));
-            const ImU32 accentColor = muted
-                ? ColorU32(128, 118, 96, 255)
-                : (kind == "weapon" || kind == "strike"
-                    ? ColorU32(232, 187, 96, 255)
-                    : (kind == "defense" || kind == "armor"
-                        ? ColorU32(146, 203, 221, 255)
-                        : (kind == "consumable" || kind == "utility"
-                            ? ColorU32(163, 220, 145, 255)
-                            : (kind == "material"
-                                ? ColorU32(214, 183, 118, 255)
-                                : (kind == "quest"
-                                    ? ColorU32(238, 213, 109, 255)
-                                    : ColorU32(205, 205, 194, 255))))));
+            if (DrawPngIcon(drawList, minBounds, maxBounds, kind, muted))
+            {
+                return;
+            }
+
+            const AZStd::string family = IconFamily(kind);
+            const auto baseColorForFamily = [](const AZStd::string& iconFamily, bool isMuted) -> ImU32
+            {
+                if (isMuted)
+                {
+                    return ColorU32(55, 52, 49, 255);
+                }
+                if (iconFamily == "strike")
+                {
+                    return ColorU32(94, 58, 44, 255);
+                }
+                if (iconFamily == "defense")
+                {
+                    return ColorU32(43, 73, 88, 255);
+                }
+                if (iconFamily == "utility")
+                {
+                    return ColorU32(50, 91, 68, 255);
+                }
+                if (iconFamily == "nature")
+                {
+                    return ColorU32(34, 79, 48, 255);
+                }
+                if (iconFamily == "material")
+                {
+                    return ColorU32(76, 67, 49, 255);
+                }
+                if (iconFamily == "quest")
+                {
+                    return ColorU32(91, 73, 35, 255);
+                }
+                if (iconFamily == "currency")
+                {
+                    return ColorU32(90, 70, 34, 255);
+                }
+                if (iconFamily == "cloth")
+                {
+                    return ColorU32(84, 48, 48, 255);
+                }
+                return ColorU32(58, 62, 72, 255);
+            };
+            const auto accentColorForFamily = [](const AZStd::string& iconFamily, bool isMuted) -> ImU32
+            {
+                if (isMuted)
+                {
+                    return ColorU32(128, 118, 96, 255);
+                }
+                if (iconFamily == "strike")
+                {
+                    return ColorU32(232, 187, 96, 255);
+                }
+                if (iconFamily == "defense")
+                {
+                    return ColorU32(146, 203, 221, 255);
+                }
+                if (iconFamily == "utility")
+                {
+                    return ColorU32(163, 220, 145, 255);
+                }
+                if (iconFamily == "nature")
+                {
+                    return ColorU32(168, 221, 122, 255);
+                }
+                if (iconFamily == "material")
+                {
+                    return ColorU32(214, 183, 118, 255);
+                }
+                if (iconFamily == "quest")
+                {
+                    return ColorU32(238, 213, 109, 255);
+                }
+                if (iconFamily == "currency")
+                {
+                    return ColorU32(239, 191, 86, 255);
+                }
+                if (iconFamily == "cloth")
+                {
+                    return ColorU32(221, 108, 91, 255);
+                }
+                return ColorU32(205, 205, 194, 255);
+            };
+            const ImU32 baseColor = baseColorForFamily(family, muted);
+            const ImU32 accentColor = accentColorForFamily(family, muted);
 
             const ImVec2 center((minBounds.x + maxBounds.x) * 0.5f, (minBounds.y + maxBounds.y) * 0.5f);
             const float width = maxBounds.x - minBounds.x;
@@ -871,7 +1520,20 @@ namespace UiClient
             drawList->AddRectFilled(minBounds, maxBounds, baseColor, 7.0f);
             drawList->AddRect(minBounds, maxBounds, ColorU32(201, 159, 78, muted ? 120 : 210), 7.0f, 0, 1.5f);
 
-            if (kind == "weapon" || kind == "strike")
+            if (family == "missing")
+            {
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.28f, minBounds.y + height * 0.28f),
+                    ImVec2(maxBounds.x - width * 0.28f, maxBounds.y - height * 0.28f),
+                    accentColor,
+                    3.0f);
+                drawList->AddLine(
+                    ImVec2(maxBounds.x - width * 0.28f, minBounds.y + height * 0.28f),
+                    ImVec2(minBounds.x + width * 0.28f, maxBounds.y - height * 0.28f),
+                    accentColor,
+                    3.0f);
+            }
+            else if (family == "strike")
             {
                 drawList->AddLine(
                     ImVec2(minBounds.x + width * 0.25f, maxBounds.y - height * 0.23f),
@@ -884,7 +1546,7 @@ namespace UiClient
                     ImVec2(maxBounds.x - width * 0.20f, minBounds.y + height * 0.34f),
                     accentColor);
             }
-            else if (kind == "defense" || kind == "armor")
+            else if (family == "defense")
             {
                 drawList->AddTriangleFilled(
                     ImVec2(center.x, minBounds.y + height * 0.18f),
@@ -897,7 +1559,7 @@ namespace UiClient
                     ImVec2(center.x, maxBounds.y - height * 0.16f),
                     ColorU32(100, 151, 171, muted ? 160 : 255));
             }
-            else if (kind == "consumable" || kind == "utility")
+            else if (family == "utility")
             {
                 drawList->AddCircleFilled(center, AZ::GetMin(width, height) * 0.22f, accentColor, 24);
                 drawList->AddRectFilled(
@@ -906,12 +1568,23 @@ namespace UiClient
                     ColorU32(226, 237, 202, muted ? 120 : 230),
                     3.0f);
             }
-            else if (kind == "material")
+            else if (family == "nature")
+            {
+                drawList->AddLine(
+                    ImVec2(center.x, maxBounds.y - height * 0.18f),
+                    ImVec2(center.x, minBounds.y + height * 0.22f),
+                    accentColor,
+                    3.0f);
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.16f, center.y - height * 0.04f), width * 0.13f, accentColor, 16);
+                drawList->AddCircleFilled(ImVec2(center.x + width * 0.16f, center.y - height * 0.10f), width * 0.12f, ColorU32(118, 190, 89, muted ? 140 : 255), 16);
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.04f, center.y - height * 0.20f), width * 0.11f, ColorU32(206, 186, 84, muted ? 130 : 255), 16);
+            }
+            else if (family == "material")
             {
                 drawList->AddCircleFilled(ImVec2(center.x - width * 0.10f, center.y + height * 0.06f), width * 0.16f, accentColor, 16);
                 drawList->AddCircleFilled(ImVec2(center.x + width * 0.13f, center.y - height * 0.08f), width * 0.13f, ColorU32(184, 160, 103, muted ? 120 : 255), 16);
             }
-            else if (kind == "quest")
+            else if (family == "quest")
             {
                 drawList->AddRectFilled(
                     ImVec2(minBounds.x + width * 0.28f, minBounds.y + height * 0.18f),
@@ -922,6 +1595,26 @@ namespace UiClient
                     ImVec2(minBounds.x + width * 0.36f, minBounds.y + height * 0.36f),
                     ImVec2(maxBounds.x - width * 0.34f, minBounds.y + height * 0.36f),
                     baseColor,
+                    2.0f);
+            }
+            else if (family == "currency")
+            {
+                drawList->AddCircleFilled(ImVec2(center.x - width * 0.12f, center.y + height * 0.04f), width * 0.17f, accentColor, 24);
+                drawList->AddCircle(ImVec2(center.x - width * 0.12f, center.y + height * 0.04f), width * 0.17f, ColorU32(255, 236, 149, muted ? 110 : 230), 24, 2.0f);
+                drawList->AddCircleFilled(ImVec2(center.x + width * 0.12f, center.y - height * 0.06f), width * 0.15f, ColorU32(221, 151, 66, muted ? 120 : 255), 24);
+            }
+            else if (family == "cloth")
+            {
+                drawList->AddQuadFilled(
+                    ImVec2(minBounds.x + width * 0.22f, minBounds.y + height * 0.24f),
+                    ImVec2(maxBounds.x - width * 0.18f, minBounds.y + height * 0.30f),
+                    ImVec2(maxBounds.x - width * 0.28f, maxBounds.y - height * 0.20f),
+                    ImVec2(minBounds.x + width * 0.16f, maxBounds.y - height * 0.26f),
+                    accentColor);
+                drawList->AddLine(
+                    ImVec2(minBounds.x + width * 0.25f, center.y),
+                    ImVec2(maxBounds.x - width * 0.25f, center.y + height * 0.04f),
+                    ColorU32(255, 186, 165, muted ? 120 : 220),
                     2.0f);
             }
             else
@@ -953,6 +1646,17 @@ namespace UiClient
                 static_cast<float>(worldState.m_session.m_maxResource),
                 ColorU32(54, 117, 181),
                 ImVec2(160.0f, 16.0f));
+            const AZ::s64 nowMs = NowMs();
+            const AZStd::string castRemaining = FormatRemainingTime(worldState.m_session.m_castEndsAt, nowMs);
+            if (!castRemaining.empty())
+            {
+                ImGui::Text("Casting %s  |  %s", GetAbilityDisplayName(worldState.m_session, worldState.m_session.m_castingAbilityId).c_str(), castRemaining.c_str());
+            }
+            const AZStd::string auraLine = FormatAuraLine(worldState.m_session.m_auras, nowMs, 2);
+            if (!auraLine.empty())
+            {
+                ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+            }
             ImGui::Text("Friendly NPCs %.1fm", distanceToCommandPoint);
         }
 
@@ -1006,6 +1710,11 @@ namespace UiClient
                 ImGui::Text("%s  |  %s", targetEntity->m_duelOpponent ? "Duel opponent" : "Player", targetEntity->m_alive ? "available" : "down");
                 DrawMeter("Vitality", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
                 ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
+                const AZStd::string auraLine = FormatAuraLine(targetEntity->m_auras, NowMs(), 2);
+                if (!auraLine.empty())
+                {
+                    ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+                }
                 if (worldState.m_session.m_pvp.m_safeZone.m_noDuel)
                 {
                     ImGui::TextUnformatted("Safe zone: duels unavailable");
@@ -1044,6 +1753,15 @@ namespace UiClient
             DrawMeter("Integrity", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(198, 93, 34), ImVec2(160.0f, 18.0f));
             ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
             ImGui::Text("Behavior: %s", targetEntity->m_aiState.empty() ? "idle" : targetEntity->m_aiState.c_str());
+            const AZStd::string auraLine = FormatAuraLine(targetEntity->m_auras, NowMs(), 2);
+            if (!auraLine.empty())
+            {
+                ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+            }
+            if (!targetEntity->m_alive)
+            {
+                ImGui::TextUnformatted("Defeated. Awaiting authoritative respawn.");
+            }
         }
 
         void DrawMinimap(
@@ -1065,7 +1783,7 @@ namespace UiClient
             drawList->AddText(ImVec2(center.x - 6.0f, center.y - radius - 14.0f), ColorU32(224, 214, 189), "N");
 
             const float mapScale = radius / 140.0f;
-            auto plotWorldPoint = [&](float worldX, float worldY, ImU32 color, float pointRadius)
+            auto tryWorldPoint = [&](float worldX, float worldY, ImVec2& outPoint) -> bool
             {
                 const float deltaX = (worldX - playerX) * mapScale;
                 const float deltaY = (worldY - playerY) * mapScale;
@@ -1074,10 +1792,52 @@ namespace UiClient
                 const float pointDeltaY = point.y - center.y;
                 if ((pointDeltaX * pointDeltaX) + (pointDeltaY * pointDeltaY) <= (radius - 8.0f) * (radius - 8.0f))
                 {
+                    outPoint = point;
+                    return true;
+                }
+                return false;
+            };
+            auto plotWorldPoint = [&](float worldX, float worldY, ImU32 color, float pointRadius)
+            {
+                ImVec2 point;
+                if (tryWorldPoint(worldX, worldY, point))
+                {
                     drawList->AddCircleFilled(point, pointRadius, color, 24);
                 }
             };
 
+            for (const auto& road : worldState.m_session.m_zoneMap.m_roads)
+            {
+                for (size_t pointIndex = 1; pointIndex < road.m_points.size(); ++pointIndex)
+                {
+                    ImVec2 previous;
+                    ImVec2 current;
+                    if (tryWorldPoint(
+                            static_cast<float>(road.m_points[pointIndex - 1].m_x),
+                            static_cast<float>(road.m_points[pointIndex - 1].m_y),
+                            previous) &&
+                        tryWorldPoint(
+                            static_cast<float>(road.m_points[pointIndex].m_x),
+                            static_cast<float>(road.m_points[pointIndex].m_y),
+                            current))
+                    {
+                        drawList->AddLine(previous, current, ColorU32(92, 74, 42, 230), 5.5f);
+                        drawList->AddLine(previous, current, ColorU32(215, 176, 96, 240), 2.0f);
+                    }
+                }
+            }
+            for (const auto& landmark : worldState.m_session.m_zoneMap.m_landmarks)
+            {
+                ImVec2 point;
+                if (tryWorldPoint(static_cast<float>(landmark.m_x), static_cast<float>(landmark.m_y), point))
+                {
+                    drawList->AddRectFilled(
+                        ImVec2(point.x - 3.5f, point.y - 3.5f),
+                        ImVec2(point.x + 3.5f, point.y + 3.5f),
+                        ColorU32(229, 216, 166),
+                        1.5f);
+                }
+            }
             for (const auto& marker : worldState.m_session.m_mapMarkers)
             {
                 ImU32 color = ColorU32(226, 183, 74);
@@ -1246,6 +2006,7 @@ namespace UiClient
         }
 
         void DrawZoneMapWindow(
+            GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
             float playerX,
             float playerY)
@@ -1260,6 +2021,8 @@ namespace UiClient
                 AZ::GetMax(360.0f, availableRegion.y - 26.0f));
             const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
             ImGui::InvisibleButton("##stonewake_zone_map_canvas", canvasSize);
+            const bool canvasClicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+            const ImVec2 clickPoint = ImGui::GetIO().MousePos;
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
             drawList->AddRectFilled(canvasMin, canvasMax, ColorU32(18, 25, 29, 245), 6.0f);
@@ -1284,11 +2047,13 @@ namespace UiClient
                 {
                     const ImVec2 previous = mapToScreen(road.m_points[pointIndex - 1].m_x, road.m_points[pointIndex - 1].m_y);
                     const ImVec2 current = mapToScreen(road.m_points[pointIndex].m_x, road.m_points[pointIndex].m_y);
-                    drawList->AddLine(previous, current, ColorU32(136, 112, 70), 4.0f);
-                    drawList->AddLine(previous, current, ColorU32(196, 169, 103), 1.5f);
+                    drawList->AddLine(previous, current, ColorU32(88, 65, 36), 7.0f);
+                    drawList->AddLine(previous, current, ColorU32(226, 184, 104), 3.0f);
                 }
             }
 
+            const NetClient::NavigationAreaState* clickedArea = nullptr;
+            float clickedAreaDistance = 999999.0f;
             for (const auto& area : worldState.m_session.m_navigationAreas)
             {
                 const ImVec2 center = mapToScreen(area.m_centerX, area.m_centerY);
@@ -1296,13 +2061,36 @@ namespace UiClient
                 const ImU32 areaColor = area.m_kind == "hostile_objective" ? ColorU32(135, 74, 52, 65) : ColorU32(72, 121, 112, 55);
                 drawList->AddCircleFilled(center, AZ::GetClamp(radius, 8.0f, 42.0f), areaColor, 32);
                 drawList->AddCircle(center, AZ::GetClamp(radius, 8.0f, 42.0f), ColorU32(178, 166, 124, 130), 32, 1.0f);
+                if (canvasClicked && !area.m_questIds.empty())
+                {
+                    const float deltaX = clickPoint.x - center.x;
+                    const float deltaY = clickPoint.y - center.y;
+                    const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
+                    const float clickRadius = AZ::GetClamp(radius, 10.0f, 48.0f);
+                    if (distance <= clickRadius && distance < clickedAreaDistance)
+                    {
+                        clickedArea = &area;
+                        clickedAreaDistance = distance;
+                    }
+                }
             }
 
             AZStd::vector<MapLabelRect> placedLabels;
             for (const auto& landmark : zoneMap.m_landmarks)
             {
                 const ImVec2 point = mapToScreen(landmark.m_x, landmark.m_y);
-                drawList->AddCircleFilled(point, 3.5f, ColorU32(199, 211, 194), 16);
+                drawList->AddRectFilled(
+                    ImVec2(point.x - 5.5f, point.y - 5.5f),
+                    ImVec2(point.x + 5.5f, point.y + 5.5f),
+                    ColorU32(206, 198, 154),
+                    2.0f);
+                drawList->AddRect(
+                    ImVec2(point.x - 7.0f, point.y - 7.0f),
+                    ImVec2(point.x + 7.0f, point.y + 7.0f),
+                    ColorU32(35, 28, 18),
+                    2.0f,
+                    0,
+                    1.5f);
                 TryDrawMapLabel(
                     drawList,
                     placedLabels,
@@ -1326,6 +2114,8 @@ namespace UiClient
                     return MapMarkerPriority(left->m_kind) < MapMarkerPriority(right->m_kind);
                 });
 
+            const NetClient::MapMarkerState* clickedMarker = nullptr;
+            float clickedMarkerDistance = 999999.0f;
             for (const auto* marker : sortedMarkers)
             {
                 if (!marker)
@@ -1336,6 +2126,17 @@ namespace UiClient
                 const ImVec2 point = mapToScreen(marker->m_x, marker->m_y);
                 drawList->AddCircleFilled(point, 6.0f, MapMarkerColor(marker->m_kind), 20);
                 drawList->AddCircle(point, 7.5f, ColorU32(21, 25, 27), 20, 1.5f);
+                if (canvasClicked)
+                {
+                    const float deltaX = clickPoint.x - point.x;
+                    const float deltaY = clickPoint.y - point.y;
+                    const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
+                    if (distance <= 18.0f && distance < clickedMarkerDistance)
+                    {
+                        clickedMarker = marker;
+                        clickedMarkerDistance = distance;
+                    }
+                }
                 const int priority = MapMarkerPriority(marker->m_kind);
                 if (!marker->m_displayName.empty() && priority <= 3)
                 {
@@ -1356,7 +2157,94 @@ namespace UiClient
                 ImVec2(playerPoint.x + 7.0f, playerPoint.y + 7.0f),
                 ColorU32(226, 240, 243));
 
-            ImGui::TextUnformatted("Legend: white player, rust objective, gold available, green turn-in, blue trainer, violet vendor");
+            if (canvasClicked && gameCore)
+            {
+                if (clickedMarker && !clickedMarker->m_entityId.empty())
+                {
+                    if (gameCore->SetTarget(clickedMarker->m_entityId))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.zone_map_marker_selected entityId=%s markerId=%s",
+                            clickedMarker->m_entityId.c_str(),
+                            clickedMarker->m_id.c_str());
+                    }
+                }
+                else if (clickedMarker && !clickedMarker->m_questId.empty())
+                {
+                    if (gameCore->TrackQuest(clickedMarker->m_questId, true))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.zone_map_quest_tracked questId=%s markerId=%s",
+                            clickedMarker->m_questId.c_str(),
+                            clickedMarker->m_id.c_str());
+                    }
+                }
+                else if (clickedArea && !clickedArea->m_questIds.empty())
+                {
+                    if (gameCore->TrackQuest(clickedArea->m_questIds[0], true))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.zone_map_area_tracked questId=%s areaId=%s",
+                            clickedArea->m_questIds[0].c_str(),
+                            clickedArea->m_areaId.c_str());
+                    }
+                }
+            }
+
+            ImGui::TextUnformatted("Legend: white player, rust objective, gold available, green turn-in, blue trainer, violet vendor. Click markers to target or track.");
+        }
+
+        void DrawStonewakeLandmarkNameplates(
+            const GameCore::ClientWorldState& worldState,
+            const GameCore::ClientCameraState& cameraState,
+            const ImVec2& displaySize)
+        {
+            if (worldState.m_session.m_zoneMap.m_landmarks.empty())
+            {
+                return;
+            }
+
+            ImDrawList* drawList = ImGui::GetForegroundDrawList();
+            const float playerX = static_cast<float>(worldState.m_session.m_position.m_x);
+            const float playerY = static_cast<float>(worldState.m_session.m_position.m_y);
+            for (const auto& landmark : worldState.m_session.m_zoneMap.m_landmarks)
+            {
+                if (landmark.m_displayName.empty())
+                {
+                    continue;
+                }
+
+                const float landmarkX = static_cast<float>(landmark.m_x);
+                const float landmarkY = static_cast<float>(landmark.m_y);
+                const float distance = Distance2D(playerX, playerY, landmarkX, landmarkY);
+                if (distance > 96.0f && LandmarkPriority(landmark.m_kind) > 2)
+                {
+                    continue;
+                }
+
+                ImVec2 screenPosition;
+                if (!ProjectWorldPointToScreen(
+                        cameraState,
+                        AZ::Vector3(landmarkX, landmarkY, 4.1f),
+                        displaySize,
+                        screenPosition))
+                {
+                    continue;
+                }
+
+                const ImVec2 textSize = ImGui::CalcTextSize(landmark.m_displayName.c_str());
+                const ImVec2 panelMin(screenPosition.x - (textSize.x * 0.5f) - 9.0f, screenPosition.y - 10.0f);
+                const ImVec2 panelMax(screenPosition.x + (textSize.x * 0.5f) + 9.0f, screenPosition.y + textSize.y + 5.0f);
+                drawList->AddRectFilled(panelMin, panelMax, ColorU32(18, 20, 17, 206), 6.0f);
+                drawList->AddRect(panelMin, panelMax, ColorU32(226, 190, 103, 210), 6.0f, 0, 1.5f);
+                drawList->AddText(
+                    ImVec2(panelMin.x + 9.0f, panelMin.y + 3.0f),
+                    ColorU32(241, 229, 196),
+                    landmark.m_displayName.c_str());
+            }
         }
 
         void DrawFriendlyNpcNameplates(
@@ -1581,6 +2469,96 @@ namespace UiClient
             ImGui::TextUnformatted("System feed only");
         }
 
+        void DrawCombatEventEntries(
+            const AZStd::vector<NetClient::WorldEventEntry>& events,
+            const char* prefix,
+            int& drawn,
+            int maxDrawn)
+        {
+            for (size_t offset = 0; offset < events.size() && drawn < maxDrawn; ++offset)
+            {
+                const NetClient::WorldEventEntry& event = events[events.size() - offset - 1];
+                if (!IsCombatEventType(event.m_type))
+                {
+                    continue;
+                }
+
+                AZStd::string line = AZStd::string::format("%s %s", prefix, event.m_type.c_str());
+                if (!event.m_summary.empty())
+                {
+                    line += " | ";
+                    line += event.m_summary;
+                }
+                ImGui::BulletText("%s", line.c_str());
+                ++drawn;
+            }
+        }
+
+        void DrawCombatFeed(const GameCore::ClientWorldState& worldState, const NetClient::VisibleEntity* targetEntity)
+        {
+            ImGui::TextUnformatted("Authoritative Combat");
+            ImGui::Separator();
+
+            if (targetEntity)
+            {
+                ImGui::Text("Target: %s", GetMobDisplayLabel(*targetEntity).c_str());
+                ImGui::Text(
+                    "Health %.0f / %.0f  |  %s",
+                    targetEntity->m_health,
+                    targetEntity->m_maxHealth,
+                    targetEntity->m_alive ? "alive" : "dead");
+            }
+            else
+            {
+                ImGui::TextUnformatted("Target: none");
+            }
+
+            const AZ::s64 nowMs = NowMs();
+            const AZStd::string gcdRemaining = FormatRemainingTime(worldState.m_session.m_globalCooldownEndsAt, nowMs);
+            if (!gcdRemaining.empty())
+            {
+                ImGui::Text("Global cooldown: %s", gcdRemaining.c_str());
+            }
+            const AZStd::string playerAuras = FormatAuraLine(worldState.m_session.m_auras, nowMs, 3);
+            if (!playerAuras.empty())
+            {
+                ImGui::TextWrapped("Player auras: %s", playerAuras.c_str());
+            }
+
+            const AZStd::string creditSummary = FormatKillCreditSummary(worldState.m_session.m_killCredits);
+            if (!creditSummary.empty())
+            {
+                ImGui::TextWrapped("Kill credit: %s", creditSummary.c_str());
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::TextUnformatted("Server feed");
+            int drawn = 0;
+            DrawCombatEventEntries(worldState.m_session.m_domainEvents, "event", drawn, 6);
+            DrawCombatEventEntries(worldState.m_session.m_stateDiffs, "diff", drawn, 6);
+            if (drawn == 0)
+            {
+                ImGui::TextUnformatted("No combat updates yet.");
+            }
+        }
+
+        bool BeginSpellbookAbilityDrag(const NetClient::SpellbookEntryState& entry)
+        {
+            if (!ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+            {
+                return false;
+            }
+
+            SpellbookAbilityDragPayload payload{};
+            std::snprintf(payload.m_abilityId, sizeof(payload.m_abilityId), "%s", entry.m_id.c_str());
+            ImGui::SetDragDropPayload(SpellbookAbilityPayloadType, &payload, sizeof(payload));
+            ImGui::TextUnformatted(entry.m_displayName.c_str());
+            ImGui::TextUnformatted("Assign to action bar");
+            ImGui::EndDragDropSource();
+            return true;
+        }
+
         void DrawActionSlots(
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
@@ -1755,7 +2733,7 @@ namespace UiClient
                     }
                 }
 
-                if (editMode && hasAbility && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                if (hasAbility && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
                 {
                     ActionBarSlotDragPayload payload{};
                     payload.m_sourceSlotIndex = slotIndex;
@@ -1766,7 +2744,7 @@ namespace UiClient
                     ImGui::EndDragDropSource();
                 }
 
-                if (editMode && ImGui::BeginDragDropTarget())
+                if (ImGui::BeginDragDropTarget())
                 {
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(SpellbookAbilityPayloadType))
                     {
@@ -1799,9 +2777,9 @@ namespace UiClient
                     ImGui::EndDragDropTarget();
                 }
 
-                if (editMode && ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                if (hasAbility && ImGui::IsItemClicked(ImGuiMouseButton_Right))
                 {
-                    if (hasAbility && gameCore->ClearActionBarSlot(slotIndex))
+                    if (gameCore->ClearActionBarSlot(slotIndex))
                     {
                         AZ_Printf("amandacore", "client.action_bar_clear_requested slot=%d", slotIndex);
                     }
@@ -1839,17 +2817,17 @@ namespace UiClient
                     }
                     if (editMode)
                     {
-                        tooltip += "\nSHIFT-click to arm move, drag to move, or SHIFT-right-click to clear.";
+                        tooltip += "\nSHIFT-click to arm move, drag to move, or right-click to clear.";
                     }
                     else
                     {
-                        tooltip += "\nBars are locked. Hold SHIFT to move or clear abilities.";
+                        tooltip += "\nDrag to move this ability, or right-click to clear.";
                     }
                     ImGui::SetTooltip("%s", tooltip.c_str());
                 }
-                else if (editMode && ImGui::IsItemHovered())
+                else if (ImGui::IsItemHovered())
                 {
-                    ImGui::SetTooltip("Drop a learned spellbook ability here, SHIFT-click after selecting a spell, or drag another action slot here.");
+                    ImGui::SetTooltip("Drop a learned spellbook ability here, or drag another action slot here.");
                 }
                 ImGui::PopID();
             }
@@ -1896,6 +2874,41 @@ namespace UiClient
                 pendingActionMoveSlot);
 
             ImGui::Spacing();
+            const bool clearPressed = ImGui::Button("Clear Slot", ImVec2(112.0f, 26.0f));
+            if (clearPressed && pendingActionMoveSlot >= 0)
+            {
+                if (gameCore->ClearActionBarSlot(pendingActionMoveSlot))
+                {
+                    AZ_Printf("amandacore", "client.action_bar_clear_requested slot=%d source=clear_drop_target", pendingActionMoveSlot);
+                }
+                pendingActionMoveSlot = -1;
+                pendingActionAssignmentAbilityId.clear();
+            }
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ActionBarSlotPayloadType))
+                {
+                    const auto* drag = static_cast<const ActionBarSlotDragPayload*>(payload->Data);
+                    if (drag && drag->m_sourceSlotIndex >= 0 && gameCore->ClearActionBarSlot(drag->m_sourceSlotIndex))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.action_bar_clear_requested slot=%d abilityId=%s source=drag_off_bar",
+                            drag->m_sourceSlotIndex,
+                            drag->m_abilityId);
+                        pendingActionMoveSlot = -1;
+                        pendingActionAssignmentAbilityId.clear();
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Drop an action slot here, or SHIFT-click a slot and press this, to clear it.");
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("Drag spells onto slots. Drag an action here to remove it.");
+
             ImGui::Text(
                 "%s interact  |  %s target  |  %s bag  |  %s spells  |  %s menu  |  Hold SHIFT to edit",
                 DisplayKeyName(interactBinding).c_str(),
@@ -1959,7 +2972,7 @@ namespace UiClient
             }
             else if (!editMode)
             {
-                ImGui::TextWrapped("Hold SHIFT to assign abilities.");
+                ImGui::TextWrapped("Drag abilities to action slots. Hold SHIFT for click-to-place.");
             }
             ImGui::Spacing();
             ImGui::BeginChild(
@@ -1980,6 +2993,7 @@ namespace UiClient
                 ImGui::PushID(entry.m_id.c_str());
                 const ImVec2 cardStart = ImGui::GetCursorScreenPos();
                 ImGui::InvisibleButton("##spell_card_icon", ImVec2(42.0f, 42.0f));
+                BeginSpellbookAbilityDrag(entry);
                 DrawProceduralIcon(
                     ImGui::GetWindowDrawList(),
                     cardStart,
@@ -1994,6 +3008,7 @@ namespace UiClient
                     pendingActionAssignmentAbilityId = entry.m_id;
                     AZ_Printf("amandacore", "client.spellbook_assignment_armed abilityId=%s", entry.m_id.c_str());
                 }
+                BeginSpellbookAbilityDrag(entry);
                 ImGui::PopStyleColor();
                 ImGui::TextWrapped("%s", entry.m_description.c_str());
                 const AZStd::string learnedFacts = FormatAbilityFacts(entry);
@@ -2007,18 +3022,9 @@ namespace UiClient
                 }
                 ImGui::TextDisabled("Known  |  level %d", entry.m_requiredLevel);
                 ImGui::EndGroup();
-                if (editMode && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-                {
-                    SpellbookAbilityDragPayload payload{};
-                    std::snprintf(payload.m_abilityId, sizeof(payload.m_abilityId), "%s", entry.m_id.c_str());
-                    ImGui::SetDragDropPayload(SpellbookAbilityPayloadType, &payload, sizeof(payload));
-                    ImGui::TextUnformatted(entry.m_displayName.c_str());
-                    ImGui::TextUnformatted("Assign to action bar");
-                    ImGui::EndDragDropSource();
-                }
                 if (ImGui::IsItemHovered())
                 {
-                    ImGui::SetTooltip(editMode ? "Drag to an action slot, or click to select then click a slot." : "Hold SHIFT to assign this ability.");
+                    ImGui::SetTooltip(editMode ? "Drag to an action slot, or click to select then click a slot." : "Drag to an action slot.");
                 }
                 ImGui::Separator();
                 ImGui::PopID();
@@ -2124,7 +3130,7 @@ namespace UiClient
                 }
                 else if (offer.m_canLearn)
                 {
-                    if (ImGui::Button("Learn", ImVec2(92.0f, 0.0f)))
+                    if (ImGui::Button("Learn", HudButtonSize(92.0f)))
                     {
                         gameCore->LearnTrainerAbility(trainer.m_id, offer.m_abilityId);
                     }
@@ -2434,7 +3440,7 @@ namespace UiClient
             if (canBuy)
             {
                 ImGui::SameLine(590.0f);
-                if (ImGui::Button("Buyout", ImVec2(78.0f, 0.0f)))
+                if (ImGui::Button("Buyout", HudButtonSize(78.0f)))
                 {
                     pendingBuyoutIndex = rowIndex;
                     ImGui::OpenPopup("Confirm Buyout");
@@ -2443,7 +3449,7 @@ namespace UiClient
             else if (listing.m_state == "active")
             {
                 ImGui::SameLine(590.0f);
-                if (ImGui::Button("Cancel", ImVec2(78.0f, 0.0f)) && gameCore)
+                if (ImGui::Button("Cancel", HudButtonSize(78.0f)) && gameCore)
                 {
                     gameCore->CancelAuction(listing.m_auctionId);
                 }
@@ -2496,7 +3502,7 @@ namespace UiClient
                     ImGui::SetNextItemWidth(120.0f);
                     ImGui::Combo("Sort", &selectedSort, sortLabels, AZ_ARRAY_SIZE(sortLabels));
                     ImGui::SameLine();
-                    if (ImGui::Button("Refresh", ImVec2(82.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Refresh", HudButtonSize(82.0f)) && gameCore)
                     {
                         gameCore->BrowseAuctions(searchBuffer, itemTypes[selectedItemType], sortValues[selectedSort]);
                     }
@@ -2528,7 +3534,7 @@ namespace UiClient
                                 listing.m_itemDisplayName.c_str(),
                                 listing.m_stackCount,
                                 FormatCopperAmount(listing.m_buyoutCopper).c_str());
-                            if (ImGui::Button("Confirm", ImVec2(96.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Confirm", HudButtonSize(96.0f)) && gameCore)
                             {
                                 gameCore->BuyoutAuction(listing.m_auctionId);
                                 pendingBuyoutIndex = -1;
@@ -2536,7 +3542,7 @@ namespace UiClient
                             }
                             ImGui::SameLine();
                         }
-                        if (ImGui::Button("Cancel", ImVec2(96.0f, 0.0f)))
+                        if (ImGui::Button("Cancel", HudButtonSize(96.0f)))
                         {
                             pendingBuyoutIndex = -1;
                             ImGui::CloseCurrentPopup();
@@ -2658,7 +3664,7 @@ namespace UiClient
                     {
                         ImGui::TextDisabled("Deposit appears after selecting an item.");
                     }
-                    if (ImGui::Button("Create Listing", ImVec2(150.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Create Listing", HudButtonSize(150.0f)) && gameCore)
                     {
                         const int buyoutCopper = atoi(buyoutBuffer);
                         if (gameCore->ListAuctionItem(selectedSellSlot, stackCount, buyoutCopper, durationSeconds[selectedDuration]))
@@ -2699,12 +3705,12 @@ namespace UiClient
             const AZStd::string buttonLabel = pendingKeybindActionId == actionId
                 ? "Press a key..."
                 : DisplayKeyName(binding);
-            if (ImGui::Button(buttonLabel.c_str(), ImVec2(132.0f, 0.0f)))
+            if (ImGui::Button(buttonLabel.c_str(), HudButtonSize(132.0f)))
             {
                 pendingKeybindActionId = actionId;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Unbind", ImVec2(74.0f, 0.0f)))
+            if (ImGui::Button("Unbind", HudButtonSize(74.0f)))
             {
                 binding.clear();
                 if (pendingKeybindActionId == actionId)
@@ -2908,7 +3914,7 @@ namespace UiClient
                     }
                     if (talent.m_canSelect)
                     {
-                        if (ImGui::Button("Select", ImVec2(92.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Select", HudButtonSize(92.0f)) && gameCore)
                         {
                             gameCore->SelectTalent(talent.m_id);
                         }
@@ -3015,7 +4021,7 @@ namespace UiClient
                     if (trackable && gameCore)
                     {
                         const char* buttonLabel = quest.m_tracked ? "Untrack" : "Track";
-                        if (ImGui::Button(buttonLabel, ImVec2(96.0f, 0.0f)))
+                        if (ImGui::Button(buttonLabel, HudButtonSize(96.0f)))
                         {
                             gameCore->TrackQuest(quest.m_id, !quest.m_tracked);
                         }
@@ -3082,8 +4088,12 @@ namespace UiClient
             char* whisperTargetBuffer,
             size_t whisperTargetBufferSize,
             bool& focusRequested,
+            bool& inputActive,
             AZStd::string& outSubmittedInput)
         {
+            AZ_UNUSED(whisperTargetBuffer);
+            AZ_UNUSED(whisperTargetBufferSize);
+            selectedChannel = "say";
             ImGui::BeginChild("##chat_scrollback", ImVec2(0.0f, 158.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
             for (const auto& message : worldState.m_social.m_chatMessages)
             {
@@ -3111,62 +4121,32 @@ namespace UiClient
                 selectedChannel = "say";
             }
             ImGui::SameLine();
-            if (ImGui::Button("Whisper", ImVec2(82.0f, 24.0f)))
-            {
-                selectedChannel = "whisper";
-            }
-            if (worldState.m_social.m_hasParty)
-            {
-                ImGui::SameLine();
-                if (ImGui::Button("Party", ImVec2(66.0f, 24.0f)))
-                {
-                    selectedChannel = "party";
-                }
-            }
-            if (worldState.m_social.m_hasGuild)
-            {
-                ImGui::SameLine();
-                if (ImGui::Button("Guild", ImVec2(66.0f, 24.0f)))
-                {
-                    selectedChannel = "guild";
-                }
-            }
-            ImGui::SameLine();
             ImGui::Text("Channel: %s", ChatChannelLabel(selectedChannel));
 
-            if (selectedChannel == "party" && !worldState.m_social.m_hasParty)
-            {
-                selectedChannel = "say";
-            }
-            if (selectedChannel == "guild" && !worldState.m_social.m_hasGuild)
-            {
-                selectedChannel = "say";
-            }
-
-            if (selectedChannel == "whisper")
-            {
-                ImGui::SetNextItemWidth(138.0f);
-                ImGui::InputText("Target", whisperTargetBuffer, whisperTargetBufferSize);
-                ImGui::SameLine();
-            }
-
-            ImGui::SetNextItemWidth(-1.0f);
             if (focusRequested)
             {
                 ImGui::SetKeyboardFocusHere();
                 focusRequested = false;
             }
-            const bool submitted = ImGui::InputText(
+            const float sendButtonWidth = 64.0f;
+            const float inputWidth = AZ::GetMax(
+                120.0f,
+                ImGui::GetContentRegionAvail().x - sendButtonWidth - ImGui::GetStyle().ItemSpacing.x);
+            ImGui::SetNextItemWidth(inputWidth);
+            const bool submittedByEnter = ImGui::InputText(
                 "##chat_input",
                 inputBuffer,
                 inputBufferSize,
                 ImGuiInputTextFlags_EnterReturnsTrue);
-            if (submitted)
+            inputActive = ImGui::IsItemActive();
+            ImGui::SameLine();
+            const bool submittedByButton = ImGui::Button("Send", ImVec2(sendButtonWidth, 0.0f));
+            if (submittedByEnter || submittedByButton)
             {
                 outSubmittedInput = inputBuffer;
-                inputBuffer[0] = '\0';
+                return true;
             }
-            return submitted;
+            return false;
         }
 
         void DrawPartyFrames(const GameCore::ClientWorldState& worldState)
@@ -3332,12 +4312,12 @@ namespace UiClient
                     ImGui::SetNextItemWidth(210.0f);
                     ImGui::InputText("Name", nameBuffer, nameBufferSize);
                     ImGui::SameLine();
-                    if (ImGui::Button("Add", ImVec2(62.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Add", HudButtonSize(62.0f)) && gameCore)
                     {
                         gameCore->AddFriend(nameBuffer);
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Remove", ImVec2(86.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Remove", HudButtonSize(86.0f)) && gameCore)
                     {
                         gameCore->RemoveFriend(nameBuffer);
                     }
@@ -3358,7 +4338,7 @@ namespace UiClient
                             ImGui::Text(" | %s", friendState.m_zoneId.c_str());
                             ImGui::SameLine();
                             ImGui::PushID(friendState.m_characterId.c_str());
-                            if (ImGui::Button("Invite", ImVec2(72.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Invite", HudButtonSize(72.0f)) && gameCore)
                             {
                                 gameCore->InviteParty(friendState.m_displayName, friendState.m_characterId);
                             }
@@ -3374,12 +4354,12 @@ namespace UiClient
                     ImGui::SetNextItemWidth(210.0f);
                     ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
                     ImGui::SameLine();
-                    if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Invite", HudButtonSize(82.0f)) && gameCore)
                     {
                         gameCore->InviteParty(nameBuffer, {});
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                    if (ImGui::Button("Leave", HudButtonSize(72.0f)) && gameCore)
                     {
                         gameCore->LeaveParty();
                     }
@@ -3395,7 +4375,7 @@ namespace UiClient
                         ImGui::SetNextItemWidth(250.0f);
                         ImGui::InputText("Guild Name", guildNameBuffer, guildNameBufferSize);
                         ImGui::SameLine();
-                        if (ImGui::Button("Create", ImVec2(86.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Create", HudButtonSize(86.0f)) && gameCore)
                         {
                             gameCore->CreateGuild(guildNameBuffer);
                         }
@@ -3420,7 +4400,7 @@ namespace UiClient
                             ImGui::SetNextItemWidth(190.0f);
                             ImGui::InputText("Invite Name", nameBuffer, nameBufferSize);
                             ImGui::SameLine();
-                            if (ImGui::Button("Invite", ImVec2(82.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Invite", HudButtonSize(82.0f)) && gameCore)
                             {
                                 gameCore->InviteGuild(nameBuffer);
                             }
@@ -3430,20 +4410,20 @@ namespace UiClient
                             ImGui::SetNextItemWidth(286.0f);
                             ImGui::InputText("Message", guildMotdBuffer, guildMotdBufferSize);
                             ImGui::SameLine();
-                            if (ImGui::Button("Set", ImVec2(58.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Set", HudButtonSize(58.0f)) && gameCore)
                             {
                                 gameCore->SetGuildMessageOfTheDay(guildMotdBuffer);
                             }
                         }
 
-                        if (ImGui::Button("Leave", ImVec2(72.0f, 0.0f)) && gameCore)
+                        if (ImGui::Button("Leave", HudButtonSize(72.0f)) && gameCore)
                         {
                             gameCore->LeaveGuild();
                         }
                         if (HasGuildPermission(guild, "disband_guild"))
                         {
                             ImGui::SameLine();
-                            if (ImGui::Button("Disband", ImVec2(92.0f, 0.0f)) && gameCore)
+                            if (ImGui::Button("Disband", HudButtonSize(92.0f)) && gameCore)
                             {
                                 gameCore->DisbandGuild();
                             }
@@ -3470,7 +4450,7 @@ namespace UiClient
                             {
                                 if (HasGuildPermission(guild, "promote_member"))
                                 {
-                                    if (ImGui::Button("Promote", ImVec2(82.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Promote", HudButtonSize(82.0f)) && gameCore)
                                     {
                                         gameCore->PromoteGuildMember(member.m_displayName);
                                     }
@@ -3478,7 +4458,7 @@ namespace UiClient
                                 }
                                 if (HasGuildPermission(guild, "demote_member"))
                                 {
-                                    if (ImGui::Button("Demote", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Demote", HudButtonSize(78.0f)) && gameCore)
                                     {
                                         gameCore->DemoteGuildMember(member.m_displayName);
                                     }
@@ -3486,7 +4466,7 @@ namespace UiClient
                                 }
                                 if (HasGuildPermission(guild, "remove_member"))
                                 {
-                                    if (ImGui::Button("Remove", ImVec2(78.0f, 0.0f)) && gameCore)
+                                    if (ImGui::Button("Remove", HudButtonSize(78.0f)) && gameCore)
                                     {
                                         gameCore->RemoveGuildMember(member.m_displayName);
                                     }
@@ -3516,17 +4496,18 @@ namespace UiClient
             struct MenuButtonState
             {
                 const char* m_label;
+                const char* m_panelName;
                 bool* m_toggle;
             };
 
             talentsOpen = false;
             MenuButtonState buttons[] = {
-                {"Char", &characterSheetOpen},
-                {"Spells", &spellbookOpen},
-                {"Quests", &questLogOpen},
-                {"Map", &mapOpen},
-                {"Bag", &bagOpen},
-                {"Settings", &settingsOpen},
+                {"Char", "character", &characterSheetOpen},
+                {"Spells", "spells", &spellbookOpen},
+                {"Quests", "quests", &questLogOpen},
+                {"Map", "map", &mapOpen},
+                {"Bag", "bag", &bagOpen},
+                {"Settings", "settings", &settingsOpen},
             };
 
             for (size_t index = 0; index < AZ_ARRAY_SIZE(buttons); ++index)
@@ -3538,6 +4519,11 @@ namespace UiClient
                 if (ImGui::Button(buttons[index].m_label, ImVec2(index == 5 ? 74.0f : 58.0f, 28.0f)))
                 {
                     *buttons[index].m_toggle = !*buttons[index].m_toggle;
+                    AZ_Printf(
+                        "amandacore",
+                        "client.utility_menu_toggle panel=%s open=%s source=button",
+                        buttons[index].m_panelName,
+                        *buttons[index].m_toggle ? "true" : "false");
                 }
             }
             socialOpen = false;
@@ -3615,6 +4601,8 @@ namespace UiClient
         m_auctionStackCount = 1;
         m_chatChannel = "say";
         m_chatFocusRequested = false;
+        m_chatInputActive = false;
+        m_chatInputBuffer[0] = '\0';
         m_auctionSearchBuffer[0] = '\0';
         m_auctionBuyoutBuffer[0] = '\0';
         LoadDefaultKeybindings();
@@ -3624,6 +4612,7 @@ namespace UiClient
     void UiClientSystemComponent::Deactivate()
     {
         SaveUiSettings();
+        ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, false);
         ImGui::ImGuiUpdateListenerBus::Handler::BusDisconnect();
         AzFramework::InputChannelEventListener::Disconnect();
     }
@@ -4324,6 +5313,26 @@ namespace UiClient
         return false;
     }
 
+    void UiClientSystemComponent::BeginChatInput()
+    {
+        m_chatChannel = "say";
+        m_chatInputActive = true;
+        m_chatFocusRequested = true;
+        ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, true);
+    }
+
+    void UiClientSystemComponent::EndChatInput(bool clearBuffer)
+    {
+        if (clearBuffer)
+        {
+            m_chatInputBuffer[0] = '\0';
+        }
+        m_chatInputActive = false;
+        m_chatFocusRequested = false;
+        ImGui::ClearActiveID();
+        ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, false);
+    }
+
     bool UiClientSystemComponent::OnInputChannelEventFiltered(const AzFramework::InputChannel& inputChannel)
     {
         const auto& channelId = inputChannel.GetInputChannelId();
@@ -4347,10 +5356,21 @@ namespace UiClient
         auto* gameCore = GameCore::IGameCoreRequests::Get();
         const AZStd::string keyName = channelId.GetName();
 
-        if (channelId == AzFramework::InputDeviceKeyboard::Key::EditEnter && !ImGui::GetIO().WantTextInput)
+        if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape && m_chatInputActive)
         {
-            m_chatFocusRequested = true;
+            EndChatInput(false);
+            AddHudEvent("Chat canceled.");
             return true;
+        }
+
+        if (channelId == AzFramework::InputDeviceKeyboard::Key::EditEnter)
+        {
+            if (!m_chatInputActive && !ImGui::GetIO().WantTextInput)
+            {
+                BeginChatInput();
+                return true;
+            }
+            return false;
         }
 
         if (!m_pendingKeybindActionId.empty())
@@ -4365,7 +5385,7 @@ namespace UiClient
             return true;
         }
 
-        if (ImGui::GetIO().WantTextInput)
+        if (m_chatInputActive || ImGui::GetIO().WantTextInput)
         {
             return false;
         }
@@ -4436,7 +5456,13 @@ namespace UiClient
             ImGui::End();
             m_lastWorldConnected = false;
             m_loggedActionBarVisible = false;
+            m_loggedActionBarCooldownRendered = false;
+            m_loggedCombatHudReady = false;
             m_loggedPlayableZoneReady = false;
+            m_lastTargetFrameSummary.clear();
+            m_lastKillCreditSummary.clear();
+            m_lastCombatDomainEventSequence = 0;
+            m_lastCombatStateDiffSequence = 0;
             return;
         }
 
@@ -4452,6 +5478,18 @@ namespace UiClient
         const bool hasHostileTarget = targetEntity && targetEntity->m_kind == "hostile_mob";
         const auto& cameraState = gameCore->GetCameraState();
         const bool actionEditMode = m_shiftHeld || ImGui::GetIO().KeyShift;
+
+        if (!m_loggedCombatHudReady)
+        {
+            AZ_Printf(
+                "amandacore",
+                "client.combat_hud_ready auras=%zu killCredits=%zu domainEvents=%zu stateDiffs=%zu",
+                worldState.m_session.m_auras.size(),
+                worldState.m_session.m_killCredits.size(),
+                worldState.m_session.m_domainEvents.size(),
+                worldState.m_session.m_stateDiffs.size());
+            m_loggedCombatHudReady = true;
+        }
 
         if (worldState.m_pendingInteractionSequence != m_lastHandledInteractionSequence)
         {
@@ -4483,6 +5521,10 @@ namespace UiClient
             }
             AddHudEvent(m_lastWorldSessionToken.empty() ? "World session linked" : "World session refreshed");
             m_lastWorldSessionToken = worldState.m_session.m_worldSessionToken;
+            m_lastTargetFrameSummary.clear();
+            m_lastKillCreditSummary.clear();
+            m_lastCombatDomainEventSequence = 0;
+            m_lastCombatStateDiffSequence = 0;
         }
         if (nearCommandPoint != m_lastNearCommandPoint)
         {
@@ -4509,12 +5551,67 @@ namespace UiClient
                 AddHudEvent(AZStd::string::format("Target locked: %s", GetMobDisplayLabel(*targetEntity).c_str()));
                 m_lastHudTargetId = targetEntity->m_id;
             }
+            const AZStd::string targetFrameSummary = AZStd::string::format(
+                "%s|%.0f|%.0f|%s|%zu|%s",
+                targetEntity->m_id.c_str(),
+                targetEntity->m_health,
+                targetEntity->m_maxHealth,
+                targetEntity->m_alive ? "alive" : "dead",
+                targetEntity->m_auras.size(),
+                targetEntity->m_aiState.c_str());
+            if (targetFrameSummary != m_lastTargetFrameSummary)
+            {
+                AZ_Printf(
+                    "amandacore",
+                    "client.target_frame_updated targetId=%s health=%.0f maxHealth=%.0f alive=%s auras=%zu aiState=%s",
+                    targetEntity->m_id.c_str(),
+                    targetEntity->m_health,
+                    targetEntity->m_maxHealth,
+                    targetEntity->m_alive ? "true" : "false",
+                    targetEntity->m_auras.size(),
+                    targetEntity->m_aiState.c_str());
+                if (!targetEntity->m_alive)
+                {
+                    AddHudEvent(AZStd::string::format("Target defeated: %s", GetMobDisplayLabel(*targetEntity).c_str()));
+                }
+                m_lastTargetFrameSummary = targetFrameSummary;
+            }
         }
         else if (!m_lastHudTargetId.empty())
         {
             AZ_Printf("amandacore", "client.target_hud_cleared");
             AddHudEvent("Target cleared");
             m_lastHudTargetId.clear();
+            m_lastTargetFrameSummary.clear();
+        }
+
+        const AZStd::string killCreditSummary = FormatKillCreditSummary(worldState.m_session.m_killCredits);
+        if (!killCreditSummary.empty() && killCreditSummary != m_lastKillCreditSummary)
+        {
+            AZ_Printf("amandacore", "client.kill_credit_displayed credit=%s", killCreditSummary.c_str());
+            AddHudEvent(AZStd::string::format("Kill credit: %s", killCreditSummary.c_str()));
+            m_lastKillCreditSummary = killCreditSummary;
+        }
+
+        const AZ::s64 maxDomainSequence = MaxEventSequence(worldState.m_session.m_domainEvents);
+        const AZ::s64 maxStateDiffSequence = MaxEventSequence(worldState.m_session.m_stateDiffs);
+        if (maxDomainSequence > m_lastCombatDomainEventSequence || maxStateDiffSequence > m_lastCombatStateDiffSequence)
+        {
+            AZ_Printf(
+                "amandacore",
+                "client.combat_hud_state_applied domainSeq=%lld stateDiffSeq=%lld domainEvents=%zu stateDiffs=%zu",
+                static_cast<long long>(maxDomainSequence),
+                static_cast<long long>(maxStateDiffSequence),
+                worldState.m_session.m_domainEvents.size(),
+                worldState.m_session.m_stateDiffs.size());
+            m_lastCombatDomainEventSequence = maxDomainSequence;
+            m_lastCombatStateDiffSequence = maxStateDiffSequence;
+        }
+
+        if (!m_loggedActionBarCooldownRendered && HasVisibleCooldown(worldState.m_session, nowMs))
+        {
+            AZ_Printf("amandacore", "client.action_bar_cooldown_rendered");
+            m_loggedActionBarCooldownRendered = true;
         }
 
         if (worldState.m_session.m_quest.m_state != m_lastQuestState)
@@ -4567,9 +5664,11 @@ namespace UiClient
         }
 
         const ImVec2 playerFramePos(18.0f, 18.0f);
-        const ImVec2 playerFrameSize(250.0f, 132.0f);
+        const ImVec2 playerFrameSize(250.0f, 156.0f);
         const ImVec2 targetFramePos(280.0f, 18.0f);
-        const ImVec2 targetFrameSize(250.0f, 132.0f);
+        const ImVec2 targetFrameSize(300.0f, 168.0f);
+        const ImVec2 combatFeedPos(280.0f, 196.0f);
+        const ImVec2 combatFeedSize(360.0f, 170.0f);
         const ImVec2 minimapSize(250.0f, 244.0f);
         const ImVec2 minimapPos(displaySize.x - minimapSize.x - 18.0f, 18.0f);
         const ImVec2 rightActionBarSize(66.0f, AZ::GetClamp(displaySize.y - 330.0f, 360.0f, 748.0f));
@@ -4577,11 +5676,11 @@ namespace UiClient
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 4.0f, 312.0f);
         const ImVec2 trackerSize(292.0f, 292.0f);
         const ImVec2 trackerPos(rightActionBarTwoPos.x - trackerSize.x - 12.0f, 286.0f);
-        const ImVec2 actionBarSize(744.0f, 122.0f);
+        const ImVec2 actionBarSize(744.0f, 154.0f);
         const ImVec2 actionBarPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
-        const ImVec2 upperActionBarSize(744.0f, 66.0f);
+        const ImVec2 upperActionBarSize(744.0f, 72.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
         const ImVec2 microMenuSize(410.0f, 42.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
@@ -4700,6 +5799,12 @@ namespace UiClient
         }
         ImGui::End();
 
+        if (BeginHudPanel("##combat_feed", "Combat", combatFeedPos, combatFeedSize))
+        {
+            DrawCombatFeed(worldState, targetEntity);
+        }
+        ImGui::End();
+
         if (worldState.m_social.m_hasParty && BeginHudPanel("##party_frames", "Party", partyFramesPos, partyFramesSize))
         {
             DrawPartyFrames(worldState);
@@ -4712,6 +5817,7 @@ namespace UiClient
         if (BeginHudPanel("##chat_window", "Chat", chatPos, chatSize))
         {
             AZStd::string submittedInput;
+            bool chatFieldActive = false;
             if (DrawChatWindow(
                     worldState,
                     m_chatChannel,
@@ -4720,9 +5826,31 @@ namespace UiClient
                     m_chatWhisperTargetBuffer,
                     AZ_ARRAY_SIZE(m_chatWhisperTargetBuffer),
                     m_chatFocusRequested,
+                    chatFieldActive,
                     submittedInput))
             {
-                SubmitChatInput(gameCore, submittedInput);
+                const bool hasText = submittedInput.find_first_not_of(" \t\r\n") != AZStd::string::npos;
+                if (hasText && SubmitChatInput(gameCore, submittedInput))
+                {
+                    EndChatInput(true);
+                }
+                else if (hasText)
+                {
+                    AddHudEvent("Chat message could not be sent.");
+                    BeginChatInput();
+                }
+                else
+                {
+                    EndChatInput(true);
+                }
+            }
+            else if (chatFieldActive && !m_chatInputActive)
+            {
+                BeginChatInput();
+            }
+            else if (m_chatInputActive && !chatFieldActive && !m_chatFocusRequested && !ImGui::IsAnyItemActive())
+            {
+                EndChatInput(false);
             }
         }
         ImGui::End();
@@ -4865,7 +5993,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_bagOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize))
+        if (m_bagOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize, false, true))
         {
             DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot);
         }
@@ -4874,7 +6002,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize))
+        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize, false, true))
         {
             DrawSocialWindow(
                 gameCore,
@@ -4891,7 +6019,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize))
+        if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize, false, true))
         {
             if (DrawSettingsWindow(
                     gameCore,
@@ -4918,7 +6046,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_spellbookOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize))
+        if (m_spellbookOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize, false, true))
         {
             DrawSpellbook(worldState, actionEditMode, m_pendingActionAssignmentAbilityId);
         }
@@ -4927,7 +6055,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_characterSheetOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize))
+        if (m_characterSheetOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize, false, true))
         {
             DrawCharacterSheetWindow(worldState);
         }
@@ -4936,7 +6064,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize))
+        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize, false, true))
         {
             DrawTalentWindow(gameCore, worldState);
         }
@@ -4945,7 +6073,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize))
+        if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize, false, true))
         {
             DrawQuestLogWindow(gameCore, worldState);
         }
@@ -4954,16 +6082,16 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize))
+        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize, false, true))
         {
-            DrawZoneMapWindow(worldState, playerX, playerY);
+            DrawZoneMapWindow(gameCore, worldState, playerX, playerY);
         }
         if (m_mapOpen)
         {
             ImGui::End();
         }
 
-        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize))
+        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize, false, true))
         {
             DrawAuctionWindow(
                 gameCore,
@@ -4981,7 +6109,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_trainerOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize))
+        if (m_trainerOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize, false, true))
         {
             DrawTrainerWindow(gameCore, worldState);
         }
@@ -4990,7 +6118,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_questGossipOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize))
+        if (m_questGossipOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize, false, true))
         {
             if (const char* closeReason = DrawQuestGossipWindow(gameCore, worldState))
             {
@@ -5003,6 +6131,7 @@ namespace UiClient
         }
 
         DrawFriendlyNpcNameplates(worldState, cameraState, displaySize);
+        DrawStonewakeLandmarkNameplates(worldState, cameraState, displaySize);
 
         if (!m_questToast.empty() && nowMs < m_questToastExpiresAt)
         {

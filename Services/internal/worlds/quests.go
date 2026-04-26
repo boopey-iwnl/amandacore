@@ -13,6 +13,9 @@ import (
 const defaultPartyQuestCreditRadius = 48.0
 
 func (s *worldServer) defaultQuestProgress(quest questDefinition) platform.CharacterQuestProgress {
+	if questHasObjectiveGraph(quest) {
+		return s.defaultGraphQuestProgress(quest)
+	}
 	return platform.CharacterQuestProgress{
 		QuestID:      quest.ID,
 		State:        questStateNotStarted,
@@ -22,6 +25,9 @@ func (s *worldServer) defaultQuestProgress(quest questDefinition) platform.Chara
 }
 
 func (s *worldServer) normalizeQuestProgress(quest questDefinition, progress platform.CharacterQuestProgress) platform.CharacterQuestProgress {
+	if questHasObjectiveGraph(quest) {
+		return s.normalizeGraphQuestProgress(quest, progress)
+	}
 	if progress.QuestID == "" {
 		progress.QuestID = quest.ID
 	}
@@ -42,7 +48,7 @@ func (s *worldServer) normalizeQuestProgress(quest questDefinition, progress pla
 		progress.CurrentCount = progress.TargetCount
 		return progress
 	}
-	if progress.CompletedAt != 0 || progress.State == questStateCompleted || progress.CurrentCount >= progress.TargetCount {
+	if progress.CompletedAt != 0 || progress.State == questStateCompleted || progress.State == questStateReady || progress.CurrentCount >= progress.TargetCount {
 		progress.State = questStateCompleted
 		progress.CurrentCount = progress.TargetCount
 		return progress
@@ -90,6 +96,7 @@ func (s *worldServer) applyCharacterProgressionLocked(session *worldSessionState
 	session.LearnedAbilityIDs = platform.NormalizeLearnedAbilityIDs(character.LearnedAbilityIDs)
 	session.ActionBarSlots = platform.NormalizeActionBarSlots(character.ActionBarSlots, session.LearnedAbilityIDs)
 	session.QuestProgress = s.loadQuestProgressFromCharacter(character)
+	session.KillCredits = platform.NormalizeCharacterKillCredits(character.KillCredits)
 	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(character.TrackedQuestIDs, session.QuestProgress)
 	session.PvPStats = platform.NormalizeCharacterPvPStats(session.CharacterID, character.PvPStats)
 	session.BindPoint = platform.NormalizeCharacterBindPoint(session.CharacterID, character.BindPoint)
@@ -124,6 +131,9 @@ func (s *worldServer) buildCharacterQuestMap(progressByQuest map[string]platform
 }
 
 func (s *worldServer) persistSessionProgressionLocked(session *worldSessionState) error {
+	if s.store == nil {
+		return nil
+	}
 	persistStartedAt := time.Now()
 	character, err := s.store.UpdateCharacterProgression(
 		session.CharacterID,
@@ -148,6 +158,7 @@ func (s *worldServer) persistSessionProgressionLocked(session *worldSessionState
 	session.LearnedAbilityIDs = platform.NormalizeLearnedAbilityIDs(character.LearnedAbilityIDs)
 	session.ActionBarSlots = platform.NormalizeActionBarSlots(character.ActionBarSlots, session.LearnedAbilityIDs)
 	session.QuestProgress = s.loadQuestProgressFromCharacter(character)
+	session.KillCredits = platform.NormalizeCharacterKillCredits(character.KillCredits)
 	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress)
 	s.applyDerivedStatsLocked(session)
 	persistStartedAt = time.Now()
@@ -163,9 +174,18 @@ func (s *worldServer) acceptQuestLocked(session *worldSessionState, questID stri
 	if session == nil {
 		return fmt.Errorf("world session token was not found")
 	}
+	s.emitWorldEventLocked(eventQuestAcceptRequested, map[string]any{
+		"characterId": session.CharacterID,
+		"questId":     questID,
+	})
 
 	quest, found := s.quests[questID]
 	if !found {
+		s.emitWorldEventLocked(eventQuestAcceptRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"questId":     questID,
+			"reason":      "QuestMissing",
+		})
 		return fmt.Errorf("quest is not available")
 	}
 
@@ -173,24 +193,59 @@ func (s *worldServer) acceptQuestLocked(session *worldSessionState, questID stri
 	switch progress.State {
 	case questStateNotStarted:
 		if err := s.validateQuestStartLocked(session, quest); err != nil {
+			s.emitWorldEventLocked(eventQuestAcceptRejected, map[string]any{
+				"characterId": session.CharacterID,
+				"questId":     quest.ID,
+				"reason":      err.Error(),
+			})
 			return err
 		}
 		now := time.Now().Unix()
 		progress.State = questStateActive
 		progress.AcceptedAt = now
 		progress.UpdatedAt = now
+		if questHasObjectiveGraph(quest) {
+			progress = s.normalizeGraphQuestProgress(quest, progress)
+			progress.State = questStateActive
+		}
 		session.QuestProgress[quest.ID] = progress
 		s.trackQuestLocked(session, quest.ID)
-		observability.LogEvent("world-service", "world.quest_accepted", map[string]any{
+		fields := map[string]any{
 			"worldSessionToken": session.Token,
 			"accountId":         session.AccountID,
 			"characterId":       session.CharacterID,
 			"questId":           quest.ID,
+		}
+		observability.LogEvent("world-service", "world.quest_accepted", fields)
+		s.emitWorldEventLocked(eventQuestAccepted, fields, questDelta(session.CharacterID, quest.ID, diffQuestAccepted, map[string]any{
+			"state": progress.State,
+		}))
+		if err := s.persistSessionProgressionLocked(session); err != nil {
+			return err
+		}
+		s.emitWorldEventLocked(eventQuestPersisted, map[string]any{
+			"characterId": session.CharacterID,
+			"questId":     quest.ID,
 		})
-		return s.persistSessionProgressionLocked(session)
+		return nil
 	case questStateActive, questStateCompleted:
+		if questHasObjectiveGraph(quest) && progress.State == questStateActive {
+			s.emitWorldEventLocked(eventQuestAcceptRejected, map[string]any{
+				"characterId": session.CharacterID,
+				"questId":     quest.ID,
+				"reason":      "QuestAlreadyAccepted",
+			})
+			return fmt.Errorf("quest is already accepted")
+		}
 		return s.completeOrTurnInQuestLocked(session, quest, progress)
+	case questStateReady:
+		return s.completeQuestLocked(session, quest.ID)
 	case questStateRewardGranted:
+		s.emitWorldEventLocked(eventQuestAcceptRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"questId":     quest.ID,
+			"reason":      "QuestAlreadyCompleted",
+		})
 		return fmt.Errorf("quest is already completed")
 	default:
 		return fmt.Errorf("quest is not available")
@@ -198,10 +253,13 @@ func (s *worldServer) acceptQuestLocked(session *worldSessionState, questID stri
 }
 
 func (s *worldServer) validateQuestStartLocked(session *worldSessionState, quest questDefinition) error {
-	if session.CurrentTargetID != quest.GiverNPCID {
+	if quest.RequiredLevel > 0 && session.Level < quest.RequiredLevel {
+		return fmt.Errorf("level is too low")
+	}
+	if !quest.AllowDirectAccept && session.CurrentTargetID != quest.GiverNPCID {
 		return fmt.Errorf("target this quest giver first")
 	}
-	if !s.friendlyInRangeLocked(session, quest.GiverNPCID) {
+	if !quest.AllowDirectAccept && !s.friendlyInRangeLocked(session, quest.GiverNPCID) {
 		return fmt.Errorf("move closer to the quest giver")
 	}
 	for _, prerequisiteID := range quest.PrerequisiteIDs {
@@ -218,6 +276,9 @@ func (s *worldServer) validateQuestStartLocked(session *worldSessionState, quest
 }
 
 func (s *worldServer) completeOrTurnInQuestLocked(session *worldSessionState, quest questDefinition, progress platform.CharacterQuestProgress) error {
+	if questHasObjectiveGraph(quest) {
+		return s.completeQuestLocked(session, quest.ID)
+	}
 	if progress.State == questStateActive {
 		if !s.questObjectiveReadyLocked(session, quest, progress) {
 			return fmt.Errorf("quest objective is not complete")
@@ -251,7 +312,55 @@ func (s *worldServer) completeOrTurnInQuestLocked(session *worldSessionState, qu
 	return s.grantQuestRewardLocked(session, quest, progress)
 }
 
+func (s *worldServer) completeQuestLocked(session *worldSessionState, questID string) error {
+	if session == nil {
+		return fmt.Errorf("world session token was not found")
+	}
+	s.emitWorldEventLocked(eventQuestCompleteRequested, map[string]any{
+		"characterId": session.CharacterID,
+		"questId":     questID,
+	})
+	quest, found := s.quests[questID]
+	if !found {
+		s.emitWorldEventLocked(eventQuestCompleteRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"questId":     questID,
+			"reason":      "QuestMissing",
+		})
+		return fmt.Errorf("quest is not available")
+	}
+	progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+	if progress.State == questStateRewardGranted {
+		s.emitWorldEventLocked(eventQuestCompleteRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"questId":     quest.ID,
+			"reason":      "QuestAlreadyCompleted",
+		})
+		return fmt.Errorf("quest is already completed")
+	}
+	if progress.State != questStateActive && progress.State != questStateCompleted && progress.State != questStateReady {
+		s.emitWorldEventLocked(eventQuestCompleteRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"questId":     quest.ID,
+			"reason":      "QuestNotInProgress",
+		})
+		return fmt.Errorf("quest is not in progress")
+	}
+	if !s.questObjectiveReadyLocked(session, quest, progress) {
+		s.emitWorldEventLocked(eventQuestCompleteRejected, map[string]any{
+			"characterId": session.CharacterID,
+			"questId":     quest.ID,
+			"reason":      "QuestObjectivesIncomplete",
+		})
+		return fmt.Errorf("quest objective is not complete")
+	}
+	return s.grantQuestRewardLocked(session, quest, progress)
+}
+
 func (s *worldServer) questObjectiveReadyLocked(session *worldSessionState, quest questDefinition, progress platform.CharacterQuestProgress) bool {
+	if questHasObjectiveGraph(quest) {
+		return s.questGraphReadyToComplete(quest, progress)
+	}
 	switch quest.ObjectiveType {
 	case objectiveTalk:
 		return session.CurrentTargetID == quest.TargetEntityID && s.friendlyInRangeLocked(session, quest.TargetEntityID)
@@ -278,8 +387,15 @@ func (s *worldServer) grantQuestRewardLocked(session *worldSessionState, quest q
 	session.CurrencyCopper += quest.RewardCopper
 	for _, item := range quest.RewardItems {
 		if err := addItemToInventory(&session.Inventory, item); err != nil {
+			s.emitWorldEventLocked(eventQuestCompleteRejected, map[string]any{
+				"characterId": session.CharacterID,
+				"questId":     quest.ID,
+				"reason":      "RewardGrantFailed",
+				"itemId":      item.ItemID,
+			})
 			return err
 		}
+		s.emitInventoryGrantedLocked(session, item.ItemID, item.StackCount, "quest_reward")
 	}
 
 	progress.State = questStateRewardGranted
@@ -292,6 +408,10 @@ func (s *worldServer) grantQuestRewardLocked(session *worldSessionState, quest q
 	if err := s.persistSessionProgressionLocked(session); err != nil {
 		return err
 	}
+	s.emitWorldEventLocked(eventQuestPersisted, map[string]any{
+		"characterId": session.CharacterID,
+		"questId":     quest.ID,
+	})
 
 	rewardCurrency := breakdownCurrency(quest.RewardCopper)
 	observability.LogEvent("world-service", "world.quest_reward_granted", map[string]any{
@@ -307,6 +427,22 @@ func (s *worldServer) grantQuestRewardLocked(session *worldSessionState, quest q
 		"level":                     session.Level,
 		"currencyTotalCopper":       session.CurrencyCopper,
 	})
+	s.emitWorldEventLocked(eventQuestCompleted, map[string]any{
+		"characterId": session.CharacterID,
+		"questId":     quest.ID,
+	}, questDelta(session.CharacterID, quest.ID, diffQuestCompleted, map[string]any{
+		"state": progress.State,
+	}))
+	s.emitWorldEventLocked(eventQuestRewardGranted, map[string]any{
+		"characterId":  session.CharacterID,
+		"questId":      quest.ID,
+		"rewardXp":     quest.RewardXP,
+		"rewardCopper": quest.RewardCopper,
+		"rewardItems":  quest.RewardItems,
+	}, questDelta(session.CharacterID, quest.ID, diffQuestReward, map[string]any{
+		"rewardXp":     quest.RewardXP,
+		"rewardCopper": quest.RewardCopper,
+	}))
 	return nil
 }
 
@@ -347,11 +483,19 @@ func (s *worldServer) applyQuestKillCreditLocked(killer *worldSessionState, kill
 		return nil
 	}
 
+	credit := s.recordKillCreditLocked(killer, killedMob, KillCreditReasonKillingBlow)
+	if err := s.applyQuestKillCreditEventLocked(killer, credit); err != nil {
+		return err
+	}
+
 	changedSessions := map[string]*worldSessionState{}
 	creditRecipients := map[string]map[string]struct{}{}
 	now := time.Now().Unix()
 	for _, questID := range s.questOrder {
 		quest := s.quests[questID]
+		if questHasObjectiveGraph(quest) {
+			continue
+		}
 		if quest.TargetMobType != killedMob.MobTypeID {
 			continue
 		}
@@ -662,6 +806,7 @@ func (s *worldServer) buildQuestSummary(session *worldSessionState, quest questD
 		"tracked":              tracked,
 		"objectiveType":        quest.ObjectiveType,
 		"objectiveText":        quest.ObjectiveText,
+		"objectiveGraph":       s.buildQuestObjectiveGraphResponse(quest, progress),
 		"state":                progress.State,
 		"currentCount":         progress.CurrentCount,
 		"targetCount":          progress.TargetCount,
@@ -731,6 +876,8 @@ func questStatusBucket(progress platform.CharacterQuestProgress) string {
 		return "active"
 	case questStateCompleted:
 		return "ready_to_turn_in"
+	case questStateReady:
+		return "ready_to_complete"
 	case questStateRewardGranted:
 		return "completed"
 	default:

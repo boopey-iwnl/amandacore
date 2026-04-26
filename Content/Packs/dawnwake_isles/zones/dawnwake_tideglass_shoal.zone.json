@@ -1,0 +1,198 @@
+{
+  "zone_id": "dawnwake_tideglass_shoal",
+  "display_name": "Tideglass Shoal",
+  "description": "Bright shoals and shallow pools used to validate Dawnwake zone adjacency.",
+  "bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "min_z": 0,
+    "max_x": 260,
+    "max_y": 210,
+    "max_z": 24
+  },
+  "shard_hint": "shoal-crossroads",
+  "map_ref": "maps/dawnwake_tideglass_shoal.map.json",
+  "entry_points": [
+    {
+      "entry_id": "from_landing_causeway",
+      "position": {
+        "x": 18,
+        "y": 102,
+        "z": 0.1
+      },
+      "facing_yaw": 80
+    },
+    {
+      "entry_id": "from_windspur_ridge",
+      "position": {
+        "x": 238,
+        "y": 174,
+        "z": 0.1
+      },
+      "facing_yaw": 245
+    }
+  ],
+  "spawn_points": [
+    {
+      "spawn_point_id": "sp_tideglass_west_arrival",
+      "purpose": "handoff_arrival",
+      "position": {
+        "x": 18,
+        "y": 102,
+        "z": 0.1
+      },
+      "facing_yaw": 80,
+      "tags": [
+        "handoff",
+        "causeway"
+      ]
+    },
+    {
+      "spawn_point_id": "sp_tideglass_ridge_arrival",
+      "purpose": "handoff_arrival",
+      "position": {
+        "x": 238,
+        "y": 174,
+        "z": 0.1
+      },
+      "facing_yaw": 245,
+      "tags": [
+        "handoff",
+        "ridge"
+      ]
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "dw_tideglass_motes",
+      "npc_archetype_id": "dw_tideglass_mote",
+      "loot_table_id": "dw_mote_spark_cache",
+      "respawn_seconds": 16,
+      "max_alive": 4,
+      "spawn_points": [
+        {
+          "spawn_point_id": "spawn_dw_mote_01",
+          "position": {
+            "x": 108,
+            "y": 108,
+            "z": 0.1
+          },
+          "facing_yaw": 180
+        },
+        {
+          "spawn_point_id": "spawn_dw_mote_02",
+          "position": {
+            "x": 126,
+            "y": 118,
+            "z": 0.1
+          },
+          "facing_yaw": 205
+        },
+        {
+          "spawn_point_id": "spawn_dw_mote_03",
+          "position": {
+            "x": 148,
+            "y": 104,
+            "z": 0.1
+          },
+          "facing_yaw": 190
+        },
+        {
+          "spawn_point_id": "spawn_dw_mote_04",
+          "position": {
+            "x": 156,
+            "y": 132,
+            "z": 0.1
+          },
+          "facing_yaw": 220
+        }
+      ],
+      "tags": [
+        "shoal",
+        "loadsim"
+      ]
+    }
+  ],
+  "handoff_gates": [
+    {
+      "gate_id": "gate_tideglass_to_dawnwake_landing",
+      "source_zone_id": "dawnwake_tideglass_shoal",
+      "destination_zone_id": "dawnwake_landing",
+      "trigger": {
+        "center": {
+          "x": 8,
+          "y": 102,
+          "z": 0.1
+        },
+        "radius": 8
+      },
+      "arrival_spawn_point_id": "sp_dawnwake_landing_east_arrival",
+      "enabled": true,
+      "retryable_when_unavailable": true,
+      "tags": [
+        "handoff",
+        "causeway"
+      ]
+    }
+  ],
+  "quest_providers": [
+    {
+      "provider_id": "dw_provider_shoal_marker",
+      "display_name": "Shoal Marker Post",
+      "position": {
+        "x": 32,
+        "y": 108,
+        "z": 0.1
+      },
+      "offered_quest_ids": [
+        "dw_tideglass_sparks"
+      ],
+      "tags": [
+        "dawnwake",
+        "route-marker"
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "transition_id": "to_landing",
+      "display_name": "Return Causeway",
+      "target_zone_id": "dawnwake_landing",
+      "destination_entry_id": "from_tideglass_causeway",
+      "position": {
+        "x": 8,
+        "y": 102,
+        "z": 0.1
+      },
+      "radius": 8,
+      "tags": [
+        "causeway"
+      ]
+    },
+    {
+      "transition_id": "to_windspur_rise",
+      "display_name": "Windspur Ridge Path",
+      "target_zone_id": "dawnwake_windspur_rise",
+      "destination_entry_id": "from_tideglass_ridge",
+      "position": {
+        "x": 250,
+        "y": 178,
+        "z": 0.1
+      },
+      "radius": 8,
+      "tags": [
+        "ridge",
+        "streaming-hook"
+      ]
+    }
+  ],
+  "runtime": {
+    "tick_ms": 50,
+    "max_players": 24,
+    "max_entities": 140
+  },
+  "tags": [
+    "dawnwake",
+    "middle-zone"
+  ]
+}

@@ -17,7 +17,7 @@ $versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
 $smokeScript = Join-Path $repoRoot "Infra\qa\Smoke-Test.ps1"
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path ([System.IO.Path]::GetTempPath()) "AmandaCore\alpha-0.1"
+    $OutputRoot = Join-Path ([System.IO.Path]::GetTempPath()) "AmandaCore\$Channel"
 }
 
 function Invoke-Native {
@@ -77,7 +77,7 @@ function ConvertTo-PackageSafeName {
     param([string]$Value)
     $safe = [regex]::Replace($Value.ToLowerInvariant(), "[^a-z0-9._-]+", "-").Trim("-")
     if ([string]::IsNullOrWhiteSpace($safe)) {
-        return "amandacore-alpha-0.1-rc"
+        return "amandacore-release-candidate"
     }
     return $safe
 }
@@ -240,7 +240,7 @@ if (-not $AllowDirty -and -not [string]::IsNullOrWhiteSpace($gitStatus)) {
 $sourceBranch = Get-GitValue -Arguments @("branch", "--show-current") -Fallback "nogit"
 $sourceCommit = Get-GitValue -Arguments @("rev-parse", "--short=12", "HEAD") -Fallback "nogit"
 if ([string]::IsNullOrWhiteSpace($PackageName)) {
-    $PackageName = ConvertTo-PackageSafeName ("amandacore-alpha-0.1-rc-" + $sourceCommit)
+    $PackageName = ConvertTo-PackageSafeName ("amandacore-" + $Channel + "-" + $sourceCommit)
 }
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
@@ -301,7 +301,7 @@ $packagedBootstrapFiles = Set-PackagedO3deBootstrapOffline -PackageRoot $script:
 $packageManifest = [ordered]@{
     schemaVersion = 1
     packageName = $PackageName
-    packageKind = "alpha-0.1-release-candidate"
+    packageKind = "$Channel-release-candidate"
     channel = $Channel
     createdAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     sourceBranch = $sourceBranch
@@ -342,11 +342,11 @@ if (-not $SkipSmoke) {
     $smokePackageRoot = $script:stagingRoot
     $smokeExtractRoot = ""
     if (-not $SkipArchive) {
-        $smokeExtractRoot = Join-Path $OutputRoot "$PackageName-smoke-extract"
+        $smokeExtractRoot = Join-Path $OutputRoot "smoke-extract"
         Assert-ChildPath -Parent $OutputRoot -Child $smokeExtractRoot
         Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Force -Path $smokeExtractRoot | Out-Null
-        Expand-Archive -Path $archivePath -DestinationPath $smokeExtractRoot -Force
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $smokeExtractRoot)
         $smokePackageRoot = $smokeExtractRoot
     }
 

@@ -1,0 +1,307 @@
+package content
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestContentPackageManifestLoadsSuccessfully(t *testing.T) {
+	result := NewContentPackageLoader().Load(DefaultPackagePath)
+	if !result.Validation.Valid() {
+		t.Fatalf("expected dev package to load, got errors: %#v", result.Validation.Errors)
+	}
+	if result.Validated == nil {
+		t.Fatalf("expected validated package")
+	}
+	if result.Package.Manifest.PackageID != "dev_foundation" {
+		t.Fatalf("unexpected package id %q", result.Package.Manifest.PackageID)
+	}
+	if len(result.Package.Zones) != 1 {
+		t.Fatalf("expected one zone, got %d", len(result.Package.Zones))
+	}
+}
+
+func TestMissingManifestFileReturnsMissingFile(t *testing.T) {
+	missingPath := filepath.Join(t.TempDir(), "missing-package.json")
+	result := NewContentPackageLoader().Load(missingPath)
+	assertValidationCode(t, result.Validation, ErrorMissingFile)
+}
+
+func TestMalformedJSONReturnsMalformedJSON(t *testing.T) {
+	manifestPath := filepath.Join(t.TempDir(), "package.json")
+	if err := os.WriteFile(manifestPath, []byte("{"), 0o644); err != nil {
+		t.Fatalf("write malformed manifest: %v", err)
+	}
+	result := NewContentPackageLoader().Load(manifestPath)
+	assertValidationCode(t, result.Validation, ErrorMalformedJSON)
+}
+
+func TestUnsupportedSchemaVersionRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Manifest.SchemaVersion = "2"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorUnsupportedSchemaVersion)
+}
+
+func TestDevFoundationPackageValidatesSuccessfully(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	report := ValidateLoadedContentPackage(loaded)
+	if !report.Valid() {
+		t.Fatalf("expected dev_foundation to validate, got %#v", report.Errors)
+	}
+}
+
+func TestDawnwakeIslesPackageValidatesSuccessfully(t *testing.T) {
+	result := NewContentPackageLoader().Load("Content/Packs/dawnwake_isles/package.json")
+	if !result.Validation.Valid() {
+		t.Fatalf("expected dawnwake_isles to validate, got %#v", result.Validation.Errors)
+	}
+	if len(result.Package.Zones) < 3 {
+		t.Fatalf("expected at least three Dawnwake zones, got %d", len(result.Package.Zones))
+	}
+	if result.Validated == nil || result.Validated.Registry.Zones["dawnwake_tideglass_shoal"].ZoneID == "" {
+		t.Fatalf("expected Dawnwake runtime registry to include tideglass shoal")
+	}
+	if len(result.Package.MapExports) != 3 {
+		t.Fatalf("expected three Dawnwake map exports, got %d", len(result.Package.MapExports))
+	}
+	if result.Validated.Registry.MapExportByZone["dawnwake_landing"].MapID == "" {
+		t.Fatalf("expected Dawnwake runtime registry to include landing map export")
+	}
+	if _, found := result.Validated.Registry.HandoffGates["gate_dawnwake_landing_to_tideglass"]; !found {
+		t.Fatalf("expected Dawnwake landing handoff gate")
+	}
+	if _, found := result.Validated.Registry.SpawnPoints["sp_tideglass_west_arrival"]; !found {
+		t.Fatalf("expected Dawnwake tideglass handoff arrival spawn point")
+	}
+}
+
+func TestDuplicateHandoffGateIDsRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[1].HandoffGates[0].GateID = loaded.Zones[0].HandoffGates[0].GateID
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorDuplicateID)
+	assertValidationPathContains(t, report, "handoff_gates[0].gate_id")
+}
+
+func TestHandoffGateReferencingMissingDestinationZoneRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].HandoffGates[0].DestinationZoneID = "missing_zone"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "handoff_gates[0].destination_zone_id")
+}
+
+func TestHandoffGateReferencingMissingArrivalSpawnRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].HandoffGates[0].ArrivalSpawnPointID = "missing_spawn"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "handoff_gates[0].arrival_spawn_point_id")
+}
+
+func TestMapExportReferencingMissingZoneRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[0].ZoneID = "missing_zone"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "map_exports[0].zone_id")
+}
+
+func TestMapExportMissingFileRejected(t *testing.T) {
+	manifestPath := filepath.Join(t.TempDir(), "package.json")
+	manifest := `{
+  "package_id": "missing_map_test",
+  "display_name": "Missing Map Test",
+  "version": "0.1.0",
+  "schema_version": "1",
+  "zones": ["zones/missing.zone.json"],
+  "map_exports": ["maps/missing.map.json"]
+}`
+	if err := os.WriteFile(manifestPath, []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	result := NewContentPackageLoader().Load(manifestPath)
+	assertValidationCode(t, result.Validation, ErrorMissingFile)
+	assertValidationPathContains(t, result.Validation, "map_exports[0]")
+}
+
+func TestMapExportMissingStreamingCellRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[0].TransitionPoints[0].StreamingCellID = "missing_cell"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "transition_points[0].streaming_cell_id")
+}
+
+func TestMapExportStreamingCellOutsideBoundsRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[0].StreamingCells[0].Bounds.MaxX = 999
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorPositionOutOfBounds)
+	assertValidationPathContains(t, report, "streaming_cells[0].bounds")
+}
+
+func TestMapExportReciprocalAdjacencyRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.MapExports[1].AdjacentZones = loaded.MapExports[1].AdjacentZones[1:]
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "adjacent_zones[0]")
+}
+
+func TestZoneTransitionReferencingMissingZoneRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].Transitions[0].TargetZoneID = "missing_zone"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "transitions[0].target_zone_id")
+}
+
+func TestZoneTransitionReferencingMissingEntryRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].Transitions[0].DestinationEntryID = "missing_entry"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "transitions[0].destination_entry_id")
+}
+
+func TestZoneTransitionOutsideBoundsRejected(t *testing.T) {
+	loaded := mustLoadDawnwakePackage(t)
+	loaded.Zones[0].Transitions[0].Position.X = 999
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorPositionOutOfBounds)
+	assertValidationPathContains(t, report, "transitions[0].position")
+}
+
+func TestDuplicateItemIDsRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Items = append(loaded.Items, loaded.Items[0])
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorDuplicateID)
+}
+
+func TestDuplicateNPCArchetypeIDsRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.NPCs = append(loaded.NPCs, loaded.NPCs[0])
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorDuplicateID)
+}
+
+func TestLootTableReferencingMissingItemRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.LootTables[0].Entries[0].ItemID = "missing_item"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "loot_tables[0].entries[0].item_id")
+}
+
+func TestSpawnGroupReferencingMissingNPCArchetypeRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Zones[0].SpawnGroups[0].NPCArchetypeID = "missing_npc"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "spawn_groups[0].npc_archetype_id")
+}
+
+func TestSpawnGroupReferencingMissingLootTableRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Zones[0].SpawnGroups[0].LootTableID = "missing_loot"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "spawn_groups[0].loot_table_id")
+}
+
+func TestSpawnPointOutsideZoneBoundsRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Zones[0].SpawnGroups[0].SpawnPoints[0].Position.X = 999
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorPositionOutOfBounds)
+}
+
+func TestQuestRewardReferencingMissingItemRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Quests[0].Rewards[0].ItemID = "missing_item"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "rewards[0].item_id")
+}
+
+func TestQuestObjectiveReferencingMissingNPCRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Quests[0].ObjectiveGraph.Nodes[0].TargetID = "missing_npc"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "objective_graph.nodes[0].target_id")
+}
+
+func TestQuestObjectiveGraphCycleRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Quests[0].ObjectiveGraph.Nodes[0].DependsOn = []string{"recover_fang"}
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorObjectiveGraphCycle)
+}
+
+func TestAbilityReferencingMissingAuraRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	loaded.Abilities[1].Effects[0].AuraID = "missing_aura"
+	report := ValidateLoadedContentPackage(loaded)
+	assertValidationCode(t, report, ErrorBrokenReference)
+	assertValidationPathContains(t, report, "abilities[1].effects[0].aura_id")
+}
+
+func TestManifestListedMissingFileRejected(t *testing.T) {
+	loaded := mustLoadDevPackage(t)
+	tempDir := t.TempDir()
+	manifestPath := filepath.Join(tempDir, "package.json")
+	manifest := `{
+  "package_id": "missing_file_test",
+  "display_name": "Missing File Test",
+  "version": "0.1.0",
+  "schema_version": "1",
+  "zones": ["zones/missing.zone.json"]
+}`
+	if err := os.WriteFile(manifestPath, []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	_ = loaded
+	result := NewContentPackageLoader().Load(manifestPath)
+	assertValidationCode(t, result.Validation, ErrorMissingFile)
+}
+
+func mustLoadDevPackage(t *testing.T) LoadedContentPackage {
+	t.Helper()
+	result := NewContentPackageLoader().Load(DefaultPackagePath)
+	if !result.Validation.Valid() {
+		t.Fatalf("expected dev package to load, got errors: %#v", result.Validation.Errors)
+	}
+	return result.Package
+}
+
+func mustLoadDawnwakePackage(t *testing.T) LoadedContentPackage {
+	t.Helper()
+	result := NewContentPackageLoader().Load("Content/Packs/dawnwake_isles/package.json")
+	if !result.Validation.Valid() {
+		t.Fatalf("expected dawnwake package to load, got errors: %#v", result.Validation.Errors)
+	}
+	return result.Package
+}
+
+func assertValidationCode(t *testing.T, report ContentValidationReport, code ContentValidationErrorCode) {
+	t.Helper()
+	if !report.HasCode(code) {
+		t.Fatalf("expected validation code %s, got %#v", code, report.Errors)
+	}
+}
+
+func assertValidationPathContains(t *testing.T, report ContentValidationReport, fragment string) {
+	t.Helper()
+	for _, validationError := range report.Errors {
+		if strings.Contains(string(validationError.Path), fragment) {
+			return
+		}
+	}
+	t.Fatalf("expected validation path containing %q, got %#v", fragment, report.Errors)
+}

@@ -2,9 +2,12 @@ package worlds
 
 import (
 	"math"
+	"strings"
 	"sync"
 	"time"
 
+	contentpkg "amandacore/services/internal/content"
+	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
 )
@@ -19,6 +22,10 @@ const (
 	playerAutoAttackGrit      = 12.0
 	playerAutoAttackCadenceMs = int64(1800)
 	playerGlobalCooldownMs    = int64(1500)
+
+	devBasicStrikeDamage     = 10.0
+	devBasicStrikeRange      = 3.0
+	devBasicStrikeCooldownMs = int64(1500)
 
 	hostileMobKind           = "hostile_mob"
 	gatheringNodeKind        = "gathering_node"
@@ -43,6 +50,10 @@ const (
 	mobAIStateDead       = "dead"
 	mobAIStateRespawning = "respawning"
 
+	npcDispositionNeutral  = "Neutral"
+	npcDispositionHostile  = "Hostile"
+	npcDispositionFriendly = "Friendly"
+
 	defaultZoneID       = "stonewake_vale"
 	secondZoneID        = "brindlebrook_roadlands"
 	dungeonZoneID       = "dun_tallowdeep_sluice"
@@ -52,6 +63,7 @@ const (
 
 	questStateNotStarted    = "not_started"
 	questStateActive        = "active"
+	questStateReady         = "ready_to_complete"
 	questStateCompleted     = "completed"
 	questStateRewardGranted = "reward_granted"
 
@@ -61,6 +73,12 @@ const (
 	objectiveTrainer = "trainer"
 	objectiveExplore = "explore"
 	objectiveUse     = "use_location"
+
+	objectiveKindKillNPC               = "KillNpc"
+	objectiveKindCollectItem           = "CollectItem"
+	objectiveKindInteractWithEntity    = "InteractWithEntity"
+	objectiveKindReachLocation         = "ReachLocationPlaceholder"
+	objectiveKindUseAbilityPlaceholder = "UseAbilityPlaceholder"
 
 	starterQuestID        = "sv_first_muster"
 	legacyEmberQuestID    = "defeat_ember_hounds_01"
@@ -75,6 +93,15 @@ const (
 	secondZoneEntryY      = 148.0
 	secondZoneMaxX        = 720.0
 	secondZoneMaxY        = 420.0
+	noContentPackagePath  = "__amandacore_no_content_package__"
+)
+
+type NpcDisposition string
+
+const (
+	NpcDispositionNeutral  NpcDisposition = "Neutral"
+	NpcDispositionHostile  NpcDisposition = "Hostile"
+	NpcDispositionFriendly NpcDisposition = "Friendly"
 )
 
 type joinTicketRequest struct {
@@ -276,6 +303,16 @@ type inventoryEquipRequest struct {
 	SlotIndex         int    `json:"slotIndex"`
 }
 
+type lootInspectRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	LootContainerID   string `json:"lootContainerId"`
+}
+
+type lootClaimRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	LootContainerID   string `json:"lootContainerId"`
+}
+
 type vendorBuyRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	VendorID          string `json:"vendorId"`
@@ -291,6 +328,11 @@ type vendorSellRequest struct {
 }
 
 type questAcceptRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	QuestID           string `json:"questId"`
+}
+
+type questCompleteRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	QuestID           string `json:"questId"`
 }
@@ -317,29 +359,51 @@ type npcService struct {
 }
 
 type sessionEntity struct {
-	ID               string       `json:"id"`
-	DisplayName      string       `json:"displayName"`
-	Kind             string       `json:"kind"`
-	MobTypeID        string       `json:"mobTypeId,omitempty"`
-	Classification   string       `json:"classification,omitempty"`
-	Elite            bool         `json:"elite,omitempty"`
-	GatherNodeTypeID string       `json:"gatherNodeTypeId,omitempty"`
-	ProfessionID     string       `json:"professionId,omitempty"`
-	RequiredSkill    int          `json:"requiredSkill,omitempty"`
-	Ready            bool         `json:"ready,omitempty"`
-	ReadyAt          int64        `json:"readyAt,omitempty"`
-	InteractionLabel string       `json:"interactionLabel,omitempty"`
-	X                float64      `json:"x"`
-	Y                float64      `json:"y"`
-	Z                float64      `json:"z"`
-	Health           float64      `json:"health"`
-	MaxHealth        float64      `json:"maxHealth"`
-	Alive            bool         `json:"alive"`
-	Targetable       bool         `json:"targetable"`
-	AIState          string       `json:"aiState,omitempty"`
-	PvPState         string       `json:"pvpState,omitempty"`
-	DuelOpponent     bool         `json:"duelOpponent,omitempty"`
-	Services         []npcService `json:"npcServices,omitempty"`
+	ID               string         `json:"id"`
+	ArchetypeID      string         `json:"archetypeId,omitempty"`
+	SpawnPointID     string         `json:"spawnPointId,omitempty"`
+	DisplayName      string         `json:"displayName"`
+	Kind             string         `json:"kind"`
+	MobTypeID        string         `json:"mobTypeId,omitempty"`
+	Disposition      string         `json:"disposition,omitempty"`
+	Classification   string         `json:"classification,omitempty"`
+	Elite            bool           `json:"elite,omitempty"`
+	GatherNodeTypeID string         `json:"gatherNodeTypeId,omitempty"`
+	ProfessionID     string         `json:"professionId,omitempty"`
+	RequiredSkill    int            `json:"requiredSkill,omitempty"`
+	Ready            bool           `json:"ready,omitempty"`
+	ReadyAt          int64          `json:"readyAt,omitempty"`
+	InteractionLabel string         `json:"interactionLabel,omitempty"`
+	X                float64        `json:"x"`
+	Y                float64        `json:"y"`
+	Z                float64        `json:"z"`
+	Health           float64        `json:"health"`
+	MaxHealth        float64        `json:"maxHealth"`
+	Alive            bool           `json:"alive"`
+	Targetable       bool           `json:"targetable"`
+	IsInCombat       bool           `json:"isInCombat"`
+	CurrentTargetID  string         `json:"currentTargetEntityId,omitempty"`
+	LastDamagedByID  string         `json:"lastDamagedByEntityId,omitempty"`
+	RespawnDelayMs   int64          `json:"respawnDelayMs,omitempty"`
+	DeathTick        int64          `json:"deathTick,omitempty"`
+	RespawnTick      int64          `json:"respawnTick,omitempty"`
+	AIState          string         `json:"aiState,omitempty"`
+	PvPState         string         `json:"pvpState,omitempty"`
+	DuelOpponent     bool           `json:"duelOpponent,omitempty"`
+	Services         []npcService   `json:"npcServices,omitempty"`
+	Auras            []auraResponse `json:"auras,omitempty"`
+}
+
+type auraResponse struct {
+	AuraID         string `json:"auraId"`
+	DisplayName    string `json:"displayName"`
+	Kind           string `json:"kind"`
+	SourceEntityID string `json:"sourceEntityId"`
+	TargetEntityID string `json:"targetEntityId"`
+	StackCount     int    `json:"stackCount"`
+	AppliedAtMs    int64  `json:"appliedAtMs"`
+	ExpiresAtMs    int64  `json:"expiresAtMs,omitempty"`
+	NextTickAtMs   int64  `json:"nextTickAtMs,omitempty"`
 }
 
 type itemRewardDefinition struct {
@@ -354,10 +418,27 @@ type itemRewardResponse struct {
 	StackCount  int    `json:"stackCount"`
 }
 
+type questObjectiveGraph struct {
+	Nodes []questObjectiveNode
+}
+
+type questObjectiveNode struct {
+	NodeID             string
+	Kind               string
+	TargetNpcArchetype string
+	TargetEntityID     string
+	TargetItemID       string
+	TargetCount        int
+	DependsOn          []string
+	Terminal           bool
+}
+
 type questDefinition struct {
 	ID                 string
 	ZoneID             string
 	Title              string
+	Summary            string
+	RequiredLevel      int
 	ObjectiveType      string
 	ObjectiveText      string
 	GiverNPCID         string
@@ -378,6 +459,9 @@ type questDefinition struct {
 	GroupRecommended   bool
 	RecommendedPlayers int
 	PartyCreditRadius  float64
+	ObjectiveGraph     questObjectiveGraph
+	AllowDirectAccept  bool
+	Tags               []string
 }
 
 type navigationAreaDefinition struct {
@@ -569,6 +653,7 @@ type worldSessionState struct {
 	CastingAbilityID   string
 	CastingTargetID    string
 	AbilityCooldowns   map[string]int64
+	ActiveAuras        map[string]auraInstance
 	Experience         int
 	CurrencyCopper     int
 	Inventory          []platform.CharacterInventorySlot
@@ -578,6 +663,7 @@ type worldSessionState struct {
 	LearnedAbilityIDs  []string
 	ActionBarSlots     []platform.CharacterActionBarSlot
 	QuestProgress      map[string]platform.CharacterQuestProgress
+	KillCredits        map[string]platform.CharacterKillCredit
 	TrackedQuestIDs    []string
 	PvPStats           platform.CharacterPvPStats
 	LastDuelResult     *duelResultState
@@ -591,11 +677,15 @@ type worldSessionState struct {
 type mobState struct {
 	ID                     string
 	InstanceID             string
+	SpawnPointID           string
 	MobTypeID              string
+	ArchetypeID            string
 	DisplayName            string
 	Kind                   string
+	Disposition            string
 	ZoneID                 string
 	Level                  int
+	LootTableID            string
 	X                      float64
 	Y                      float64
 	Z                      float64
@@ -617,16 +707,25 @@ type mobState struct {
 	Targetable             bool
 	AIState                string
 	CurrentTargetCharacter string
+	LastDamagedByCharacter string
+	LastDamagedByEntityID  string
 	LastAttackAtMs         int64
+	DeathTick              int64
 	RespawnAtMs            int64
+	RespawnTick            int64
+	ActiveAuras            map[string]auraInstance
 }
 
 type mobSpawnDefinition struct {
 	ID              string
+	SpawnPointID    string
 	ZoneID          string
 	MobTypeID       string
+	ArchetypeID     string
 	DisplayName     string
+	Disposition     string
 	Level           int
+	LootTableID     string
 	X               float64
 	Y               float64
 	Z               float64
@@ -690,9 +789,31 @@ type dungeonInstanceState struct {
 	LastPlayerLeftAtMs int64
 }
 
+type KillCreditReason string
+
+const (
+	KillCreditReasonKillingBlow KillCreditReason = "killing_blow"
+)
+
+type KillCredit struct {
+	CharacterID    string           `json:"characterId"`
+	SourceEntityID string           `json:"sourceEntityId"`
+	NpcArchetypeID string           `json:"npcArchetypeId"`
+	ZoneID         string           `json:"zoneId"`
+	InstanceID     string           `json:"instanceId,omitempty"`
+	TickMs         int64            `json:"tickMs"`
+	Reason         KillCreditReason `json:"reason"`
+}
+
+type KillCreditLedger struct {
+	CreditsByCharacter map[string]map[string]int
+	Entries            []KillCredit
+}
+
 type worldServer struct {
 	store                  *store.FileStore
 	metrics                *worldMetrics
+	runtime                *WorldRuntime
 	mutex                  sync.Mutex
 	sessionsByToken        map[string]*worldSessionState
 	sessionTokenByChar     map[string]string
@@ -705,6 +826,9 @@ type worldServer struct {
 	instanceByParty        map[string]string
 	instanceCounter        int64
 	housingInstanceCounter int64
+	eventSequence          int64
+	domainEvents           []DomainEvent
+	stateDiffs             []StateDiff
 	quests                 map[string]questDefinition
 	questOrder             []string
 	quest                  questDefinition
@@ -712,7 +836,19 @@ type worldServer struct {
 	friendlyNPCOrder       []string
 	gatheringNodes         map[string]*gatheringNodeState
 	gatheringNodeOrder     []string
+	lootContainers         map[string]*lootContainerState
+	lootContainerOrder     []string
+	lootContainerCounter   int64
+	killCreditLedger       KillCreditLedger
+	abilityCatalog         map[string]abilityDefinition
+	auraCatalog            map[string]auraDefinition
 	zones                  map[string]zoneDefinition
+	contentRegistry        *contentpkg.RuntimeContentRegistry
+	zoneRuntimes           map[string]*ContentZoneRuntime
+	handoffGates           map[string]ZoneHandoffGateDefinition
+	shardCoordinator       *ShardCoordinator
+	contentMobSpawns       []mobSpawnDefinition
+	contentActivation      ContentActivationResult
 	chatMessages           []chatEnvelope
 	chatSequence           int64
 	partyInvites           map[string]partyInviteState
@@ -721,9 +857,14 @@ type worldServer struct {
 }
 
 func newWorldServer(fileStore *store.FileStore) *worldServer {
+	return newWorldServerWithContentPackage(fileStore, noContentPackagePath)
+}
+
+func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackagePath string) *worldServer {
 	server := &worldServer{
 		store:              fileStore,
 		metrics:            newWorldMetrics(),
+		runtime:            NewWorldRuntime(WorldRuntimeConfig{}),
 		sessionsByToken:    map[string]*worldSessionState{},
 		sessionTokenByChar: map[string]string{},
 		mobs:               map[string]*mobState{},
@@ -734,12 +875,24 @@ func newWorldServer(fileStore *store.FileStore) *worldServer {
 		quests:             map[string]questDefinition{},
 		friendlyNPCs:       map[string]friendlyNPCDefinition{},
 		gatheringNodes:     map[string]*gatheringNodeState{},
-		zones:              map[string]zoneDefinition{},
-		partyInvites:       map[string]partyInviteState{},
+		lootContainers:     map[string]*lootContainerState{},
+		abilityCatalog:     defaultAbilityCatalog(),
+		auraCatalog:        defaultAuraCatalog(),
+		killCreditLedger: KillCreditLedger{
+			CreditsByCharacter: map[string]map[string]int{},
+		},
+		zones:        map[string]zoneDefinition{},
+		zoneRuntimes: map[string]*ContentZoneRuntime{},
+		handoffGates: defaultZoneHandoffGateDefinitions(),
+		partyInvites: map[string]partyInviteState{},
 	}
 	server.loadStarterContentLocked()
+	server.loadConfiguredContentPackageLocked(contentPackagePath)
+	server.ensureShardCoordinatorLocked()
 	server.ensureMobsLocked()
 	server.ensureGatheringNodesLocked()
+	server.emitWorldEventLocked(eventItemCatalogLoaded, map[string]any{"itemCount": len(itemDefinitions)})
+	server.emitWorldEventLocked(eventLootTableLoaded, map[string]any{"lootTableCount": len(devLootTables)})
 	return server
 }
 
@@ -749,11 +902,16 @@ func (s *worldServer) loadStarterContentLocked() {
 	allZones = append(allZones, housingZoneDefinitions...)
 	for _, zone := range allZones {
 		s.zones[zone.ID] = zone
+		observability.LogEvent("world-service", observability.EventWorldZoneLoaded, map[string]any{
+			"zoneId":      zone.ID,
+			"displayName": zone.DisplayName,
+		})
 	}
 
 	allQuests := append([]questDefinition{}, stonewakeQuestDefinitions...)
 	allQuests = append(allQuests, brindlebrookQuestDefinitions...)
 	allQuests = append(allQuests, dungeonQuestDefinitions...)
+	allQuests = append(allQuests, devProgressionQuestDefinitions...)
 	s.questOrder = make([]string, 0, len(allQuests))
 	for _, quest := range allQuests {
 		if quest.ZoneID == "" {
@@ -768,6 +926,7 @@ func (s *worldServer) loadStarterContentLocked() {
 	if quest, ok := s.quests[starterQuestID]; ok {
 		s.quest = quest
 	}
+	s.emitWorldEventLocked(eventQuestCatalogLoaded, map[string]any{"questCount": len(s.quests)})
 
 	allFriendlyNPCs := append([]friendlyNPCDefinition{}, stonewakeFriendlyNPCs...)
 	allFriendlyNPCs = append(allFriendlyNPCs, brindlebrookFriendlyNPCs...)
@@ -794,43 +953,113 @@ func (s *worldServer) ensureMobsLocked() {
 
 	allMobSpawns := append([]mobSpawnDefinition{}, stonewakeMobSpawns...)
 	allMobSpawns = append(allMobSpawns, brindlebrookMobSpawns...)
+	allMobSpawns = append(allMobSpawns, s.contentMobSpawns...)
 	s.mobOrder = make([]string, 0, len(allMobSpawns))
 	for _, spawn := range allMobSpawns {
-		zoneID := spawn.ZoneID
-		if zoneID == "" {
-			zoneID = defaultZoneID
+		if spawn.ZoneID == "" {
+			spawn.ZoneID = defaultZoneID
+		}
+		if spawn.ArchetypeID == "" {
+			spawn.ArchetypeID = spawn.MobTypeID
+		}
+		if spawn.SpawnPointID == "" {
+			spawn.SpawnPointID = spawn.ID
+		}
+		if spawn.Disposition == "" {
+			spawn.Disposition = string(NpcDispositionHostile)
 		}
 		spawn.Z = clampSpawnGroundZ(spawn.Z)
 		s.mobOrder = append(s.mobOrder, spawn.ID)
-		s.mobs[spawn.ID] = &mobState{
-			ID:              spawn.ID,
-			InstanceID:      "",
-			MobTypeID:       spawn.MobTypeID,
-			DisplayName:     spawn.DisplayName,
-			Kind:            hostileMobKind,
-			ZoneID:          zoneID,
-			Level:           spawn.Level,
-			X:               spawn.X,
-			Y:               spawn.Y,
-			Z:               spawn.Z,
-			SpawnX:          spawn.X,
-			SpawnY:          spawn.Y,
-			SpawnZ:          spawn.Z,
-			Health:          spawn.MaxHealth,
-			MaxHealth:       spawn.MaxHealth,
-			AggroRadius:     spawn.AggroRadius,
-			AttackRange:     spawn.AttackRange,
-			AttackDamage:    spawn.AttackDamage,
-			AttackCadenceMs: spawn.AttackCadenceMs,
-			MoveSpeedPerSec: spawn.MoveSpeedPerSec,
-			LeashRadius:     spawn.LeashRadius,
-			RespawnDelayMs:  spawn.RespawnDelayMs,
-			Classification:  spawn.Classification,
-			Elite:           spawn.Elite,
-			Alive:           true,
-			Targetable:      true,
-			AIState:         mobAIStateIdle,
-		}
+		mob := newMobStateFromSpawn(spawn, "")
+		s.mobs[spawn.ID] = mob
+		s.emitWorldEventLocked(eventNPCSpawnPointLoaded, mobSpawnPayload(mob))
+		s.emitWorldEventLocked(eventNPCSpawned, mobSpawnPayload(mob), entitySpawnDelta(mob))
+		s.emitWorldEventLocked(eventWorldEntitySpawned, mobSpawnPayload(mob))
+	}
+}
+
+func newMobStateFromSpawn(spawn mobSpawnDefinition, instanceID string) *mobState {
+	archetypeID := spawn.ArchetypeID
+	if archetypeID == "" {
+		archetypeID = spawn.MobTypeID
+	}
+	spawnPointID := spawn.SpawnPointID
+	if spawnPointID == "" {
+		spawnPointID = spawn.ID
+	}
+	disposition := spawn.Disposition
+	if disposition == "" {
+		disposition = npcDispositionHostile
+	}
+	disposition = normalizeNpcDisposition(disposition)
+	return &mobState{
+		ID:              spawn.ID,
+		InstanceID:      instanceID,
+		ArchetypeID:     archetypeID,
+		SpawnPointID:    spawnPointID,
+		MobTypeID:       spawn.MobTypeID,
+		DisplayName:     spawn.DisplayName,
+		Kind:            hostileMobKind,
+		Disposition:     disposition,
+		ZoneID:          spawn.ZoneID,
+		Level:           spawn.Level,
+		LootTableID:     spawn.LootTableID,
+		X:               spawn.X,
+		Y:               spawn.Y,
+		Z:               spawn.Z,
+		SpawnX:          spawn.X,
+		SpawnY:          spawn.Y,
+		SpawnZ:          spawn.Z,
+		Health:          spawn.MaxHealth,
+		MaxHealth:       spawn.MaxHealth,
+		AggroRadius:     spawn.AggroRadius,
+		AttackRange:     spawn.AttackRange,
+		AttackDamage:    spawn.AttackDamage,
+		AttackCadenceMs: spawn.AttackCadenceMs,
+		MoveSpeedPerSec: spawn.MoveSpeedPerSec,
+		LeashRadius:     spawn.LeashRadius,
+		RespawnDelayMs:  spawn.RespawnDelayMs,
+		Classification:  spawn.Classification,
+		Elite:           spawn.Elite,
+		Alive:           true,
+		Targetable:      true,
+		AIState:         mobAIStateIdle,
+	}
+}
+
+func normalizeNpcDisposition(disposition string) string {
+	switch strings.ToLower(strings.TrimSpace(disposition)) {
+	case strings.ToLower(npcDispositionFriendly):
+		return npcDispositionFriendly
+	case strings.ToLower(npcDispositionNeutral):
+		return npcDispositionNeutral
+	case strings.ToLower(npcDispositionHostile):
+		return npcDispositionHostile
+	default:
+		return disposition
+	}
+}
+
+func mobSpawnPayload(mob *mobState) map[string]any {
+	if mob == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"entityId":     mob.ID,
+		"archetypeId":  mob.ArchetypeID,
+		"spawnPointId": mob.SpawnPointID,
+		"displayName":  mob.DisplayName,
+		"zoneId":       mob.ZoneID,
+		"instanceId":   mob.InstanceID,
+		"disposition":  mob.Disposition,
+		"x":            mob.X,
+		"y":            mob.Y,
+		"z":            mob.Z,
+		"level":        mob.Level,
+		"maxHealth":    mob.MaxHealth,
+		"health":       mob.Health,
+		"alive":        mob.Alive,
+		"targetable":   mob.Targetable,
 	}
 }
 

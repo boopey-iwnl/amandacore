@@ -58,6 +58,7 @@ type state struct {
 	HousingStorage      map[string][]platform.HousingStorageSlot  `json:"housingStorage"`
 	HousingDecorations  map[string][]platform.DecorationPlacement `json:"housingDecorations"`
 	AccountProgress     map[string]platform.AccountProgressState  `json:"accountProgress"`
+	MigrationHistory    map[string]MigrationRecord                `json:"migrationHistory"`
 	BuildManifest       platform.BuildManifest                    `json:"buildManifest"`
 }
 
@@ -68,7 +69,16 @@ type FileStore struct {
 	state    state
 }
 
+type FileStoreOpenOptions struct {
+	ApplyMigrations bool
+	SaveOnOpen      bool
+}
+
 func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore, error) {
+	return NewFileStoreWithOptions(path, buildID, worldEndpoint, FileStoreOpenOptions{ApplyMigrations: true, SaveOnOpen: true})
+}
+
+func NewFileStoreWithOptions(path string, buildID string, worldEndpoint string, options FileStoreOpenOptions) (*FileStore, error) {
 	buildManifest := defaultBuildManifest(buildID, worldEndpoint)
 	fileStore := &FileStore{
 		path:     path,
@@ -94,6 +104,7 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 			HousingStorage:      map[string][]platform.HousingStorageSlot{},
 			HousingDecorations:  map[string][]platform.DecorationPlacement{},
 			AccountProgress:     map[string]platform.AccountProgressState{},
+			MigrationHistory:    map[string]MigrationRecord{},
 			BuildManifest:       buildManifest,
 		},
 	}
@@ -103,8 +114,19 @@ func NewFileStore(path string, buildID string, worldEndpoint string) (*FileStore
 	}
 	defer fileStore.unlockState()
 
+	if options.ApplyMigrations {
+		if _, err := fileStore.applyMigrationsLocked(MigrationOptions{}); err != nil {
+			return nil, err
+		}
+	}
 	fileStore.applyRuntimeBuildManifest(buildManifest, worldEndpoint)
-	return fileStore, fileStore.saveLocked()
+	if !options.SaveOnOpen {
+		return fileStore, nil
+	}
+	if err := fileStore.saveLocked(); err != nil {
+		return nil, err
+	}
+	return fileStore, nil
 }
 
 func (s *FileStore) RegisterAccount(username string, password string) (platform.Account, error) {
@@ -537,6 +559,7 @@ func (s *FileStore) CreateCharacter(accountID string, realmID string, displayNam
 		Professions:     []platform.CharacterProfessionState{},
 		Talents:         map[string]int{},
 		Quests:          map[string]platform.CharacterQuestProgress{},
+		KillCredits:     map[string]platform.CharacterKillCredit{},
 		TrackedQuestIDs: []string{},
 		LastSeenAt:      time.Now().Unix(),
 	}
@@ -1344,6 +1367,30 @@ func (s *FileStore) UpdateCharacterProgression(
 	return &copy, nil
 }
 
+func (s *FileStore) UpdateCharacterKillCredits(characterID string, killCredits map[string]platform.CharacterKillCredit) (*platform.Character, error) {
+	if err := s.lockState(true); err != nil {
+		return nil, err
+	}
+	defer s.unlockState()
+
+	character, ok := s.state.Characters[characterID]
+	if !ok {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	character.KillCredits = cloneKillCreditsMap(killCredits)
+	character = platform.NormalizeCharacter(character)
+	character.LastSeenAt = time.Now().Unix()
+	s.state.Characters[characterID] = character
+
+	if err := s.saveLocked(); err != nil {
+		return nil, err
+	}
+
+	copy := normalizedCharacterCopy(character)
+	return &copy, nil
+}
+
 func (s *FileStore) UpdateCharacterTrackedQuests(characterID string, trackedQuestIDs []string) (*platform.Character, error) {
 	if err := s.lockState(true); err != nil {
 		return nil, err
@@ -1626,6 +1673,9 @@ func (s *FileStore) load() error {
 		}
 		s.state.AccountProgress = loaded.AccountProgress
 	}
+	if loaded.MigrationHistory != nil {
+		s.state.MigrationHistory = loaded.MigrationHistory
+	}
 	if loaded.BuildManifest.ID != "" {
 		s.state.BuildManifest = loaded.BuildManifest
 	}
@@ -1723,6 +1773,9 @@ func (s *FileStore) reloadLocked() error {
 		for accountID, progress := range loaded.AccountProgress {
 			loaded.AccountProgress[accountID] = platform.NormalizeAccountProgress(accountID, progress)
 		}
+	}
+	if loaded.MigrationHistory == nil {
+		loaded.MigrationHistory = map[string]MigrationRecord{}
 	}
 	if loaded.BuildManifest.ID == "" {
 		loaded.BuildManifest = s.state.BuildManifest
@@ -1938,9 +1991,20 @@ func cloneQuestProgressMap(source map[string]platform.CharacterQuestProgress) ma
 
 	cloned := make(map[string]platform.CharacterQuestProgress, len(source))
 	for key, value := range source {
+		if len(value.ObjectiveProgress) > 0 {
+			objectives := make(map[string]platform.CharacterQuestObjectiveProgress, len(value.ObjectiveProgress))
+			for nodeID, objective := range value.ObjectiveProgress {
+				objectives[nodeID] = objective
+			}
+			value.ObjectiveProgress = objectives
+		}
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func cloneKillCreditsMap(source map[string]platform.CharacterKillCredit) map[string]platform.CharacterKillCredit {
+	return platform.NormalizeCharacterKillCredits(source)
 }
 
 func cloneInventorySlots(source []platform.CharacterInventorySlot) []platform.CharacterInventorySlot {
@@ -2005,6 +2069,7 @@ func normalizedCharacterCopy(source platform.Character) platform.Character {
 	normalized.Talents = cloneTalentRanks(normalized.Talents)
 	normalized.ActionBarSlots = cloneActionBarSlots(normalized.ActionBarSlots, normalized.LearnedAbilityIDs)
 	normalized.Quests = cloneQuestProgressMap(normalized.Quests)
+	normalized.KillCredits = cloneKillCreditsMap(normalized.KillCredits)
 	normalized.TrackedQuestIDs = cloneStringIDs(normalized.TrackedQuestIDs)
 	normalized.BindPoint = platform.NormalizeCharacterBindPoint(normalized.ID, normalized.BindPoint)
 	normalized.TravelState = platform.NormalizeCharacterTravelState(normalized.TravelState)

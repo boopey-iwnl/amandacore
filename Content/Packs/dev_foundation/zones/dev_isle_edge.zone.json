@@ -1,0 +1,84 @@
+{
+  "zone_id": "dev_isle_edge",
+  "display_name": "Dev Isle Edge",
+  "description": "A compact original AmandaCore validation zone for package-loaded server runtime content.",
+  "bounds": {
+    "min_x": 0,
+    "min_y": 0,
+    "min_z": 0,
+    "max_x": 96,
+    "max_y": 64,
+    "max_z": 16
+  },
+  "entry_points": [
+    {
+      "entry_id": "dev_isle_arrival",
+      "position": {
+        "x": 10,
+        "y": 10,
+        "z": 0.1
+      },
+      "facing_yaw": 90
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "dev_isle_stalker_edge",
+      "npc_archetype_id": "dev_isle_stalker",
+      "loot_table_id": "dev_isle_stalker_cache",
+      "respawn_seconds": 10,
+      "max_alive": 2,
+      "spawn_points": [
+        {
+          "spawn_point_id": "spawn_dev_isle_stalker_01",
+          "position": {
+            "x": 52,
+            "y": 42,
+            "z": 0.1
+          },
+          "facing_yaw": 180
+        },
+        {
+          "spawn_point_id": "spawn_dev_isle_stalker_02",
+          "position": {
+            "x": 60,
+            "y": 46,
+            "z": 0.1
+          },
+          "facing_yaw": 205
+        }
+      ],
+      "tags": [
+        "dev",
+        "hostile"
+      ]
+    }
+  ],
+  "quest_providers": [
+    {
+      "provider_id": "provider_dev_pathfinder",
+      "display_name": "Pathfinder Nessa Orin",
+      "position": {
+        "x": 12,
+        "y": 12,
+        "z": 0.1
+      },
+      "offered_quest_ids": [
+        "dev_first_hunt"
+      ],
+      "tags": [
+        "dev",
+        "quest"
+      ]
+    }
+  ],
+  "runtime": {
+    "tick_ms": 50,
+    "max_players": 8,
+    "max_entities": 64
+  },
+  "tags": [
+    "dev",
+    "test-zone"
+  ]
+}

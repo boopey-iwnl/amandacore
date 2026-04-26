@@ -1,0 +1,122 @@
+{
+  "zone_id": "kingsfall_harbor",
+  "display_name": "Kingsfall Harbor",
+  "description": "A distinct capital city zone skeleton for social, vendor, quest, and future city-service hooks.",
+  "continent_id": "dawnwake_isles",
+  "bounds": {
+    "min_x": 560,
+    "min_y": 80,
+    "min_z": -25,
+    "max_x": 760,
+    "max_y": 260,
+    "max_z": 180
+  },
+  "entry_points": [
+    {
+      "entry_id": "kingsfall_west_gate",
+      "position": {
+        "x": 566,
+        "y": 174,
+        "z": 0
+      },
+      "facing_yaw": 90
+    },
+    {
+      "entry_id": "kingsfall_harbor_quay",
+      "position": {
+        "x": 690,
+        "y": 118,
+        "z": 0
+      },
+      "facing_yaw": 180
+    }
+  ],
+  "transition_gates": [
+    {
+      "transition_id": "kingsfall_to_highroad_city_gate",
+      "from_zone_id": "kingsfall_harbor",
+      "to_zone_id": "highroad_pass",
+      "kind": "city-gate",
+      "gate_bounds": {
+        "min_x": 560,
+        "min_y": 154,
+        "min_z": -5,
+        "max_x": 566,
+        "max_y": 194,
+        "max_z": 35
+      },
+      "entry_point_id_on_arrival": "highroad_kingsfall_gate",
+      "tags": ["walk", "city-gate"]
+    },
+    {
+      "transition_id": "kingsfall_harbor_route_placeholder",
+      "from_zone_id": "kingsfall_harbor",
+      "to_zone_id": "dawnwake_landing",
+      "kind": "harbor-route-placeholder",
+      "gate_bounds": {
+        "min_x": 684,
+        "min_y": 108,
+        "min_z": -5,
+        "max_x": 704,
+        "max_y": 128,
+        "max_z": 25
+      },
+      "entry_point_id_on_arrival": "landing_shore",
+      "disabled": true,
+      "tags": ["future-harbor-route"]
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "kingsfall_harbor_rats",
+      "npc_archetype_id": "dawnwake_harbor_rat",
+      "loot_table_id": "dawnwake_harbor_rat_junk",
+      "respawn_seconds": 20,
+      "max_alive": 1,
+      "spawn_points": [
+        {
+          "spawn_point_id": "kingsfall_harbor_rat_01",
+          "position": {
+            "x": 642,
+            "y": 126,
+            "z": 0
+          },
+          "facing_yaw": 310
+        }
+      ],
+      "tags": ["placeholder", "low-hostile-density"]
+    }
+  ],
+  "quest_providers": [
+    {
+      "provider_id": "kingsfall_harbor_notice_board",
+      "display_name": "Kingsfall Harbor Notice Board",
+      "position": {
+        "x": 598,
+        "y": 178,
+        "z": 0
+      },
+      "offered_quest_ids": [],
+      "tags": ["city", "social", "quest-provider-placeholder"]
+    }
+  ],
+  "runtime": {
+    "tick_ms": 50,
+    "max_players": 128,
+    "max_entities": 512
+  },
+  "streaming": {
+    "interest_radius": 96,
+    "adjacent_preload_distance": 50,
+    "priority": "city",
+    "notes": [
+      "Capital city skeleton only; no full city services yet.",
+      "High player density expected; hostile NPC density intentionally low."
+    ]
+  },
+  "tags": ["city", "capital", "social", "placeholder-bounds"],
+  "metadata": {
+    "accuracy": "placeholder",
+    "source": "pending_map_trace"
+  }
+}

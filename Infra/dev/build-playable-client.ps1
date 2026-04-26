@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $launcherProject = Join-Path $repoRoot "Client\\Launcher\\AmandaCore.Launcher\\AmandaCore.Launcher.csproj"
 $worldClientProject = Join-Path $repoRoot "Client\\Game\\AmandaCore.WorldClient\\AmandaCore.WorldClient.csproj"
+$localControlsProject = Join-Path $repoRoot "Client\\Tools\\AmandaCore.LocalControls\\AmandaCore.LocalControls.csproj"
 $versionManifestScript = Join-Path $PSScriptRoot "write-version-manifest.ps1"
 $versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
 $o3deBuildRoots = @(
@@ -46,6 +47,7 @@ if (!(Test-Path $versionManifestPath)) {
 
 Invoke-Native $dotnet "build" $launcherProject
 Invoke-Native $dotnet "build" $worldClientProject
+Invoke-Native $dotnet "build" $localControlsProject
 
 foreach ($o3deBuildRoot in $o3deBuildRoots) {
     if (Test-Path $o3deBuildRoot) {
@@ -53,5 +55,5 @@ foreach ($o3deBuildRoot in $o3deBuildRoots) {
     }
 }
 
-Write-Host "Playable client build completed for launcher, world client, and available O3DE GameLauncher targets."
+Write-Host "Playable client build completed for launcher, world client, local controls, and available O3DE GameLauncher targets."
 Write-Host "Build manifest: $versionManifestPath"

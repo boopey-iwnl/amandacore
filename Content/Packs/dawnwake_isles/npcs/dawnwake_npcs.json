@@ -1,0 +1,142 @@
+{
+    "npcs":  [
+                 {
+                     "archetype_id":  "dw_saltglade_strider",
+                     "display_name":  "Saltglade Strider",
+                     "level":  2,
+                     "max_health":  42,
+                     "disposition":  "Hostile",
+                     "attack_range":  2.6,
+                     "aggro_range":  6,
+                     "leash_range":  18,
+                     "base_damage":  4,
+                     "attack_interval_ms":  1700,
+                     "default_ability_ids":  [
+                                                 "dw_tidecut"
+                                             ],
+                     "tags":  [
+                                  "dawnwake",
+                                  "shore"
+                              ]
+                 },
+                 {
+                     "archetype_id":  "dw_tideglass_mote",
+                     "display_name":  "Tideglass Mote",
+                     "level":  3,
+                     "max_health":  50,
+                     "disposition":  "Hostile",
+                     "attack_range":  3,
+                     "aggro_range":  7,
+                     "leash_range":  20,
+                     "base_damage":  5,
+                     "attack_interval_ms":  1800,
+                     "default_ability_ids":  [
+                                                 "dw_shimmer_jolt"
+                                             ],
+                     "tags":  [
+                                  "dawnwake",
+                                  "shoal"
+                              ]
+                 },
+                 {
+                     "archetype_id":  "dw_rise_sentinel",
+                     "display_name":  "Windspur Sentinel",
+                     "level":  4,
+                     "max_health":  72,
+                     "disposition":  "Hostile",
+                     "attack_range":  2.8,
+                     "aggro_range":  8,
+                     "leash_range":  24,
+                     "base_damage":  7,
+                     "attack_interval_ms":  1900,
+                     "default_ability_ids":  [
+                                                 "dw_windguard_bash"
+                                             ],
+                     "tags":  [
+                                  "dawnwake",
+                                  "rise"
+                              ]
+                 },
+                 {
+                     "archetype_id":  "dawnwake_tide_scavenger",
+                     "display_name":  "Dawnwake Tide Scavenger",
+                     "level":  1,
+                     "max_health":  34,
+                     "disposition":  "hostile",
+                     "attack_range":  2.5,
+                     "aggro_range":  7,
+                     "leash_range":  18,
+                     "base_damage":  3,
+                     "attack_interval_ms":  1500,
+                     "default_ability_ids":  [
+
+                                             ],
+                     "tags":  [
+                                  "dawnwake",
+                                  "starter",
+                                  "placeholder"
+                              ]
+                 },
+                 {
+                     "archetype_id":  "dawnwake_reef_stalker",
+                     "display_name":  "Dawnwake Reef Stalker",
+                     "level":  2,
+                     "max_health":  52,
+                     "disposition":  "hostile",
+                     "attack_range":  2.7,
+                     "aggro_range":  8,
+                     "leash_range":  22,
+                     "base_damage":  5,
+                     "attack_interval_ms":  1500,
+                     "default_ability_ids":  [
+
+                                             ],
+                     "tags":  [
+                                  "dawnwake",
+                                  "wilds",
+                                  "placeholder"
+                              ]
+                 },
+                 {
+                     "archetype_id":  "dawnwake_harbor_rat",
+                     "display_name":  "Dawnwake Harbor Rat",
+                     "level":  1,
+                     "max_health":  18,
+                     "disposition":  "neutral",
+                     "attack_range":  1.8,
+                     "aggro_range":  0,
+                     "leash_range":  8,
+                     "base_damage":  1,
+                     "attack_interval_ms":  1800,
+                     "default_ability_ids":  [
+
+                                             ],
+                     "tags":  [
+                                  "dawnwake",
+                                  "city",
+                                  "low-density",
+                                  "placeholder"
+                              ]
+                 },
+                 {
+                     "archetype_id":  "dawnwake_road_bandit_placeholder",
+                     "display_name":  "Dawnwake Road Bandit Placeholder",
+                     "level":  4,
+                     "max_health":  92,
+                     "disposition":  "hostile",
+                     "attack_range":  2.8,
+                     "aggro_range":  9,
+                     "leash_range":  26,
+                     "base_damage":  8,
+                     "attack_interval_ms":  1600,
+                     "default_ability_ids":  [
+
+                                             ],
+                     "tags":  [
+                                  "dawnwake",
+                                  "route",
+                                  "placeholder"
+                              ]
+                 }
+             ]
+}

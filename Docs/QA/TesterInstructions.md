@@ -6,9 +6,9 @@ Use these steps for every assigned Alpha 0.1 release-candidate build. Stay on th
 
 1. Extract or open the tester package.
 2. Open `Infra\dev\Launch-LocalOpsGui.cmd`.
-3. Click `Build + Restart Stack`, or `Start Services` if the build is already prepared.
+3. Click `Start local stack`.
 4. Wait until all services show healthy.
-5. Click `Open Launcher`.
+5. Click `Launch AmandaCore Launcher`.
 6. Register or log in with the assigned test account.
 7. Load realms, load characters, create or select a Human Warrior, then join world.
 8. Confirm `Docs\QA\Alpha01FeatureFreeze.md`, `Docs\QA\KnownIssues.md`, and `Docs\QA\ReleaseNotes.md` are present.
@@ -35,7 +35,7 @@ Do not test guild management, mail, direct trade, auction house, housing/storage
 
 For every `FAIL` or `BLOCKED` item:
 
-1. Click `Collect Diagnostics` in Local Ops.
+1. Click `Collect diagnostics` in Local Ops.
 2. Fill out `Docs\QA\bug-report-template.md`.
 3. Attach the diagnostic zip from `%LOCALAPPDATA%\amandacore\diagnostics`.
 4. Include the completed checklist.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 
 func TestAdminSeedAndLogin(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create file store: %v", err)
 	}
@@ -47,7 +48,7 @@ func TestAdminSeedAndLogin(t *testing.T) {
 
 func TestCharacterCreationAndJoinTicket(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create file store: %v", err)
 	}
@@ -85,11 +86,14 @@ func TestCharacterCreationAndJoinTicket(t *testing.T) {
 	if character.CurrencyCopper != platform.StarterCurrencyCopper {
 		t.Fatalf("expected starter copper %d, got %d", platform.StarterCurrencyCopper, character.CurrencyCopper)
 	}
-	if len(character.LearnedAbilityIDs) != 3 {
-		t.Fatalf("expected 3 starting learned abilities, got %d", len(character.LearnedAbilityIDs))
+	if len(character.LearnedAbilityIDs) != len(platform.DefaultStartingLearnedAbilityIDs()) {
+		t.Fatalf("expected %d starting learned abilities, got %d", len(platform.DefaultStartingLearnedAbilityIDs()), len(character.LearnedAbilityIDs))
 	}
 	if character.LearnedAbilityIDs[0] != platform.AutoAttackAbilityID {
 		t.Fatalf("expected auto attack as first learned ability, got %s", character.LearnedAbilityIDs[0])
+	}
+	if !slices.Contains(character.LearnedAbilityIDs, platform.DevBasicStrikeAbilityID) {
+		t.Fatalf("expected dev basic strike as a starting learned ability, got %#v", character.LearnedAbilityIDs)
 	}
 
 	ticket, err := fileStore.IssueWorldJoinTicket(account.ID, session.ID, character.ID, "sunset-frontier-dev")
@@ -112,6 +116,28 @@ func TestCharacterCreationAndJoinTicket(t *testing.T) {
 	}
 }
 
+func TestCharacterNormalizationBackfillsNewStarterAbilities(t *testing.T) {
+	character := platform.NormalizeCharacter(platform.Character{
+		ID:                "char_legacy",
+		AccountID:         "acct_legacy",
+		RealmID:           "sunset-frontier-dev",
+		DisplayName:       "Legacy",
+		LearnedAbilityIDs: []string{platform.AutoAttackAbilityID, platform.SteadyStrikeAbilityID, platform.BraceAbilityID},
+		ActionBarSlots: []platform.CharacterActionBarSlot{
+			{SlotIndex: 0, AbilityID: platform.AutoAttackAbilityID},
+			{SlotIndex: 1, AbilityID: platform.SteadyStrikeAbilityID},
+			{SlotIndex: 2, AbilityID: platform.BraceAbilityID},
+		},
+	})
+
+	if !slices.Contains(character.LearnedAbilityIDs, platform.DevBasicStrikeAbilityID) {
+		t.Fatalf("expected normalization to backfill dev basic strike, got %#v", character.LearnedAbilityIDs)
+	}
+	if character.ActionBarSlots[3].AbilityID != "" {
+		t.Fatalf("expected normalization to preserve empty action bar slot 3, got %s", character.ActionBarSlots[3].AbilityID)
+	}
+}
+
 func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
 	legacyState := map[string]any{
@@ -121,7 +147,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 				"id":             "sunset-frontier-dev",
 				"displayName":    "Sunset Frontier Dev",
 				"region":         "local",
-				"endpoint":       "http://localhost:8085",
+				"endpoint":       "http://127.0.0.1:8085",
 				"supportedBuild": "test-build",
 				"onlinePlayers":  0,
 				"online":         true,
@@ -156,7 +182,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 			"requiredServices":  []string{"auth-service"},
 			"launcherNews":      "test",
 			"allowedForLogin":   true,
-			"worldEndpointHint": "http://localhost:8085",
+			"worldEndpointHint": "http://127.0.0.1:8085",
 		},
 	}
 
@@ -168,7 +194,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 		t.Fatalf("failed to write legacy state: %v", err)
 	}
 
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to open store with legacy state: %v", err)
 	}
@@ -183,7 +209,7 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 	if character.ClassID != platform.DefaultClassID {
 		t.Fatalf("expected legacy class %s, got %s", platform.DefaultClassID, character.ClassID)
 	}
-	if len(character.LearnedAbilityIDs) != 3 {
+	if len(character.LearnedAbilityIDs) != len(platform.DefaultStartingLearnedAbilityIDs()) {
 		t.Fatalf("expected normalized legacy abilities, got %d entries", len(character.LearnedAbilityIDs))
 	}
 
@@ -213,14 +239,14 @@ func TestLegacyCharacterIdentityDefaultsPersistOnLoad(t *testing.T) {
 	if persisted.ClassID != platform.DefaultClassID {
 		t.Fatalf("expected persisted class %s, got %s", platform.DefaultClassID, persisted.ClassID)
 	}
-	if len(persisted.LearnedAbilityIDs) != 3 {
+	if len(persisted.LearnedAbilityIDs) != len(platform.DefaultStartingLearnedAbilityIDs()) {
 		t.Fatalf("expected persisted learned abilities, got %d", len(persisted.LearnedAbilityIDs))
 	}
 }
 
 func TestUpdateCharacterProgressionPersistsLearnedAbilities(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create file store: %v", err)
 	}
@@ -254,11 +280,11 @@ func TestUpdateCharacterProgressionPersistsLearnedAbilities(t *testing.T) {
 		t.Fatalf("failed to update character progression: %v", err)
 	}
 
-	if len(updated.LearnedAbilityIDs) != 4 {
+	if len(updated.LearnedAbilityIDs) != len(platform.DefaultStartingLearnedAbilityIDs())+1 {
 		t.Fatalf("expected learned abilities to persist driving blow, got %#v", updated.LearnedAbilityIDs)
 	}
 
-	reopenedStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	reopenedStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to reopen store: %v", err)
 	}
@@ -282,7 +308,7 @@ func TestUpdateCharacterProgressionPersistsLearnedAbilities(t *testing.T) {
 
 func TestMultipleStoreInstancesPersistWithoutCorruption(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "platform-state.json")
-	fileStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+	fileStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 	if err != nil {
 		t.Fatalf("failed to create initial file store: %v", err)
 	}
@@ -299,7 +325,7 @@ func TestMultipleStoreInstancesPersistWithoutCorruption(t *testing.T) {
 		go func(worker int) {
 			defer waitGroup.Done()
 
-			workerStore, err := NewFileStore(storePath, "test-build", "http://localhost:8085")
+			workerStore, err := NewFileStore(storePath, "test-build", "http://127.0.0.1:8085")
 			if err != nil {
 				errorChannel <- fmt.Errorf("worker %d failed to open store: %w", worker, err)
 				return

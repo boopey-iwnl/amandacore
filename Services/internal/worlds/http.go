@@ -5,11 +5,14 @@ import (
 	"encoding/hex"
 	"math"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"amandacore/services/internal/httpapi"
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
+	"amandacore/services/internal/simcore"
 	"amandacore/services/internal/store"
 )
 
@@ -18,7 +21,7 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 }
 
 func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adminEnabled bool) {
-	server := newWorldServer(fileStore)
+	server := newConfiguredWorldServer(fileStore)
 
 	joinTicketHandler := httpapi.RequireSession(fileStore, func(w http.ResponseWriter, r *http.Request, session *platform.Session) {
 		var request joinTicketRequest
@@ -35,13 +38,13 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 			return
 		}
 
-		observability.LogEvent("world-service", "character.selected", map[string]any{
+		observability.LogEvent("world-service", observability.EventCharacterSelected, map[string]any{
 			"accountId":   session.AccountID,
 			"sessionId":   session.ID,
 			"characterId": request.CharacterID,
 			"realmId":     request.RealmID,
 		})
-		observability.LogEvent("world-service", "world.join_ticket_issued", map[string]any{
+		observability.LogEvent("world-service", observability.EventWorldJoinTicketIssued, map[string]any{
 			"accountId":   ticket.AccountID,
 			"sessionId":   ticket.SessionID,
 			"ticketId":    ticket.TicketID,
@@ -56,6 +59,7 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 
 	mux.HandleFunc("POST /v1/world/connect", server.instrumentEndpointFunc("connect", server.handleConnect))
 	mux.HandleFunc("POST /v1/world/reconnect", server.instrumentEndpointFunc("reconnect", server.handleReconnect))
+	mux.HandleFunc("POST /v1/world/zone/handoff", server.instrumentEndpointFunc("zone_handoff", server.handleZoneHandoff))
 	mux.HandleFunc("POST /v1/world/move", server.instrumentEndpointFunc("move", server.handleMove))
 	mux.HandleFunc("POST /v1/world/disconnect", server.instrumentEndpointFunc("disconnect", server.handleDisconnect))
 	mux.HandleFunc("POST /v1/world/target", server.instrumentEndpointFunc("target", server.handleTarget))
@@ -71,6 +75,7 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	mux.HandleFunc("POST /v1/world/mount/summon", server.instrumentEndpointFunc("mount_summon", server.handleSummonMount))
 	mux.HandleFunc("POST /v1/world/mount/dismiss", server.instrumentEndpointFunc("mount_dismiss", server.handleDismissMount))
 	mux.HandleFunc("POST /v1/world/quest/accept", server.instrumentEndpointFunc("quest_accept", server.handleQuestAccept))
+	mux.HandleFunc("POST /v1/world/quest/complete", server.instrumentEndpointFunc("quest_complete", server.handleQuestComplete))
 	mux.HandleFunc("POST /v1/world/quest/track", server.instrumentEndpointFunc("quest_track", server.handleQuestTrack))
 	mux.HandleFunc("POST /v1/world/dungeon/enter", server.instrumentEndpointFunc("dungeon_enter", server.handleDungeonEnter))
 	mux.HandleFunc("POST /v1/world/dungeon/exit", server.instrumentEndpointFunc("dungeon_exit", server.handleDungeonExit))
@@ -85,6 +90,8 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	mux.HandleFunc("POST /v1/world/action-bar/clear", server.instrumentEndpointFunc("action_bar_clear", server.handleActionBarClear))
 	mux.HandleFunc("POST /v1/world/inventory/move", server.instrumentEndpointFunc("inventory_move", server.handleInventoryMove))
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
+	mux.HandleFunc("POST /v1/world/loot/inspect", server.instrumentEndpointFunc("loot_inspect", server.handleLootInspect))
+	mux.HandleFunc("POST /v1/world/loot/claim", server.instrumentEndpointFunc("loot_claim", server.handleLootClaim))
 	mux.HandleFunc("GET /v1/world/housing/status", server.instrumentEndpointFunc("housing_status", server.handleHousingStatus))
 	mux.HandleFunc("POST /v1/world/housing/enter", server.instrumentEndpointFunc("housing_enter", server.handleHousingEnter))
 	mux.HandleFunc("POST /v1/world/housing/leave", server.instrumentEndpointFunc("housing_leave", server.handleHousingLeave))
@@ -145,6 +152,13 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	}))
 }
 
+func newConfiguredWorldServer(fileStore *store.FileStore) *worldServer {
+	if contentPackagePath := strings.TrimSpace(os.Getenv("AMANDACORE_CONTENT_PACKAGE")); contentPackagePath != "" {
+		return newWorldServerWithContentPackage(fileStore, contentPackagePath)
+	}
+	return newWorldServer(fileStore)
+}
+
 func registerAdminRoutes(mux *http.ServeMux, server *worldServer, fileStore *store.FileStore) {
 	mux.Handle("POST /v1/world/admin/characters/{characterId}/teleport", server.instrumentEndpoint("admin_teleport", httpapi.RequirePermission(fileStore, platform.PermissionTeleportCharacter, server.handleAdminTeleport)))
 	mux.Handle("POST /v1/world/admin/characters/{characterId}/repair", server.instrumentEndpoint("admin_repair", httpapi.RequirePermission(fileStore, platform.PermissionRepairCharacter, server.handleAdminRepair)))
@@ -171,7 +185,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	observability.LogEvent("world-service", "world.join_ticket_consumed", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldJoinTicketConsumed, map[string]any{
 		"ticketId":    ticket.TicketID,
 		"accountId":   ticket.AccountID,
 		"sessionId":   ticket.SessionID,
@@ -215,7 +229,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				s.reviveSessionLocked(session)
 			}
 			s.applyCharacterProgressionLocked(session, character)
-			observability.LogEvent("world-service", "world.player_spawned", map[string]any{
+			observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
 				"worldSessionToken": session.Token,
 				"accountId":         session.AccountID,
 				"characterId":       session.CharacterID,
@@ -256,7 +270,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	s.sessionsByToken[session.Token] = session
 	s.sessionTokenByChar[session.CharacterID] = session.Token
-	observability.LogEvent("world-service", "world.player_spawned", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
@@ -336,7 +350,18 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	}
 	s.applyCharacterProgressionLocked(session, character)
 
-	observability.LogEvent("world-service", "world.reconnected", map[string]any{
+	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+		SessionID: simcore.SessionID(session.Token),
+		ActorID:   simcore.EntityID(session.CharacterID),
+		ZoneID:    simcore.ZoneID(session.ZoneID),
+		Command: simcore.ReconnectIntentCommand{
+			EntityID: simcore.EntityID(session.CharacterID),
+			Reason:   "client_reconnect",
+		},
+	})
+	s.runRuntimeTickLocked(time.Now())
+
+	observability.LogEvent("world-service", observability.EventWorldReconnected, map[string]any{
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
 		"characterId":       session.CharacterID,
@@ -378,10 +403,28 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	from := simcore.Vector3{X: session.X, Y: session.Y, Z: session.Z}
 	nextX, nextY := s.resolveMovementLocked(session, request.DeltaX, request.DeltaY)
+	to := simcore.Vector3{X: nextX, Y: nextY, Z: session.Z}
+	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+		SessionID: simcore.SessionID(session.Token),
+		ActorID:   simcore.EntityID(session.CharacterID),
+		ZoneID:    simcore.ZoneID(session.ZoneID),
+		Command: simcore.MoveIntentCommand{
+			EntityID: simcore.EntityID(session.CharacterID),
+			From:     from,
+			Delta:    simcore.Vector3{X: request.DeltaX, Y: request.DeltaY},
+			To:       to,
+		},
+	})
+	s.runRuntimeTickLocked(time.Now())
 	session.X = nextX
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
+	if _, err := s.applyContentZoneTransitionsLocked(session); err != nil {
+		httpapi.Error(w, http.StatusConflict, "zone_transition_failed", err.Error())
+		return
+	}
 
 	if session.HousingSpaceID != "" || session.InstanceID != "" {
 		httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
@@ -396,7 +439,7 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	observability.LogEvent("world-service", "world.character_saved", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
 		"reason":            "move",
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
@@ -405,6 +448,11 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		"x":                 character.PositionX,
 		"y":                 character.PositionY,
 		"z":                 character.PositionZ,
+	})
+	observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
+		"aggregateKind": "character",
+		"aggregateId":   character.ID,
+		"reason":        "move",
 	})
 
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
@@ -433,6 +481,16 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 
 	session.Connected = false
 	session.LastSeenAt = time.Now().Unix()
+	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+		SessionID: simcore.SessionID(session.Token),
+		ActorID:   simcore.EntityID(session.CharacterID),
+		ZoneID:    simcore.ZoneID(session.ZoneID),
+		Command: simcore.DisconnectIntentCommand{
+			EntityID: simcore.EntityID(session.CharacterID),
+			Reason:   "client_disconnect",
+		},
+	})
+	s.runRuntimeTickLocked(time.Now())
 	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
 	s.resetSessionCombatStateLocked(session, "disconnect")
 	s.clearMobAggroForCharacterLocked(session.CharacterID)
@@ -466,7 +524,7 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	observability.LogEvent("world-service", "world.character_saved", map[string]any{
+	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
 		"reason":            "disconnect",
 		"worldSessionToken": session.Token,
 		"accountId":         session.AccountID,
@@ -475,6 +533,11 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		"x":                 character.PositionX,
 		"y":                 character.PositionY,
 		"z":                 character.PositionZ,
+	})
+	observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
+		"aggregateKind": "character",
+		"aggregateId":   character.ID,
+		"reason":        "disconnect",
 	})
 
 	s.metrics.recordSessionEvent("disconnect_succeeded")
@@ -565,6 +628,60 @@ func (s *worldServer) handleInventoryEquip(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleLootInspect(w http.ResponseWriter, r *http.Request) {
+	var request lootInspectRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+	if _, err := s.inspectLootLocked(session, request.LootContainerID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "loot_inspect_failed", err.Error())
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleLootClaim(w http.ResponseWriter, r *http.Request) {
+	var request lootClaimRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+	if err := s.claimLootLocked(session, request.LootContainerID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "loot_claim_failed", err.Error())
+		return
+	}
 	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
 }
 
@@ -678,6 +795,35 @@ func (s *worldServer) handleQuestAccept(w http.ResponseWriter, r *http.Request) 
 
 	if err := s.acceptQuestLocked(session, request.QuestID); err != nil {
 		httpapi.Error(w, http.StatusBadRequest, "quest_invalid", err.Error())
+		return
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+}
+
+func (s *worldServer) handleQuestComplete(w http.ResponseWriter, r *http.Request) {
+	var request questCompleteRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if err := s.advanceWorldLocked(time.Now()); err != nil {
+		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+		return
+	}
+
+	session, ok := s.sessionsByToken[request.WorldSessionToken]
+	if !ok {
+		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
+		return
+	}
+
+	if err := s.completeQuestLocked(session, request.QuestID); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "quest_complete_invalid", err.Error())
 		return
 	}
 
@@ -1078,20 +1224,30 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		}
 
 		entities = append(entities, sessionEntity{
-			ID:             mob.ID,
-			DisplayName:    mob.DisplayName,
-			Kind:           mob.Kind,
-			MobTypeID:      mob.MobTypeID,
-			Classification: mob.Classification,
-			Elite:          mob.Elite,
-			X:              mob.X,
-			Y:              mob.Y,
-			Z:              mob.Z,
-			Health:         mob.Health,
-			MaxHealth:      mob.MaxHealth,
-			Alive:          mob.Alive,
-			Targetable:     mob.Targetable,
-			AIState:        mob.AIState,
+			ID:              mob.ID,
+			ArchetypeID:     mob.ArchetypeID,
+			SpawnPointID:    mob.SpawnPointID,
+			DisplayName:     mob.DisplayName,
+			Kind:            mob.Kind,
+			MobTypeID:       mob.MobTypeID,
+			Disposition:     mob.Disposition,
+			Classification:  mob.Classification,
+			Elite:           mob.Elite,
+			X:               mob.X,
+			Y:               mob.Y,
+			Z:               mob.Z,
+			Health:          mob.Health,
+			MaxHealth:       mob.MaxHealth,
+			Alive:           mob.Alive,
+			Targetable:      mob.Targetable,
+			IsInCombat:      mob.CurrentTargetCharacter != "",
+			CurrentTargetID: mob.CurrentTargetCharacter,
+			LastDamagedByID: mob.LastDamagedByCharacter,
+			RespawnDelayMs:  mob.RespawnDelayMs,
+			DeathTick:       mob.DeathTick,
+			RespawnTick:     mob.RespawnTick,
+			AIState:         mob.AIState,
+			Auras:           buildAuraResponses(mob.ActiveAuras),
 		})
 	}
 
@@ -1117,6 +1273,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 			Targetable:   true,
 			PvPState:     pvpState,
 			DuelOpponent: duelOpponent,
+			Auras:        buildAuraResponses(candidate.ActiveAuras),
 		})
 	}
 
@@ -1138,6 +1295,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"maxResource":    session.MaxResource,
 		"resourceName":   "Grit",
 		"alive":          session.Alive,
+		"auras":          buildAuraResponses(session.ActiveAuras),
 		"experience":     session.Experience,
 		"currencyCopper": session.CurrencyCopper,
 		"currency":       breakdownCurrency(session.CurrencyCopper),
@@ -1159,8 +1317,14 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"vendor":               s.buildVendorResponse(session),
 		"quest":                s.buildQuestResponse(session),
 		"quests":               s.buildQuestListResponse(session),
+		"killCredits":          buildKillCreditResponse(session.KillCredits),
+		"lootContainers":       s.buildLootContainersResponseLocked(session),
+		"domainEvents":         cloneDomainEvents(s.domainEvents),
+		"stateDiffs":           cloneStateDiffs(s.stateDiffs),
 		"trackedQuestIds":      s.normalizeTrackedQuestIDsLocked(session.TrackedQuestIDs, session.QuestProgress),
 		"zoneMap":              s.buildZoneMapResponse(session),
+		"streaming":            s.buildStreamingHintsResponse(session),
+		"zoneHandoff":          s.buildZoneHandoffResponseLocked(session),
 		"navigationAreas":      s.buildNavigationAreasResponse(session),
 		"mapMarkers":           s.buildMapMarkersResponse(session),
 		"housing":              s.buildHousingResponseLocked(session),

@@ -52,9 +52,10 @@ $env:AMANDACORE_SERVER_VERSION = [string]$versionManifest.serverVersion
 $env:AMANDACORE_CONTENT_VERSION = [string]$versionManifest.contentVersion
 $env:AMANDACORE_PROTOCOL_VERSION = [string]$versionManifest.protocolVersion
 $env:AMANDACORE_API_VERSION = [string]$versionManifest.apiVersion
-$env:AMANDACORE_WORLD_ENDPOINT = if ([string]::IsNullOrWhiteSpace([string]$versionManifest.worldEndpointHint)) { "http://localhost:8085" } else { [string]$versionManifest.worldEndpointHint }
+$env:AMANDACORE_WORLD_ENDPOINT = if ([string]::IsNullOrWhiteSpace([string]$versionManifest.worldEndpointHint)) { "http://127.0.0.1:8085" } else { [string]$versionManifest.worldEndpointHint }
 $env:AMANDACORE_REPO_ROOT = $repoRoot
 $env:AMANDACORE_PVP_DUELS_ENABLED = "0"
+$env:AMANDACORE_SERVICE_HOST = if ([string]::IsNullOrWhiteSpace($env:AMANDACORE_SERVICE_HOST)) { "127.0.0.1" } else { $env:AMANDACORE_SERVICE_HOST }
 
 $serviceDefinitions = @(
     @{ Name = "auth-service"; Port = "8081" },
@@ -67,7 +68,7 @@ $serviceDefinitions = @(
 
 function Wait-ServiceReady($serviceName, $port, $logPath) {
     $deadline = (Get-Date).AddSeconds(20)
-    $healthUrl = "http://localhost:$port/health"
+    $healthUrl = "http://127.0.0.1:$port/health"
 
     while ((Get-Date) -lt $deadline) {
         try {
@@ -93,7 +94,7 @@ $processes = @()
 foreach ($service in $serviceDefinitions) {
     $exePath = Join-Path $servicesRoot "bin\\$($service.Name).exe"
     $logPath = Join-Path $logsRoot "$($service.Name).log"
-    $command = "[System.Environment]::SetEnvironmentVariable('AMANDACORE_SERVICE_PORT','$($service.Port)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_STORE_PATH','$($env:AMANDACORE_STORE_PATH)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_LOCAL_SEED_FILE','$secretPath','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_BUILD_ID','$($env:AMANDACORE_BUILD_ID)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_BUILD_CHANNEL','$($env:AMANDACORE_BUILD_CHANNEL)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_DISPLAY_VERSION','$($env:AMANDACORE_DISPLAY_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_BUILD_GENERATED_AT_UTC','$($env:AMANDACORE_BUILD_GENERATED_AT_UTC)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_CLIENT_VERSION','$($env:AMANDACORE_CLIENT_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_SERVER_VERSION','$($env:AMANDACORE_SERVER_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_CONTENT_VERSION','$($env:AMANDACORE_CONTENT_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_PROTOCOL_VERSION','$($env:AMANDACORE_PROTOCOL_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_API_VERSION','$($env:AMANDACORE_API_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_WORLD_ENDPOINT','$($env:AMANDACORE_WORLD_ENDPOINT)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_PVP_DUELS_ENABLED','$($env:AMANDACORE_PVP_DUELS_ENABLED)','Process'); & '$exePath' *>> '$logPath'"
+    $command = "[System.Environment]::SetEnvironmentVariable('AMANDACORE_SERVICE_HOST','$($env:AMANDACORE_SERVICE_HOST)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_SERVICE_PORT','$($service.Port)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_STORE_PATH','$($env:AMANDACORE_STORE_PATH)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_LOCAL_SEED_FILE','$secretPath','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_BUILD_ID','$($env:AMANDACORE_BUILD_ID)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_BUILD_CHANNEL','$($env:AMANDACORE_BUILD_CHANNEL)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_DISPLAY_VERSION','$($env:AMANDACORE_DISPLAY_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_BUILD_GENERATED_AT_UTC','$($env:AMANDACORE_BUILD_GENERATED_AT_UTC)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_CLIENT_VERSION','$($env:AMANDACORE_CLIENT_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_SERVER_VERSION','$($env:AMANDACORE_SERVER_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_CONTENT_VERSION','$($env:AMANDACORE_CONTENT_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_PROTOCOL_VERSION','$($env:AMANDACORE_PROTOCOL_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_API_VERSION','$($env:AMANDACORE_API_VERSION)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_WORLD_ENDPOINT','$($env:AMANDACORE_WORLD_ENDPOINT)','Process'); [System.Environment]::SetEnvironmentVariable('AMANDACORE_PVP_DUELS_ENABLED','$($env:AMANDACORE_PVP_DUELS_ENABLED)','Process'); & '$exePath' *>> '$logPath'"
 
     $process = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoLogo", "-NoProfile", "-Command", $command -PassThru -WindowStyle Hidden
     $processes += [pscustomobject]@{

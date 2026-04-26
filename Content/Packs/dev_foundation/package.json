@@ -1,0 +1,33 @@
+{
+  "package_id": "dev_foundation",
+  "display_name": "Dev Foundation Content",
+  "version": "0.1.0",
+  "schema_version": "1",
+  "description": "Original AmandaCore placeholder content used to validate runtime content package loading.",
+  "authorship": "AmandaCore original development content.",
+  "zones": [
+    "zones/dev_isle_edge.zone.json"
+  ],
+  "npc_catalogs": [
+    "npcs/dev_npcs.json"
+  ],
+  "item_catalogs": [
+    "items/dev_items.json"
+  ],
+  "loot_catalogs": [
+    "loot/dev_loot.json"
+  ],
+  "quest_catalogs": [
+    "quests/dev_quests.json"
+  ],
+  "ability_catalogs": [
+    "abilities/dev_abilities.json"
+  ],
+  "aura_catalogs": [
+    "auras/dev_auras.json"
+  ],
+  "tags": [
+    "dev",
+    "runtime-loader"
+  ]
+}

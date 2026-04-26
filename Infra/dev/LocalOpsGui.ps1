@@ -149,7 +149,7 @@ function Get-ServiceStatuses {
         $serviceName = [string]$service.Name
         $port = [string]$service.Port
         $processes = @(Get-Process -Name $serviceName -ErrorAction SilentlyContinue)
-        $healthUrl = "http://localhost:$port/health"
+        $healthUrl = "http://127.0.0.1:$port/health"
         $healthStatus = if ($processes.Count -gt 0) { "Starting" } else { "Stopped" }
         $lastError = ""
 
@@ -268,6 +268,28 @@ function Get-LatestDiagnosticBundle {
     return ""
 }
 
+function Get-RepoRevisionSummary {
+    try {
+        $branch = (& git -C $repoRoot branch --show-current 2>$null).Trim()
+        $commit = (& git -C $repoRoot rev-parse --short HEAD 2>$null).Trim()
+        $upstream = (& git -C $repoRoot rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null).Trim()
+        $dirty = (& git -C $repoRoot status --porcelain 2>$null)
+        $dirtyText = if ($dirty) { "dirty" } else { "clean" }
+        if ([string]::IsNullOrWhiteSpace($branch) -or [string]::IsNullOrWhiteSpace($commit)) {
+            return "Unavailable"
+        }
+
+        if ([string]::IsNullOrWhiteSpace($upstream)) {
+            return "$branch @ $commit ($dirtyText)"
+        }
+
+        return "$branch @ $commit tracking $upstream ($dirtyText)"
+    }
+    catch {
+        return "Unavailable: $($_.Exception.Message)"
+    }
+}
+
 function Set-StatusMessage {
     param(
         [Parameter(Mandatory = $true)]
@@ -318,6 +340,8 @@ function Refresh-Status {
     }
 
     $pathBox.Lines = @(
+        "Repo root: $repoRoot",
+        "Repo revision: $(Get-RepoRevisionSummary)",
         "Service logs: $serviceLogsRoot",
         "Game client log: $gameLogPath",
         "User log folder: $userLogRoot",
@@ -349,14 +373,14 @@ $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawin
 $form.Controls.Add($titleLabel)
 
 $subtitleLabel = New-Object System.Windows.Forms.Label
-$subtitleLabel.Text = "Wraps the existing Infra/dev scripts for starting services, stopping services, and opening the launcher."
+$subtitleLabel.Text = "Use Build + Launch Test for the human visual pass. Services bind to local loopback by default."
 $subtitleLabel.Location = New-Object System.Drawing.Point(20, 46)
 $subtitleLabel.Size = New-Object System.Drawing.Size(690, 32)
 $subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $form.Controls.Add($subtitleLabel)
 
 $startButton = New-Object System.Windows.Forms.Button
-$startButton.Text = "Build + Restart Stack"
+$startButton.Text = "Build + Launch Test"
 $startButton.Location = New-Object System.Drawing.Point(20, 92)
 $startButton.Size = New-Object System.Drawing.Size(160, 34)
 $form.Controls.Add($startButton)
@@ -497,8 +521,8 @@ $pathBox.Font = New-Object System.Drawing.Font("Consolas", 9)
 $form.Controls.Add($pathBox)
 
 $startButton.Add_Click({
-    Set-StatusMessage -Message "Stopping old processes, building latest binaries, and starting local stack..." -Color ([System.Drawing.Color]::DodgerBlue)
-    $command = "& '$startScript' -BuildFirst"
+    Set-StatusMessage -Message "Stopping old processes, building latest binaries, starting services, and opening launcher..." -Color ([System.Drawing.Color]::DodgerBlue)
+    $command = "& '$startScript' -BuildFirst -StartLauncher"
     Invoke-BackgroundPowerShell -Command $command
     Start-Sleep -Milliseconds 500
     Refresh-Status

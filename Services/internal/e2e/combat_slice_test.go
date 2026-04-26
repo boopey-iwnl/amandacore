@@ -29,6 +29,8 @@ const (
 	stonewakeCombatMob1 = "mob_ditch_rat_01"
 	stonewakeCombatMob2 = "mob_ditch_rat_02"
 	stonewakeDeathMob   = "mob_bram_kettle_01"
+
+	expectedStonewakeCombatMobCount = 38
 )
 
 func TestCombatSliceHardening(t *testing.T) {
@@ -36,8 +38,8 @@ func TestCombatSliceHardening(t *testing.T) {
 		fixture := newCombatFixture(t)
 		state := fixture.getWorldState(t)
 		mobs := findHostileMobs(t, state)
-		if len(mobs) != 37 {
-			t.Fatalf("expected 37 Stonewake hostile/training entities, got %d", len(mobs))
+		if len(mobs) != expectedStonewakeCombatMobCount {
+			t.Fatalf("expected %d Stonewake hostile/training entities, got %d", expectedStonewakeCombatMobCount, len(mobs))
 		}
 	})
 

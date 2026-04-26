@@ -1,0 +1,95 @@
+{
+  "continent_id": "dawnwake_isles",
+  "display_name": "Dawnwake Isles",
+  "description": "Original AmandaCore continent skeleton for early Dawnwake Isles traversal and future O3DE streaming.",
+  "origin": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "units": "AmandaCore server units; +X runs east, +Y runs inland, +Z is elevation.",
+  "zones": [
+    {
+      "zone_id": "dawnwake_landing",
+      "display_name": "Dawnwake Landing",
+      "tags": ["coastal", "starter"]
+    },
+    {
+      "zone_id": "amberglass_fields",
+      "display_name": "Amberglass Fields",
+      "tags": ["inland", "wilds"]
+    },
+    {
+      "zone_id": "mistwood_reach",
+      "display_name": "Mistwood Reach",
+      "tags": ["forest", "wilds"]
+    },
+    {
+      "zone_id": "highroad_pass",
+      "display_name": "Highroad Pass",
+      "tags": ["route", "pass"]
+    },
+    {
+      "zone_id": "kingsfall_harbor",
+      "display_name": "Kingsfall Harbor",
+      "tags": ["city", "capital"]
+    }
+  ],
+  "adjacency": [
+    {
+      "adjacency_id": "landing_to_amberglass",
+      "from_zone_id": "dawnwake_landing",
+      "to_zone_id": "amberglass_fields",
+      "transition_ids": ["landing_to_amberglass_road", "amberglass_to_landing_road"],
+      "kind": "road",
+      "bidirectional": true,
+      "tags": ["walkable", "starter-route"]
+    },
+    {
+      "adjacency_id": "amberglass_to_mistwood",
+      "from_zone_id": "amberglass_fields",
+      "to_zone_id": "mistwood_reach",
+      "transition_ids": ["amberglass_to_mistwood_north_path", "mistwood_to_amberglass_south_path"],
+      "kind": "road",
+      "bidirectional": true,
+      "tags": ["walkable", "wilds-route"]
+    },
+    {
+      "adjacency_id": "amberglass_to_highroad",
+      "from_zone_id": "amberglass_fields",
+      "to_zone_id": "highroad_pass",
+      "transition_ids": ["amberglass_to_highroad_pass", "highroad_to_amberglass_pass"],
+      "kind": "mountain-pass",
+      "bidirectional": true,
+      "tags": ["walkable", "route"]
+    },
+    {
+      "adjacency_id": "highroad_to_kingsfall",
+      "from_zone_id": "highroad_pass",
+      "to_zone_id": "kingsfall_harbor",
+      "transition_ids": ["highroad_to_kingsfall_city_gate", "kingsfall_to_highroad_city_gate"],
+      "kind": "city-gate",
+      "bidirectional": true,
+      "tags": ["walkable", "city-gate"]
+    }
+  ],
+  "default_entry": {
+    "zone_id": "dawnwake_landing",
+    "entry_point_id": "landing_shore"
+  },
+  "streaming": {
+    "activation_policy": "activate_all_for_milestone",
+    "default_interest_radius": 72,
+    "gate_hint_radius": 42
+  },
+  "tags": [
+    "dawnwake",
+    "placeholder-bounds",
+    "continent-skeleton"
+  ],
+  "metadata": {
+    "accuracy": "placeholder",
+    "source": "pending_map_trace",
+    "todo": "Replace rectangular scaffold bounds and transition centers with AmandaCore map traces before the full Dawnwake milestone."
+  }
+}

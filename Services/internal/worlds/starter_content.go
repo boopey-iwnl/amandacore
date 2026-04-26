@@ -11,6 +11,9 @@ const (
 	npcQuartermasterLyraID  = "npc_quartermaster_lyra"
 	objWatchLanternID       = "obj_watch_lantern"
 	mobTrainingDummyTypeID  = "training_dummy"
+	mobDevIsleStalkerTypeID = "dev_isle_stalker"
+	mobDevIsleStalkerID     = "npc_dev_isle_stalker_01"
+	mobDevIsleStalkerSpawn  = "spawn_dev_isle_stalker_01"
 	mobDitchRatTypeID       = "ditch_rat"
 	mobFieldBoarTypeID      = "field_boar"
 	mobRidgeCrowTypeID      = "ridge_crow"
@@ -309,4 +312,5 @@ var stonewakeMobSpawns = []mobSpawnDefinition{
 	{ID: "mob_ashband_poacher_07", MobTypeID: mobAshbandPoacherTypeID, DisplayName: "Ashband Poacher", Level: 5, X: 363.0, Y: 236.0, MaxHealth: 115, AggroRadius: 5.5, AttackRange: 2.75, AttackDamage: 10, AttackCadenceMs: 2000, MoveSpeedPerSec: 4.2, LeashRadius: 22, RespawnDelayMs: 16000},
 	{ID: "mob_ashband_poacher_08", MobTypeID: mobAshbandPoacherTypeID, DisplayName: "Ashband Poacher", Level: 5, X: 407.0, Y: 205.0, MaxHealth: 115, AggroRadius: 5.5, AttackRange: 2.75, AttackDamage: 10, AttackCadenceMs: 2000, MoveSpeedPerSec: 4.2, LeashRadius: 22, RespawnDelayMs: 16000},
 	{ID: "mob_bram_kettle_01", MobTypeID: mobBramKettleTypeID, DisplayName: "Bram Kettle", Level: 5, X: 420.0, Y: 224.0, MaxHealth: 180, AggroRadius: 6, AttackRange: 2.75, AttackDamage: 12, AttackCadenceMs: 1900, MoveSpeedPerSec: 4.2, LeashRadius: 24, RespawnDelayMs: 30000},
+	{ID: mobDevIsleStalkerID, SpawnPointID: mobDevIsleStalkerSpawn, ArchetypeID: mobDevIsleStalkerTypeID, MobTypeID: mobDevIsleStalkerTypeID, DisplayName: "Isle Stalker", Disposition: npcDispositionHostile, Level: 1, X: 42.0, Y: 16.0, MaxHealth: 30, AggroRadius: 8.0, AttackRange: 2.5, AttackDamage: 3, AttackCadenceMs: 1500, MoveSpeedPerSec: 4.0, LeashRadius: 18.0, RespawnDelayMs: 10000},
 }

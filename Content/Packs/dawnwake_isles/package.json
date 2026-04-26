@@ -1,0 +1,50 @@
+{
+    "package_id":  "dawnwake_isles",
+    "display_name":  "Dawnwake Isles",
+    "version":  "0.1.0",
+    "schema_version":  "1",
+    "description":  "Original AmandaCore Dawnwake Isles multi-zone skeleton for traversal, runtime activation, and future O3DE streaming.",
+    "authorship":  "AmandaCore original development content.",
+    "zones":  [
+                  "zones/dawnwake_landing.zone.json",
+                  "zones/dawnwake_tideglass_shoal.zone.json",
+                  "zones/dawnwake_windspur_rise.zone.json",
+                  "zones/amberglass_fields.zone.json",
+                  "zones/mistwood_reach.zone.json",
+                  "zones/highroad_pass.zone.json",
+                  "zones/kingsfall_harbor.zone.json"
+              ],
+    "map_exports":  [
+                        "maps/dawnwake_landing.map.json",
+                        "maps/dawnwake_tideglass_shoal.map.json",
+                        "maps/dawnwake_windspur_rise.map.json"
+                    ],
+    "npc_catalogs":  [
+                         "npcs/dawnwake_npcs.json"
+                     ],
+    "item_catalogs":  [
+                          "items/dawnwake_items.json"
+                      ],
+    "loot_catalogs":  [
+                          "loot/dawnwake_loot.json"
+                      ],
+    "quest_catalogs":  [
+                           "quests/dawnwake_quests.json"
+                       ],
+    "ability_catalogs":  [
+                             "abilities/dawnwake_abilities.json"
+                         ],
+    "aura_catalogs":  [
+                          "auras/dawnwake_auras.json"
+                      ],
+    "tags":  [
+                 "dawnwake",
+                 "multi-zone",
+                 "streaming-ready",
+                 "continent-skeleton",
+                 "placeholder-bounds"
+             ],
+    "continent_files":  [
+                            "continent/dawnwake_isles.continent.json"
+                        ]
+}

@@ -1,0 +1,90 @@
+{
+  "zone_id": "mistwood_reach",
+  "display_name": "Mistwood Reach",
+  "description": "A provisional forest and highland wilds zone reserved for later denser traversal and encounter work.",
+  "continent_id": "dawnwake_isles",
+  "bounds": {
+    "min_x": 200,
+    "min_y": 160,
+    "min_z": -25,
+    "max_x": 420,
+    "max_y": 360,
+    "max_z": 220
+  },
+  "entry_points": [
+    {
+      "entry_id": "mistwood_south_path",
+      "position": {
+        "x": 306,
+        "y": 166,
+        "z": 0
+      },
+      "facing_yaw": 0
+    }
+  ],
+  "transition_gates": [
+    {
+      "transition_id": "mistwood_to_amberglass_south_path",
+      "from_zone_id": "mistwood_reach",
+      "to_zone_id": "amberglass_fields",
+      "kind": "road",
+      "gate_bounds": {
+        "min_x": 286,
+        "min_y": 160,
+        "min_z": -5,
+        "max_x": 326,
+        "max_y": 166,
+        "max_z": 25
+      },
+      "entry_point_id_on_arrival": "amberglass_mistwood_path",
+      "tags": ["walk", "wilds"]
+    }
+  ],
+  "spawn_groups": [
+    {
+      "spawn_group_id": "mistwood_road_bandits",
+      "npc_archetype_id": "dawnwake_road_bandit_placeholder",
+      "loot_table_id": "dawnwake_bandit_placeholder_pack",
+      "respawn_seconds": 18,
+      "max_alive": 2,
+      "spawn_points": [
+        {
+          "spawn_point_id": "mistwood_road_bandit_01",
+          "position": {
+            "x": 300,
+            "y": 220,
+            "z": 0
+          },
+          "facing_yaw": 130
+        },
+        {
+          "spawn_point_id": "mistwood_road_bandit_02",
+          "position": {
+            "x": 332,
+            "y": 246,
+            "z": 0
+          },
+          "facing_yaw": 305
+        }
+      ],
+      "tags": ["placeholder", "hostile"]
+    }
+  ],
+  "quest_providers": [],
+  "runtime": {
+    "tick_ms": 50,
+    "max_players": 48,
+    "max_entities": 320
+  },
+  "streaming": {
+    "interest_radius": 80,
+    "adjacent_preload_distance": 44,
+    "priority": "normal",
+    "notes": ["Future forest streaming and encounter test bed."]
+  },
+  "tags": ["forest", "highland", "wilds", "placeholder-bounds"],
+  "metadata": {
+    "accuracy": "placeholder",
+    "source": "pending_map_trace"
+  }
+}
