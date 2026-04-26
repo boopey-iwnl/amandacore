@@ -345,7 +345,6 @@ if (-not $SkipSmoke) {
         $smokeExtractRoot = Join-Path $OutputRoot "$PackageName-smoke-extract"
         Assert-ChildPath -Parent $OutputRoot -Child $smokeExtractRoot
         Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Force -Path $smokeExtractRoot | Out-Null
         Expand-Archive -Path $archivePath -DestinationPath $smokeExtractRoot -Force
         $smokePackageRoot = $smokeExtractRoot
     }
