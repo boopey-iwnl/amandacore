@@ -19,6 +19,10 @@ cache/
 logs/
 *.log
 *.tmp
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
 
 .vs/
 .vscode/
