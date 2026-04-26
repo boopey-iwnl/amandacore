@@ -89,7 +89,9 @@ The placeholder scene adapter emits these command names:
 
 These commands are intentionally presentation-only. They carry AmandaCore zone IDs, map IDs, cell IDs, display names, bounds, transition positions, transition readiness, and tags from the server-owned streaming payload. They do not grant client authority over traversal, visibility, combat, or persistence.
 
-`Gems/ZoneStreaming` now mirrors this contract as `ZoneStreaming::PlaceholderSceneCommand` and exposes `ZoneStreaming::IZoneStreamingDebugRequests::ApplyPlaceholderSceneCommand`. The Gem stores debug state and draws zone bounds, visible streaming cells, current-cell highlights, and transition affordance markers through O3DE AuxGeom. The JSONL file output is optional and deterministic; it exists so local bridge work can be tested without introducing an O3DE SDK dependency into the C# client.
+`Gems/ZoneStreaming` now mirrors this contract as `ZoneStreaming::PlaceholderSceneCommand` and exposes `ZoneStreaming::IZoneStreamingDebugRequests::ApplyPlaceholderSceneCommand`. The Gem stores debug state and draws zone bounds, visible streaming cells, current-cell highlights, and transition affordance markers through O3DE AuxGeom.
+
+The live debug bridge uses the same deterministic JSON Lines file. The C# client writes one command per line with `--streaming-command-file`, and the O3DE Gem tails the file when `AMANDACORE_STREAMING_COMMAND_FILE` is set to the same path or when `SetCommandStreamPath` is called in-engine. The file is a debug transport only and does not grant client authority over movement, transitions, visibility, combat, quests, or persistence.
 
 Run the command translation checks with:
 
@@ -150,8 +152,8 @@ The scenario validates map exports, activates zone runtimes, confirms streaming 
 - Transition handling is immediate and radius-based.
 - Streaming cells are runtime hints and debug volumes, not loaded O3DE asset chunks.
 - There is no interest-management or cross-worker shard handoff yet.
-- The `ZoneStreaming` Gem consumes the C++ command representation; direct JSONL parsing inside the Gem is deferred.
+- The `ZoneStreaming` Gem currently consumes live commands through a local JSONL tailer; production IPC or direct launcher/O3DE integration is deferred.
 
 ## Next Step
 
-Connect the launcher/O3DE client bridge so live streaming callbacks feed `IZoneStreamingDebugRequests` in-engine, then replace placeholder authoring metadata with AmandaCore-owned O3DE editor metadata or asset processor output.
+Replace the local JSONL bridge with a direct launcher/O3DE runtime bridge, then replace placeholder authoring metadata with AmandaCore-owned O3DE editor metadata or asset processor output.

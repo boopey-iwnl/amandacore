@@ -49,6 +49,17 @@ Supported command names:
 - `ShowTransitionAffordance`
 - `ClearTransitionAffordance`
 
+The same interface also exposes the local live bridge:
+
+```cpp
+auto* debugStreaming = ZoneStreaming::IZoneStreamingDebugRequests::Get();
+if (debugStreaming)
+{
+    debugStreaming->SetCommandStreamPath("C:/Temp/amandacore/streaming.commands.jsonl");
+    auto status = debugStreaming->GetCommandStreamBridgeStatus();
+}
+```
+
 ## Debug Visuals
 
 `ZoneStreamingSystemComponent` stores the active debug scene state and draws it every tick through O3DE AuxGeom:
@@ -66,36 +77,46 @@ The component also exposes read-only accessors for lightweight validation:
 - `GetCellVolume`
 - `GetHighlightedCell`
 - `GetTransitionAffordance`
+- `GetCommandStreamBridgeStatus`
 - `GetVisibleCellCount`
 
-## Deterministic Command File
+## Live Command File Bridge
 
-The C# world client can also write a deterministic JSON Lines command stream for local bridge testing:
+The C# world client can write a deterministic JSON Lines command stream while it is connected to the live world service:
 
 ```powershell
 dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands --streaming-command-file "$env:TEMP\amandacore\streaming.commands.jsonl"
 ```
 
-The file contains one serialized placeholder scene command per line and no timestamps. It is a bridge/test artifact, not a runtime authority source. A later launcher or O3DE client integration can translate this stream, IPC, or direct network callbacks into `ApplyPlaceholderSceneCommand` calls without changing the world-service contract.
+The file contains one serialized placeholder scene command per line and no timestamps. The writer opens the file with read/write sharing so the O3DE Gem can tail it while commands are appended.
+
+Point the O3DE Gem at the same file with either:
+
+```powershell
+$env:AMANDACORE_STREAMING_COMMAND_FILE="$env:TEMP\amandacore\streaming.commands.jsonl"
+```
+
+or a direct in-engine call to `SetCommandStreamPath`. `ZoneStreamingSystemComponent` polls the file, parses new lines, and feeds valid commands into `ApplyPlaceholderSceneCommand`. This is a local debug bridge only; the JSONL file is not a runtime authority source.
 
 ## Verification Flow
 
 1. Start the local AmandaCore services with Dawnwake content enabled.
-2. Join the world with `Client/Game/AmandaCore.WorldClient`.
-3. Select `--streaming-sink scene-commands` to print placeholder commands, and optionally add `--streaming-command-file` to persist JSONL.
-4. Enable the `ZoneStreaming` Gem in an O3DE client build.
-5. Add or load the `ZoneStreamingSystemComponent`.
-6. Feed placeholder commands into `IZoneStreamingDebugRequests::ApplyPlaceholderSceneCommand`.
-7. Verify the scene shows zone bounds, visible cells, the current-cell highlight, and transition affordance markers.
+2. Set `AMANDACORE_STREAMING_COMMAND_FILE` for the O3DE process or call `SetCommandStreamPath` after the Gem activates.
+3. Join the world with `Client/Game/AmandaCore.WorldClient`.
+4. Select `--streaming-sink scene-commands` to print placeholder commands and add `--streaming-command-file` with the same path the Gem is watching.
+5. Enable the `ZoneStreaming` Gem in an O3DE client build.
+6. Add or load the `ZoneStreamingSystemComponent`.
+7. Verify `zone_streaming.command_stream_active` appears after commands are read.
+8. Verify the scene shows zone bounds, visible cells, the current-cell highlight, and transition affordance markers.
 
 ## Current Limits
 
 - No real terrain, prefab, entity, or asset streaming is implemented.
-- The Gem does not parse JSONL directly yet; it consumes the stable C++ command representation.
+- The live bridge is a local JSONL tailer, not production IPC or replication.
 - Debug labels are not drawn yet; the first visualization uses shapes and deterministic colors.
 - The world client remains a .NET prototype and does not take an O3DE SDK dependency.
 - The binding is debug-only and should not be used for authoritative movement or transition decisions.
 
 ## Next Milestone
 
-Connect the AmandaCore launcher/O3DE client bridge so live world-client streaming callbacks feed `IZoneStreamingDebugRequests` in-engine, then replace placeholder authoring files with AmandaCore-owned O3DE editor metadata or asset processor output while preserving the server-side validation boundary.
+Replace the local JSONL bridge with a launcher/O3DE runtime bridge that feeds the same command API directly, then connect the exporter to AmandaCore-owned O3DE editor metadata or asset processor output while preserving the server-side validation boundary.

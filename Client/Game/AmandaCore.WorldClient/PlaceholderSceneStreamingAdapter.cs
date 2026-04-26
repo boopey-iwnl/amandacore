@@ -143,12 +143,14 @@ internal sealed class JsonLinesPlaceholderSceneCommandSink : IPlaceholderSceneCo
         {
             Directory.CreateDirectory(directory);
         }
-        File.WriteAllText(_path, string.Empty);
+        using var stream = new FileStream(_path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
     }
 
     public void Emit(PlaceholderSceneCommand command)
     {
-        File.AppendAllText(_path, JsonSerializer.Serialize(command, _jsonOptions) + Environment.NewLine);
+        using var stream = new FileStream(_path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+        using var writer = new StreamWriter(stream);
+        writer.WriteLine(JsonSerializer.Serialize(command, _jsonOptions));
     }
 }
 

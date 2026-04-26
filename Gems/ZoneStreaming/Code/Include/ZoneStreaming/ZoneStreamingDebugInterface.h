@@ -74,6 +74,15 @@ namespace ZoneStreaming
         bool m_ready = false;
     };
 
+    struct CommandStreamBridgeStatus
+    {
+        AZStd::string m_path;
+        bool m_enabled = false;
+        size_t m_linesRead = 0;
+        size_t m_commandsApplied = 0;
+        size_t m_parseErrors = 0;
+    };
+
     class IZoneStreamingDebugRequests
     {
     public:
@@ -97,11 +106,13 @@ namespace ZoneStreaming
         }
 
         virtual void ApplyPlaceholderSceneCommand(const PlaceholderSceneCommand& command) = 0;
+        virtual void SetCommandStreamPath(const AZStd::string& path) = 0;
         virtual void ResetDebugScene() = 0;
         virtual const DebugZoneVolume* GetZoneVolume() const = 0;
         virtual const DebugCellVolume* GetCellVolume(const AZStd::string& cellId) const = 0;
         virtual const DebugCellVolume* GetHighlightedCell() const = 0;
         virtual const DebugTransitionAffordance* GetTransitionAffordance() const = 0;
+        virtual CommandStreamBridgeStatus GetCommandStreamBridgeStatus() const = 0;
         virtual size_t GetVisibleCellCount() const = 0;
     };
 

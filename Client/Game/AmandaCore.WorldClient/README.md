@@ -32,6 +32,15 @@ dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket
 
 The command file is JSON Lines with one placeholder scene command per line and no timestamps. It is meant for local bridge/debug validation; the O3DE Gem consumes the same command contract through `ZoneStreaming::IZoneStreamingDebugRequests`.
 
+Live O3DE debug bridge:
+
+```powershell
+$env:AMANDACORE_STREAMING_COMMAND_FILE="$env:TEMP\amandacore\streaming.commands.jsonl"
+dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands --streaming-command-file "$env:AMANDACORE_STREAMING_COMMAND_FILE"
+```
+
+Run the O3DE client with the same `AMANDACORE_STREAMING_COMMAND_FILE` value. The `ZoneStreaming` Gem tails that file and renders debug volumes from the streamed commands.
+
 Adapter checks:
 
 ```powershell

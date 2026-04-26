@@ -27,14 +27,20 @@ namespace ZoneStreaming
         void OnTick(float deltaTime, AZ::ScriptTimePoint time) override;
 
         void ApplyPlaceholderSceneCommand(const PlaceholderSceneCommand& command) override;
+        void SetCommandStreamPath(const AZStd::string& path) override;
         void ResetDebugScene() override;
         const DebugZoneVolume* GetZoneVolume() const override;
         const DebugCellVolume* GetCellVolume(const AZStd::string& cellId) const override;
         const DebugCellVolume* GetHighlightedCell() const override;
         const DebugTransitionAffordance* GetTransitionAffordance() const override;
+        CommandStreamBridgeStatus GetCommandStreamBridgeStatus() const override;
         size_t GetVisibleCellCount() const override;
 
     private:
+        void ConfigureCommandStreamFromEnvironment();
+        void PollCommandStream(float deltaTime);
+        void ProcessCommandStreamChunk(const char* data, size_t size);
+        void ProcessCommandStreamLine(const AZStd::string& line);
         void DrawDebugVolumes();
 
         DebugZoneVolume m_zoneVolume;
@@ -44,5 +50,14 @@ namespace ZoneStreaming
         bool m_hasZoneVolume = false;
         bool m_hasTransitionAffordance = false;
         bool m_loggedDebugSceneActive = false;
+        AZStd::string m_commandStreamPath;
+        AZStd::string m_commandStreamPendingLine;
+        AZ::u64 m_commandStreamOffset = 0;
+        float m_commandStreamPollAccumulator = 0.0f;
+        size_t m_commandStreamLinesRead = 0;
+        size_t m_commandStreamCommandsApplied = 0;
+        size_t m_commandStreamParseErrors = 0;
+        bool m_loggedCommandStreamActive = false;
+        bool m_loggedCommandStreamMissing = false;
     };
 }

@@ -77,7 +77,7 @@ The minimal world client now consumes Dawnwake streaming metadata through a dedi
 - current cell computed from the server-authoritative player position
 - nearest transition hint and ready state
 
-`IWorldStreamingPreviewSink` is the first O3DE-facing adapter boundary. The console client uses `ConsoleWorldStreamingPreviewSink` by default, and `PlaceholderSceneStreamingAdapter` can emit structured placeholder commands for zone bounds, streaming cells, current-cell highlighting, and transition affordances. `Gems/ZoneStreaming` now consumes the mirrored C++ command contract through `IZoneStreamingDebugRequests` and draws debug-only in-engine volumes.
+`IWorldStreamingPreviewSink` is the first O3DE-facing adapter boundary. The console client uses `ConsoleWorldStreamingPreviewSink` by default, and `PlaceholderSceneStreamingAdapter` can emit structured placeholder commands for zone bounds, streaming cells, current-cell highlighting, and transition affordances. `Gems/ZoneStreaming` now consumes the mirrored C++ command contract through `IZoneStreamingDebugRequests`, can tail the same JSONL command file for live debug bridge testing, and draws debug-only in-engine volumes.
 
 Run the client with placeholder scene commands:
 
@@ -90,6 +90,8 @@ Write deterministic JSON Lines for bridge testing:
 ```powershell
 dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --streaming-sink scene-commands --streaming-command-file "$env:TEMP\amandacore\dawnwake-streaming.commands.jsonl"
 ```
+
+Run the O3DE client with `AMANDACORE_STREAMING_COMMAND_FILE` set to the same path to have the `ZoneStreaming` Gem tail live Dawnwake commands.
 
 ## Loadsim
 
@@ -114,7 +116,7 @@ This scenario validates map exports, verifies active streaming metadata, travers
 ## Current Limitations
 
 - No O3DE terrain, prefab, asset, or world-partition data is loaded yet.
-- The client streaming hook emits console preview events or placeholder scene commands only; the `ZoneStreaming` Gem currently renders debug AuxGeom volumes from the mirrored command contract.
+- The client streaming hook emits console preview events or placeholder scene commands only; the `ZoneStreaming` Gem currently renders debug AuxGeom volumes from the mirrored command contract or live JSONL bridge.
 - Map export files are generated from AmandaCore-owned placeholder authoring metadata, not O3DE asset products.
 - Zone bounds and positions are placeholder server coordinates authored for this package only.
 - Transition handling is radius-based and immediate.
@@ -123,4 +125,4 @@ This scenario validates map exports, verifies active streaming metadata, travers
 
 ## Next Milestone
 
-Connect the launcher/O3DE client bridge so live Dawnwake streaming callbacks feed the `ZoneStreaming` Gem in-engine, then connect the exporter to real AmandaCore O3DE editor metadata or asset processor output.
+Replace the JSONL debug bridge with direct launcher/O3DE runtime command delivery, then connect the exporter to real AmandaCore O3DE editor metadata or asset processor output.

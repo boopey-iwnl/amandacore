@@ -87,14 +87,17 @@ The scene-command sink is not an asset pipeline. It is a stable adapter contract
 
 `Gems/ZoneStreaming` now mirrors this contract as a C++ debug API. `ZoneStreamingSystemComponent` consumes `PlaceholderSceneCommand` records through `IZoneStreamingDebugRequests::ApplyPlaceholderSceneCommand` and draws zone bounds, streaming cells, highlighted cells, and transition markers through AuxGeom.
 
+For local live validation, the client writes JSON Lines to `--streaming-command-file` and the Gem tails the same path when `AMANDACORE_STREAMING_COMMAND_FILE` is set. That bridge keeps the C# client free of O3DE SDK dependencies and keeps all server/content authority outside the client.
+
 ## Current Limits
 
 - The source authoring files are JSON placeholders, not O3DE asset products.
 - The exporter does not inspect `.prefab`, terrain, world partition, or asset processor output.
 - The client retains streaming preview frames and emits placeholder scene commands; it does not prefetch cells or load assets yet.
 - The first O3DE binding draws debug volumes only and does not parse map exports or stream O3DE products.
+- The live bridge is a JSONL debug transport, not a production streaming protocol.
 - Server traversal remains immediate and radius-based.
 
 ## Next Step
 
-Connect the live launcher/O3DE client bridge to the `ZoneStreaming` Gem command API, then replace the placeholder JSON source with AmandaCore-owned O3DE editor metadata or asset processor output while preserving the generated map export validation boundary.
+Replace the JSONL bridge with direct launcher/O3DE runtime command delivery, then replace the placeholder JSON source with AmandaCore-owned O3DE editor metadata or asset processor output while preserving the generated map export validation boundary.

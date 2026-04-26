@@ -4,6 +4,7 @@ tests.CellChangesEmitHideAndHighlightCommands();
 tests.DisabledStreamingClearsPlaceholderState();
 tests.StreamingSinkModeParsesSceneCommands();
 tests.StreamingCommandFileWritesDeterministicJsonLines();
+tests.StreamingCommandFileAllowsLiveBridgeReader();
 Console.WriteLine("AmandaCore.WorldClient streaming adapter tests passed.");
 
 internal sealed class StreamingPreviewAdapterTests
@@ -102,6 +103,33 @@ internal sealed class StreamingPreviewAdapterTests
             if (!lines[3].Contains("\"Command\":\"HighlightCurrentCell\"", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException($"Expected fourth command line to highlight current cell, got {lines[3]}.");
+            }
+        }
+        finally
+        {
+            if (File.Exists(commandPath))
+            {
+                File.Delete(commandPath);
+            }
+        }
+    }
+
+    public void StreamingCommandFileAllowsLiveBridgeReader()
+    {
+        var commandPath = Path.Combine(Path.GetTempPath(), $"amandacore-streaming-live-{Guid.NewGuid():N}.jsonl");
+        try
+        {
+            var preview = new ClientStreamingPreviewState(new PlaceholderSceneStreamingAdapter(new JsonLinesPlaceholderSceneCommandSink(commandPath)));
+            using var reader = new FileStream(commandPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+            preview.Update(TestWorldSessionResponses.Create(zoneId: "dawnwake_landing", playerX: 5, playerY: 5));
+
+            reader.Seek(0, SeekOrigin.Begin);
+            using var streamReader = new StreamReader(reader, leaveOpen: true);
+            var commandStream = streamReader.ReadToEnd();
+            if (!commandStream.Contains("\"Command\":\"CreateStreamingCellVolume\"", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected live bridge reader to observe streaming cell commands while the writer is active.");
             }
         }
         finally
