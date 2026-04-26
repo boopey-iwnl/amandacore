@@ -345,7 +345,8 @@ if (-not $SkipSmoke) {
         $smokeExtractRoot = Join-Path $OutputRoot "$PackageName-smoke-extract"
         Assert-ChildPath -Parent $OutputRoot -Child $smokeExtractRoot
         Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
-        Expand-Archive -Path $archivePath -DestinationPath $smokeExtractRoot -Force
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $smokeExtractRoot)
         $smokePackageRoot = $smokeExtractRoot
     }
 
