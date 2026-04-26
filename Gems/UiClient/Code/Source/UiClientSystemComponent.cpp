@@ -1,6 +1,7 @@
 #include <UiClient/UiClientSystemComponent.h>
 
 #include <AzCore/Console/IConsole.h>
+#include <AzCore/std/containers/unordered_map.h>
 #include <AzCore/Math/MathUtils.h>
 #include <AzCore/Math/Vector2.h>
 #include <AzCore/Math/Vector3.h>
@@ -16,13 +17,20 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <Windows.h>
+#include <wincodec.h>
+#include <wrl/client.h>
+
+#pragma comment(lib, "windowscodecs.lib")
 
 namespace UiClient
 {
@@ -75,6 +83,17 @@ namespace UiClient
             ImVec2 m_min;
             ImVec2 m_max;
             int m_priority = 99;
+        };
+
+        constexpr int PngIconSampleDimension = 12;
+        constexpr int PngIconSamplePixelCount = PngIconSampleDimension * PngIconSampleDimension;
+
+        struct PngIconSample
+        {
+            bool m_attempted = false;
+            bool m_loaded = false;
+            AZStd::string m_path;
+            std::array<ImU32, PngIconSamplePixelCount> m_pixels{};
         };
 
         AZStd::string SlotActionId(int slotIndex)
@@ -209,6 +228,338 @@ namespace UiClient
         float Clamp01(float value)
         {
             return AZ::GetClamp(value, 0.0f, 1.0f);
+        }
+
+        bool FileExists(const AZStd::string& path)
+        {
+            const DWORD attributes = GetFileAttributesA(path.c_str());
+            return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+        }
+
+        AZStd::string JoinPath(const AZStd::string& left, const char* right)
+        {
+            if (left.empty())
+            {
+                return right;
+            }
+
+            const char last = left[left.size() - 1];
+            if (last == '\\' || last == '/')
+            {
+                return left + right;
+            }
+            return left + "\\" + right;
+        }
+
+        AZStd::string ParentPath(const AZStd::string& path)
+        {
+            const size_t separator = path.find_last_of("\\/");
+            if (separator == AZStd::string::npos || separator == 0)
+            {
+                return {};
+            }
+            return path.substr(0, separator);
+        }
+
+        AZStd::string FindRepoRootForIcons()
+        {
+            char currentDirectory[MAX_PATH]{};
+            const DWORD length = GetCurrentDirectoryA(MAX_PATH, currentDirectory);
+            if (length == 0 || length >= MAX_PATH)
+            {
+                return {};
+            }
+
+            AZStd::string candidate(currentDirectory);
+            for (int depth = 0; depth < 9 && !candidate.empty(); ++depth)
+            {
+                if (FileExists(JoinPath(candidate, "Content\\Art\\Icons\\UI\\icon_missing.png")))
+                {
+                    return candidate;
+                }
+                candidate = ParentPath(candidate);
+            }
+
+            return {};
+        }
+
+        AZStd::string IconPathForKind(const AZStd::string& kind)
+        {
+            if (kind == "ability_auto_attack")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_auto_attack.png";
+            }
+            if (kind == "ability_steady_strike")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_steady_strike.png";
+            }
+            if (kind == "ability_driving_blow")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_driving_blow.png";
+            }
+            if (kind == "ability_hampering_strike")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_hampering_strike.png";
+            }
+            if (kind == "ability_brace")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_brace.png";
+            }
+            if (kind == "ability_rallying_call")
+            {
+                return "Content\\Art\\Icons\\Abilities\\ability_rallying_call.png";
+            }
+            if (kind == "item_road_ration")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_road_ration.png";
+            }
+            if (kind == "item_oat_bundle")
+            {
+                return "Content\\Art\\Icons\\Items\\item_oat_bundle.png";
+            }
+            if (kind == "currency_copper")
+            {
+                return "Content\\Art\\Icons\\Inventory\\currency_copper.png";
+            }
+            if (kind == "item_militia_token")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_militia_token.png";
+            }
+            if (kind == "item_padded_vest")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_padded_vest.png";
+            }
+            if (kind == "item_handwraps")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_handwraps.png";
+            }
+            if (kind == "item_scroll_supplies")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_scroll_supplies.png";
+            }
+            if (kind == "item_ore_chunk")
+            {
+                return "Content\\Art\\Icons\\Items\\item_ore_chunk.png";
+            }
+            if (kind == "item_torn_cloth")
+            {
+                return "Content\\Art\\Icons\\Items\\item_torn_cloth.png";
+            }
+            if (kind == "item_field_boots")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_field_boots.png";
+            }
+            if (kind == "item_field_dressing")
+            {
+                return "Content\\Art\\Icons\\Inventory\\item_field_dressing.png";
+            }
+            if (kind == "menu_spellbook")
+            {
+                return "Content\\Art\\Icons\\UI\\menu_spellbook.png";
+            }
+            return "Content\\Art\\Icons\\UI\\icon_missing.png";
+        }
+
+        AZStd::string ResolveIconPath(const AZStd::string& kind)
+        {
+            static const AZStd::string repoRoot = FindRepoRootForIcons();
+            if (repoRoot.empty())
+            {
+                return {};
+            }
+
+            const AZStd::string requested = JoinPath(repoRoot, IconPathForKind(kind).c_str());
+            if (FileExists(requested))
+            {
+                return requested;
+            }
+
+            const AZStd::string fallback = JoinPath(repoRoot, "Content\\Art\\Icons\\UI\\icon_missing.png");
+            return FileExists(fallback) ? fallback : AZStd::string{};
+        }
+
+        bool ToWidePath(const AZStd::string& path, std::wstring& outPath)
+        {
+            const int required = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, nullptr, 0);
+            if (required <= 0)
+            {
+                return false;
+            }
+
+            outPath.assign(static_cast<size_t>(required), L'\0');
+            const int written = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, outPath.data(), required);
+            if (written <= 0)
+            {
+                outPath.clear();
+                return false;
+            }
+            if (!outPath.empty() && outPath.back() == L'\0')
+            {
+                outPath.pop_back();
+            }
+            return true;
+        }
+
+        Microsoft::WRL::ComPtr<IWICImagingFactory> CreateWicFactory()
+        {
+            const HRESULT initResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+            if (FAILED(initResult) && initResult != RPC_E_CHANGED_MODE)
+            {
+                return {};
+            }
+
+            Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+            if (FAILED(CoCreateInstance(
+                    CLSID_WICImagingFactory,
+                    nullptr,
+                    CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(factory.GetAddressOf()))))
+            {
+                return {};
+            }
+            return factory;
+        }
+
+        bool LoadPngIconSample(const AZStd::string& path, PngIconSample& outSample)
+        {
+            std::wstring widePath;
+            if (!ToWidePath(path, widePath))
+            {
+                return false;
+            }
+
+            static Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
+            if (!factory)
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+            if (FAILED(factory->CreateDecoderFromFilename(
+                    widePath.c_str(),
+                    nullptr,
+                    GENERIC_READ,
+                    WICDecodeMetadataCacheOnLoad,
+                    decoder.GetAddressOf())))
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+            if (FAILED(decoder->GetFrame(0, frame.GetAddressOf())))
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+            if (FAILED(factory->CreateFormatConverter(converter.GetAddressOf())))
+            {
+                return false;
+            }
+            if (FAILED(converter->Initialize(
+                    frame.Get(),
+                    GUID_WICPixelFormat32bppRGBA,
+                    WICBitmapDitherTypeNone,
+                    nullptr,
+                    0.0,
+                    WICBitmapPaletteTypeCustom)))
+            {
+                return false;
+            }
+
+            UINT width = 0;
+            UINT height = 0;
+            if (FAILED(converter->GetSize(&width, &height)) || width == 0 || height == 0)
+            {
+                return false;
+            }
+
+            const UINT stride = width * 4;
+            const UINT byteCount = stride * height;
+            std::vector<unsigned char> rgba(byteCount);
+            if (FAILED(converter->CopyPixels(nullptr, stride, byteCount, rgba.data())))
+            {
+                return false;
+            }
+
+            outSample.m_path = path;
+            for (int y = 0; y < PngIconSampleDimension; ++y)
+            {
+                const UINT sampledY = static_cast<UINT>(((y * 2 + 1) * height) / (PngIconSampleDimension * 2));
+                const UINT sourceY = sampledY < height ? sampledY : height - 1;
+                for (int x = 0; x < PngIconSampleDimension; ++x)
+                {
+                    const UINT sampledX = static_cast<UINT>(((x * 2 + 1) * width) / (PngIconSampleDimension * 2));
+                    const UINT sourceX = sampledX < width ? sampledX : width - 1;
+                    const size_t sourceIndex = (static_cast<size_t>(sourceY) * stride) + (static_cast<size_t>(sourceX) * 4);
+                    outSample.m_pixels[(y * PngIconSampleDimension) + x] =
+                        IM_COL32(rgba[sourceIndex], rgba[sourceIndex + 1], rgba[sourceIndex + 2], rgba[sourceIndex + 3]);
+                }
+            }
+            return true;
+        }
+
+        const PngIconSample* GetPngIconSample(const AZStd::string& kind)
+        {
+            static AZStd::unordered_map<AZStd::string, PngIconSample> iconCache;
+            PngIconSample& sample = iconCache[kind];
+            if (!sample.m_attempted)
+            {
+                sample.m_attempted = true;
+                const AZStd::string path = ResolveIconPath(kind);
+                sample.m_loaded = !path.empty() && LoadPngIconSample(path, sample);
+            }
+            return sample.m_loaded ? &sample : nullptr;
+        }
+
+        ImU32 MutedIconColor(ImU32 color)
+        {
+            const int red = (color >> IM_COL32_R_SHIFT) & 0xFF;
+            const int green = (color >> IM_COL32_G_SHIFT) & 0xFF;
+            const int blue = (color >> IM_COL32_B_SHIFT) & 0xFF;
+            const int alpha = (color >> IM_COL32_A_SHIFT) & 0xFF;
+            return IM_COL32(
+                (red + 66) / 2,
+                (green + 62) / 2,
+                (blue + 58) / 2,
+                AZ::GetMin(alpha, 165));
+        }
+
+        bool DrawPngIcon(
+            ImDrawList* drawList,
+            const ImVec2& minBounds,
+            const ImVec2& maxBounds,
+            const AZStd::string& kind,
+            bool muted)
+        {
+            const PngIconSample* sample = GetPngIconSample(kind);
+            if (!sample)
+            {
+                return false;
+            }
+
+            drawList->AddRectFilled(minBounds, maxBounds, ColorU32(13, 16, 20, 255), 7.0f);
+            const float width = maxBounds.x - minBounds.x;
+            const float height = maxBounds.y - minBounds.y;
+            const float cellWidth = width / static_cast<float>(PngIconSampleDimension);
+            const float cellHeight = height / static_cast<float>(PngIconSampleDimension);
+            for (int y = 0; y < PngIconSampleDimension; ++y)
+            {
+                for (int x = 0; x < PngIconSampleDimension; ++x)
+                {
+                    const ImU32 pixel = sample->m_pixels[(y * PngIconSampleDimension) + x];
+                    const ImU32 color = muted ? MutedIconColor(pixel) : pixel;
+                    const ImVec2 cellMin(minBounds.x + (cellWidth * x), minBounds.y + (cellHeight * y));
+                    const ImVec2 cellMax(minBounds.x + (cellWidth * (x + 1)), minBounds.y + (cellHeight * (y + 1)));
+                    drawList->AddRectFilled(cellMin, cellMax, color);
+                }
+            }
+            if (muted)
+            {
+                drawList->AddRectFilled(minBounds, maxBounds, ColorU32(8, 10, 12, 78), 7.0f);
+            }
+            drawList->AddRect(minBounds, maxBounds, ColorU32(201, 159, 78, muted ? 120 : 220), 7.0f, 0, 1.5f);
+            return true;
         }
 
         bool ProjectWorldPointToScreen(
@@ -1057,6 +1408,11 @@ namespace UiClient
             const AZStd::string& kind,
             bool muted = false)
         {
+            if (DrawPngIcon(drawList, minBounds, maxBounds, kind, muted))
+            {
+                return;
+            }
+
             const AZStd::string family = IconFamily(kind);
             const auto baseColorForFamily = [](const AZStd::string& iconFamily, bool isMuted) -> ImU32
             {
@@ -1591,6 +1947,7 @@ namespace UiClient
         }
 
         void DrawZoneMapWindow(
+            GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
             float playerX,
             float playerY)
@@ -1605,6 +1962,8 @@ namespace UiClient
                 AZ::GetMax(360.0f, availableRegion.y - 26.0f));
             const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
             ImGui::InvisibleButton("##stonewake_zone_map_canvas", canvasSize);
+            const bool canvasClicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+            const ImVec2 clickPoint = ImGui::GetIO().MousePos;
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
             drawList->AddRectFilled(canvasMin, canvasMax, ColorU32(18, 25, 29, 245), 6.0f);
@@ -1634,6 +1993,8 @@ namespace UiClient
                 }
             }
 
+            const NetClient::NavigationAreaState* clickedArea = nullptr;
+            float clickedAreaDistance = 999999.0f;
             for (const auto& area : worldState.m_session.m_navigationAreas)
             {
                 const ImVec2 center = mapToScreen(area.m_centerX, area.m_centerY);
@@ -1641,6 +2002,18 @@ namespace UiClient
                 const ImU32 areaColor = area.m_kind == "hostile_objective" ? ColorU32(135, 74, 52, 65) : ColorU32(72, 121, 112, 55);
                 drawList->AddCircleFilled(center, AZ::GetClamp(radius, 8.0f, 42.0f), areaColor, 32);
                 drawList->AddCircle(center, AZ::GetClamp(radius, 8.0f, 42.0f), ColorU32(178, 166, 124, 130), 32, 1.0f);
+                if (canvasClicked && !area.m_questIds.empty())
+                {
+                    const float deltaX = clickPoint.x - center.x;
+                    const float deltaY = clickPoint.y - center.y;
+                    const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
+                    const float clickRadius = AZ::GetClamp(radius, 10.0f, 48.0f);
+                    if (distance <= clickRadius && distance < clickedAreaDistance)
+                    {
+                        clickedArea = &area;
+                        clickedAreaDistance = distance;
+                    }
+                }
             }
 
             AZStd::vector<MapLabelRect> placedLabels;
@@ -1671,6 +2044,8 @@ namespace UiClient
                     return MapMarkerPriority(left->m_kind) < MapMarkerPriority(right->m_kind);
                 });
 
+            const NetClient::MapMarkerState* clickedMarker = nullptr;
+            float clickedMarkerDistance = 999999.0f;
             for (const auto* marker : sortedMarkers)
             {
                 if (!marker)
@@ -1681,6 +2056,17 @@ namespace UiClient
                 const ImVec2 point = mapToScreen(marker->m_x, marker->m_y);
                 drawList->AddCircleFilled(point, 6.0f, MapMarkerColor(marker->m_kind), 20);
                 drawList->AddCircle(point, 7.5f, ColorU32(21, 25, 27), 20, 1.5f);
+                if (canvasClicked)
+                {
+                    const float deltaX = clickPoint.x - point.x;
+                    const float deltaY = clickPoint.y - point.y;
+                    const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
+                    if (distance <= 18.0f && distance < clickedMarkerDistance)
+                    {
+                        clickedMarker = marker;
+                        clickedMarkerDistance = distance;
+                    }
+                }
                 const int priority = MapMarkerPriority(marker->m_kind);
                 if (!marker->m_displayName.empty() && priority <= 3)
                 {
@@ -1701,7 +2087,44 @@ namespace UiClient
                 ImVec2(playerPoint.x + 7.0f, playerPoint.y + 7.0f),
                 ColorU32(226, 240, 243));
 
-            ImGui::TextUnformatted("Legend: white player, rust objective, gold available, green turn-in, blue trainer, violet vendor");
+            if (canvasClicked && gameCore)
+            {
+                if (clickedMarker && !clickedMarker->m_entityId.empty())
+                {
+                    if (gameCore->SetTarget(clickedMarker->m_entityId))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.zone_map_marker_selected entityId=%s markerId=%s",
+                            clickedMarker->m_entityId.c_str(),
+                            clickedMarker->m_id.c_str());
+                    }
+                }
+                else if (clickedMarker && !clickedMarker->m_questId.empty())
+                {
+                    if (gameCore->TrackQuest(clickedMarker->m_questId, true))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.zone_map_quest_tracked questId=%s markerId=%s",
+                            clickedMarker->m_questId.c_str(),
+                            clickedMarker->m_id.c_str());
+                    }
+                }
+                else if (clickedArea && !clickedArea->m_questIds.empty())
+                {
+                    if (gameCore->TrackQuest(clickedArea->m_questIds[0], true))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.zone_map_area_tracked questId=%s areaId=%s",
+                            clickedArea->m_questIds[0].c_str(),
+                            clickedArea->m_areaId.c_str());
+                    }
+                }
+            }
+
+            ImGui::TextUnformatted("Legend: white player, rust objective, gold available, green turn-in, blue trainer, violet vendor. Click markers to target or track.");
         }
 
         void DrawFriendlyNpcNameplates(
@@ -2000,6 +2423,22 @@ namespace UiClient
             }
         }
 
+        bool BeginSpellbookAbilityDrag(const NetClient::SpellbookEntryState& entry)
+        {
+            if (!ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+            {
+                return false;
+            }
+
+            SpellbookAbilityDragPayload payload{};
+            std::snprintf(payload.m_abilityId, sizeof(payload.m_abilityId), "%s", entry.m_id.c_str());
+            ImGui::SetDragDropPayload(SpellbookAbilityPayloadType, &payload, sizeof(payload));
+            ImGui::TextUnformatted(entry.m_displayName.c_str());
+            ImGui::TextUnformatted("Assign to action bar");
+            ImGui::EndDragDropSource();
+            return true;
+        }
+
         void DrawActionSlots(
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
@@ -2174,7 +2613,7 @@ namespace UiClient
                     }
                 }
 
-                if (editMode && hasAbility && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                if (hasAbility && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
                 {
                     ActionBarSlotDragPayload payload{};
                     payload.m_sourceSlotIndex = slotIndex;
@@ -2185,7 +2624,7 @@ namespace UiClient
                     ImGui::EndDragDropSource();
                 }
 
-                if (editMode && ImGui::BeginDragDropTarget())
+                if (ImGui::BeginDragDropTarget())
                 {
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(SpellbookAbilityPayloadType))
                     {
@@ -2218,9 +2657,9 @@ namespace UiClient
                     ImGui::EndDragDropTarget();
                 }
 
-                if (editMode && ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                if (hasAbility && ImGui::IsItemClicked(ImGuiMouseButton_Right))
                 {
-                    if (hasAbility && gameCore->ClearActionBarSlot(slotIndex))
+                    if (gameCore->ClearActionBarSlot(slotIndex))
                     {
                         AZ_Printf("amandacore", "client.action_bar_clear_requested slot=%d", slotIndex);
                     }
@@ -2258,17 +2697,17 @@ namespace UiClient
                     }
                     if (editMode)
                     {
-                        tooltip += "\nSHIFT-click to arm move, drag to move, or SHIFT-right-click to clear.";
+                        tooltip += "\nSHIFT-click to arm move, drag to move, or right-click to clear.";
                     }
                     else
                     {
-                        tooltip += "\nBars are locked. Hold SHIFT to move or clear abilities.";
+                        tooltip += "\nDrag to move this ability, or right-click to clear.";
                     }
                     ImGui::SetTooltip("%s", tooltip.c_str());
                 }
-                else if (editMode && ImGui::IsItemHovered())
+                else if (ImGui::IsItemHovered())
                 {
-                    ImGui::SetTooltip("Drop a learned spellbook ability here, SHIFT-click after selecting a spell, or drag another action slot here.");
+                    ImGui::SetTooltip("Drop a learned spellbook ability here, or drag another action slot here.");
                 }
                 ImGui::PopID();
             }
@@ -2315,6 +2754,41 @@ namespace UiClient
                 pendingActionMoveSlot);
 
             ImGui::Spacing();
+            const bool clearPressed = ImGui::Button("Clear Slot", ImVec2(112.0f, 26.0f));
+            if (clearPressed && pendingActionMoveSlot >= 0)
+            {
+                if (gameCore->ClearActionBarSlot(pendingActionMoveSlot))
+                {
+                    AZ_Printf("amandacore", "client.action_bar_clear_requested slot=%d source=clear_drop_target", pendingActionMoveSlot);
+                }
+                pendingActionMoveSlot = -1;
+                pendingActionAssignmentAbilityId.clear();
+            }
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ActionBarSlotPayloadType))
+                {
+                    const auto* drag = static_cast<const ActionBarSlotDragPayload*>(payload->Data);
+                    if (drag && drag->m_sourceSlotIndex >= 0 && gameCore->ClearActionBarSlot(drag->m_sourceSlotIndex))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.action_bar_clear_requested slot=%d abilityId=%s source=drag_off_bar",
+                            drag->m_sourceSlotIndex,
+                            drag->m_abilityId);
+                        pendingActionMoveSlot = -1;
+                        pendingActionAssignmentAbilityId.clear();
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Drop an action slot here, or SHIFT-click a slot and press this, to clear it.");
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("Drag spells onto slots. Drag an action here to remove it.");
+
             ImGui::Text(
                 "%s interact  |  %s target  |  %s bag  |  %s spells  |  %s menu  |  Hold SHIFT to edit",
                 DisplayKeyName(interactBinding).c_str(),
@@ -2378,7 +2852,7 @@ namespace UiClient
             }
             else if (!editMode)
             {
-                ImGui::TextWrapped("Hold SHIFT to assign abilities.");
+                ImGui::TextWrapped("Drag abilities to action slots. Hold SHIFT for click-to-place.");
             }
             ImGui::Spacing();
             ImGui::BeginChild(
@@ -2399,6 +2873,7 @@ namespace UiClient
                 ImGui::PushID(entry.m_id.c_str());
                 const ImVec2 cardStart = ImGui::GetCursorScreenPos();
                 ImGui::InvisibleButton("##spell_card_icon", ImVec2(42.0f, 42.0f));
+                BeginSpellbookAbilityDrag(entry);
                 DrawProceduralIcon(
                     ImGui::GetWindowDrawList(),
                     cardStart,
@@ -2413,6 +2888,7 @@ namespace UiClient
                     pendingActionAssignmentAbilityId = entry.m_id;
                     AZ_Printf("amandacore", "client.spellbook_assignment_armed abilityId=%s", entry.m_id.c_str());
                 }
+                BeginSpellbookAbilityDrag(entry);
                 ImGui::PopStyleColor();
                 ImGui::TextWrapped("%s", entry.m_description.c_str());
                 const AZStd::string learnedFacts = FormatAbilityFacts(entry);
@@ -2426,18 +2902,9 @@ namespace UiClient
                 }
                 ImGui::TextDisabled("Known  |  level %d", entry.m_requiredLevel);
                 ImGui::EndGroup();
-                if (editMode && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-                {
-                    SpellbookAbilityDragPayload payload{};
-                    std::snprintf(payload.m_abilityId, sizeof(payload.m_abilityId), "%s", entry.m_id.c_str());
-                    ImGui::SetDragDropPayload(SpellbookAbilityPayloadType, &payload, sizeof(payload));
-                    ImGui::TextUnformatted(entry.m_displayName.c_str());
-                    ImGui::TextUnformatted("Assign to action bar");
-                    ImGui::EndDragDropSource();
-                }
                 if (ImGui::IsItemHovered())
                 {
-                    ImGui::SetTooltip(editMode ? "Drag to an action slot, or click to select then click a slot." : "Hold SHIFT to assign this ability.");
+                    ImGui::SetTooltip(editMode ? "Drag to an action slot, or click to select then click a slot." : "Drag to an action slot.");
                 }
                 ImGui::Separator();
                 ImGui::PopID();
@@ -3569,23 +4036,29 @@ namespace UiClient
                 ImGui::SameLine();
             }
 
-            ImGui::SetNextItemWidth(-1.0f);
             if (focusRequested)
             {
                 ImGui::SetKeyboardFocusHere();
                 focusRequested = false;
             }
-            const bool submitted = ImGui::InputText(
+            const float sendButtonWidth = 64.0f;
+            const float inputWidth = AZ::GetMax(
+                120.0f,
+                ImGui::GetContentRegionAvail().x - sendButtonWidth - ImGui::GetStyle().ItemSpacing.x);
+            ImGui::SetNextItemWidth(inputWidth);
+            const bool submittedByEnter = ImGui::InputText(
                 "##chat_input",
                 inputBuffer,
                 inputBufferSize,
                 ImGuiInputTextFlags_EnterReturnsTrue);
-            if (submitted)
+            ImGui::SameLine();
+            const bool submittedByButton = ImGui::Button("Send", ImVec2(sendButtonWidth, 0.0f));
+            if (submittedByEnter || submittedByButton)
             {
                 outSubmittedInput = inputBuffer;
-                inputBuffer[0] = '\0';
+                return true;
             }
-            return submitted;
+            return false;
         }
 
         void DrawPartyFrames(const GameCore::ClientWorldState& worldState)
@@ -5226,7 +5699,20 @@ namespace UiClient
                     m_chatFocusRequested,
                     submittedInput))
             {
-                SubmitChatInput(gameCore, submittedInput);
+                const bool hasText = submittedInput.find_first_not_of(" \t\r\n") != AZStd::string::npos;
+                if (hasText && SubmitChatInput(gameCore, submittedInput))
+                {
+                    m_chatInputBuffer[0] = '\0';
+                }
+                else if (hasText)
+                {
+                    AddHudEvent("Chat message could not be sent.");
+                    m_chatFocusRequested = true;
+                }
+                else
+                {
+                    m_chatFocusRequested = true;
+                }
             }
         }
         ImGui::End();
@@ -5460,7 +5946,7 @@ namespace UiClient
 
         if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize, false, true))
         {
-            DrawZoneMapWindow(worldState, playerX, playerY);
+            DrawZoneMapWindow(gameCore, worldState, playerX, playerY);
         }
         if (m_mapOpen)
         {
