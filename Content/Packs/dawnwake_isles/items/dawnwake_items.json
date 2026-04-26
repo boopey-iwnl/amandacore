@@ -1,0 +1,51 @@
+{
+  "items": [
+    {
+      "item_id": "dw_saltglade_shell",
+      "display_name": "Saltglade Shell",
+      "description": "A ridged shell used by Dawnwake surveyors to mark safe sandbars.",
+      "kind": "material",
+      "quality": "common",
+      "max_stack": 20,
+      "tags": [
+        "dawnwake"
+      ]
+    },
+    {
+      "item_id": "dw_tideglass_splinter",
+      "display_name": "Tideglass Splinter",
+      "description": "A bright shard from a tideglass mote.",
+      "kind": "quest",
+      "quality": "common",
+      "max_stack": 10,
+      "tags": [
+        "dawnwake",
+        "quest"
+      ]
+    },
+    {
+      "item_id": "dw_survey_ribbon",
+      "display_name": "Survey Ribbon",
+      "description": "A waxed ribbon for marking Dawnwake route stakes.",
+      "kind": "material",
+      "quality": "common",
+      "max_stack": 20,
+      "tags": [
+        "dawnwake",
+        "reward"
+      ]
+    },
+    {
+      "item_id": "dw_windspur_token",
+      "display_name": "Windspur Token",
+      "description": "A carved marker carried by sentinels along the high path.",
+      "kind": "material",
+      "quality": "common",
+      "max_stack": 20,
+      "tags": [
+        "dawnwake",
+        "rise"
+      ]
+    }
+  ]
+}

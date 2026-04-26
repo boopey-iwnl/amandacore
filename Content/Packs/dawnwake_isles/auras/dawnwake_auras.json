@@ -1,0 +1,23 @@
+{
+  "auras": [
+    {
+      "aura_id": "dw_braced_winds",
+      "display_name": "Braced Winds",
+      "kind": "buff",
+      "duration_ms": 4000,
+      "max_stacks": 1,
+      "stack_rule": "refresh",
+      "tick_rule": "none",
+      "modifiers": [
+        {
+          "stat": "armor",
+          "operation": "add",
+          "value": 2
+        }
+      ],
+      "tags": [
+        "dawnwake"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "abilities": [
+    {
+      "ability_id": "dw_tidecut",
+      "display_name": "Tidecut",
+      "school": "physical",
+      "target_rule": "enemy",
+      "range": 2.8,
+      "timing": {
+        "cast_ms": 0
+      },
+      "cooldown_ms": 1500,
+      "effects": [
+        {
+          "kind": "direct_damage",
+          "magnitude": 7
+        }
+      ],
+      "tags": [
+        "dawnwake"
+      ]
+    },
+    {
+      "ability_id": "dw_shimmer_jolt",
+      "display_name": "Shimmer Jolt",
+      "school": "arcane",
+      "target_rule": "enemy",
+      "range": 5,
+      "timing": {
+        "cast_ms": 250
+      },
+      "cooldown_ms": 2200,
+      "effects": [
+        {
+          "kind": "direct_damage",
+          "magnitude": 8
+        }
+      ],
+      "tags": [
+        "dawnwake",
+        "shoal"
+      ]
+    },
+    {
+      "ability_id": "dw_windguard_bash",
+      "display_name": "Windguard Bash",
+      "school": "physical",
+      "target_rule": "enemy",
+      "range": 3,
+      "timing": {
+        "cast_ms": 0
+      },
+      "cooldown_ms": 2600,
+      "effects": [
+        {
+          "kind": "direct_damage",
+          "magnitude": 10
+        },
+        {
+          "kind": "apply_aura",
+          "aura_id": "dw_braced_winds",
+          "magnitude": 1
+        }
+      ],
+      "tags": [
+        "dawnwake",
+        "rise"
+      ]
+    }
+  ]
+}

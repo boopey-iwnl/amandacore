@@ -1,0 +1,61 @@
+{
+  "npcs": [
+    {
+      "archetype_id": "dw_saltglade_strider",
+      "display_name": "Saltglade Strider",
+      "level": 2,
+      "max_health": 42,
+      "disposition": "Hostile",
+      "attack_range": 2.6,
+      "aggro_range": 6,
+      "leash_range": 18,
+      "base_damage": 4,
+      "attack_interval_ms": 1700,
+      "default_ability_ids": [
+        "dw_tidecut"
+      ],
+      "tags": [
+        "dawnwake",
+        "shore"
+      ]
+    },
+    {
+      "archetype_id": "dw_tideglass_mote",
+      "display_name": "Tideglass Mote",
+      "level": 3,
+      "max_health": 50,
+      "disposition": "Hostile",
+      "attack_range": 3,
+      "aggro_range": 7,
+      "leash_range": 20,
+      "base_damage": 5,
+      "attack_interval_ms": 1800,
+      "default_ability_ids": [
+        "dw_shimmer_jolt"
+      ],
+      "tags": [
+        "dawnwake",
+        "shoal"
+      ]
+    },
+    {
+      "archetype_id": "dw_rise_sentinel",
+      "display_name": "Windspur Sentinel",
+      "level": 4,
+      "max_health": 72,
+      "disposition": "Hostile",
+      "attack_range": 2.8,
+      "aggro_range": 8,
+      "leash_range": 24,
+      "base_damage": 7,
+      "attack_interval_ms": 1900,
+      "default_ability_ids": [
+        "dw_windguard_bash"
+      ],
+      "tags": [
+        "dawnwake",
+        "rise"
+      ]
+    }
+  ]
+}

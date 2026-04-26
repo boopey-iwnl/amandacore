@@ -57,6 +57,8 @@ Each Gem has a single, durable responsibility:
 
 The data model is deliberately wider than the first slice so future work can scale without a rewrite. JSON Schema definitions live in `Content/Schemas/gameplay.schema.json`, and example authored content lives in `Content/GameData/ZoneSlice`.
 
+The first server-side runtime content package loader is documented in `Docs/ContentPackageLoader.md`. It loads AmandaCore-owned JSON package manifests from `Content/Packs`, validates zones and catalogs before activation, and activates validated content into the Go `worldServer` as additive runtime content while preserving existing hardcoded starter flows. `Docs/DawnwakeIsles.md` documents the first original multi-zone package with server-side adjacency and transition metadata for future streamed-world expansion.
+
 ## Recommended future O3DE wiring
 
 - Build `AmandaCoreShared` as a normal static library and link it into both client and server Gems.

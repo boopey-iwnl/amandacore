@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -11,30 +13,38 @@ import (
 )
 
 type options struct {
-	Clients  int
-	Duration time.Duration
-	CmdRate  int
-	Scenario string
+	Clients     int
+	Duration    time.Duration
+	CmdRate     int
+	CommandRate float64
+	Scenario    string
+	ContentPath string
 }
 
 func main() {
 	opts := parseOptions()
-	if opts.Scenario != "quest-basic" {
-		exitf("unsupported scenario %q", opts.Scenario)
-	}
 
-	report, err := worlds.RunQuestBasicLoadsim(worlds.QuestBasicLoadsimOptions{
-		Clients:  opts.Clients,
-		Duration: opts.Duration,
-		CmdRate:  opts.CmdRate,
-	})
-	printQuestReport(report)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "loadsim failed: %v\n", err)
-		os.Exit(1)
-	}
-	if len(report.Errors) > 0 {
-		os.Exit(1)
+	switch opts.Scenario {
+	case "quest-basic":
+		report, err := worlds.RunQuestBasicLoadsim(worlds.QuestBasicLoadsimOptions{
+			Clients:  opts.Clients,
+			Duration: opts.Duration,
+			CmdRate:  opts.CmdRate,
+		})
+		printQuestReport(report)
+		exitOnLoadsimError(err, len(report.Errors))
+	case "content-package-basic", "dawnwake-traversal-basic":
+		report, err := worlds.RunContentPackageLoadsim(worlds.ContentPackageLoadsimOptions{
+			Clients:     opts.Clients,
+			Duration:    opts.Duration,
+			CommandRate: opts.CommandRate,
+			Scenario:    opts.Scenario,
+			ContentPath: opts.ContentPath,
+		})
+		printContentReport(report)
+		exitOnLoadsimError(err, len(report.Errors))
+	default:
+		exitf("unsupported scenario %q", opts.Scenario)
 	}
 }
 
@@ -45,6 +55,7 @@ func parseOptions() options {
 	flag.StringVar(&durationText, "duration", "30s", "scenario duration budget, for example 30s")
 	flag.IntVar(&opts.CmdRate, "cmd-rate", 2, "nominal commands per second per player")
 	flag.StringVar(&opts.Scenario, "scenario", "quest-basic", "scenario name")
+	flag.StringVar(&opts.ContentPath, "content", "", "content package manifest path")
 	flag.Parse()
 
 	duration, err := time.ParseDuration(durationText)
@@ -59,6 +70,7 @@ func parseOptions() options {
 	if opts.CmdRate <= 0 {
 		exitf("--cmd-rate must be greater than zero")
 	}
+	opts.CommandRate = float64(opts.CmdRate)
 	return opts
 }
 
@@ -87,6 +99,69 @@ func printQuestReport(report worlds.QuestBasicLoadsimReport) {
 	fmt.Printf("- errors: %d\n", len(report.Errors))
 	for _, errText := range report.Errors {
 		fmt.Printf("  - %s\n", errText)
+	}
+}
+
+func printContentReport(report worlds.ContentPackageLoadsimReport) {
+	fmt.Println("Content package loadsim report")
+	fmt.Printf("- content package loaded: %v\n", report.ContentPackageLoaded)
+	fmt.Printf("- package id: %s\n", report.PackageID)
+	fmt.Printf("- validation errors: %d\n", len(report.ValidationErrors))
+	for _, validationError := range report.ValidationErrors {
+		fmt.Printf("  - %s\n", validationError)
+	}
+	fmt.Printf("- zones activated: %d\n", report.ZonesActivated)
+	fmt.Printf("- catalogs loaded: %s\n", formatCounts(report.CatalogsLoaded))
+	fmt.Printf("- NPCs spawned: %d\n", report.NPCsSpawned)
+	fmt.Printf("- quest providers registered: %d\n", report.QuestProvidersRegistered)
+	fmt.Printf("- transitions loaded: %d\n", report.TransitionsLoaded)
+	fmt.Printf("- transitions completed: %d\n", report.TransitionsCompleted)
+	fmt.Printf("- quests accepted: %d\n", report.QuestsAccepted)
+	fmt.Printf("- NPC kills: %d\n", report.NPCKills)
+	fmt.Printf("- loot containers created: %d\n", report.LootContainersCreated)
+	fmt.Printf("- loot claims completed: %d\n", report.LootClaimsCompleted)
+	fmt.Printf("- inventory grants: %s\n", formatCounts(report.InventoryGrants))
+	fmt.Printf("- quests completed: %d\n", report.QuestsCompleted)
+	fmt.Printf("- rewards granted: %d\n", report.RewardsGranted)
+	fmt.Printf("- average tick duration: %.3fms\n", report.AverageTickDurationMs)
+	fmt.Printf("- max tick duration: %.3fms\n", report.MaxTickDurationMs)
+	fmt.Printf("- max queue depth: %d\n", report.MaxQueueDepth)
+	fmt.Printf("- errors: %d\n", len(report.Errors))
+	for _, runError := range report.Errors {
+		fmt.Printf("  - %s\n", runError)
+	}
+	encoded, err := json.Marshal(report)
+	if err == nil {
+		fmt.Printf("- json: %s\n", string(encoded))
+	}
+}
+
+func formatCounts(counts map[string]int) string {
+	if len(counts) == 0 {
+		return "{}"
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := "{"
+	for index, key := range keys {
+		if index > 0 {
+			result += ", "
+		}
+		result += fmt.Sprintf("%s:%d", key, counts[key])
+	}
+	return result + "}"
+}
+
+func exitOnLoadsimError(err error, errorCount int) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "loadsim failed: %v\n", err)
+		os.Exit(1)
+	}
+	if errorCount > 0 {
+		os.Exit(1)
 	}
 }
 

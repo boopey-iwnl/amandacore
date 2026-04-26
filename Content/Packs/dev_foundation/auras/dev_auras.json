@@ -1,0 +1,17 @@
+{
+  "auras": [
+    {
+      "aura_id": "dev_pressure_mark",
+      "display_name": "Pressure Mark",
+      "kind": "debuff",
+      "duration_ms": 3000,
+      "max_stacks": 1,
+      "stack_rule": "refresh",
+      "tick_rule": "none",
+      "modifiers": [],
+      "tags": [
+        "dev"
+      ]
+    }
+  ]
+}

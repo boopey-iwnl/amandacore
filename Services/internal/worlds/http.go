@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"math"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"amandacore/services/internal/httpapi"
@@ -18,7 +20,7 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 }
 
 func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adminEnabled bool) {
-	server := newWorldServer(fileStore)
+	server := newConfiguredWorldServer(fileStore)
 
 	joinTicketHandler := httpapi.RequireSession(fileStore, func(w http.ResponseWriter, r *http.Request, session *platform.Session) {
 		var request joinTicketRequest
@@ -146,6 +148,13 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 			"revision": "alpha-0.1-stonewake-starter-zone",
 		})
 	}))
+}
+
+func newConfiguredWorldServer(fileStore *store.FileStore) *worldServer {
+	if contentPackagePath := strings.TrimSpace(os.Getenv("AMANDACORE_CONTENT_PACKAGE")); contentPackagePath != "" {
+		return newWorldServerWithContentPackage(fileStore, contentPackagePath)
+	}
+	return newWorldServer(fileStore)
 }
 
 func registerAdminRoutes(mux *http.ServeMux, server *worldServer, fileStore *store.FileStore) {
@@ -385,6 +394,10 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 	session.X = nextX
 	session.Y = nextY
 	session.LastSeenAt = time.Now().Unix()
+	if _, err := s.applyContentZoneTransitionsLocked(session); err != nil {
+		httpapi.Error(w, http.StatusConflict, "zone_transition_failed", err.Error())
+		return
+	}
 
 	if session.HousingSpaceID != "" || session.InstanceID != "" {
 		httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
