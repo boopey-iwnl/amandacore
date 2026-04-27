@@ -66,7 +66,7 @@ Temporarily outside the loop:
 - social, guild, party, auction, vendor, housing, travel, dungeon, gathering, crafting, profession, talent, and loot-specific routes still use existing locked helpers unless they enter through a loop-backed command listed above.
 - multi-zone handoff coordinator behavior remains its existing queue/coordinator model.
 
-Milestone 5 should move combat, loot, and quest reward expansion deeper into command-owned gameplay rules. Later milestones should absorb social/economy systems into their own transactional authority boundaries.
+Milestone 5 moves combat, loot, threat, and quest reward expansion deeper into command-owned gameplay rules. Later milestones should absorb social/economy systems into their own transactional authority boundaries.
 
 ## Snapshot/Delta Strategy For Current Polling Clients
 
@@ -119,9 +119,9 @@ Contract fixtures did not need changes because no public API shape changed.
 
 ## Risks For Milestone 5 Combat/Loot/Quest Expansion
 
-- Combat helpers still contain substantial existing logic and are invoked inside loop commands rather than being fully decomposed into command-native reducers.
+- Combat helpers still contain substantial existing logic and are invoked inside loop commands while the loop package now has command-native reducers and replay tests for combat, threat, loot, quest, item, and currency state.
 - Mob AI and aura advancement still run when HTTP commands or polls advance the world; a future fixed tick worker may need to own those ticks.
-- Loot, vendor, gathering, crafting, dungeon, and social/economy routes still mutate through existing locked helpers.
+- Vendor, gathering, crafting, dungeon, and social/economy routes still mutate through existing locked helpers. Loot inspect and claim now enter the Stonewake loop.
 - The loop snapshot is intentionally compact while the HTTP response remains richer; future replication work must define an explicit delta contract.
 - SQL transactional character-state methods are ready, but runtime world commands still write through the file-store default path.
 

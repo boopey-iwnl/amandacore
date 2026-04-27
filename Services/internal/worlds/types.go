@@ -710,6 +710,7 @@ type mobState struct {
 	CurrentTargetCharacter string
 	LastDamagedByCharacter string
 	LastDamagedByEntityID  string
+	ThreatByCharacter      map[string]float64
 	LastAttackAtMs         int64
 	DeathTick              int64
 	RespawnAtMs            int64

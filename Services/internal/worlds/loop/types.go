@@ -24,11 +24,37 @@ const (
 	CommandSelectTarget           CommandKind = "SelectTarget"
 	CommandClearTarget            CommandKind = "ClearTarget"
 	CommandStartAutoAttack        CommandKind = "StartAutoAttack"
+	CommandStopAutoAttack         CommandKind = "StopAutoAttack"
 	CommandCastAbility            CommandKind = "CastAbility"
 	CommandUseAbility             CommandKind = "UseAbility"
+	CommandCancelCast             CommandKind = "CancelCast"
+	CommandApplyDamage            CommandKind = "ApplyDamage"
+	CommandApplyHeal              CommandKind = "ApplyHeal"
+	CommandResolveDeath           CommandKind = "ResolveDeath"
+	CommandRespawnNPC             CommandKind = "RespawnNpc"
+	CommandScheduleRespawn        CommandKind = "ScheduleRespawn"
+	CommandRequestCombatSnapshot  CommandKind = "RequestCombatSnapshot"
+	CommandAddThreat              CommandKind = "AddThreat"
+	CommandDecayThreat            CommandKind = "DecayThreat"
+	CommandResetThreat            CommandKind = "ResetThreat"
+	CommandSelectNPCTarget        CommandKind = "SelectNpcTarget"
+	CommandClearThreatOnDeath     CommandKind = "ClearThreatOnDeath"
+	CommandClearThreatOnLeash     CommandKind = "ClearThreatOnLeash"
 	CommandAcceptQuest            CommandKind = "AcceptQuest"
+	CommandAbandonQuest           CommandKind = "AbandonQuest"
 	CommandProgressQuestObjective CommandKind = "ProgressQuestObjective"
+	CommandCompleteQuest          CommandKind = "CompleteQuest"
+	CommandClaimQuestReward       CommandKind = "ClaimQuestReward"
 	CommandInteractNPC            CommandKind = "InteractNpc"
+	CommandGenerateLoot           CommandKind = "GenerateLoot"
+	CommandOpenLoot               CommandKind = "OpenLoot"
+	CommandClaimLootItem          CommandKind = "ClaimLootItem"
+	CommandClaimCurrencyReward    CommandKind = "ClaimCurrencyReward"
+	CommandCloseLoot              CommandKind = "CloseLoot"
+	CommandApplyQuestReward       CommandKind = "ApplyQuestReward"
+	CommandApplyKillLoot          CommandKind = "ApplyKillLoot"
+	CommandApplyCurrencyDelta     CommandKind = "ApplyCurrencyDelta"
+	CommandApplyItemGrant         CommandKind = "ApplyItemGrant"
 	CommandUpdateActionBar        CommandKind = "UpdateActionBar"
 	CommandMoveInventoryItem      CommandKind = "MoveInventoryItem"
 	CommandRequestSnapshot        CommandKind = "RequestSnapshot"
@@ -51,44 +77,66 @@ type Position struct {
 }
 
 type PlayerState struct {
-	SessionToken     string         `json:"worldSessionToken"`
-	AccountID        string         `json:"accountId,omitempty"`
-	CharacterID      string         `json:"characterId"`
-	DisplayName      string         `json:"displayName,omitempty"`
-	ZoneID           string         `json:"zoneId"`
-	Position         Position       `json:"position"`
-	Connected        bool           `json:"connected"`
-	Health           float64        `json:"health,omitempty"`
-	MaxHealth        float64        `json:"maxHealth,omitempty"`
-	Resource         float64        `json:"resource,omitempty"`
-	MaxResource      float64        `json:"maxResource,omitempty"`
-	Alive            bool           `json:"alive"`
-	TargetID         string         `json:"targetId,omitempty"`
-	AutoAttackActive bool           `json:"autoAttackActive,omitempty"`
-	QuestProgress    map[string]int `json:"questProgress,omitempty"`
-	InventorySlots   map[int]string `json:"inventorySlots,omitempty"`
-	ActionBarSlots   map[int]string `json:"actionBarSlots,omitempty"`
+	SessionToken     string          `json:"worldSessionToken"`
+	AccountID        string          `json:"accountId,omitempty"`
+	CharacterID      string          `json:"characterId"`
+	DisplayName      string          `json:"displayName,omitempty"`
+	ZoneID           string          `json:"zoneId"`
+	Position         Position        `json:"position"`
+	Connected        bool            `json:"connected"`
+	Health           float64         `json:"health,omitempty"`
+	MaxHealth        float64         `json:"maxHealth,omitempty"`
+	Resource         float64         `json:"resource,omitempty"`
+	MaxResource      float64         `json:"maxResource,omitempty"`
+	Alive            bool            `json:"alive"`
+	TargetID         string          `json:"targetId,omitempty"`
+	AutoAttackActive bool            `json:"autoAttackActive,omitempty"`
+	QuestProgress    map[string]int  `json:"questProgress,omitempty"`
+	QuestCompleted   map[string]bool `json:"questCompleted,omitempty"`
+	LootClaims       map[string]bool `json:"lootClaims,omitempty"`
+	InventorySlots   map[int]string  `json:"inventorySlots,omitempty"`
+	ActionBarSlots   map[int]string  `json:"actionBarSlots,omitempty"`
+	CurrencyCopper   int             `json:"currencyCopper,omitempty"`
 }
 
 type NpcState struct {
-	ID          string   `json:"id"`
-	ZoneID      string   `json:"zoneId"`
-	Position    Position `json:"position"`
-	Health      float64  `json:"health,omitempty"`
-	MaxHealth   float64  `json:"maxHealth,omitempty"`
-	Alive       bool     `json:"alive"`
-	Targetable  bool     `json:"targetable"`
-	TargetID    string   `json:"targetId,omitempty"`
-	DisplayName string   `json:"displayName,omitempty"`
-	Kind        string   `json:"kind,omitempty"`
+	ID          string             `json:"id"`
+	ZoneID      string             `json:"zoneId"`
+	Position    Position           `json:"position"`
+	Health      float64            `json:"health,omitempty"`
+	MaxHealth   float64            `json:"maxHealth,omitempty"`
+	Alive       bool               `json:"alive"`
+	Targetable  bool               `json:"targetable"`
+	TargetID    string             `json:"targetId,omitempty"`
+	DisplayName string             `json:"displayName,omitempty"`
+	Kind        string             `json:"kind,omitempty"`
+	Threat      map[string]float64 `json:"threat,omitempty"`
+	RespawnTick uint64             `json:"respawnTick,omitempty"`
+}
+
+type LootItemState struct {
+	ItemID   string `json:"itemId"`
+	Quantity int    `json:"quantity"`
+}
+
+type LootContainerState struct {
+	ID                   string          `json:"id"`
+	SourceEntityID       string          `json:"sourceEntityId"`
+	OwnerCharacterID     string          `json:"ownerCharacterId"`
+	Items                []LootItemState `json:"items"`
+	OpenedByCharacterID  string          `json:"openedByCharacterId,omitempty"`
+	ClaimedByCharacterID string          `json:"claimedByCharacterId,omitempty"`
+	ClaimedAtTick        uint64          `json:"claimedAtTick,omitempty"`
+	Closed               bool            `json:"closed,omitempty"`
 }
 
 type WorldSnapshot struct {
-	ShardID string        `json:"shardId"`
-	ZoneID  string        `json:"zoneId"`
-	Tick    uint64        `json:"tick"`
-	Players []PlayerState `json:"players"`
-	NPCs    []NpcState    `json:"npcs"`
+	ShardID        string               `json:"shardId"`
+	ZoneID         string               `json:"zoneId"`
+	Tick           uint64               `json:"tick"`
+	Players        []PlayerState        `json:"players"`
+	NPCs           []NpcState           `json:"npcs"`
+	LootContainers []LootContainerState `json:"lootContainers,omitempty"`
 }
 
 type ReplayRecord struct {
@@ -103,21 +151,23 @@ type ReplayRecord struct {
 }
 
 type LoopMetrics struct {
-	ShardID             string        `json:"shardId"`
-	ZoneID              string        `json:"zoneId"`
-	QueueDepth          int           `json:"queueDepth"`
-	QueueCapacity       int           `json:"queueCapacity"`
-	CommandsAccepted    uint64        `json:"commandsAccepted"`
-	CommandsApplied     uint64        `json:"commandsApplied"`
-	CommandsRejected    uint64        `json:"commandsRejected"`
-	CommandTimeouts     uint64        `json:"commandTimeouts"`
-	SnapshotsEmitted    uint64        `json:"snapshotsEmitted"`
-	ReconnectsRestored  uint64        `json:"reconnectsRestored"`
-	ReplayRecords       uint64        `json:"replayRecords"`
-	LastCommandLatency  time.Duration `json:"lastCommandLatency"`
-	MaxCommandLatency   time.Duration `json:"maxCommandLatency"`
-	LastAppliedSequence uint64        `json:"lastAppliedSequence"`
-	Running             bool          `json:"running"`
+	ShardID                  string        `json:"shardId"`
+	ZoneID                   string        `json:"zoneId"`
+	QueueDepth               int           `json:"queueDepth"`
+	QueueCapacity            int           `json:"queueCapacity"`
+	CommandsAccepted         uint64        `json:"commandsAccepted"`
+	CommandsApplied          uint64        `json:"commandsApplied"`
+	CommandsRejected         uint64        `json:"commandsRejected"`
+	GameplayCommandsApplied  uint64        `json:"gameplayCommandsApplied"`
+	GameplayCommandsRejected uint64        `json:"gameplayCommandsRejected"`
+	CommandTimeouts          uint64        `json:"commandTimeouts"`
+	SnapshotsEmitted         uint64        `json:"snapshotsEmitted"`
+	ReconnectsRestored       uint64        `json:"reconnectsRestored"`
+	ReplayRecords            uint64        `json:"replayRecords"`
+	LastCommandLatency       time.Duration `json:"lastCommandLatency"`
+	MaxCommandLatency        time.Duration `json:"maxCommandLatency"`
+	LastAppliedSequence      uint64        `json:"lastAppliedSequence"`
+	Running                  bool          `json:"running"`
 }
 
 type CommandContext struct {
@@ -183,6 +233,7 @@ type ShardState struct {
 	playersBySession  map[string]PlayerState
 	playerSessionByID map[string]string
 	npcs              map[string]NpcState
+	lootContainers    map[string]LootContainerState
 }
 
 func NewShardState(shardID string, zoneID string) *ShardState {
@@ -198,6 +249,7 @@ func NewShardState(shardID string, zoneID string) *ShardState {
 		playersBySession:  map[string]PlayerState{},
 		playerSessionByID: map[string]string{},
 		npcs:              map[string]NpcState{},
+		lootContainers:    map[string]LootContainerState{},
 	}
 }
 
@@ -209,6 +261,8 @@ func (s *ShardState) UpsertPlayer(player PlayerState) {
 		player.ZoneID = s.ZoneID
 	}
 	player.QuestProgress = cloneIntMap(player.QuestProgress)
+	player.QuestCompleted = cloneBoolMap(player.QuestCompleted)
+	player.LootClaims = cloneBoolMap(player.LootClaims)
 	player.InventorySlots = cloneSlotMap(player.InventorySlots)
 	player.ActionBarSlots = cloneSlotMap(player.ActionBarSlots)
 	s.playersBySession[player.SessionToken] = player
@@ -237,11 +291,32 @@ func (s *ShardState) UpsertNPC(npc NpcState) {
 	if npc.ZoneID == "" {
 		npc.ZoneID = s.ZoneID
 	}
+	npc.Threat = cloneFloatMap(npc.Threat)
 	s.npcs[npc.ID] = npc
 }
 
 func (s *ShardState) RemoveNPC(id string) {
 	delete(s.npcs, id)
+}
+
+func (s *ShardState) NPC(id string) (NpcState, bool) {
+	npc, ok := s.npcs[id]
+	npc.Threat = cloneFloatMap(npc.Threat)
+	return npc, ok
+}
+
+func (s *ShardState) UpsertLootContainer(container LootContainerState) {
+	if container.ID == "" {
+		return
+	}
+	container.Items = cloneLootItems(container.Items)
+	s.lootContainers[container.ID] = container
+}
+
+func (s *ShardState) LootContainer(id string) (LootContainerState, bool) {
+	container, ok := s.lootContainers[id]
+	container.Items = cloneLootItems(container.Items)
+	return container, ok
 }
 
 func (s *ShardState) Snapshot() WorldSnapshot {
@@ -255,23 +330,36 @@ func (s *ShardState) Snapshot() WorldSnapshot {
 
 	npcs := make([]NpcState, 0, len(s.npcs))
 	for _, npc := range s.npcs {
+		npc.Threat = cloneFloatMap(npc.Threat)
 		npcs = append(npcs, npc)
 	}
 	sort.Slice(npcs, func(left, right int) bool {
 		return npcs[left].ID < npcs[right].ID
 	})
 
+	lootContainers := make([]LootContainerState, 0, len(s.lootContainers))
+	for _, container := range s.lootContainers {
+		container.Items = cloneLootItems(container.Items)
+		lootContainers = append(lootContainers, container)
+	}
+	sort.Slice(lootContainers, func(left, right int) bool {
+		return lootContainers[left].ID < lootContainers[right].ID
+	})
+
 	return WorldSnapshot{
-		ShardID: s.ShardID,
-		ZoneID:  s.ZoneID,
-		Tick:    s.Tick,
-		Players: players,
-		NPCs:    npcs,
+		ShardID:        s.ShardID,
+		ZoneID:         s.ZoneID,
+		Tick:           s.Tick,
+		Players:        players,
+		NPCs:           npcs,
+		LootContainers: lootContainers,
 	}
 }
 
 func clonePlayer(player PlayerState) PlayerState {
 	player.QuestProgress = cloneIntMap(player.QuestProgress)
+	player.QuestCompleted = cloneBoolMap(player.QuestCompleted)
+	player.LootClaims = cloneBoolMap(player.LootClaims)
 	player.InventorySlots = cloneSlotMap(player.InventorySlots)
 	player.ActionBarSlots = cloneSlotMap(player.ActionBarSlots)
 	return player
@@ -296,6 +384,37 @@ func cloneSlotMap(source map[int]string) map[int]string {
 	for key, value := range source {
 		cloned[key] = value
 	}
+	return cloned
+}
+
+func cloneBoolMap(source map[string]bool) map[string]bool {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]bool, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneFloatMap(source map[string]float64) map[string]float64 {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]float64, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneLootItems(source []LootItemState) []LootItemState {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make([]LootItemState, len(source))
+	copy(cloned, source)
 	return cloned
 }
 

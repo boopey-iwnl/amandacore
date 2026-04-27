@@ -17,39 +17,52 @@ const (
 	EventWorldCharacterSaved     = "world.character_saved"
 	EventWorldReconnected        = "world.reconnected"
 
-	EventWorldTickStarted         = "world.tick.started"
-	EventWorldTickCompleted       = "world.tick.completed"
-	EventWorldTickSlow            = "world.tick.slow"
-	EventWorldCommandEnqueued     = "world.command.enqueued"
-	EventWorldCommandRejected     = "world.command.rejected"
-	EventWorldLoopStarted         = "world.loop_started"
-	EventWorldLoopStopped         = "world.loop_stopped"
-	EventWorldCommandAccepted     = "world.command_accepted"
-	EventWorldCommandApplied      = "world.command_applied"
-	EventWorldSnapshotEmitted     = "world.snapshot_emitted"
-	EventWorldReplayRecorded      = "world.replay_recorded"
-	EventWorldReconnectRestored   = "world.reconnect_restored"
-	EventWorldCommandTimeout      = "world.command_timeout"
-	EventWorldZoneLoaded          = "world.zone.loaded"
-	EventWorldZoneUnloaded        = "world.zone.unloaded"
-	EventWorldEntitySpawned       = "world.entity.spawned"
-	EventWorldEntityDespawned     = "world.entity.despawned"
-	EventCombatIntentSubmitted    = "combat.intent_submitted"
-	EventCombatAbilityResolved    = "combat.ability_resolved"
-	EventAbilityCastStarted       = "ability.cast_started"
-	EventAbilityCastCompleted     = "ability.cast_completed"
-	EventAbilityCastInterrupted   = "ability.cast_interrupted"
-	EventAbilityEffectResolved    = "ability.effect_resolved"
-	EventAuraApplied              = "aura.applied"
-	EventAuraRefreshed            = "aura.refreshed"
-	EventAuraTicked               = "aura.ticked"
-	EventAuraExpired              = "aura.expired"
-	EventCooldownStarted          = "cooldown.started"
-	EventCooldownReady            = "cooldown.ready"
-	EventNPCSpawned               = "npc.spawned"
-	EventAdminActionRequested     = "admin.action_requested"
-	EventAdminActionApplied       = "admin.action_applied"
-	EventPersistenceSnapshotSaved = "persistence.snapshot_saved"
+	EventWorldTickStarted             = "world.tick.started"
+	EventWorldTickCompleted           = "world.tick.completed"
+	EventWorldTickSlow                = "world.tick.slow"
+	EventWorldCommandEnqueued         = "world.command.enqueued"
+	EventWorldCommandRejected         = "world.command.rejected"
+	EventWorldLoopStarted             = "world.loop_started"
+	EventWorldLoopStopped             = "world.loop_stopped"
+	EventWorldCommandAccepted         = "world.command_accepted"
+	EventWorldCommandApplied          = "world.command_applied"
+	EventWorldSnapshotEmitted         = "world.snapshot_emitted"
+	EventWorldReplayRecorded          = "world.replay_recorded"
+	EventWorldReconnectRestored       = "world.reconnect_restored"
+	EventWorldCommandTimeout          = "world.command_timeout"
+	EventWorldZoneLoaded              = "world.zone.loaded"
+	EventWorldZoneUnloaded            = "world.zone.unloaded"
+	EventWorldEntitySpawned           = "world.entity.spawned"
+	EventWorldEntityDespawned         = "world.entity.despawned"
+	EventCombatIntentSubmitted        = "combat.intent_submitted"
+	EventCombatTargetSelected         = "combat.target_selected"
+	EventCombatAutoAttackStarted      = "combat.auto_attack_started"
+	EventCombatAbilityResolved        = "combat.ability_resolved"
+	EventCombatDamageApplied          = "combat.damage_applied"
+	EventCombatEntityDefeated         = "combat.entity_defeated"
+	EventThreatUpdated                = "threat.updated"
+	EventQuestObjectiveProgressed     = "quest.objective_progressed"
+	EventQuestCompleted               = "quest.completed"
+	EventQuestRewardClaimed           = "quest.reward_claimed"
+	EventLootGenerated                = "loot.generated"
+	EventLootClaimed                  = "loot.claimed"
+	EventLootClaimRejected            = "loot.claim_rejected"
+	EventWorldGameplayCommandApplied  = "world.loop_gameplay_command_applied"
+	EventWorldGameplayCommandRejected = "world.loop_gameplay_command_rejected"
+	EventAbilityCastStarted           = "ability.cast_started"
+	EventAbilityCastCompleted         = "ability.cast_completed"
+	EventAbilityCastInterrupted       = "ability.cast_interrupted"
+	EventAbilityEffectResolved        = "ability.effect_resolved"
+	EventAuraApplied                  = "aura.applied"
+	EventAuraRefreshed                = "aura.refreshed"
+	EventAuraTicked                   = "aura.ticked"
+	EventAuraExpired                  = "aura.expired"
+	EventCooldownStarted              = "cooldown.started"
+	EventCooldownReady                = "cooldown.ready"
+	EventNPCSpawned                   = "npc.spawned"
+	EventAdminActionRequested         = "admin.action_requested"
+	EventAdminActionApplied           = "admin.action_applied"
+	EventPersistenceSnapshotSaved     = "persistence.snapshot_saved"
 )
 
 func StableEventNames() []string {
@@ -81,7 +94,20 @@ func StableEventNames() []string {
 		EventWorldEntitySpawned,
 		EventWorldEntityDespawned,
 		EventCombatIntentSubmitted,
+		EventCombatTargetSelected,
+		EventCombatAutoAttackStarted,
 		EventCombatAbilityResolved,
+		EventCombatDamageApplied,
+		EventCombatEntityDefeated,
+		EventThreatUpdated,
+		EventQuestObjectiveProgressed,
+		EventQuestCompleted,
+		EventQuestRewardClaimed,
+		EventLootGenerated,
+		EventLootClaimed,
+		EventLootClaimRejected,
+		EventWorldGameplayCommandApplied,
+		EventWorldGameplayCommandRejected,
 		EventAbilityCastStarted,
 		EventAbilityCastCompleted,
 		EventAbilityCastInterrupted,

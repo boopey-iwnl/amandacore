@@ -427,6 +427,14 @@ func (s *worldServer) grantQuestRewardLocked(session *worldSessionState, quest q
 		"level":                     session.Level,
 		"currencyTotalCopper":       session.CurrencyCopper,
 	})
+	observability.LogEvent("world-service", observability.EventQuestRewardClaimed, map[string]any{
+		"worldSessionToken":         session.Token,
+		"characterId":               session.CharacterID,
+		"questId":                   quest.ID,
+		"rewardXp":                  quest.RewardXP,
+		"rewardCurrencyTotalCopper": quest.RewardCopper,
+		"rewardItemCount":           len(quest.RewardItems),
+	})
 	s.emitWorldEventLocked(eventQuestCompleted, map[string]any{
 		"characterId": session.CharacterID,
 		"questId":     quest.ID,
@@ -528,6 +536,14 @@ func (s *worldServer) applyQuestKillCreditLocked(killer *worldSessionState, kill
 				"currentCount":      progress.CurrentCount,
 				"targetCount":       progress.TargetCount,
 				"sharedPartyCredit": quest.PartyShareable && candidate.CharacterID != killer.CharacterID,
+				"killedMobId":       killedMob.ID,
+			})
+			observability.LogEvent("world-service", observability.EventQuestObjectiveProgressed, map[string]any{
+				"worldSessionToken": candidate.Token,
+				"characterId":       candidate.CharacterID,
+				"questId":           quest.ID,
+				"currentCount":      progress.CurrentCount,
+				"targetCount":       progress.TargetCount,
 				"killedMobId":       killedMob.ID,
 			})
 		}

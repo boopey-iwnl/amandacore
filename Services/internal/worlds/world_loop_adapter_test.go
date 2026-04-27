@@ -12,6 +12,7 @@ import (
 
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
+	worldloop "amandacore/services/internal/worlds/loop"
 )
 
 func TestStonewakeHTTPHotPathUsesAuthoritativeLoop(t *testing.T) {
@@ -74,6 +75,65 @@ func TestStonewakeLoopRejectsInvalidSessionHTTPCommand(t *testing.T) {
 	}
 }
 
+func TestStonewakeGameplayCommandsUseAuthoritativeLoop(t *testing.T) {
+	server, ticket := newStonewakeLoopTestServer(t)
+	defer stopStonewakeLoop(t, server)
+
+	connect := postWorldHandler(t, server.handleConnect, map[string]any{"ticketId": ticket.TicketID}, http.StatusCreated)
+	token := connect["worldSessionToken"].(string)
+
+	server.mutex.Lock()
+	session := server.sessionsByToken[token]
+	server.lootContainers = map[string]*lootContainerState{
+		"loot_loop_001": {
+			LootContainerID:   "loot_loop_001",
+			SourceEntityID:    "mob_loop_rat",
+			SourceArchetypeID: "loop_rat",
+			LootTableID:       "loop_rat_loot",
+			ZoneID:            session.ZoneID,
+			X:                 session.X,
+			Y:                 session.Y,
+			Z:                 session.Z,
+			OwnerCharacterID:  session.CharacterID,
+			Items: []lootContainerItemState{{
+				ItemID:      itemDevFieldRationID,
+				DisplayName: "Field Ration",
+				Quantity:    1,
+			}},
+			CreatedAtMs: nowMillis(),
+			ExpiresAtMs: nowMillis() + defaultLootExpiry.Milliseconds(),
+		},
+	}
+	server.lootContainerOrder = []string{"loot_loop_001"}
+	server.mutex.Unlock()
+
+	postWorldHandler(t, server.handleLootInspect, map[string]any{
+		"worldSessionToken": token,
+		"lootContainerId":   "loot_loop_001",
+	}, http.StatusOK)
+	state := postWorldHandler(t, server.handleLootClaim, map[string]any{
+		"worldSessionToken": token,
+		"lootContainerId":   "loot_loop_001",
+	}, http.StatusOK)
+
+	inventory := state["inventory"].(map[string]any)
+	if !inventoryContainsItem(inventory, itemDevFieldRationID) {
+		t.Fatalf("expected claimed loot in inventory, got %#v", inventory)
+	}
+
+	records := server.stonewakeLoop.ReplayLog()
+	if !replayContainsKind(records, worldloop.CommandOpenLoot) {
+		t.Fatalf("expected OpenLoot replay record, got %#v", records)
+	}
+	if !replayContainsKind(records, worldloop.CommandClaimLootItem) {
+		t.Fatalf("expected ClaimLootItem replay record, got %#v", records)
+	}
+	metrics := server.stonewakeLoop.Metrics()
+	if metrics.GameplayCommandsApplied < 2 {
+		t.Fatalf("expected gameplay command metrics for loot, got %#v", metrics)
+	}
+}
+
 func newStonewakeLoopTestServer(t *testing.T) (*worldServer, platform.WorldJoinTicket) {
 	t.Helper()
 
@@ -98,6 +158,32 @@ func newStonewakeLoopTestServer(t *testing.T) (*worldServer, platform.WorldJoinT
 		t.Fatalf("ticket create failed: %v", err)
 	}
 	return newWorldServer(fileStore), ticket
+}
+
+func replayContainsKind(records []worldloop.ReplayRecord, kind worldloop.CommandKind) bool {
+	for _, record := range records {
+		if record.CommandKind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func inventoryContainsItem(inventory map[string]any, itemID string) bool {
+	slots, ok := inventory["slots"].([]any)
+	if !ok {
+		return false
+	}
+	for _, slotValue := range slots {
+		slot, ok := slotValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		if slot["itemId"] == itemID {
+			return true
+		}
+	}
+	return false
 }
 
 func postWorldHandler(t *testing.T, handler http.HandlerFunc, payload map[string]any, expectedStatus int) map[string]any {

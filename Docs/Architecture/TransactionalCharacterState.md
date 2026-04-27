@@ -106,7 +106,7 @@ Milestone 3 tests cover:
 - concurrent inventory grants without duplicated or lost state
 - file-store recovery payload compatibility
 
-Existing e2e tests continue to cover the active file-backed service path for account-to-world, reconnect, inventory, action bar, quest, combat, trainer, vendor, gathering, crafting, social, guild, housing, and travel flows.
+Existing e2e tests continue to cover the active file-backed service path for account-to-world, reconnect, inventory, action bar, quest, combat, trainer, vendor, gathering, crafting, social, guild, housing, and travel flows. Milestone 5 adds loop-level replay and duplicate-mutation tests for combat, loot, quest rewards, item grants, and currency deltas while leaving the default runtime store path file-backed.
 
 ## Non-Goals
 
@@ -119,7 +119,7 @@ Existing e2e tests continue to cover the active file-backed service path for acc
 ## Risks For Milestone 4 World Loop
 
 - The world loop still mutates session-local state before persistence.
-- SQL methods are ready for authoritative command handlers, but current HTTP world actions are not yet funneled through a single command queue.
+- SQL methods are ready for authoritative command handlers, and current Stonewake gameplay HTTP actions now enter the single command queue before invoking runtime persistence.
 - Quest and inventory semantics still depend on world package content definitions.
-- Multi-character transactions, party-shared quest credit, and future loot ownership need explicit world-loop commands.
+- Multi-character transactions, party-shared quest credit, and future party loot ownership still need explicit transactional cutover work.
 - Runtime backend selection and import/rollback remain deferred.
