@@ -4,7 +4,7 @@
 
 AmandaCore's local file-backed store is useful for development, but the next backend milestones need stronger storage guarantees: durable transactions, uniqueness constraints, replayable migration history, cleaner repository boundaries, and a path toward multi-process service reliability.
 
-Milestone 2 introduced the relational foundation while preserving the current playable Alpha flow. Milestone 3 adds transactional character-state behavior on that foundation. The existing file store remains the default service path.
+Milestone 2 introduced the relational foundation while preserving the current playable Alpha flow. Milestone 3 adds transactional character-state behavior on that foundation. Milestone 4 routes the Stonewake world hot path through a single-writer loop before any broad runtime SQL cutover. The existing file store remains the default service path.
 
 ## What Milestone 2 Implements
 
@@ -26,6 +26,12 @@ Milestone 3 adds transactional SQL character-state methods for inventory, quests
 
 The active runtime still uses the file-backed store. The SQL behavior is validated through repository tests until a later milestone introduces explicit backend selection and service cutover.
 
+## What Milestone 4 Implements
+
+Milestone 4 adds an authoritative Stonewake loop for current world-service hot paths. Connect, disconnect, reconnect, movement, target selection, auto-attack, ability activation, quest accept/complete/track, inventory move/equip, action-bar updates, and world-state polling now submit AmandaCore commands to one shard-local execution context before mutating current session/NPC state.
+
+This loop owns command ordering, emits loop/replay/snapshot observability events, records in-memory replay entries, and keeps the existing HTTP response contract stable. It does not make SQL the runtime default and does not remove the file-backed store.
+
 ## What Remains On File Store
 
 The active service commands still instantiate `store.NewFileStore` through current configuration. These runtime flows remain file-backed:
@@ -33,7 +39,7 @@ The active service commands still instantiate `store.NewFileStore` through curre
 - launcher login and account APIs
 - realm listing and build manifest serving
 - character create/select/state/progression APIs
-- world join and current HTTP world actions
+- world join and current HTTP world actions still persist through file-store methods, although the Stonewake hot path is now ordered by the single-writer loop
 - admin, support, moderation, auction, mail, social, guild, party, housing, and load-simulation paths
 
 The new SQL store is a foundation and test adapter until a later milestone explicitly converts service callers behind repository interfaces.
@@ -111,7 +117,7 @@ Runtime cutover should convert service callers in narrow slices:
 2. Add an explicit backend selector only when startup, validation, and rollback behavior are ready.
 3. Move character create/select/update behind `CharacterRepository`.
 4. Move inventory, quest, learned ability, and action-bar mutations behind dedicated repositories.
-5. Route world commands through the Milestone 4 single-writer loop before broad gameplay SQL writes.
+5. Gradually move loop-backed world commands from file-store persistence to the transactional repositories where the authority boundary is already explicit.
 6. Add a file-state import or reset runbook before any production cutover.
 
 ## Rollback And Corruption Considerations
