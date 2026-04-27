@@ -49,7 +49,7 @@ The diagnostic world client then consumes:
 | Realm/build | launcher to realm service | `realms[]`, `id`, `displayName`, `endpoint`, `supportedBuild`, `protocolVersion`, `apiVersion` |
 | Character | launcher to character service | `realmId`, `displayName`, `raceId`, `classId`, `archetypeId`, `zoneId`, `level` |
 | World join | launcher to world service | `ticketId`, `sessionId`, `accountId`, `characterId`, `realmId`, `worldEndpoint`, `expiresAt` |
-| World session | client to world service | `worldSessionToken`, `position`, `entities`, `actionBar`, `inventory`, `quests`, `domainEvents`, `stateDiffs`, `streaming` |
+| World session | client to world service | `worldSessionToken`, `position`, `entities`, `actionBar`, `inventory`, `quests`, `domainEvents`, `stateDiffs`, `streaming`, additive replication metadata |
 | Admin/support | operator clients to admin services | RBAC-gated account, character, quest, item, currency, moderation, support, and audit payloads |
 | Social/economy | world client to world service | chat, friends, party, guild, auction, mail, inventory, currency, and audit state |
 
@@ -61,6 +61,7 @@ The diagnostic world client then consumes:
 - The world session response has grown beyond the original connect payload to include combat, progression, inventory, social, economy, and streaming fields.
 - Admin functionality is split between `admin-service` routes and `world-service` admin routes.
 - Current HTTP polling remains the compatibility transport; future push/delta replication must adapt to existing canonical command and state contracts.
+- Milestone 6 adds optional world-session replication metadata (`cursor`, `snapshotVersion`, `deltaVersion`, `replication`) while preserving existing route names and full response payloads.
 
 ## Freeze Rules
 

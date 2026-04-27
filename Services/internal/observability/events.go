@@ -49,6 +49,14 @@ const (
 	EventLootClaimRejected            = "loot.claim_rejected"
 	EventWorldGameplayCommandApplied  = "world.loop_gameplay_command_applied"
 	EventWorldGameplayCommandRejected = "world.loop_gameplay_command_rejected"
+	EventReplicationSnapshotEmitted   = "replication.snapshot_emitted"
+	EventReplicationDeltaEmitted      = "replication.delta_emitted"
+	EventReplicationCursorAccepted    = "replication.cursor_accepted"
+	EventReplicationCursorStale       = "replication.cursor_stale"
+	EventReplicationResyncRequired    = "replication.resync_required"
+	EventReplicationClientConverged   = "replication.client_converged"
+	EventReplicationClientDiverged    = "replication.client_diverged"
+	EventReplicationFrameDropped      = "replication.frame_dropped"
 	EventAbilityCastStarted           = "ability.cast_started"
 	EventAbilityCastCompleted         = "ability.cast_completed"
 	EventAbilityCastInterrupted       = "ability.cast_interrupted"
@@ -108,6 +116,14 @@ func StableEventNames() []string {
 		EventLootClaimRejected,
 		EventWorldGameplayCommandApplied,
 		EventWorldGameplayCommandRejected,
+		EventReplicationSnapshotEmitted,
+		EventReplicationDeltaEmitted,
+		EventReplicationCursorAccepted,
+		EventReplicationCursorStale,
+		EventReplicationResyncRequired,
+		EventReplicationClientConverged,
+		EventReplicationClientDiverged,
+		EventReplicationFrameDropped,
 		EventAbilityCastStarted,
 		EventAbilityCastCompleted,
 		EventAbilityCastInterrupted,

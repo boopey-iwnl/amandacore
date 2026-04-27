@@ -51,6 +51,7 @@ namespace NetClient
         bool State(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
+            const AZStd::string& cursor,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 

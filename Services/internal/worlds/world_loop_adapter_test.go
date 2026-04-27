@@ -134,6 +134,61 @@ func TestStonewakeGameplayCommandsUseAuthoritativeLoop(t *testing.T) {
 	}
 }
 
+func TestStonewakeStateResponseIncludesReplicationMetadata(t *testing.T) {
+	server, ticket := newStonewakeLoopTestServer(t)
+	defer stopStonewakeLoop(t, server)
+
+	connect := postWorldHandler(t, server.handleConnect, map[string]any{"ticketId": ticket.TicketID}, http.StatusCreated)
+	token := connect["worldSessionToken"].(string)
+	connectCursor, ok := connect["cursor"].(string)
+	if !ok || connectCursor == "" {
+		t.Fatalf("expected connect cursor in response, got %#v", connect)
+	}
+	if connect["fullSnapshot"] != true {
+		t.Fatalf("expected connect full snapshot metadata, got %#v", connect["replication"])
+	}
+
+	postWorldHandler(t, server.handleMove, map[string]any{
+		"worldSessionToken": token,
+		"deltaX":            2,
+		"deltaY":            1,
+	}, http.StatusOK)
+
+	state := getWorldHandler(t, server.handleState, "/v1/world/state?worldSessionToken="+token+"&since="+connectCursor, http.StatusOK)
+	if state["resyncRequired"] == true {
+		t.Fatalf("expected retained delta, got resync metadata %#v", state["replication"])
+	}
+	if state["fullSnapshot"] == true {
+		t.Fatalf("expected delta metadata for retained cursor, got %#v", state["replication"])
+	}
+	replicationBody := state["replication"].(map[string]any)
+	if replicationBody["kind"] != "delta" {
+		t.Fatalf("expected delta kind, got %#v", replicationBody)
+	}
+	if !changedResponseContains(state["changed"].([]any), "player", state["characterId"].(string), "position") {
+		t.Fatalf("expected player position changed field, got %#v", state["changed"])
+	}
+
+	latestCursor := state["cursor"].(string)
+	noop := getWorldHandler(t, server.handleState, "/v1/world/state?worldSessionToken="+token+"&since="+latestCursor, http.StatusOK)
+	if noop["fullSnapshot"] == true || noop["resyncRequired"] == true {
+		t.Fatalf("expected no-op delta metadata, got %#v", noop["replication"])
+	}
+	if noop["deltaVersion"] != state["deltaVersion"] {
+		t.Fatalf("expected no-op poll to preserve version, got %v then %v", state["deltaVersion"], noop["deltaVersion"])
+	}
+}
+
+func TestStonewakeStateRejectsInvalidReplicationCursor(t *testing.T) {
+	server, ticket := newStonewakeLoopTestServer(t)
+	defer stopStonewakeLoop(t, server)
+
+	connect := postWorldHandler(t, server.handleConnect, map[string]any{"ticketId": ticket.TicketID}, http.StatusCreated)
+	token := connect["worldSessionToken"].(string)
+
+	getWorldHandler(t, server.handleState, "/v1/world/state?worldSessionToken="+token+"&since=not-a-cursor", http.StatusBadRequest)
+}
+
 func newStonewakeLoopTestServer(t *testing.T) (*worldServer, platform.WorldJoinTicket) {
 	t.Helper()
 
@@ -181,6 +236,28 @@ func inventoryContainsItem(inventory map[string]any, itemID string) bool {
 		}
 		if slot["itemId"] == itemID {
 			return true
+		}
+	}
+	return false
+}
+
+func changedResponseContains(changes []any, domain string, entityID string, field string) bool {
+	for _, value := range changes {
+		change, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		if change["domain"] != domain || change["entityId"] != entityID {
+			continue
+		}
+		fields, ok := change["fields"].([]any)
+		if !ok {
+			continue
+		}
+		for _, candidate := range fields {
+			if candidate == field {
+				return true
+			}
 		}
 	}
 	return false

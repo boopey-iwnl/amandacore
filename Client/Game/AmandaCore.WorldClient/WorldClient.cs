@@ -22,9 +22,14 @@ internal sealed class WorldClient
         return PostAsync<WorldSessionResponse>("/v1/world/reconnect", new { worldSessionToken });
     }
 
-    public Task<WorldSessionResponse> GetStateAsync(string worldSessionToken)
+    public Task<WorldSessionResponse> GetStateAsync(string worldSessionToken, string cursor = "")
     {
-        return GetAsync<WorldSessionResponse>($"/v1/world/state?worldSessionToken={Uri.EscapeDataString(worldSessionToken)}");
+        var path = $"/v1/world/state?worldSessionToken={Uri.EscapeDataString(worldSessionToken)}";
+        if (!string.IsNullOrWhiteSpace(cursor))
+        {
+            path += $"&since={Uri.EscapeDataString(cursor)}";
+        }
+        return GetAsync<WorldSessionResponse>(path);
     }
 
     public Task<WorldSessionResponse> MoveAsync(string worldSessionToken, double deltaX, double deltaY)

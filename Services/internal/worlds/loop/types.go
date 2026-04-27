@@ -5,8 +5,11 @@ package loop
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
+
+	"amandacore/services/internal/worlds/replication"
 )
 
 const (
@@ -164,6 +167,10 @@ type LoopMetrics struct {
 	SnapshotsEmitted         uint64        `json:"snapshotsEmitted"`
 	ReconnectsRestored       uint64        `json:"reconnectsRestored"`
 	ReplayRecords            uint64        `json:"replayRecords"`
+	StateVersion             uint64        `json:"stateVersion"`
+	ReplicationFrames        uint64        `json:"replicationFrames"`
+	ReplicationRetainedFrom  uint64        `json:"replicationRetainedFrom"`
+	ReplicationRetainedTo    uint64        `json:"replicationRetainedTo"`
 	LastCommandLatency       time.Duration `json:"lastCommandLatency"`
 	MaxCommandLatency        time.Duration `json:"maxCommandLatency"`
 	LastAppliedSequence      uint64        `json:"lastAppliedSequence"`
@@ -178,12 +185,13 @@ type CommandContext struct {
 }
 
 type CommandResult struct {
-	CommandID string
-	Sequence  uint64
-	Kind      CommandKind
-	Tick      uint64
-	Snapshot  WorldSnapshot
-	Payload   any
+	CommandID   string
+	Sequence    uint64
+	Kind        CommandKind
+	Tick        uint64
+	Snapshot    WorldSnapshot
+	Replication replication.Frame
+	Payload     any
 }
 
 type WorldCommand interface {
@@ -416,6 +424,182 @@ func cloneLootItems(source []LootItemState) []LootItemState {
 	cloned := make([]LootItemState, len(source))
 	copy(cloned, source)
 	return cloned
+}
+
+func changedFields(previous WorldSnapshot, current WorldSnapshot, version uint64) []replication.ChangedFields {
+	var changes []replication.ChangedFields
+	if previous.ShardID != current.ShardID || previous.ZoneID != current.ZoneID {
+		changes = append(changes, replication.ChangedFields{
+			Domain:   "world",
+			EntityID: current.ShardID,
+			Fields:   []string{"shardId", "zoneId"},
+			Version:  version,
+		})
+	}
+
+	previousPlayers := map[string]PlayerState{}
+	for _, player := range previous.Players {
+		previousPlayers[player.CharacterID] = player
+	}
+	currentPlayers := map[string]PlayerState{}
+	for _, player := range current.Players {
+		currentPlayers[player.CharacterID] = player
+		fields := changedPlayerFields(previousPlayers[player.CharacterID], player)
+		if len(fields) > 0 {
+			changes = append(changes, replication.ChangedFields{
+				Domain:   "player",
+				EntityID: player.CharacterID,
+				Fields:   fields,
+				Version:  version,
+			})
+		}
+	}
+	for id := range previousPlayers {
+		if _, ok := currentPlayers[id]; !ok {
+			changes = append(changes, replication.ChangedFields{
+				Domain:   "player",
+				EntityID: id,
+				Fields:   []string{"removed"},
+				Version:  version,
+			})
+		}
+	}
+
+	previousNPCs := map[string]NpcState{}
+	for _, npc := range previous.NPCs {
+		previousNPCs[npc.ID] = npc
+	}
+	currentNPCs := map[string]NpcState{}
+	for _, npc := range current.NPCs {
+		currentNPCs[npc.ID] = npc
+		fields := changedNPCFields(previousNPCs[npc.ID], npc)
+		if len(fields) > 0 {
+			changes = append(changes, replication.ChangedFields{
+				Domain:   "npc",
+				EntityID: npc.ID,
+				Fields:   fields,
+				Version:  version,
+			})
+		}
+	}
+	for id := range previousNPCs {
+		if _, ok := currentNPCs[id]; !ok {
+			changes = append(changes, replication.ChangedFields{
+				Domain:   "npc",
+				EntityID: id,
+				Fields:   []string{"removed"},
+				Version:  version,
+			})
+		}
+	}
+
+	previousLoot := map[string]LootContainerState{}
+	for _, container := range previous.LootContainers {
+		previousLoot[container.ID] = container
+	}
+	currentLoot := map[string]LootContainerState{}
+	for _, container := range current.LootContainers {
+		currentLoot[container.ID] = container
+		fields := changedLootFields(previousLoot[container.ID], container)
+		if len(fields) > 0 {
+			changes = append(changes, replication.ChangedFields{
+				Domain:   "loot",
+				EntityID: container.ID,
+				Fields:   fields,
+				Version:  version,
+			})
+		}
+	}
+	for id := range previousLoot {
+		if _, ok := currentLoot[id]; !ok {
+			changes = append(changes, replication.ChangedFields{
+				Domain:   "loot",
+				EntityID: id,
+				Fields:   []string{"removed"},
+				Version:  version,
+			})
+		}
+	}
+
+	return replication.NormalizeChangedFields(changes)
+}
+
+func changedPlayerFields(previous PlayerState, current PlayerState) []string {
+	var fields []string
+	if previous.SessionToken == "" && previous.CharacterID == "" {
+		return []string{"created"}
+	}
+	if previous.SessionToken != current.SessionToken || previous.AccountID != current.AccountID || previous.DisplayName != current.DisplayName {
+		fields = append(fields, "identity")
+	}
+	if previous.ZoneID != current.ZoneID {
+		fields = append(fields, "zone")
+	}
+	if previous.Position != current.Position {
+		fields = append(fields, "position")
+	}
+	if previous.Connected != current.Connected {
+		fields = append(fields, "connection")
+	}
+	if previous.Health != current.Health || previous.MaxHealth != current.MaxHealth || previous.Resource != current.Resource || previous.MaxResource != current.MaxResource || previous.Alive != current.Alive {
+		fields = append(fields, "vitals")
+	}
+	if previous.TargetID != current.TargetID || previous.AutoAttackActive != current.AutoAttackActive {
+		fields = append(fields, "combat")
+	}
+	if !reflect.DeepEqual(previous.QuestProgress, current.QuestProgress) || !reflect.DeepEqual(previous.QuestCompleted, current.QuestCompleted) {
+		fields = append(fields, "quests")
+	}
+	if !reflect.DeepEqual(previous.LootClaims, current.LootClaims) {
+		fields = append(fields, "loot")
+	}
+	if !reflect.DeepEqual(previous.InventorySlots, current.InventorySlots) || previous.CurrencyCopper != current.CurrencyCopper {
+		fields = append(fields, "inventory")
+	}
+	if !reflect.DeepEqual(previous.ActionBarSlots, current.ActionBarSlots) {
+		fields = append(fields, "actionBar")
+	}
+	sort.Strings(fields)
+	return fields
+}
+
+func changedNPCFields(previous NpcState, current NpcState) []string {
+	var fields []string
+	if previous.ID == "" {
+		return []string{"created"}
+	}
+	if previous.ZoneID != current.ZoneID || previous.DisplayName != current.DisplayName || previous.Kind != current.Kind {
+		fields = append(fields, "identity")
+	}
+	if previous.Position != current.Position {
+		fields = append(fields, "position")
+	}
+	if previous.Health != current.Health || previous.MaxHealth != current.MaxHealth || previous.Alive != current.Alive || previous.Targetable != current.Targetable || previous.RespawnTick != current.RespawnTick {
+		fields = append(fields, "vitals")
+	}
+	if previous.TargetID != current.TargetID || !reflect.DeepEqual(previous.Threat, current.Threat) {
+		fields = append(fields, "threat")
+	}
+	sort.Strings(fields)
+	return fields
+}
+
+func changedLootFields(previous LootContainerState, current LootContainerState) []string {
+	var fields []string
+	if previous.ID == "" {
+		return []string{"created"}
+	}
+	if previous.SourceEntityID != current.SourceEntityID || previous.OwnerCharacterID != current.OwnerCharacterID {
+		fields = append(fields, "ownership")
+	}
+	if !reflect.DeepEqual(previous.Items, current.Items) {
+		fields = append(fields, "items")
+	}
+	if previous.OpenedByCharacterID != current.OpenedByCharacterID || previous.ClaimedByCharacterID != current.ClaimedByCharacterID || previous.ClaimedAtTick != current.ClaimedAtTick || previous.Closed != current.Closed {
+		fields = append(fields, "claim")
+	}
+	sort.Strings(fields)
+	return fields
 }
 
 func cloneAnyMap(source map[string]any) map[string]any {

@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"amandacore/services/internal/worlds/replication"
 )
 
 const (
 	defaultQueueLimit     = 256
 	defaultCommandTimeout = 2 * time.Second
+	defaultDeltaRetention = 128
 )
 
 type Clock interface {
@@ -45,6 +48,7 @@ type ShardLoopConfig struct {
 	ZoneID         string
 	QueueLimit     int
 	CommandTimeout time.Duration
+	DeltaRetention int
 	Clock          Clock
 	Observer       Observer
 }
@@ -61,18 +65,21 @@ type commandResponse struct {
 }
 
 type ShardLoop struct {
-	mu        sync.Mutex
-	config    ShardLoopConfig
-	state     *ShardState
-	queue     chan commandRequest
-	stop      chan struct{}
-	done      chan struct{}
-	started   bool
-	stopped   bool
-	sequence  uint64
-	tick      uint64
-	replayLog []ReplayRecord
-	metrics   LoopMetrics
+	mu                sync.Mutex
+	config            ShardLoopConfig
+	state             *ShardState
+	queue             chan commandRequest
+	stop              chan struct{}
+	done              chan struct{}
+	started           bool
+	stopped           bool
+	sequence          uint64
+	tick              uint64
+	stateVersion      uint64
+	latestSnapshot    WorldSnapshot
+	replayLog         []ReplayRecord
+	replicationFrames []replication.Frame
+	metrics           LoopMetrics
 }
 
 func NewShardLoop(config ShardLoopConfig) *ShardLoop {
@@ -87,6 +94,9 @@ func NewShardLoop(config ShardLoopConfig) *ShardLoop {
 	}
 	if config.CommandTimeout <= 0 {
 		config.CommandTimeout = defaultCommandTimeout
+	}
+	if config.DeltaRetention <= 0 {
+		config.DeltaRetention = defaultDeltaRetention
 	}
 	if config.Clock == nil {
 		config.Clock = SystemClock{}
@@ -240,6 +250,56 @@ func (l *ShardLoop) Metrics() LoopMetrics {
 	return metrics
 }
 
+func (l *ShardLoop) ReplicationFrameSince(cursor replication.Cursor, reason replication.DeltaReason) replication.Frame {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	currentSnapshot := l.latestSnapshot
+	if currentSnapshot.ShardID == "" {
+		currentSnapshot = WorldSnapshot{ShardID: l.config.ShardID, ZoneID: l.config.ZoneID}
+	}
+	currentCursor := l.currentCursorLocked()
+	if reason == "" {
+		reason = replication.DeltaReasonPoll
+	}
+	if cursor.Empty() {
+		return replication.NewSnapshotFrame(currentCursor, replication.SnapshotReasonPoll, currentSnapshot, nil)
+	}
+	if cursor.StateVersion > currentCursor.StateVersion {
+		return replication.NewResyncFrame(currentCursor, replication.SnapshotReasonResync, currentSnapshot, nil)
+	}
+	if cursor.StateVersion == currentCursor.StateVersion {
+		return replication.NewNoopFrame(currentCursor, replication.DeltaReasonNoop)
+	}
+	if len(l.replicationFrames) == 0 {
+		return replication.NewResyncFrame(currentCursor, replication.SnapshotReasonResync, currentSnapshot, nil)
+	}
+
+	oldestVersion := uint64(0)
+	for _, frame := range l.replicationFrames {
+		if frame.Cursor.StateVersion == 0 {
+			continue
+		}
+		if oldestVersion == 0 || frame.Cursor.StateVersion < oldestVersion {
+			oldestVersion = frame.Cursor.StateVersion
+		}
+	}
+	if oldestVersion == 0 || cursor.StateVersion < oldestVersion-1 {
+		return replication.NewResyncFrame(currentCursor, replication.SnapshotReasonResync, currentSnapshot, nil)
+	}
+
+	var changed []replication.ChangedFields
+	for _, frame := range l.replicationFrames {
+		if frame.Cursor.StateVersion > cursor.StateVersion {
+			changed = append(changed, frame.Changed...)
+		}
+	}
+	if len(changed) == 0 {
+		return replication.NewNoopFrame(currentCursor, replication.DeltaReasonNoop)
+	}
+	return replication.NewDeltaFrame(cursor, currentCursor, reason, changed, currentSnapshot)
+}
+
 func (l *ShardLoop) ReplayLog() []ReplayRecord {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -281,6 +341,7 @@ func (l *ShardLoop) apply(request commandRequest) {
 	startedAt := l.config.Clock.Now()
 
 	l.mu.Lock()
+	previousSnapshot := l.state.Snapshot()
 	l.sequence++
 	l.tick++
 	sequence := l.sequence
@@ -314,6 +375,11 @@ func (l *ShardLoop) apply(request commandRequest) {
 
 	latency := l.config.Clock.Now().Sub(startedAt)
 	l.mu.Lock()
+	var frame replication.Frame
+	if err == nil {
+		frame = l.recordReplicationFrameLocked(request.command.Kind(), sequence, tick, previousSnapshot, result.Snapshot)
+		result.Replication = frame
+	}
 	l.metrics.LastCommandLatency = latency
 	if latency > l.metrics.MaxCommandLatency {
 		l.metrics.MaxCommandLatency = latency
@@ -388,6 +454,25 @@ func (l *ShardLoop) apply(request commandRequest) {
 			Tick:         tick,
 		})
 	}
+	if err == nil && frame.ProtocolVersion != "" {
+		eventName := "replication.delta_emitted"
+		if frame.FullSnapshot {
+			eventName = "replication.snapshot_emitted"
+		}
+		if frame.ResyncRequired {
+			eventName = "replication.resync_required"
+		}
+		l.emit(LoopEvent{
+			Name:         eventName,
+			CommandID:    commandID,
+			CommandKind:  request.command.Kind(),
+			SessionToken: request.command.SessionToken(),
+			ActorID:      request.command.ActorID(),
+			Sequence:     sequence,
+			Tick:         tick,
+			QueueDepth:   len(l.queue),
+		})
+	}
 	if err == nil {
 		l.emit(LoopEvent{
 			Name:         "world.replay_recorded",
@@ -419,6 +504,68 @@ func (l *ShardLoop) apply(request commandRequest) {
 	}
 
 	request.done <- commandResponse{result: result, err: err}
+}
+
+func (l *ShardLoop) recordReplicationFrameLocked(kind CommandKind, sequence uint64, tick uint64, previous WorldSnapshot, current WorldSnapshot) replication.Frame {
+	l.latestSnapshot = current
+	nextVersion := l.stateVersion + 1
+	changes := changedFields(previous, current, nextVersion)
+	if len(changes) == 0 {
+		cursor := l.currentCursorLocked()
+		cursor.Sequence = sequence
+		cursor.Tick = tick
+		return replication.NewNoopFrame(cursor, replication.DeltaReasonNoop)
+	}
+
+	l.stateVersion = nextVersion
+	cursor := replication.Cursor{
+		ShardID:      l.config.ShardID,
+		ZoneID:       l.config.ZoneID,
+		StateVersion: l.stateVersion,
+		Sequence:     sequence,
+		Tick:         tick,
+	}
+	var frame replication.Frame
+	switch kind {
+	case CommandConnectWorldSession:
+		frame = replication.NewSnapshotFrame(cursor, replication.SnapshotReasonConnect, current, changes)
+	case CommandReconnectWorldSession:
+		frame = replication.NewSnapshotFrame(cursor, replication.SnapshotReasonReconnect, current, changes)
+	default:
+		from := cursor
+		from.StateVersion--
+		frame = replication.NewDeltaFrame(from, cursor, replication.DeltaReasonCommand, changes, current)
+	}
+	l.replicationFrames = append(l.replicationFrames, frame)
+	if len(l.replicationFrames) > l.config.DeltaRetention {
+		l.replicationFrames = l.replicationFrames[len(l.replicationFrames)-l.config.DeltaRetention:]
+	}
+	l.metrics.StateVersion = l.stateVersion
+	l.metrics.ReplicationFrames = uint64(len(l.replicationFrames))
+	l.metrics.ReplicationRetainedFrom = 0
+	l.metrics.ReplicationRetainedTo = 0
+	for _, retained := range l.replicationFrames {
+		if retained.Cursor.StateVersion == 0 {
+			continue
+		}
+		if l.metrics.ReplicationRetainedFrom == 0 || retained.Cursor.StateVersion < l.metrics.ReplicationRetainedFrom {
+			l.metrics.ReplicationRetainedFrom = retained.Cursor.StateVersion
+		}
+		if retained.Cursor.StateVersion > l.metrics.ReplicationRetainedTo {
+			l.metrics.ReplicationRetainedTo = retained.Cursor.StateVersion
+		}
+	}
+	return frame
+}
+
+func (l *ShardLoop) currentCursorLocked() replication.Cursor {
+	return replication.Cursor{
+		ShardID:      l.config.ShardID,
+		ZoneID:       l.config.ZoneID,
+		StateVersion: l.stateVersion,
+		Sequence:     l.sequence,
+		Tick:         l.tick,
+	}
 }
 
 func (l *ShardLoop) recordAccepted() {

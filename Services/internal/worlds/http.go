@@ -15,6 +15,7 @@ import (
 	"amandacore/services/internal/simcore"
 	"amandacore/services/internal/store"
 	worldloop "amandacore/services/internal/worlds/loop"
+	"amandacore/services/internal/worlds/replication"
 )
 
 func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
@@ -1142,6 +1143,11 @@ func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, http.StatusBadRequest, "missing_token", "worldSessionToken query parameter is required.")
 		return
 	}
+	sinceCursor, err := replication.ParseCursor(r.URL.Query().Get("since"))
+	if err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_cursor", err.Error())
+		return
+	}
 
 	response, err := s.submitStonewakeHTTPCommand(
 		r.Context(),
@@ -1162,7 +1168,7 @@ func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
 				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusNotFound, "world_session_missing", "World session token was not found.")
 			}
 			s.syncStonewakeStateLocked(state, session)
-			return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
+			return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session), SinceCursor: sinceCursor}, nil
 		})
 	if err != nil {
 		s.writeStonewakeCommandError(w, err)
