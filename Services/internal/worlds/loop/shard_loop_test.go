@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"amandacore/services/internal/worlds/replication"
 )
 
 func TestShardLoopReplayMatchesFinalSnapshot(t *testing.T) {
@@ -325,6 +327,169 @@ func TestShardLoopDuplicateLootAndQuestRewardsApplyOnce(t *testing.T) {
 	}
 }
 
+func TestShardLoopReplicationDeltaConvergesFromCursor(t *testing.T) {
+	shard := NewShardLoop(ShardLoopConfig{QueueLimit: 16})
+	if err := shard.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	defer stopLoop(t, shard)
+
+	player := PlayerState{
+		SessionToken: "world_replication",
+		CharacterID:  "replicator",
+		ZoneID:       StonewakeZoneID,
+		Position:     Position{X: 5, Y: 6},
+		Connected:    true,
+		Alive:        true,
+		Health:       88,
+		MaxHealth:    88,
+	}
+	connect := mustSubmit(t, shard, ConnectWorldSessionCommand{Player: player})
+	if !connect.Replication.FullSnapshot || connect.Replication.SnapshotVersion != 1 {
+		t.Fatalf("expected connect full snapshot version 1, got %#v", connect.Replication)
+	}
+	startCursor := connect.Replication.Cursor
+
+	move := mustSubmit(t, shard, ApplyMovementCommand{
+		Token: player.SessionToken,
+		Actor: player.CharacterID,
+		Delta: Position{X: 3, Y: -2},
+	})
+	if move.Replication.Kind != replication.FrameDelta || move.Replication.SnapshotVersion != 2 {
+		t.Fatalf("expected movement delta version 2, got %#v", move.Replication)
+	}
+
+	frame := shard.ReplicationFrameSince(startCursor, replication.DeltaReasonPoll)
+	if frame.Kind != replication.FrameDelta || frame.ResyncRequired || frame.FullSnapshot {
+		t.Fatalf("expected retained delta frame, got %#v", frame)
+	}
+	if !changedContains(frame.Changed, "player", player.CharacterID, "position") {
+		t.Fatalf("expected player position change, got %#v", frame.Changed)
+	}
+
+	currentSnapshot, ok := frame.Delta.State.(WorldSnapshot)
+	if !ok {
+		t.Fatalf("expected delta state to carry WorldSnapshot, got %T", frame.Delta.State)
+	}
+	if got := currentSnapshot.Players[0].Position; got.X != 8 || got.Y != 4 {
+		t.Fatalf("expected converged position 8,4 got %#v", got)
+	}
+}
+
+func TestShardLoopNoopPollDoesNotAdvanceStateVersion(t *testing.T) {
+	shard := NewShardLoop(ShardLoopConfig{QueueLimit: 16})
+	if err := shard.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	defer stopLoop(t, shard)
+
+	player := PlayerState{SessionToken: "world_noop", CharacterID: "noop", ZoneID: StonewakeZoneID, Connected: true, Alive: true}
+	connect := mustSubmit(t, shard, ConnectWorldSessionCommand{Player: player})
+	if connect.Replication.SnapshotVersion != 1 {
+		t.Fatalf("expected initial version 1, got %#v", connect.Replication)
+	}
+	poll := mustSubmit(t, shard, RequestSnapshotCommand{Token: player.SessionToken, Actor: player.CharacterID})
+	if poll.Replication.Kind != replication.FrameNoop {
+		t.Fatalf("expected no-op replication frame, got %#v", poll.Replication)
+	}
+	if poll.Replication.SnapshotVersion != connect.Replication.SnapshotVersion {
+		t.Fatalf("expected no state version advance, got connect=%d poll=%d", connect.Replication.SnapshotVersion, poll.Replication.SnapshotVersion)
+	}
+}
+
+func TestShardLoopStaleCursorRequiresFullResync(t *testing.T) {
+	shard := NewShardLoop(ShardLoopConfig{QueueLimit: 16, DeltaRetention: 1})
+	if err := shard.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	defer stopLoop(t, shard)
+
+	player := PlayerState{SessionToken: "world_stale", CharacterID: "stale", ZoneID: StonewakeZoneID, Connected: true, Alive: true}
+	connect := mustSubmit(t, shard, ConnectWorldSessionCommand{Player: player})
+	mustSubmit(t, shard, ApplyMovementCommand{Token: player.SessionToken, Actor: player.CharacterID, Delta: Position{X: 1}})
+	mustSubmit(t, shard, ApplyMovementCommand{Token: player.SessionToken, Actor: player.CharacterID, Delta: Position{X: 1}})
+
+	frame := shard.ReplicationFrameSince(connect.Replication.Cursor, replication.DeltaReasonPoll)
+	if !frame.ResyncRequired || !frame.FullSnapshot || frame.Kind != replication.FrameSnapshot {
+		t.Fatalf("expected stale cursor resync snapshot, got %#v", frame)
+	}
+}
+
+func TestShardLoopReplicationReplayVersionsAreDeterministic(t *testing.T) {
+	shard := NewShardLoop(ShardLoopConfig{QueueLimit: 16})
+	if err := shard.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	defer stopLoop(t, shard)
+
+	player := PlayerState{SessionToken: "world_replay_replication", CharacterID: "replay_replication", ZoneID: StonewakeZoneID, Connected: true, Alive: true}
+	versions := []uint64{
+		mustSubmit(t, shard, ConnectWorldSessionCommand{Player: player}).Replication.SnapshotVersion,
+		mustSubmit(t, shard, ApplyMovementCommand{Token: player.SessionToken, Actor: player.CharacterID, Delta: Position{X: 1}}).Replication.SnapshotVersion,
+		mustSubmit(t, shard, ApplyMovementCommand{Token: player.SessionToken, Actor: player.CharacterID, Delta: Position{Y: 2}}).Replication.SnapshotVersion,
+	}
+	for index, version := range versions {
+		want := uint64(index + 1)
+		if version != want {
+			t.Fatalf("expected deterministic version %d at index %d, got %d", want, index, version)
+		}
+	}
+
+	live, err := shard.Snapshot(context.Background(), player.SessionToken, player.CharacterID)
+	if err != nil {
+		t.Fatalf("snapshot failed: %v", err)
+	}
+	replayed, err := Replay(WorldSnapshot{ShardID: StonewakeShardID, ZoneID: StonewakeZoneID}, shard.ReplayLog())
+	if err != nil {
+		t.Fatalf("replay failed: %v", err)
+	}
+	if live.Players[0].Position != replayed.Players[0].Position {
+		t.Fatalf("expected replay to match live snapshot: live=%#v replay=%#v", live.Players[0].Position, replayed.Players[0].Position)
+	}
+}
+
+func TestShardLoopReplicationSmallSoakConverges(t *testing.T) {
+	shard := NewShardLoop(ShardLoopConfig{QueueLimit: 128})
+	if err := shard.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	defer stopLoop(t, shard)
+
+	const clients = 8
+	cursors := map[string]replication.Cursor{}
+	for index := 0; index < clients; index++ {
+		player := PlayerState{
+			SessionToken: "world_soak_" + string(rune('a'+index)),
+			CharacterID:  "soak_" + string(rune('a'+index)),
+			ZoneID:       StonewakeZoneID,
+			Connected:    true,
+			Alive:        true,
+		}
+		result := mustSubmit(t, shard, ConnectWorldSessionCommand{Player: player})
+		cursors[player.SessionToken] = result.Replication.Cursor
+	}
+
+	for index := 0; index < clients; index++ {
+		token := "world_soak_" + string(rune('a'+index))
+		actor := "soak_" + string(rune('a'+index))
+		mustSubmit(t, shard, ApplyMovementCommand{Token: token, Actor: actor, Delta: Position{X: float64(index + 1), Y: 1}})
+		frame := shard.ReplicationFrameSince(cursors[token], replication.DeltaReasonPoll)
+		if frame.ResyncRequired || frame.Kind != replication.FrameDelta {
+			t.Fatalf("expected client %s delta convergence frame, got %#v", token, frame)
+		}
+		next, report := replication.AcceptFrame(cursors[token], frame)
+		if !report.Converged {
+			t.Fatalf("expected convergence report for %s, got %#v", token, report)
+		}
+		cursors[token] = next
+	}
+
+	metrics := shard.Metrics()
+	if metrics.StateVersion < clients*2 {
+		t.Fatalf("expected state versions for connect and movement commands, got %#v", metrics)
+	}
+}
+
 func stopLoop(t *testing.T, shard *ShardLoop) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -378,4 +543,18 @@ func countItems(slots map[int]string) map[string]int {
 		}
 	}
 	return counts
+}
+
+func changedContains(changes []replication.ChangedFields, domain string, entityID string, field string) bool {
+	for _, change := range changes {
+		if change.Domain != domain || change.EntityID != entityID {
+			continue
+		}
+		for _, candidate := range change.Fields {
+			if candidate == field {
+				return true
+			}
+		}
+	}
+	return false
 }

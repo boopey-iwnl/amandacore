@@ -1741,8 +1741,35 @@ namespace GameCore
     bool GameCoreSystemComponent::ApplyWorldSessionResponse(NetClient::WorldSessionResponse&& response, const char* source)
     {
         const NetClient::WorldSessionResponse previousSession = m_worldState.m_session;
+        if (response.m_replication.m_snapshotVersion > 0 &&
+            previousSession.m_replication.m_snapshotVersion > response.m_replication.m_snapshotVersion &&
+            !response.m_replication.m_fullSnapshot &&
+            !response.m_replication.m_resyncRequired)
+        {
+            AZ_Warning(
+                "amandacore",
+                false,
+                "Dropped stale world replication frame source=%s previousVersion=%lld incomingVersion=%lld cursor=%s",
+                source,
+                static_cast<long long>(previousSession.m_replication.m_snapshotVersion),
+                static_cast<long long>(response.m_replication.m_snapshotVersion),
+                response.m_replication.m_cursor.c_str());
+            return false;
+        }
         m_worldState.m_session = AZStd::move(response);
         EnsureAbilityPresentationDefaults(m_worldState.m_session, source);
+        if (m_worldState.m_session.m_replication.m_snapshotVersion > 0)
+        {
+            AZ_Printf(
+                "amandacore",
+                "client.replication_state_applied source=%s version=%lld delta=%lld cursor=%s fullSnapshot=%s resyncRequired=%s",
+                source,
+                static_cast<long long>(m_worldState.m_session.m_replication.m_snapshotVersion),
+                static_cast<long long>(m_worldState.m_session.m_replication.m_deltaVersion),
+                m_worldState.m_session.m_replication.m_cursor.c_str(),
+                m_worldState.m_session.m_replication.m_fullSnapshot ? "true" : "false",
+                m_worldState.m_session.m_replication.m_resyncRequired ? "true" : "false");
+        }
         LogCombatStateIfChanged(previousSession, source);
         LogAbilityStateIfChanged(previousSession, source);
         LogQuestStateIfChanged(previousSession, source);
@@ -1923,6 +1950,7 @@ namespace GameCore
             !NetClient::IWorldHttpClient::Get()->State(
                 m_launchOptions.m_worldEndpoint,
                 m_worldState.m_session.m_worldSessionToken,
+                m_worldState.m_session.m_replication.m_cursor,
                 response,
                 error))
         {

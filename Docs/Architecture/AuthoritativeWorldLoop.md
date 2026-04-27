@@ -72,7 +72,7 @@ Milestone 5 moves combat, loot, threat, and quest reward expansion deeper into c
 
 The loop emits an authoritative `WorldSnapshot` for its compact state mirror. Current clients still consume `buildResponse`, which is richer than the loop snapshot and includes inventory, quest, action bar, spellbook, social, map, streaming, housing, travel, PvP, domain-event, and state-diff fields.
 
-For M4, `/v1/world/state` submits `RequestSnapshot` through the loop, advances the existing world simulation inside that command, syncs the compact loop snapshot, then returns the unchanged full HTTP response. This preserves polling clients while making snapshot generation loop-backed.
+Milestone 6 adds the `amandacore.replication.v1` metadata layer. Loop-backed world responses now include additive `snapshotVersion`, `deltaVersion`, `cursor`, `fullSnapshot`, `resyncRequired`, `changed`, and `replication` fields. Existing polling clients can ignore them; clients that send `since=<cursor>` to `/v1/world/state` receive retained delta metadata or a full-resync signal.
 
 Push replication and binary deltas remain non-goals.
 

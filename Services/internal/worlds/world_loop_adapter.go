@@ -11,13 +11,15 @@ import (
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	worldloop "amandacore/services/internal/worlds/loop"
+	"amandacore/services/internal/worlds/replication"
 )
 
 const stonewakeCommandTimeout = 3 * time.Second
 
 type stonewakeHTTPResponse struct {
-	Status int
-	Body   any
+	Status      int
+	Body        any
+	SinceCursor replication.Cursor
 }
 
 type stonewakeCommandHTTPError struct {
@@ -92,6 +94,7 @@ func (s *worldServer) submitStonewakeHTTPCommand(
 	if !ok {
 		return stonewakeHTTPResponse{}, fmt.Errorf("stonewake command returned unexpected payload %T", result.Payload)
 	}
+	response = s.attachStonewakeReplicationMetadata(response, result)
 	return response, nil
 }
 
@@ -120,6 +123,65 @@ func (s *worldServer) submitStonewakeSessionMutation(
 		s.syncStonewakeStateLocked(state, session)
 		return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
 	})
+}
+
+func (s *worldServer) attachStonewakeReplicationMetadata(response stonewakeHTTPResponse, result worldloop.CommandResult) stonewakeHTTPResponse {
+	body, ok := response.Body.(map[string]any)
+	if !ok {
+		return response
+	}
+
+	frame := result.Replication
+	if !response.SinceCursor.Empty() && s.stonewakeLoop != nil {
+		frame = s.stonewakeLoop.ReplicationFrameSince(response.SinceCursor, replication.DeltaReasonPoll)
+	}
+	if frame.ProtocolVersion == "" {
+		return response
+	}
+
+	cursorToken := frame.Cursor.Token()
+	body["snapshotVersion"] = frame.SnapshotVersion
+	body["deltaVersion"] = frame.DeltaVersion
+	body["cursor"] = cursorToken
+	body["fullSnapshot"] = frame.FullSnapshot
+	body["resyncRequired"] = frame.ResyncRequired
+	body["changed"] = frame.Changed
+	replicationBody := map[string]any{
+		"protocolVersion": frame.ProtocolVersion,
+		"kind":            frame.Kind,
+		"snapshotVersion": frame.SnapshotVersion,
+		"deltaVersion":    frame.DeltaVersion,
+		"cursor":          cursorToken,
+		"cursorState":     frame.Cursor,
+		"fullSnapshot":    frame.FullSnapshot,
+		"resyncRequired":  frame.ResyncRequired,
+		"changed":         frame.Changed,
+		"reason":          frame.Reason,
+	}
+	body["replication"] = replicationBody
+	if frame.Snapshot != nil {
+		replicationBody["snapshot"] = frame.Snapshot
+	}
+	if frame.Delta != nil {
+		replicationBody["delta"] = frame.Delta
+	}
+
+	eventName := observability.EventReplicationCursorAccepted
+	if !response.SinceCursor.Empty() && frame.ResyncRequired {
+		eventName = observability.EventReplicationCursorStale
+	}
+	observability.LogEvent("world-service", eventName, map[string]any{
+		"cursor":         cursorToken,
+		"stateVersion":   frame.SnapshotVersion,
+		"resyncRequired": frame.ResyncRequired,
+	})
+	if frame.ResyncRequired {
+		observability.LogEvent("world-service", observability.EventReplicationResyncRequired, map[string]any{
+			"cursor":       cursorToken,
+			"stateVersion": frame.SnapshotVersion,
+		})
+	}
+	return response
 }
 
 func (s *worldServer) writeStonewakeCommandError(w http.ResponseWriter, err error) {
