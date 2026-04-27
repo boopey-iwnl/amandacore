@@ -177,33 +177,99 @@ func (s *Store) GetCharacterByName(realmID string, displayName string) (*platfor
 
 func (s *Store) UpdateCharacterState(characterID string, zoneID string, x float64, y float64, z float64) (*platform.Character, error) {
 	now := s.now().Unix()
+	var updated platform.Character
 	if err := s.WithTransaction("sqlstore.character_position", func(tx *Tx) error {
-		if _, err := tx.tx.Exec(
-			`UPDATE ac_characters SET zone_id = ?, position_x = ?, position_y = ?, position_z = ?, last_seen_at = ? WHERE id = ?`,
-			zoneID,
-			x,
-			y,
-			z,
-			now,
-			characterID); err != nil {
+		character, version, err := tx.loadCharacterForMutation(characterID)
+		if err != nil {
 			return err
 		}
-		_, err := tx.tx.Exec(
-			`INSERT INTO ac_character_position_snapshots (snapshot_id, character_id, zone_id, position_x, position_y, position_z, captured_at, reason)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			randomID("pos"),
-			characterID,
-			zoneID,
-			x,
-			y,
-			z,
-			now,
-			"character_state_update")
-		return err
+		character.ZoneID = zoneID
+		character.PositionX = x
+		character.PositionY = y
+		character.PositionZ = z
+		character.LastSeenAt = now
+		if err := tx.saveCharacterWithVersion(platform.NormalizeCharacter(character), version); err != nil {
+			return err
+		}
+		if err := tx.insertPositionSnapshot(filestore.CharacterPositionSnapshot{
+			SnapshotID:       randomID("pos"),
+			CharacterID:      characterID,
+			ZoneID:           zoneID,
+			X:                x,
+			Y:                y,
+			Z:                z,
+			CapturedAt:       now,
+			Reason:           "character_state_update",
+			CharacterVersion: version + 1,
+		}); err != nil {
+			return err
+		}
+		updated = platform.NormalizeCharacter(character)
+		return nil
 	}); err != nil {
 		return nil, err
 	}
-	return s.GetCharacterByID(characterID)
+	return &updated, nil
+}
+
+func (s *Store) GetCharacterPositionSnapshots(characterID string, limit int) ([]filestore.CharacterPositionSnapshot, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 25
+	}
+	rows, err := s.db.Query(
+		`SELECT snapshot_id, character_id, world_session_token, zone_id, position_x, position_y, position_z, captured_at, reason, character_version
+		FROM ac_character_position_snapshots
+		WHERE character_id = ?
+		ORDER BY captured_at DESC, snapshot_id DESC
+		LIMIT ?`,
+		characterID,
+		limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var snapshots []filestore.CharacterPositionSnapshot
+	for rows.Next() {
+		var snapshot filestore.CharacterPositionSnapshot
+		if err := rows.Scan(
+			&snapshot.SnapshotID,
+			&snapshot.CharacterID,
+			&snapshot.WorldSessionToken,
+			&snapshot.ZoneID,
+			&snapshot.X,
+			&snapshot.Y,
+			&snapshot.Z,
+			&snapshot.CapturedAt,
+			&snapshot.Reason,
+			&snapshot.CharacterVersion); err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	return snapshots, rows.Err()
+}
+
+func (tx *Tx) insertPositionSnapshot(snapshot filestore.CharacterPositionSnapshot) error {
+	if snapshot.SnapshotID == "" {
+		snapshot.SnapshotID = randomID("pos")
+	}
+	_, err := tx.tx.Exec(
+		`INSERT INTO ac_character_position_snapshots (
+			snapshot_id, character_id, world_session_token, zone_id, position_x, position_y, position_z,
+			captured_at, reason, character_version
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		snapshot.SnapshotID,
+		snapshot.CharacterID,
+		snapshot.WorldSessionToken,
+		snapshot.ZoneID,
+		snapshot.X,
+		snapshot.Y,
+		snapshot.Z,
+		snapshot.CapturedAt,
+		snapshot.Reason,
+		snapshot.CharacterVersion)
+	return err
 }
 
 func (s *Store) GetCharacterInventory(characterID string) ([]platform.CharacterInventorySlot, error) {
@@ -596,12 +662,16 @@ func saveCharacterCollections(tx *sql.Tx, character platform.Character) error {
 
 	for _, slot := range character.Inventory {
 		if _, err := tx.Exec(
-			`INSERT INTO ac_character_inventory (character_id, slot_index, item_id, display_name, stack_count) VALUES (?, ?, ?, ?, ?)`,
+			`INSERT INTO ac_character_inventory (
+				character_id, slot_index, item_id, display_name, stack_count, slot_version, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			character.ID,
 			slot.SlotIndex,
 			slot.ItemID,
 			slot.DisplayName,
-			slot.StackCount); err != nil {
+			slot.StackCount,
+			1,
+			character.LastSeenAt); err != nil {
 			return err
 		}
 	}
@@ -613,8 +683,8 @@ func saveCharacterCollections(tx *sql.Tx, character platform.Character) error {
 		if _, err := tx.Exec(
 			`INSERT INTO ac_character_quests (
 				character_id, quest_id, state, current_count, target_count, accepted_at, completed_at,
-				reward_granted_at, updated_at, objective_progress_json
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				reward_granted_at, updated_at, objective_progress_json, progress_version, updated_at_row
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			character.ID,
 			quest.QuestID,
 			quest.State,
@@ -624,25 +694,30 @@ func saveCharacterCollections(tx *sql.Tx, character platform.Character) error {
 			quest.CompletedAt,
 			quest.RewardGrantedAt,
 			quest.UpdatedAt,
-			objectivesJSON); err != nil {
+			objectivesJSON,
+			1,
+			character.LastSeenAt); err != nil {
 			return err
 		}
 	}
 	for _, abilityID := range character.LearnedAbilityIDs {
 		if _, err := tx.Exec(
-			`INSERT INTO ac_learned_abilities (character_id, ability_id, learned_at) VALUES (?, ?, ?)`,
+			`INSERT INTO ac_learned_abilities (character_id, ability_id, learned_at, updated_at) VALUES (?, ?, ?, ?)`,
 			character.ID,
 			abilityID,
+			character.LastSeenAt,
 			character.LastSeenAt); err != nil {
 			return err
 		}
 	}
 	for _, slot := range character.ActionBarSlots {
 		if _, err := tx.Exec(
-			`INSERT INTO ac_action_bar_slots (character_id, slot_index, ability_id) VALUES (?, ?, ?)`,
+			`INSERT INTO ac_action_bar_slots (character_id, slot_index, ability_id, slot_version, updated_at) VALUES (?, ?, ?, ?, ?)`,
 			character.ID,
 			slot.SlotIndex,
-			slot.AbilityID); err != nil {
+			slot.AbilityID,
+			1,
+			character.LastSeenAt); err != nil {
 			return err
 		}
 	}

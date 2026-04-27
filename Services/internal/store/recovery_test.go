@@ -14,4 +14,7 @@ func TestSessionRecoveryStateRestoresZoneAndPosition(t *testing.T) {
 	if recovery.CharacterID != character.ID || recovery.ZoneID != "brindlebrook_hollow" || recovery.X != 44 || recovery.Y != 55 || recovery.Z != 1 {
 		t.Fatalf("unexpected recovery state: %#v", recovery)
 	}
+	if len(recovery.Inventory) == 0 || len(recovery.ActionBarSlots) == 0 || len(recovery.LearnedAbilityIDs) == 0 {
+		t.Fatalf("expected recovery to include gameplay state: %#v", recovery)
+	}
 }
