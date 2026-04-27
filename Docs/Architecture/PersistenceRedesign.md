@@ -4,7 +4,7 @@
 
 AmandaCore's local file-backed store is useful for development, but the next backend milestones need stronger storage guarantees: durable transactions, uniqueness constraints, replayable migration history, cleaner repository boundaries, and a path toward multi-process service reliability.
 
-Milestone 2 introduces the relational foundation while preserving the current playable Alpha flow. The existing file store remains the default service path.
+Milestone 2 introduced the relational foundation while preserving the current playable Alpha flow. Milestone 3 adds transactional character-state behavior on that foundation. The existing file store remains the default service path.
 
 ## What Milestone 2 Implements
 
@@ -19,6 +19,12 @@ Milestone 2 adds a testable SQLite-backed package at `Services/internal/store/sq
 - round-trip tests for the implemented repositories
 
 The Go service module now depends on `modernc.org/sqlite` so tests do not require a native SQLite driver or external database server.
+
+## What Milestone 3 Implements
+
+Milestone 3 adds transactional SQL character-state methods for inventory, quests, learned abilities, action bars, position snapshots, quest rewards, idempotent mutation retry, and reconnect restoration. It also adds `000006_transactional_character_state.sql` with character state versions, collection timestamps/versions, position snapshot metadata, and `ac_character_state_mutations`.
+
+The active runtime still uses the file-backed store. The SQL behavior is validated through repository tests until a later milestone introduces explicit backend selection and service cutover.
 
 ## What Remains On File Store
 
@@ -51,6 +57,7 @@ The new SQL store is a foundation and test adapter until a later milestone expli
 - audit events
 - migration history
 - unit-of-work transactions
+- transactional character-state mutations
 
 These interfaces are AmandaCore-owned boundaries. They intentionally describe current service behavior instead of copying another MMO server's modules, table layout, or packet model.
 
@@ -63,6 +70,7 @@ The relational schema uses AmandaCore `ac_*` table names:
 - gameplay state: `ac_character_inventory`, `ac_character_quests`, `ac_learned_abilities`, `ac_action_bar_slots`, `ac_currency_ledger`
 - world session state: `ac_world_join_tickets`, `ac_world_sessions`, `ac_character_position_snapshots`
 - events and audit: `ac_domain_events`, `ac_audit_events`
+- transactional state: `ac_character_state_mutations`
 - migration metadata: `ac_schema_migrations`
 
 Some character subdocuments remain JSON columns temporarily where the service aggregate is still broader than the Milestone 2 cutover scope. Later milestones should normalize only when a caller and transaction boundary are ready.
@@ -89,15 +97,21 @@ The SQL store currently supports local/test SQLite files. Tests open temporary d
 
 No SQLite database files should be committed. Use temp directories, ignored local paths, or throwaway files when manually experimenting.
 
-## Later Milestone 3 Cutover Plan
+## Transaction And Idempotency Behavior
 
-Milestone 3 should convert service callers in narrow slices:
+Character-state SQL mutations run in one transaction, update the character row with an expected `state_version`, rewrite normalized owned collections, and commit only after the full mutation succeeds. If a mutation key is provided, the normalized character response is recorded and replayed for identical retries.
+
+Current idempotent operations include inventory grants, quest accept/progress/reward, learned ability grants, and action-bar/inventory mutations when callers provide `MutationOptions.MutationKey`.
+
+## Later Runtime Cutover Plan
+
+Runtime cutover should convert service callers in narrow slices:
 
 1. Keep the current file store as the default fallback.
 2. Add an explicit backend selector only when startup, validation, and rollback behavior are ready.
 3. Move character create/select/update behind `CharacterRepository`.
 4. Move inventory, quest, learned ability, and action-bar mutations behind dedicated repositories.
-5. Add concurrency tests for item loss/duplication and action-bar/quest mutation retries.
+5. Route world commands through the Milestone 4 single-writer loop before broad gameplay SQL writes.
 6. Add a file-state import or reset runbook before any production cutover.
 
 ## Rollback And Corruption Considerations
