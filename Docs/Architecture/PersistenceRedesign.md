@@ -32,6 +32,8 @@ Milestone 4 adds an authoritative Stonewake loop for current world-service hot p
 
 This loop owns command ordering, emits loop/replay/snapshot observability events, records in-memory replay entries, and keeps the existing HTTP response contract stable. It does not make SQL the runtime default and does not remove the file-backed store.
 
+Milestone 5 adds command and replay coverage for combat, threat, loot, quest progression, quest rewards, item grants, and currency deltas. Loot inspect/claim and quest reward completion now have explicit loop command names while the current file-backed runtime persistence path remains intact.
+
 ## What Remains On File Store
 
 The active service commands still instantiate `store.NewFileStore` through current configuration. These runtime flows remain file-backed:
@@ -116,7 +118,7 @@ Runtime cutover should convert service callers in narrow slices:
 1. Keep the current file store as the default fallback.
 2. Add an explicit backend selector only when startup, validation, and rollback behavior are ready.
 3. Move character create/select/update behind `CharacterRepository`.
-4. Move inventory, quest, learned ability, and action-bar mutations behind dedicated repositories.
+4. Move inventory, quest, learned ability, combat reward, loot claim, and action-bar mutations behind dedicated repositories.
 5. Gradually move loop-backed world commands from file-store persistence to the transactional repositories where the authority boundary is already explicit.
 6. Add a file-state import or reset runbook before any production cutover.
 

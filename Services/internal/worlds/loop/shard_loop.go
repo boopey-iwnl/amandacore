@@ -321,8 +321,14 @@ func (l *ShardLoop) apply(request commandRequest) {
 	l.metrics.LastAppliedSequence = sequence
 	if err != nil {
 		l.metrics.CommandsRejected++
+		if isGameplayCommand(request.command.Kind()) {
+			l.metrics.GameplayCommandsRejected++
+		}
 	} else {
 		l.metrics.CommandsApplied++
+		if isGameplayCommand(request.command.Kind()) {
+			l.metrics.GameplayCommandsApplied++
+		}
 		if request.command.Kind() == CommandRequestSnapshot {
 			l.metrics.SnapshotsEmitted++
 		}
@@ -393,6 +399,24 @@ func (l *ShardLoop) apply(request commandRequest) {
 			Tick:         tick,
 		})
 	}
+	if isGameplayCommand(request.command.Kind()) {
+		eventName := "world.loop_gameplay_command_applied"
+		if err != nil {
+			eventName = "world.loop_gameplay_command_rejected"
+		}
+		l.emit(LoopEvent{
+			Name:         eventName,
+			CommandID:    commandID,
+			CommandKind:  request.command.Kind(),
+			SessionToken: request.command.SessionToken(),
+			ActorID:      request.command.ActorID(),
+			Sequence:     sequence,
+			Tick:         tick,
+			QueueDepth:   len(l.queue),
+			Latency:      latency,
+			Err:          err,
+		})
+	}
 
 	request.done <- commandResponse{result: result, err: err}
 }
@@ -430,6 +454,9 @@ func Replay(initial WorldSnapshot, records []ReplayRecord) (WorldSnapshot, error
 	}
 	for _, npc := range initial.NPCs {
 		state.UpsertNPC(npc)
+	}
+	for _, container := range initial.LootContainers {
+		state.UpsertLootContainer(container)
 	}
 
 	for _, record := range records {
@@ -503,6 +530,139 @@ func applyReplayRecord(state *ShardState, record ReplayRecord) error {
 		}
 		player.AutoAttackActive = boolValue(record.Payload, "enabled", false)
 		state.UpsertPlayer(player)
+	case CommandStopAutoAttack:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		player.AutoAttackActive = false
+		state.UpsertPlayer(player)
+	case CommandUseAbility:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		targetID := stringValue(record.Payload, "targetId", player.TargetID)
+		damage := floatValue(record.Payload, "damage", 0)
+		heal := floatValue(record.Payload, "heal", 0)
+		if heal > 0 {
+			player.Health = minNumber(player.MaxHealth, player.Health+heal)
+			state.UpsertPlayer(player)
+		}
+		if damage > 0 {
+			if err := applyDamage(state, player.CharacterID, targetID, damage, floatValue(record.Payload, "threat", 0), record.Tick); err != nil {
+				return err
+			}
+		}
+	case CommandApplyDamage:
+		if err := applyDamage(
+			state,
+			stringValue(record.Payload, "sourceId", record.ActorID),
+			stringValue(record.Payload, "targetId", ""),
+			floatValue(record.Payload, "amount", 0),
+			floatValue(record.Payload, "threat", 0),
+			record.Tick); err != nil {
+			return err
+		}
+	case CommandApplyHeal:
+		targetID := stringValue(record.Payload, "targetId", record.ActorID)
+		amount := floatValue(record.Payload, "amount", 0)
+		if token, ok := state.playerSessionByID[targetID]; ok {
+			player := state.playersBySession[token]
+			player.Health = minNumber(player.MaxHealth, player.Health+amount)
+			if player.Health > 0 {
+				player.Alive = true
+			}
+			state.UpsertPlayer(player)
+		} else if npc, ok := state.npcs[targetID]; ok {
+			npc.Health = minNumber(npc.MaxHealth, npc.Health+amount)
+			if npc.Health > 0 {
+				npc.Alive = true
+				npc.Targetable = true
+			}
+			state.UpsertNPC(npc)
+		} else {
+			return ErrTargetMissing
+		}
+	case CommandResolveDeath:
+		if err := resolveDeath(
+			state,
+			stringValue(record.Payload, "entityId", ""),
+			stringValue(record.Payload, "killedById", ""),
+			uint64(floatValue(record.Payload, "respawnTick", 0))); err != nil {
+			return err
+		}
+	case CommandRespawnNPC:
+		npcID := stringValue(record.Payload, "npcId", "")
+		if npcID == "" {
+			return ErrTargetMissing
+		}
+		health := floatValue(record.Payload, "health", 1)
+		maxHealth := floatValue(record.Payload, "maxHealth", health)
+		state.UpsertNPC(NpcState{
+			ID:          npcID,
+			ZoneID:      stringValue(record.Payload, "zoneId", state.ZoneID),
+			Position:    Position{X: floatValue(record.Payload, "x", 0), Y: floatValue(record.Payload, "y", 0), Z: floatValue(record.Payload, "z", 0)},
+			Health:      health,
+			MaxHealth:   maxHealth,
+			Alive:       true,
+			Targetable:  true,
+			DisplayName: stringValue(record.Payload, "displayName", ""),
+			Kind:        stringValue(record.Payload, "kind", ""),
+			RespawnTick: record.Tick,
+		})
+	case CommandScheduleRespawn:
+		npcID := stringValue(record.Payload, "npcId", "")
+		npc, ok := state.npcs[npcID]
+		if !ok {
+			return ErrTargetMissing
+		}
+		npc.RespawnTick = uint64(floatValue(record.Payload, "respawnTick", 0))
+		state.UpsertNPC(npc)
+	case CommandAddThreat:
+		if err := addThreat(
+			state,
+			stringValue(record.Payload, "npcId", ""),
+			stringValue(record.Payload, "targetId", ""),
+			floatValue(record.Payload, "amount", 0)); err != nil {
+			return err
+		}
+	case CommandDecayThreat:
+		npcID := stringValue(record.Payload, "npcId", "")
+		npc, ok := state.npcs[npcID]
+		if !ok {
+			return ErrTargetMissing
+		}
+		amount := floatValue(record.Payload, "amount", 0)
+		for targetID, value := range npc.Threat {
+			next := value - amount
+			if next <= 0 {
+				delete(npc.Threat, targetID)
+			} else {
+				npc.Threat[targetID] = next
+			}
+		}
+		npc.TargetID = highestThreatTarget(npc.Threat)
+		state.UpsertNPC(npc)
+	case CommandResetThreat, CommandClearThreatOnLeash:
+		npcID := stringValue(record.Payload, "npcId", "")
+		npc, ok := state.npcs[npcID]
+		if !ok {
+			return ErrTargetMissing
+		}
+		npc.Threat = nil
+		npc.TargetID = ""
+		state.UpsertNPC(npc)
+	case CommandSelectNPCTarget:
+		npcID := stringValue(record.Payload, "npcId", "")
+		npc, ok := state.npcs[npcID]
+		if !ok {
+			return ErrTargetMissing
+		}
+		npc.TargetID = highestThreatTarget(npc.Threat)
+		state.UpsertNPC(npc)
+	case CommandClearThreatOnDeath:
+		clearThreatForEntity(state, stringValue(record.Payload, "entityId", ""))
 	case CommandAcceptQuest:
 		player, ok := state.playersBySession[record.SessionToken]
 		if !ok {
@@ -529,6 +689,161 @@ func applyReplayRecord(state *ShardState, record ReplayRecord) error {
 			player.QuestProgress[questID] += int(floatValue(record.Payload, "delta", 1))
 		}
 		state.UpsertPlayer(player)
+	case CommandAbandonQuest:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		questID := stringValue(record.Payload, "questId", "")
+		delete(player.QuestProgress, questID)
+		delete(player.QuestCompleted, questID)
+		state.UpsertPlayer(player)
+	case CommandCompleteQuest:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		if player.QuestCompleted == nil {
+			player.QuestCompleted = map[string]bool{}
+		}
+		player.QuestCompleted[stringValue(record.Payload, "questId", "")] = true
+		state.UpsertPlayer(player)
+	case CommandClaimQuestReward, CommandApplyQuestReward:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		key := stringValue(record.Payload, "mutationKey", "")
+		questID := stringValue(record.Payload, "questId", "")
+		if key == "" {
+			key = "quest:" + questID
+		}
+		if player.LootClaims == nil {
+			player.LootClaims = map[string]bool{}
+		}
+		if !player.LootClaims[key] {
+			if player.QuestCompleted == nil {
+				player.QuestCompleted = map[string]bool{}
+			}
+			player.QuestCompleted[questID] = true
+			player.CurrencyCopper += int(floatValue(record.Payload, "currencyDelta", 0))
+			if player.InventorySlots == nil {
+				player.InventorySlots = map[int]string{}
+			}
+			for _, itemID := range stringSliceValue(record.Payload, "itemIds") {
+				player.InventorySlots[firstEmptySlot(player.InventorySlots)] = itemID
+			}
+			player.LootClaims[key] = true
+		}
+		state.UpsertPlayer(player)
+	case CommandGenerateLoot:
+		containerID := stringValue(record.Payload, "containerId", "")
+		if containerID == "" {
+			return fmt.Errorf("loot container is required")
+		}
+		state.UpsertLootContainer(LootContainerState{
+			ID:               containerID,
+			SourceEntityID:   stringValue(record.Payload, "sourceId", ""),
+			OwnerCharacterID: stringValue(record.Payload, "ownerId", ""),
+			Items:            lootItemsValue(record.Payload, "items"),
+		})
+	case CommandOpenLoot:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		containerID := stringValue(record.Payload, "containerId", "")
+		container, ok := state.lootContainers[containerID]
+		if !ok {
+			return fmt.Errorf("loot is missing")
+		}
+		container.OpenedByCharacterID = player.CharacterID
+		state.UpsertLootContainer(container)
+	case CommandClaimLootItem, CommandApplyKillLoot:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		containerID := stringValue(record.Payload, "containerId", "")
+		container, ok := state.lootContainers[containerID]
+		if !ok {
+			return fmt.Errorf("loot is missing")
+		}
+		key := stringValue(record.Payload, "mutationKey", "")
+		if key == "" {
+			key = "loot:" + containerID
+		}
+		if player.LootClaims == nil {
+			player.LootClaims = map[string]bool{}
+		}
+		if !player.LootClaims[key] && container.ClaimedAtTick == 0 {
+			if player.InventorySlots == nil {
+				player.InventorySlots = map[int]string{}
+			}
+			itemFilter := stringValue(record.Payload, "itemId", "")
+			for _, item := range container.Items {
+				if itemFilter != "" && item.ItemID != itemFilter {
+					continue
+				}
+				for quantity := 0; quantity < maxInt(1, item.Quantity); quantity++ {
+					player.InventorySlots[firstEmptySlot(player.InventorySlots)] = item.ItemID
+				}
+			}
+			player.LootClaims[key] = true
+			container.ClaimedByCharacterID = player.CharacterID
+			container.ClaimedAtTick = record.Tick
+		}
+		state.UpsertPlayer(player)
+		state.UpsertLootContainer(container)
+	case CommandClaimCurrencyReward, CommandApplyCurrencyDelta:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		key := stringValue(record.Payload, "mutationKey", "")
+		if key != "" {
+			if player.LootClaims == nil {
+				player.LootClaims = map[string]bool{}
+			}
+			if player.LootClaims[key] {
+				state.UpsertPlayer(player)
+				return nil
+			}
+			player.LootClaims[key] = true
+		}
+		player.CurrencyCopper += int(floatValue(record.Payload, "amount", 0))
+		state.UpsertPlayer(player)
+	case CommandApplyItemGrant:
+		player, ok := state.playersBySession[record.SessionToken]
+		if !ok {
+			return ErrSessionMissing
+		}
+		key := stringValue(record.Payload, "mutationKey", "")
+		if key != "" {
+			if player.LootClaims == nil {
+				player.LootClaims = map[string]bool{}
+			}
+			if player.LootClaims[key] {
+				state.UpsertPlayer(player)
+				return nil
+			}
+			player.LootClaims[key] = true
+		}
+		if player.InventorySlots == nil {
+			player.InventorySlots = map[int]string{}
+		}
+		for index := 0; index < int(floatValue(record.Payload, "quantity", 1)); index++ {
+			player.InventorySlots[firstEmptySlot(player.InventorySlots)] = stringValue(record.Payload, "itemId", "")
+		}
+		state.UpsertPlayer(player)
+	case CommandCloseLoot:
+		containerID := stringValue(record.Payload, "containerId", "")
+		container, ok := state.lootContainers[containerID]
+		if !ok {
+			return fmt.Errorf("loot is missing")
+		}
+		container.Closed = true
+		state.UpsertLootContainer(container)
 	case CommandUpdateActionBar:
 		player, ok := state.playersBySession[record.SessionToken]
 		if !ok {
@@ -558,7 +873,7 @@ func applyReplayRecord(state *ShardState, record ReplayRecord) error {
 			delete(player.InventorySlots, from)
 		}
 		state.UpsertPlayer(player)
-	case CommandCastAbility, CommandUseAbility, CommandInteractNPC, CommandRequestSnapshot:
+	case CommandCastAbility, CommandCancelCast, CommandInteractNPC, CommandRequestSnapshot, CommandRequestCombatSnapshot:
 		return nil
 	default:
 		return fmt.Errorf("unsupported replay command %s", record.CommandKind)
@@ -604,6 +919,95 @@ func boolValue(source map[string]any, key string, fallback bool) bool {
 		return value
 	}
 	return fallback
+}
+
+func isGameplayCommand(kind CommandKind) bool {
+	switch kind {
+	case CommandSelectTarget,
+		CommandClearTarget,
+		CommandStartAutoAttack,
+		CommandStopAutoAttack,
+		CommandCastAbility,
+		CommandUseAbility,
+		CommandCancelCast,
+		CommandApplyDamage,
+		CommandApplyHeal,
+		CommandResolveDeath,
+		CommandRespawnNPC,
+		CommandScheduleRespawn,
+		CommandRequestCombatSnapshot,
+		CommandAddThreat,
+		CommandDecayThreat,
+		CommandResetThreat,
+		CommandSelectNPCTarget,
+		CommandClearThreatOnDeath,
+		CommandClearThreatOnLeash,
+		CommandAcceptQuest,
+		CommandAbandonQuest,
+		CommandProgressQuestObjective,
+		CommandCompleteQuest,
+		CommandClaimQuestReward,
+		CommandInteractNPC,
+		CommandGenerateLoot,
+		CommandOpenLoot,
+		CommandClaimLootItem,
+		CommandClaimCurrencyReward,
+		CommandCloseLoot,
+		CommandApplyQuestReward,
+		CommandApplyKillLoot,
+		CommandApplyCurrencyDelta,
+		CommandApplyItemGrant,
+		CommandUpdateActionBar,
+		CommandMoveInventoryItem:
+		return true
+	default:
+		return false
+	}
+}
+
+func stringSliceValue(source map[string]any, key string) []string {
+	if source == nil {
+		return nil
+	}
+	switch value := source[key].(type) {
+	case []string:
+		return append([]string(nil), value...)
+	case []any:
+		result := make([]string, 0, len(value))
+		for _, item := range value {
+			if text, ok := item.(string); ok {
+				result = append(result, text)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+func lootItemsValue(source map[string]any, key string) []LootItemState {
+	if source == nil {
+		return nil
+	}
+	switch value := source[key].(type) {
+	case []LootItemState:
+		return cloneLootItems(value)
+	case []any:
+		items := make([]LootItemState, 0, len(value))
+		for _, itemValue := range value {
+			itemMap, ok := itemValue.(map[string]any)
+			if !ok {
+				continue
+			}
+			items = append(items, LootItemState{
+				ItemID:   stringValue(itemMap, "itemId", ""),
+				Quantity: int(floatValue(itemMap, "quantity", 1)),
+			})
+		}
+		return items
+	default:
+		return nil
+	}
 }
 
 func IsStopped(err error) bool {

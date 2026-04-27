@@ -668,24 +668,21 @@ func (s *worldServer) handleLootInspect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandOpenLoot,
+		request.WorldSessionToken,
+		map[string]any{"lootContainerId": request.LootContainerID},
+		"loot_inspect_failed",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			_, err := s.inspectLootLocked(session, request.LootContainerID)
+			return err
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	if _, err := s.inspectLootLocked(session, request.LootContainerID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "loot_inspect_failed", err.Error())
-		return
-	}
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleLootClaim(w http.ResponseWriter, r *http.Request) {
@@ -695,24 +692,20 @@ func (s *worldServer) handleLootClaim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandClaimLootItem,
+		request.WorldSessionToken,
+		map[string]any{"lootContainerId": request.LootContainerID},
+		"loot_claim_failed",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.claimLootLocked(session, request.LootContainerID)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	if err := s.claimLootLocked(session, request.LootContainerID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "loot_claim_failed", err.Error())
-		return
-	}
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleVendorBuy(w http.ResponseWriter, r *http.Request) {
@@ -832,7 +825,7 @@ func (s *worldServer) handleQuestComplete(w http.ResponseWriter, r *http.Request
 
 	response, err := s.submitStonewakeSessionMutation(
 		r.Context(),
-		worldloop.CommandProgressQuestObjective,
+		worldloop.CommandClaimQuestReward,
 		request.WorldSessionToken,
 		map[string]any{"questId": request.QuestID, "complete": true},
 		"quest_complete_invalid",
@@ -909,9 +902,13 @@ func (s *worldServer) handleAutoAttack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	kind := worldloop.CommandStartAutoAttack
+	if !request.Enabled {
+		kind = worldloop.CommandStopAutoAttack
+	}
 	response, err := s.submitStonewakeSessionMutation(
 		r.Context(),
-		worldloop.CommandStartAutoAttack,
+		kind,
 		request.WorldSessionToken,
 		map[string]any{"enabled": request.Enabled},
 		"auto_attack_invalid",
@@ -1125,7 +1122,7 @@ func (s *worldServer) handleAbility(w http.ResponseWriter, r *http.Request) {
 
 	response, err := s.submitStonewakeSessionMutation(
 		r.Context(),
-		worldloop.CommandCastAbility,
+		worldloop.CommandUseAbility,
 		request.WorldSessionToken,
 		map[string]any{"abilityId": request.AbilityID},
 		"ability_invalid",

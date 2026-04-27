@@ -234,6 +234,8 @@ func (s *worldServer) syncStonewakeNPCsLocked(state *worldloop.ShardState) {
 			TargetID:    mob.CurrentTargetCharacter,
 			DisplayName: mob.DisplayName,
 			Kind:        mob.Kind,
+			Threat:      stonewakeThreatTable(mob.ThreatByCharacter),
+			RespawnTick: uint64(mob.RespawnTick),
 		})
 	}
 }
@@ -273,4 +275,20 @@ func stonewakeActionBarSlots(source []platform.CharacterActionBarSlot, learnedAb
 		return nil
 	}
 	return slots
+}
+
+func stonewakeThreatTable(source map[string]float64) map[string]float64 {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]float64, len(source))
+	for characterID, threat := range source {
+		if threat > 0 {
+			cloned[characterID] = threat
+		}
+	}
+	if len(cloned) == 0 {
+		return nil
+	}
+	return cloned
 }

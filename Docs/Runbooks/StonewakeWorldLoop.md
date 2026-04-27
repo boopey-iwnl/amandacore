@@ -52,7 +52,7 @@ Loop-owned for Stonewake hot paths:
 - action-bar assign/move/clear
 - snapshot/poll
 
-Existing direct locked helpers remain for systems outside the M4 boundary, including social/economy/admin/housing/dungeon/travel/gathering/crafting/vendor/loot-specific flows.
+Existing direct locked helpers remain for systems outside the M4/M5 boundary, including social/economy/admin/housing/dungeon/travel/gathering/crafting/vendor flows. Loot inspect and claim are now loop-backed.
 
 ## Persistence Boundary
 
@@ -87,9 +87,12 @@ Replay is in-memory only. The loop records logical ticks and command payloads an
 - `POST /v1/world/move` -> `ApplyMovement`
 - `POST /v1/world/target` -> `SelectTarget` or `ClearTarget`
 - `POST /v1/world/attack/auto` -> `StartAutoAttack`
-- `POST /v1/world/attack/ability` -> `CastAbility`
+- `POST /v1/world/attack/ability` -> `UseAbility`
 - `POST /v1/world/quest/accept` -> `AcceptQuest`
-- `POST /v1/world/quest/complete` and `POST /v1/world/quest/track` -> `ProgressQuestObjective`
+- `POST /v1/world/quest/complete` -> `ClaimQuestReward`
+- `POST /v1/world/quest/track` -> `ProgressQuestObjective`
+- `POST /v1/world/loot/inspect` -> `OpenLoot`
+- `POST /v1/world/loot/claim` -> `ClaimLootItem`
 - `POST /v1/world/inventory/move` and `POST /v1/world/inventory/equip` -> `MoveInventoryItem`
 - `POST /v1/world/action-bar/*` -> `UpdateActionBar`
 - `GET /v1/world/state` -> `RequestSnapshot`
