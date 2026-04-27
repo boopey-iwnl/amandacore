@@ -22,6 +22,14 @@ const (
 	EventWorldTickSlow            = "world.tick.slow"
 	EventWorldCommandEnqueued     = "world.command.enqueued"
 	EventWorldCommandRejected     = "world.command.rejected"
+	EventWorldLoopStarted         = "world.loop_started"
+	EventWorldLoopStopped         = "world.loop_stopped"
+	EventWorldCommandAccepted     = "world.command_accepted"
+	EventWorldCommandApplied      = "world.command_applied"
+	EventWorldSnapshotEmitted     = "world.snapshot_emitted"
+	EventWorldReplayRecorded      = "world.replay_recorded"
+	EventWorldReconnectRestored   = "world.reconnect_restored"
+	EventWorldCommandTimeout      = "world.command_timeout"
 	EventWorldZoneLoaded          = "world.zone.loaded"
 	EventWorldZoneUnloaded        = "world.zone.unloaded"
 	EventWorldEntitySpawned       = "world.entity.spawned"
@@ -60,6 +68,14 @@ func StableEventNames() []string {
 		EventWorldTickSlow,
 		EventWorldCommandEnqueued,
 		EventWorldCommandRejected,
+		EventWorldLoopStarted,
+		EventWorldLoopStopped,
+		EventWorldCommandAccepted,
+		EventWorldCommandApplied,
+		EventWorldSnapshotEmitted,
+		EventWorldReplayRecorded,
+		EventWorldReconnectRestored,
+		EventWorldCommandTimeout,
 		EventWorldZoneLoaded,
 		EventWorldZoneUnloaded,
 		EventWorldEntitySpawned,

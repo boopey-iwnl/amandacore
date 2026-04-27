@@ -14,6 +14,7 @@ import (
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/simcore"
 	"amandacore/services/internal/store"
+	worldloop "amandacore/services/internal/worlds/loop"
 )
 
 func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
@@ -200,35 +201,86 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	response, err := s.submitStonewakeHTTPCommand(
+		r.Context(),
+		worldloop.CommandConnectWorldSession,
+		"",
+		character.ID,
+		map[string]any{
+			"ticketId":    ticket.TicketID,
+			"characterId": character.ID,
+			"realmId":     ticket.RealmID,
+		},
+		func(state *worldloop.ShardState) (stonewakeHTTPResponse, error) {
+			s.mutex.Lock()
+			defer s.mutex.Unlock()
 
-	s.ensureMobsLocked()
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
-		return
-	}
-
-	if existingToken, ok := s.sessionTokenByChar[character.ID]; ok {
-		if session, found := s.sessionsByToken[existingToken]; found {
-			session.DisplayName = character.DisplayName
-			session.Connected = true
-			session.LastSeenAt = time.Now().Unix()
-			if session.HousingSpaceID != "" {
-				if err := s.returnSessionFromHousingLocked(session, "connect_resume"); err != nil {
-					httpapi.Error(w, http.StatusInternalServerError, "housing_recover_failed", err.Error())
-					return
-				}
-			} else if session.ZoneID == "" {
-				session.ZoneID = character.ZoneID
+			s.ensureMobsLocked()
+			if err := s.advanceWorldLocked(time.Now()); err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "world_advance_failed", err.Error())
 			}
-			s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
-			s.resetSessionCombatStateLocked(session, "reconnect")
-			s.clearMobAggroForCharacterLocked(session.CharacterID)
-			if !session.Alive || session.Health <= 0.0 {
-				s.reviveSessionLocked(session)
+
+			if existingToken, ok := s.sessionTokenByChar[character.ID]; ok {
+				if session, found := s.sessionsByToken[existingToken]; found {
+					session.DisplayName = character.DisplayName
+					session.Connected = true
+					session.LastSeenAt = time.Now().Unix()
+					if session.HousingSpaceID != "" {
+						if err := s.returnSessionFromHousingLocked(session, "connect_resume"); err != nil {
+							return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "housing_recover_failed", err.Error())
+						}
+					} else if session.ZoneID == "" {
+						session.ZoneID = character.ZoneID
+					}
+					s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
+					s.resetSessionCombatStateLocked(session, "reconnect")
+					s.clearMobAggroForCharacterLocked(session.CharacterID)
+					if !session.Alive || session.Health <= 0.0 {
+						s.reviveSessionLocked(session)
+					}
+					s.applyCharacterProgressionLocked(session, character)
+					s.syncStonewakeStateLocked(state, session)
+					observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
+						"worldSessionToken": session.Token,
+						"accountId":         session.AccountID,
+						"characterId":       session.CharacterID,
+						"realmId":           session.RealmID,
+						"zoneId":            session.ZoneID,
+						"x":                 session.X,
+						"y":                 session.Y,
+						"z":                 session.Z,
+						"resumeExisting":    true,
+					})
+					s.sendSystemMessageLocked("World session reconnected.", recipientSet(session.CharacterID))
+					s.metrics.recordSessionEvent("connect_resumed")
+					return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
+				}
+			}
+
+			session := &worldSessionState{
+				Token:       "world_" + randomWorldToken(),
+				AccountID:   ticket.AccountID,
+				CharacterID: ticket.CharacterID,
+				DisplayName: character.DisplayName,
+				ClassID:     character.ClassID,
+				RealmID:     ticket.RealmID,
+				ZoneID:      character.ZoneID,
+				X:           character.PositionX,
+				Y:           character.PositionY,
+				Z:           character.PositionZ,
+				Connected:   true,
+				LastSeenAt:  time.Now().Unix(),
+				Health:      playerMaxHealth,
+				MaxHealth:   playerMaxHealth,
+				Resource:    0,
+				MaxResource: playerMaxResource,
+				Alive:       true,
 			}
 			s.applyCharacterProgressionLocked(session, character)
+
+			s.sessionsByToken[session.Token] = session
+			s.sessionTokenByChar[session.CharacterID] = session.Token
+			s.syncStonewakeStateLocked(state, session)
 			observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
 				"worldSessionToken": session.Token,
 				"accountId":         session.AccountID,
@@ -238,52 +290,17 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				"x":                 session.X,
 				"y":                 session.Y,
 				"z":                 session.Z,
-				"resumeExisting":    true,
+				"resumeExisting":    false,
 			})
-			s.sendSystemMessageLocked("World session reconnected.", recipientSet(session.CharacterID))
-			s.metrics.recordSessionEvent("connect_resumed")
-			httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
-			return
-		}
+			s.sendSystemMessageLocked("World session linked.", recipientSet(session.CharacterID))
+			s.metrics.recordSessionEvent("connect_created")
+			return stonewakeHTTPResponse{Status: http.StatusCreated, Body: s.buildResponse(session)}, nil
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
+		return
 	}
-
-	session := &worldSessionState{
-		Token:       "world_" + randomWorldToken(),
-		AccountID:   ticket.AccountID,
-		CharacterID: ticket.CharacterID,
-		DisplayName: character.DisplayName,
-		ClassID:     character.ClassID,
-		RealmID:     ticket.RealmID,
-		ZoneID:      character.ZoneID,
-		X:           character.PositionX,
-		Y:           character.PositionY,
-		Z:           character.PositionZ,
-		Connected:   true,
-		LastSeenAt:  time.Now().Unix(),
-		Health:      playerMaxHealth,
-		MaxHealth:   playerMaxHealth,
-		Resource:    0,
-		MaxResource: playerMaxResource,
-		Alive:       true,
-	}
-	s.applyCharacterProgressionLocked(session, character)
-
-	s.sessionsByToken[session.Token] = session
-	s.sessionTokenByChar[session.CharacterID] = session.Token
-	observability.LogEvent("world-service", observability.EventWorldPlayerSpawned, map[string]any{
-		"worldSessionToken": session.Token,
-		"accountId":         session.AccountID,
-		"characterId":       session.CharacterID,
-		"realmId":           session.RealmID,
-		"zoneId":            session.ZoneID,
-		"x":                 session.X,
-		"y":                 session.Y,
-		"z":                 session.Z,
-		"resumeExisting":    false,
-	})
-	s.sendSystemMessageLocked("World session linked.", recipientSet(session.CharacterID))
-	s.metrics.recordSessionEvent("connect_created")
-	httpapi.WriteJSON(w, http.StatusCreated, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
@@ -293,89 +310,100 @@ func (s *worldServer) handleReconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	response, err := s.submitStonewakeHTTPCommand(
+		r.Context(),
+		worldloop.CommandReconnectWorldSession,
+		request.WorldSessionToken,
+		"",
+		map[string]any{"worldSessionToken": request.WorldSessionToken},
+		func(state *worldloop.ShardState) (stonewakeHTTPResponse, error) {
+			s.mutex.Lock()
+			defer s.mutex.Unlock()
 
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
-		return
-	}
+			if err := s.advanceWorldLocked(time.Now()); err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "world_advance_failed", err.Error())
+			}
 
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		s.metrics.recordSessionEvent("reconnect_missing")
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
+			session, ok := s.sessionsByToken[request.WorldSessionToken]
+			if !ok {
+				s.metrics.recordSessionEvent("reconnect_missing")
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusNotFound, "world_session_missing", "World session token was not found.")
+			}
 
-	character, err := s.store.GetCharacterByID(session.CharacterID)
+			character, err := s.store.GetCharacterByID(session.CharacterID)
+			if err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusNotFound, "character_missing", err.Error())
+			}
+
+			session.DisplayName = character.DisplayName
+			session.Connected = true
+			session.LastSeenAt = time.Now().Unix()
+			if session.InstanceID != "" && s.dungeonInstanceActiveForSessionLocked(session) {
+				if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
+					instance.PlayersInside[session.CharacterID] = true
+					instance.State = dungeonStateActive
+					instance.LastPlayerLeftAtMs = 0
+				}
+			} else if session.InstanceID != "" {
+				s.recoverExpiredDungeonSessionLocked(session)
+			} else if session.HousingSpaceID != "" {
+				session.HousingSpaceID = ""
+				session.HousingInstanceID = ""
+				session.ReturnZoneID = ""
+				session.ReturnX = 0
+				session.ReturnY = 0
+				session.ReturnZ = 0
+				session.ZoneID = character.ZoneID
+				session.X = character.PositionX
+				session.Y = character.PositionY
+				session.Z = character.PositionZ
+			} else {
+				session.ZoneID = character.ZoneID
+				session.X = character.PositionX
+				session.Y = character.PositionY
+				session.Z = character.PositionZ
+			}
+			s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
+			s.resetSessionCombatStateLocked(session, "reconnect")
+			s.clearMobAggroForCharacterLocked(session.CharacterID)
+			if !session.Alive || session.Health <= 0.0 {
+				s.reviveSessionLocked(session)
+			}
+			s.applyCharacterProgressionLocked(session, character)
+
+			s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+				SessionID: simcore.SessionID(session.Token),
+				ActorID:   simcore.EntityID(session.CharacterID),
+				ZoneID:    simcore.ZoneID(session.ZoneID),
+				Command: simcore.ReconnectIntentCommand{
+					EntityID: simcore.EntityID(session.CharacterID),
+					Reason:   "client_reconnect",
+				},
+			})
+			s.runRuntimeTickLocked(time.Now())
+			s.syncStonewakeStateLocked(state, session)
+
+			observability.LogEvent("world-service", observability.EventWorldReconnected, map[string]any{
+				"worldSessionToken": session.Token,
+				"accountId":         session.AccountID,
+				"characterId":       session.CharacterID,
+				"realmId":           session.RealmID,
+				"zoneId":            session.ZoneID,
+				"x":                 session.X,
+				"y":                 session.Y,
+				"z":                 session.Z,
+				"health":            session.Health,
+				"resource":          session.Resource,
+			})
+			s.sendSystemMessageLocked("World session reconnected.", recipientSet(session.CharacterID))
+			s.metrics.recordSessionEvent("reconnect_succeeded")
+			return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
+		})
 	if err != nil {
-		httpapi.Error(w, http.StatusNotFound, "character_missing", err.Error())
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session.DisplayName = character.DisplayName
-	session.Connected = true
-	session.LastSeenAt = time.Now().Unix()
-	if session.InstanceID != "" && s.dungeonInstanceActiveForSessionLocked(session) {
-		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
-			instance.PlayersInside[session.CharacterID] = true
-			instance.State = dungeonStateActive
-			instance.LastPlayerLeftAtMs = 0
-		}
-	} else if session.InstanceID != "" {
-		s.recoverExpiredDungeonSessionLocked(session)
-	} else if session.HousingSpaceID != "" {
-		session.HousingSpaceID = ""
-		session.HousingInstanceID = ""
-		session.ReturnZoneID = ""
-		session.ReturnX = 0
-		session.ReturnY = 0
-		session.ReturnZ = 0
-		session.ZoneID = character.ZoneID
-		session.X = character.PositionX
-		session.Y = character.PositionY
-		session.Z = character.PositionZ
-	} else {
-		session.ZoneID = character.ZoneID
-		session.X = character.PositionX
-		session.Y = character.PositionY
-		session.Z = character.PositionZ
-	}
-	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
-	s.resetSessionCombatStateLocked(session, "reconnect")
-	s.clearMobAggroForCharacterLocked(session.CharacterID)
-	if !session.Alive || session.Health <= 0.0 {
-		s.reviveSessionLocked(session)
-	}
-	s.applyCharacterProgressionLocked(session, character)
-
-	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
-		SessionID: simcore.SessionID(session.Token),
-		ActorID:   simcore.EntityID(session.CharacterID),
-		ZoneID:    simcore.ZoneID(session.ZoneID),
-		Command: simcore.ReconnectIntentCommand{
-			EntityID: simcore.EntityID(session.CharacterID),
-			Reason:   "client_reconnect",
-		},
-	})
-	s.runRuntimeTickLocked(time.Now())
-
-	observability.LogEvent("world-service", observability.EventWorldReconnected, map[string]any{
-		"worldSessionToken": session.Token,
-		"accountId":         session.AccountID,
-		"characterId":       session.CharacterID,
-		"realmId":           session.RealmID,
-		"zoneId":            session.ZoneID,
-		"x":                 session.X,
-		"y":                 session.Y,
-		"z":                 session.Z,
-		"health":            session.Health,
-		"resource":          session.Resource,
-	})
-	s.sendSystemMessageLocked("World session reconnected.", recipientSet(session.CharacterID))
-	s.metrics.recordSessionEvent("reconnect_succeeded")
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
@@ -385,77 +413,88 @@ func (s *worldServer) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
-		return
-	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-	if !session.Alive {
-		httpapi.Error(w, http.StatusConflict, "player_dead", "Dead players cannot move.")
-		return
-	}
-
-	from := simcore.Vector3{X: session.X, Y: session.Y, Z: session.Z}
-	nextX, nextY := s.resolveMovementLocked(session, request.DeltaX, request.DeltaY)
-	to := simcore.Vector3{X: nextX, Y: nextY, Z: session.Z}
-	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
-		SessionID: simcore.SessionID(session.Token),
-		ActorID:   simcore.EntityID(session.CharacterID),
-		ZoneID:    simcore.ZoneID(session.ZoneID),
-		Command: simcore.MoveIntentCommand{
-			EntityID: simcore.EntityID(session.CharacterID),
-			From:     from,
-			Delta:    simcore.Vector3{X: request.DeltaX, Y: request.DeltaY},
-			To:       to,
+	response, err := s.submitStonewakeHTTPCommand(
+		r.Context(),
+		worldloop.CommandApplyMovement,
+		request.WorldSessionToken,
+		"",
+		map[string]any{
+			"deltaX": request.DeltaX,
+			"deltaY": request.DeltaY,
 		},
-	})
-	s.runRuntimeTickLocked(time.Now())
-	session.X = nextX
-	session.Y = nextY
-	session.LastSeenAt = time.Now().Unix()
-	if _, err := s.applyContentZoneTransitionsLocked(session); err != nil {
-		httpapi.Error(w, http.StatusConflict, "zone_transition_failed", err.Error())
-		return
-	}
+		func(state *worldloop.ShardState) (stonewakeHTTPResponse, error) {
+			s.mutex.Lock()
+			defer s.mutex.Unlock()
 
-	if session.HousingSpaceID != "" || session.InstanceID != "" {
-		httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
-		return
-	}
+			if err := s.advanceWorldLocked(time.Now()); err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "world_advance_failed", err.Error())
+			}
 
-	persistStartedAt := time.Now()
-	character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
-	s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
+			session, ok := s.sessionsByToken[request.WorldSessionToken]
+			if !ok {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusNotFound, "world_session_missing", "World session token was not found.")
+			}
+			if !session.Alive {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusConflict, "player_dead", "Dead players cannot move.")
+			}
+
+			from := simcore.Vector3{X: session.X, Y: session.Y, Z: session.Z}
+			nextX, nextY := s.resolveMovementLocked(session, request.DeltaX, request.DeltaY)
+			to := simcore.Vector3{X: nextX, Y: nextY, Z: session.Z}
+			s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+				SessionID: simcore.SessionID(session.Token),
+				ActorID:   simcore.EntityID(session.CharacterID),
+				ZoneID:    simcore.ZoneID(session.ZoneID),
+				Command: simcore.MoveIntentCommand{
+					EntityID: simcore.EntityID(session.CharacterID),
+					From:     from,
+					Delta:    simcore.Vector3{X: request.DeltaX, Y: request.DeltaY},
+					To:       to,
+				},
+			})
+			s.runRuntimeTickLocked(time.Now())
+			session.X = nextX
+			session.Y = nextY
+			session.LastSeenAt = time.Now().Unix()
+			if _, err := s.applyContentZoneTransitionsLocked(session); err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusConflict, "zone_transition_failed", err.Error())
+			}
+
+			if session.HousingSpaceID != "" || session.InstanceID != "" {
+				s.syncStonewakeStateLocked(state, session)
+				return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
+			}
+
+			persistStartedAt := time.Now()
+			character, err := s.store.UpdateCharacterState(session.CharacterID, session.ZoneID, session.X, session.Y, session.Z)
+			s.recordPersistenceDuration("character_state_move", persistStartedAt, err)
+			if err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "character_save_failed", err.Error())
+			}
+
+			observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
+				"reason":            "move",
+				"worldSessionToken": session.Token,
+				"accountId":         session.AccountID,
+				"characterId":       session.CharacterID,
+				"zoneId":            character.ZoneID,
+				"x":                 character.PositionX,
+				"y":                 character.PositionY,
+				"z":                 character.PositionZ,
+			})
+			observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
+				"aggregateKind": "character",
+				"aggregateId":   character.ID,
+				"reason":        "move",
+			})
+			s.syncStonewakeStateLocked(state, session)
+			return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
+		})
 	if err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
-		"reason":            "move",
-		"worldSessionToken": session.Token,
-		"accountId":         session.AccountID,
-		"characterId":       session.CharacterID,
-		"zoneId":            character.ZoneID,
-		"x":                 character.PositionX,
-		"y":                 character.PositionY,
-		"z":                 character.PositionZ,
-	})
-	observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
-		"aggregateKind": "character",
-		"aggregateId":   character.ID,
-		"reason":        "move",
-	})
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
@@ -465,83 +504,92 @@ func (s *worldServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	response, err := s.submitStonewakeHTTPCommand(
+		r.Context(),
+		worldloop.CommandDisconnectWorldSession,
+		request.WorldSessionToken,
+		"",
+		map[string]any{"reason": "client_disconnect"},
+		func(state *worldloop.ShardState) (stonewakeHTTPResponse, error) {
+			s.mutex.Lock()
+			defer s.mutex.Unlock()
 
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
-		return
-	}
+			if err := s.advanceWorldLocked(time.Now()); err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "world_advance_failed", err.Error())
+			}
 
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
+			session, ok := s.sessionsByToken[request.WorldSessionToken]
+			if !ok {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusNotFound, "world_session_missing", "World session token was not found.")
+			}
 
-	session.Connected = false
-	session.LastSeenAt = time.Now().Unix()
-	s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
-		SessionID: simcore.SessionID(session.Token),
-		ActorID:   simcore.EntityID(session.CharacterID),
-		ZoneID:    simcore.ZoneID(session.ZoneID),
-		Command: simcore.DisconnectIntentCommand{
-			EntityID: simcore.EntityID(session.CharacterID),
-			Reason:   "client_disconnect",
-		},
-	})
-	s.runRuntimeTickLocked(time.Now())
-	s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
-	s.resetSessionCombatStateLocked(session, "disconnect")
-	s.clearMobAggroForCharacterLocked(session.CharacterID)
+			session.Connected = false
+			session.LastSeenAt = time.Now().Unix()
+			s.enqueueRuntimeCommandLocked(simcore.CommandEnvelope{
+				SessionID: simcore.SessionID(session.Token),
+				ActorID:   simcore.EntityID(session.CharacterID),
+				ZoneID:    simcore.ZoneID(session.ZoneID),
+				Command: simcore.DisconnectIntentCommand{
+					EntityID: simcore.EntityID(session.CharacterID),
+					Reason:   "client_disconnect",
+				},
+			})
+			s.runRuntimeTickLocked(time.Now())
+			s.cancelDuelForCharacterLocked(session.CharacterID, duelReasonDisconnect)
+			s.resetSessionCombatStateLocked(session, "disconnect")
+			s.clearMobAggroForCharacterLocked(session.CharacterID)
 
-	if session.HousingSpaceID != "" {
-		if err := s.returnSessionFromHousingLocked(session, "disconnect"); err != nil {
-			httpapi.Error(w, http.StatusInternalServerError, "housing_recover_failed", err.Error())
-			return
-		}
-		s.metrics.recordSessionEvent("disconnect_succeeded")
-		httpapi.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
-		return
-	}
+			if session.HousingSpaceID != "" {
+				if err := s.returnSessionFromHousingLocked(session, "disconnect"); err != nil {
+					return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "housing_recover_failed", err.Error())
+				}
+				s.syncStonewakeStateLocked(state, session)
+				s.metrics.recordSessionEvent("disconnect_succeeded")
+				return stonewakeHTTPResponse{Status: http.StatusOK, Body: map[string]bool{"ok": true}}, nil
+			}
 
-	persistStartedAt := time.Now()
-	persistZoneID, persistX, persistY, persistZ := session.ZoneID, session.X, session.Y, session.Z
-	if session.InstanceID != "" {
-		if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
-			delete(instance.PlayersInside, session.CharacterID)
-			s.markDungeonEmptyIfNeededLocked(instance)
-		}
-		persistZoneID, persistX, persistY, persistZ = session.ReturnZoneID, session.ReturnX, session.ReturnY, session.ReturnZ
-		if persistZoneID == "" {
-			persistZoneID, persistX, persistY, persistZ = secondZoneID, 590, 342, 0
-		}
-	}
-	character, err := s.store.UpdateCharacterState(session.CharacterID, persistZoneID, persistX, persistY, persistZ)
-	s.recordPersistenceDuration("character_state_disconnect", persistStartedAt, err)
+			persistStartedAt := time.Now()
+			persistZoneID, persistX, persistY, persistZ := session.ZoneID, session.X, session.Y, session.Z
+			if session.InstanceID != "" {
+				if instance := s.dungeonInstances[session.InstanceID]; instance != nil {
+					delete(instance.PlayersInside, session.CharacterID)
+					s.markDungeonEmptyIfNeededLocked(instance)
+				}
+				persistZoneID, persistX, persistY, persistZ = session.ReturnZoneID, session.ReturnX, session.ReturnY, session.ReturnZ
+				if persistZoneID == "" {
+					persistZoneID, persistX, persistY, persistZ = secondZoneID, 590, 342, 0
+				}
+			}
+			character, err := s.store.UpdateCharacterState(session.CharacterID, persistZoneID, persistX, persistY, persistZ)
+			s.recordPersistenceDuration("character_state_disconnect", persistStartedAt, err)
+			if err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "character_save_failed", err.Error())
+			}
+
+			observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
+				"reason":            "disconnect",
+				"worldSessionToken": session.Token,
+				"accountId":         session.AccountID,
+				"characterId":       session.CharacterID,
+				"zoneId":            character.ZoneID,
+				"x":                 character.PositionX,
+				"y":                 character.PositionY,
+				"z":                 character.PositionZ,
+			})
+			observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
+				"aggregateKind": "character",
+				"aggregateId":   character.ID,
+				"reason":        "disconnect",
+			})
+			s.syncStonewakeStateLocked(state, session)
+			s.metrics.recordSessionEvent("disconnect_succeeded")
+			return stonewakeHTTPResponse{Status: http.StatusOK, Body: map[string]bool{"ok": true}}, nil
+		})
 	if err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "character_save_failed", err.Error())
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	observability.LogEvent("world-service", observability.EventWorldCharacterSaved, map[string]any{
-		"reason":            "disconnect",
-		"worldSessionToken": session.Token,
-		"accountId":         session.AccountID,
-		"characterId":       session.CharacterID,
-		"zoneId":            character.ZoneID,
-		"x":                 character.PositionX,
-		"y":                 character.PositionY,
-		"z":                 character.PositionZ,
-	})
-	observability.LogEvent("world-service", observability.EventPersistenceSnapshotSaved, map[string]any{
-		"aggregateKind": "character",
-		"aggregateId":   character.ID,
-		"reason":        "disconnect",
-	})
-
-	s.metrics.recordSessionEvent("disconnect_succeeded")
-	httpapi.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleActionBarMove(w http.ResponseWriter, r *http.Request) {
@@ -551,26 +599,20 @@ func (s *worldServer) handleActionBarMove(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandUpdateActionBar,
+		request.WorldSessionToken,
+		map[string]any{"fromSlotIndex": request.FromSlotIndex, "toSlotIndex": request.ToSlotIndex},
+		"action_bar_move_failed",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.moveActionBarSlotLocked(session, request.FromSlotIndex, request.ToSlotIndex)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.moveActionBarSlotLocked(session, request.FromSlotIndex, request.ToSlotIndex); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "action_bar_move_failed", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleInventoryMove(w http.ResponseWriter, r *http.Request) {
@@ -580,26 +622,20 @@ func (s *worldServer) handleInventoryMove(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandMoveInventoryItem,
+		request.WorldSessionToken,
+		map[string]any{"fromSlotIndex": request.FromSlotIndex, "toSlotIndex": request.ToSlotIndex},
+		"inventory_move_failed",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.moveInventorySlotLocked(session, request.FromSlotIndex, request.ToSlotIndex)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.moveInventorySlotLocked(session, request.FromSlotIndex, request.ToSlotIndex); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "inventory_move_failed", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleInventoryEquip(w http.ResponseWriter, r *http.Request) {
@@ -609,26 +645,20 @@ func (s *worldServer) handleInventoryEquip(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandMoveInventoryItem,
+		request.WorldSessionToken,
+		map[string]any{"slotIndex": request.SlotIndex, "equip": true},
+		"inventory_equip_failed",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.equipInventorySlotLocked(session, request.SlotIndex)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.equipInventorySlotLocked(session, request.SlotIndex); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "inventory_equip_failed", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleLootInspect(w http.ResponseWriter, r *http.Request) {
@@ -750,26 +780,24 @@ func (s *worldServer) handleTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	kind := worldloop.CommandSelectTarget
+	if request.TargetID == "" {
+		kind = worldloop.CommandClearTarget
+	}
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		kind,
+		request.WorldSessionToken,
+		map[string]any{"targetId": request.TargetID},
+		"target_invalid",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.setTargetLocked(session, request.TargetID)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.setTargetLocked(session, request.TargetID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "target_invalid", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleQuestAccept(w http.ResponseWriter, r *http.Request) {
@@ -779,26 +807,20 @@ func (s *worldServer) handleQuestAccept(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandAcceptQuest,
+		request.WorldSessionToken,
+		map[string]any{"questId": request.QuestID},
+		"quest_invalid",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.acceptQuestLocked(session, request.QuestID)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.acceptQuestLocked(session, request.QuestID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "quest_invalid", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleQuestComplete(w http.ResponseWriter, r *http.Request) {
@@ -808,26 +830,20 @@ func (s *worldServer) handleQuestComplete(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandProgressQuestObjective,
+		request.WorldSessionToken,
+		map[string]any{"questId": request.QuestID, "complete": true},
+		"quest_complete_invalid",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.completeQuestLocked(session, request.QuestID)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.completeQuestLocked(session, request.QuestID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "quest_complete_invalid", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleQuestTrack(w http.ResponseWriter, r *http.Request) {
@@ -837,45 +853,53 @@ func (s *worldServer) handleQuestTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	response, err := s.submitStonewakeHTTPCommand(
+		r.Context(),
+		worldloop.CommandProgressQuestObjective,
+		request.WorldSessionToken,
+		"",
+		map[string]any{"questId": request.QuestID, "tracked": request.Tracked},
+		func(state *worldloop.ShardState) (stonewakeHTTPResponse, error) {
+			s.mutex.Lock()
+			defer s.mutex.Unlock()
 
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
-		return
-	}
+			if err := s.advanceWorldLocked(time.Now()); err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "world_advance_failed", err.Error())
+			}
 
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
+			session, ok := s.sessionsByToken[request.WorldSessionToken]
+			if !ok {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusNotFound, "world_session_missing", "World session token was not found.")
+			}
 
-	quest, found := s.quests[request.QuestID]
-	if !found {
-		httpapi.Error(w, http.StatusBadRequest, "quest_invalid", "Quest is not available.")
-		return
-	}
-	progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
-	if request.Tracked && progress.State != questStateActive && progress.State != questStateCompleted {
-		httpapi.Error(w, http.StatusBadRequest, "quest_tracking_invalid", "Only active or ready-to-turn-in quests can be tracked.")
-		return
-	}
+			quest, found := s.quests[request.QuestID]
+			if !found {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusBadRequest, "quest_invalid", "Quest is not available.")
+			}
+			progress := s.normalizeQuestProgress(quest, session.QuestProgress[quest.ID])
+			if request.Tracked && progress.State != questStateActive && progress.State != questStateCompleted {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusBadRequest, "quest_tracking_invalid", "Only active or ready-to-turn-in quests can be tracked.")
+			}
 
-	if request.Tracked {
-		s.trackQuestLocked(session, quest.ID)
-	} else {
-		s.untrackQuestLocked(session, quest.ID)
-	}
+			if request.Tracked {
+				s.trackQuestLocked(session, quest.ID)
+			} else {
+				s.untrackQuestLocked(session, quest.ID)
+			}
 
-	character, err := s.store.UpdateCharacterTrackedQuests(session.CharacterID, session.TrackedQuestIDs)
+			character, err := s.store.UpdateCharacterTrackedQuests(session.CharacterID, session.TrackedQuestIDs)
+			if err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "quest_tracking_save_failed", err.Error())
+			}
+			session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(character.TrackedQuestIDs, session.QuestProgress)
+			s.syncStonewakeStateLocked(state, session)
+			return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
+		})
 	if err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "quest_tracking_save_failed", err.Error())
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-	session.TrackedQuestIDs = s.normalizeTrackedQuestIDsLocked(character.TrackedQuestIDs, session.QuestProgress)
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleAutoAttack(w http.ResponseWriter, r *http.Request) {
@@ -885,26 +909,20 @@ func (s *worldServer) handleAutoAttack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandStartAutoAttack,
+		request.WorldSessionToken,
+		map[string]any{"enabled": request.Enabled},
+		"auto_attack_invalid",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.setAutoAttackLocked(session, request.Enabled)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.setAutoAttackLocked(session, request.Enabled); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "auto_attack_invalid", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleTrainerLearn(w http.ResponseWriter, r *http.Request) {
@@ -1059,26 +1077,20 @@ func (s *worldServer) handleActionBarAssign(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandUpdateActionBar,
+		request.WorldSessionToken,
+		map[string]any{"slotIndex": request.SlotIndex, "abilityId": request.AbilityID},
+		"action_bar_assign_invalid",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.assignActionBarSlotLocked(session, request.SlotIndex, request.AbilityID)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.assignActionBarSlotLocked(session, request.SlotIndex, request.AbilityID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "action_bar_assign_invalid", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleActionBarClear(w http.ResponseWriter, r *http.Request) {
@@ -1088,26 +1100,20 @@ func (s *worldServer) handleActionBarClear(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandUpdateActionBar,
+		request.WorldSessionToken,
+		map[string]any{"slotIndex": request.SlotIndex, "clear": true},
+		"action_bar_clear_invalid",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.clearActionBarSlotLocked(session, request.SlotIndex)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.clearActionBarSlotLocked(session, request.SlotIndex); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "action_bar_clear_invalid", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleAbility(w http.ResponseWriter, r *http.Request) {
@@ -1117,26 +1123,20 @@ func (s *worldServer) handleAbility(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandCastAbility,
+		request.WorldSessionToken,
+		map[string]any{"abilityId": request.AbilityID},
+		"ability_invalid",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.activateAbilityLocked(session, request.AbilityID)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[request.WorldSessionToken]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	if err := s.activateAbilityLocked(session, request.AbilityID); err != nil {
-		httpapi.Error(w, http.StatusBadRequest, "ability_invalid", err.Error())
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
@@ -1146,21 +1146,32 @@ func (s *worldServer) handleState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	response, err := s.submitStonewakeHTTPCommand(
+		r.Context(),
+		worldloop.CommandRequestSnapshot,
+		token,
+		"",
+		map[string]any{"worldSessionToken": token},
+		func(state *worldloop.ShardState) (stonewakeHTTPResponse, error) {
+			s.mutex.Lock()
+			defer s.mutex.Unlock()
 
-	if err := s.advanceWorldLocked(time.Now()); err != nil {
-		httpapi.Error(w, http.StatusInternalServerError, "world_advance_failed", err.Error())
+			if err := s.advanceWorldLocked(time.Now()); err != nil {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusInternalServerError, "world_advance_failed", err.Error())
+			}
+
+			session, ok := s.sessionsByToken[token]
+			if !ok {
+				return stonewakeHTTPResponse{}, newStonewakeCommandHTTPError(http.StatusNotFound, "world_session_missing", "World session token was not found.")
+			}
+			s.syncStonewakeStateLocked(state, session)
+			return stonewakeHTTPResponse{Status: http.StatusOK, Body: s.buildResponse(session)}, nil
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
 		return
 	}
-
-	session, ok := s.sessionsByToken[token]
-	if !ok {
-		httpapi.Error(w, http.StatusNotFound, "world_session_missing", "World session token was not found.")
-		return
-	}
-
-	httpapi.WriteJSON(w, http.StatusOK, s.buildResponse(session))
+	httpapi.WriteJSON(w, response.Status, response.Body)
 }
 
 func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {

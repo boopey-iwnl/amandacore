@@ -97,7 +97,11 @@ func (s *worldServer) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	counts := s.sessionCountsLocked()
 	s.mutex.Unlock()
 
-	httpapi.WriteJSON(w, http.StatusOK, s.metrics.snapshot(counts))
+	snapshot := s.metrics.snapshot(counts)
+	if s.stonewakeLoop != nil {
+		snapshot["stonewakeLoop"] = s.stonewakeLoop.Metrics()
+	}
+	httpapi.WriteJSON(w, http.StatusOK, snapshot)
 }
 
 func (s *worldServer) sessionCountsLocked() worldSessionCounts {
