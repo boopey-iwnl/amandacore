@@ -2,7 +2,7 @@
 
 ## Status
 
-The relational store is available for Milestone 2 and Milestone 3 tests and local experiments only. AmandaCore services still default to the existing file-backed `platform-state.json` path.
+The relational store is available for Milestone 2, Milestone 3, and Milestone 7 tests and local experiments only. AmandaCore services still default to the existing file-backed `platform-state.json` path.
 
 ## Run Migration And Repository Tests
 
@@ -19,6 +19,14 @@ Focused Milestone 3 transactional character-state tests:
 ```powershell
 Push-Location Services
 go test ./internal/store/sqlstore -run "TestTransactional|TestConcurrentInventoryGrants" -count=1
+Pop-Location
+```
+
+Focused Milestone 7 social/economy tests:
+
+```powershell
+Push-Location Services
+go test ./internal/store/sqlstore -run "TestSocial|TestConcurrentParty|TestEconomy|TestConcurrentAuction" -count=1
 Pop-Location
 ```
 
@@ -60,7 +68,7 @@ Re-running migrations is a no-op. Editing a migration after it has been applied 
 
 Milestone 2 does not add `AMANDACORE_STORE_BACKEND` or `AMANDACORE_SQLITE_PATH` to service startup. That selector is intentionally deferred so Alpha 0.15 gameplay and local service scripts keep the existing file-backed behavior.
 
-Milestone 3 does not add runtime backend selection. SQLite remains test-only through the `sqlstore` package.
+Milestone 3 and Milestone 7 do not add runtime backend selection. SQLite remains test-only through the `sqlstore` package.
 
 ## Transactional Character-State Behavior
 
@@ -69,6 +77,12 @@ The SQL store supports transaction-wrapped character-state mutations for invento
 Retryable callers can pass `MutationOptions.MutationKey`. The store records the normalized character response in `ac_character_state_mutations` and replays that response for the same character, operation, and key instead of applying duplicate rewards or item grants.
 
 Character rows use `state_version` for optimistic conflict detection. Collection rows include version/timestamp columns for later finer-grained updates.
+
+## Transactional Social And Economy Behavior
+
+The SQL store supports transaction-wrapped social/economy foundations for friends, ignores, party invite accept, guild invite accept, chat message persistence, currency ledger entries, vendor buy/sell, auction list/buy/cancel, mail creation, and mail attachment claim.
+
+Retry-sensitive social/economy methods use mutation keys and relational uniqueness constraints to prevent duplicated memberships, duplicated currency, duplicated auction settlement, and duplicated mail claims under retry or concurrent operation.
 
 ## Seed Fixtures
 
@@ -82,7 +96,7 @@ These helpers use fake local/test values only. They do not read secrets and do n
 
 ## Rollback
 
-Milestone 2 and Milestone 3 do not migrate runtime data. If a local SQLite experiment fails, discard the test database file and continue using `platform-state.json`.
+Milestone 2, Milestone 3, and Milestone 7 do not migrate runtime data. If a local SQLite experiment fails, discard the test database file and continue using `platform-state.json`.
 
 If later milestones enable SQL service startup, capture the migration status and back up the database before any import or cutover. Do not mix file-store and SQL writers for the same runtime environment.
 

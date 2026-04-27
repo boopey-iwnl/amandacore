@@ -4,7 +4,7 @@
 
 AmandaCore's local file-backed store is useful for development, but the next backend milestones need stronger storage guarantees: durable transactions, uniqueness constraints, replayable migration history, cleaner repository boundaries, and a path toward multi-process service reliability.
 
-Milestone 2 introduced the relational foundation while preserving the current playable Alpha flow. Milestone 3 adds transactional character-state behavior on that foundation. Milestone 4 routes the Stonewake world hot path through a single-writer loop before any broad runtime SQL cutover. The existing file store remains the default service path.
+Milestone 2 introduced the relational foundation while preserving the current playable Alpha flow. Milestone 3 adds transactional character-state behavior on that foundation. Milestone 4 routes the Stonewake world hot path through a single-writer loop before any broad runtime SQL cutover. Milestone 7 adds SQL-backed social and economy transaction foundations. The existing file store remains the default service path.
 
 ## What Milestone 2 Implements
 
@@ -33,6 +33,12 @@ Milestone 4 adds an authoritative Stonewake loop for current world-service hot p
 This loop owns command ordering, emits loop/replay/snapshot observability events, records in-memory replay entries, and keeps the existing HTTP response contract stable. It does not make SQL the runtime default and does not remove the file-backed store.
 
 Milestone 5 adds command and replay coverage for combat, threat, loot, quest progression, quest rewards, item grants, and currency deltas. Loot inspect/claim and quest reward completion now have explicit loop command names while the current file-backed runtime persistence path remains intact.
+
+## What Milestone 7 Implements
+
+Milestone 7 adds SQL social/economy persistence foundations for friends, ignores, party invites and membership, guild invites and membership, chat messages, currency ledger mutations, vendor buy/sell transactions, auction list/buy/cancel flows, mail messages, mail attachment claims, idempotency records, and transfer audit rows.
+
+The active runtime remains file-backed. The new SQL behavior is validated through repository tests and is intended for later staged service cutover.
 
 ## What Remains On File Store
 
@@ -66,6 +72,7 @@ The new SQL store is a foundation and test adapter until a later milestone expli
 - migration history
 - unit-of-work transactions
 - transactional character-state mutations
+- social, ignore, party, guild, chat, currency, and economy repository boundaries
 
 These interfaces are AmandaCore-owned boundaries. They intentionally describe current service behavior instead of copying another MMO server's modules, table layout, or packet model.
 
@@ -79,6 +86,8 @@ The relational schema uses AmandaCore `ac_*` table names:
 - world session state: `ac_world_join_tickets`, `ac_world_sessions`, `ac_character_position_snapshots`
 - events and audit: `ac_domain_events`, `ac_audit_events`
 - transactional state: `ac_character_state_mutations`
+- social state: `ac_friend_links`, `ac_ignore_links`, `ac_parties`, `ac_party_members`, `ac_party_invites`, `ac_guilds`, `ac_guild_members`, `ac_guild_invites`, `ac_chat_messages`, `ac_social_mutations`
+- economy and mail state: `ac_currency_ledger`, `ac_auction_listings`, `ac_auction_transactions`, `ac_vendor_transactions`, `ac_economy_mutations`, `ac_mail_messages`, `ac_mail_attachments`, `ac_transfer_audit_events`
 - migration metadata: `ac_schema_migrations`
 
 Some character subdocuments remain JSON columns temporarily where the service aggregate is still broader than the Milestone 2 cutover scope. Later milestones should normalize only when a caller and transaction boundary are ready.
@@ -111,6 +120,8 @@ Character-state SQL mutations run in one transaction, update the character row w
 
 Current idempotent operations include inventory grants, quest accept/progress/reward, learned ability grants, and action-bar/inventory mutations when callers provide `MutationOptions.MutationKey`.
 
+Milestone 7 extends the same pattern to SQL social/economy foundations. Party and guild invite accepts, currency ledger mutations, vendor buy/sell, auction list/buy/cancel, and mail attachment claim flows either replay, reject safely, or roll back without partial item, currency, membership, or listing state.
+
 ## Later Runtime Cutover Plan
 
 Runtime cutover should convert service callers in narrow slices:
@@ -120,7 +131,8 @@ Runtime cutover should convert service callers in narrow slices:
 3. Move character create/select/update behind `CharacterRepository`.
 4. Move inventory, quest, learned ability, combat reward, loot claim, and action-bar mutations behind dedicated repositories.
 5. Gradually move loop-backed world commands from file-store persistence to the transactional repositories where the authority boundary is already explicit.
-6. Add a file-state import or reset runbook before any production cutover.
+6. Move social/economy HTTP handlers behind the new repositories only after backend selection, import/reset behavior, and human tests are ready.
+7. Add a file-state import or reset runbook before any production cutover.
 
 ## Rollback And Corruption Considerations
 
