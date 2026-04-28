@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/dialogue-v1.schema.json",
+  "title": "AmandaCore Dialogue Catalog v1",
+  "type": "object",
+  "required": ["dialogues"],
+  "additionalProperties": false,
+  "properties": {
+    "dialogues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dialogue_id", "entries"],
+        "properties": {
+          "dialogue_id": { "$ref": "#/$defs/content_id" },
+          "speaker_id": { "$ref": "#/$defs/content_id" },
+          "entries": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["entry_id", "text"],
+              "properties": {
+                "entry_id": { "$ref": "#/$defs/content_id" },
+                "text": { "type": "string", "minLength": 1 },
+                "next_entry_ids": { "$ref": "#/$defs/id_list" },
+                "hook_binding_ids": { "$ref": "#/$defs/id_list" },
+                "tags": { "$ref": "#/$defs/string_list" }
+              }
+            }
+          },
+          "tags": { "$ref": "#/$defs/string_list" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "id_list": { "type": "array", "items": { "$ref": "#/$defs/content_id" }, "uniqueItems": true },
+    "string_list": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }
+}

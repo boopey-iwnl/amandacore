@@ -120,3 +120,7 @@ The snapshot, delta, cursor, acknowledgement, changed-field, and convergence mod
 - Social and economy systems still use separate request/response state models.
 - Future mail, auction, party, and guild transactionality will need their own versioning and acknowledgement rules.
 - HTTP polling still returns full payloads, so delta-size metrics are useful but not yet representative of a push transport.
+
+## Milestone 8 Content Boundary Note
+
+The content compiler does not change the replication contract. Package version and catalog data remain server-side runtime inputs unless a future endpoint deliberately exposes them. If future clients need content manifest metadata, it should be added as optional replication or bootstrap metadata with stale-version handling and contract fixtures.

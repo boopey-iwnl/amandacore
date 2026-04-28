@@ -1,0 +1,55 @@
+{
+  "hook_bindings": [
+    {
+      "binding_id": "hook_dev_first_hunt_accept",
+      "hook": "on_quest_accept",
+      "source_id": "dev_first_hunt",
+      "priority": 10,
+      "enabled": true,
+      "actions": [
+        {
+          "action": "emit_event",
+          "event_name": "dev.first_hunt.accepted"
+        }
+      ],
+      "tags": [
+        "dev",
+        "quest"
+      ]
+    },
+    {
+      "binding_id": "hook_dev_stalker_defeated",
+      "hook": "on_npc_defeated",
+      "source_id": "dev_isle_stalker",
+      "priority": 20,
+      "enabled": true,
+      "actions": [
+        {
+          "action": "progress_quest_objective",
+          "target_id": "dev_first_hunt",
+          "quantity": 1
+        }
+      ],
+      "tags": [
+        "dev",
+        "combat"
+      ]
+    },
+    {
+      "binding_id": "hook_dev_loot_claimed",
+      "hook": "on_loot_claimed",
+      "source_id": "dev_isle_stalker_cache",
+      "priority": 30,
+      "enabled": true,
+      "actions": [
+        {
+          "action": "none"
+        }
+      ],
+      "tags": [
+        "dev",
+        "loot"
+      ]
+    }
+  ]
+}

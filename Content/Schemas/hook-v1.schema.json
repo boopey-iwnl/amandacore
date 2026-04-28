@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/hook-v1.schema.json",
+  "title": "AmandaCore Hook Binding Catalog v1",
+  "type": "object",
+  "required": ["hook_bindings"],
+  "additionalProperties": false,
+  "properties": {
+    "hook_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["binding_id", "hook", "source_id", "actions"],
+        "properties": {
+          "binding_id": { "$ref": "#/$defs/content_id" },
+          "hook": {
+            "enum": [
+              "on_npc_interact",
+              "on_quest_accept",
+              "on_quest_objective_progress",
+              "on_quest_complete",
+              "on_quest_reward_claim",
+              "on_npc_defeated",
+              "on_loot_generated",
+              "on_loot_claimed",
+              "on_vendor_buy",
+              "on_vendor_sell",
+              "on_trainer_learn",
+              "on_zone_enter",
+              "on_landmark_enter"
+            ]
+          },
+          "source_id": { "$ref": "#/$defs/content_id" },
+          "priority": { "type": "integer" },
+          "enabled": { "type": "boolean" },
+          "actions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["action"],
+              "properties": {
+                "action": {
+                  "enum": [
+                    "none",
+                    "emit_event",
+                    "progress_quest_objective",
+                    "grant_item",
+                    "grant_currency",
+                    "show_dialogue",
+                    "unlock_trainer_ability"
+                  ]
+                },
+                "target_id": { "$ref": "#/$defs/content_id" },
+                "quantity": { "type": "integer" },
+                "event_name": { "$ref": "#/$defs/content_id" },
+                "message": { "type": "string" }
+              }
+            }
+          },
+          "tags": { "$ref": "#/$defs/string_list" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "string_list": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }
+}

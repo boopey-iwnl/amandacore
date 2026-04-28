@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/quest-v1.schema.json",
+  "title": "AmandaCore Quest Catalog v1",
+  "type": "object",
+  "required": ["quests"],
+  "additionalProperties": false,
+  "properties": {
+    "quests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["quest_id", "display_name", "summary", "objective_graph"],
+        "additionalProperties": false,
+        "properties": {
+          "quest_id": { "$ref": "#/$defs/content_id" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "required_level": { "type": "integer", "minimum": 0 },
+          "prerequisite_quest_ids": { "$ref": "#/$defs/id_list" },
+          "objective_graph": {
+            "type": "object",
+            "required": ["nodes"],
+            "properties": {
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["node_id", "kind", "target_id", "required_count"],
+                  "properties": {
+                    "node_id": { "$ref": "#/$defs/content_id" },
+                    "kind": { "enum": ["kill_npc", "collect_item", "talk_provider"] },
+                    "target_id": { "$ref": "#/$defs/content_id" },
+                    "required_count": { "type": "integer", "minimum": 1 },
+                    "depends_on": { "$ref": "#/$defs/id_list" }
+                  }
+                },
+                "minItems": 1
+              }
+            }
+          },
+          "rewards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["item_id", "quantity"],
+              "properties": {
+                "item_id": { "$ref": "#/$defs/content_id" },
+                "quantity": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "tags": { "$ref": "#/$defs/string_list" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "id_list": { "type": "array", "items": { "$ref": "#/$defs/content_id" }, "uniqueItems": true },
+    "string_list": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }
+}
