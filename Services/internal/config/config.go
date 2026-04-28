@@ -13,43 +13,47 @@ import (
 )
 
 type ServiceConfig struct {
-	ServiceName       string
-	Host              string
-	Port              string
-	Environment       string
-	StoreBackend      string
-	StorePath         string
-	SQLitePath        string
-	LocalSeedFile     string
-	AdminSeedUsername string
-	AdminSeedPassword string
-	AdminToolsEnabled bool
-	BuildID           string
-	WorldEndpoint     string
+	ServiceName                string
+	Host                       string
+	Port                       string
+	Environment                string
+	StoreBackend               string
+	StorePath                  string
+	SQLitePath                 string
+	RequireMigrations          bool
+	AllowFileStoreInProduction bool
+	LocalSeedFile              string
+	AdminSeedUsername          string
+	AdminSeedPassword          string
+	AdminToolsEnabled          bool
+	BuildID                    string
+	WorldEndpoint              string
 }
 
 func Load(serviceName string, defaultPort string) ServiceConfig {
-	environment := valueOrDefault("AMANDACORE_ENVIRONMENT", "development")
+	environment := firstValueOrDefault("local", "AMANDACORE_ENV", "AMANDACORE_ENVIRONMENT")
 	localSeedFile := valueOrDefault("AMANDACORE_LOCAL_SEED_FILE", filepath.Clean(".secrets/amandacore.dev.env"))
 	if !isProductionEnvironment(environment) {
 		loadEnvFileIfPresent(localSeedFile)
-		environment = valueOrDefault("AMANDACORE_ENVIRONMENT", environment)
+		environment = firstValueOrDefault(environment, "AMANDACORE_ENV", "AMANDACORE_ENVIRONMENT")
 	}
 
 	return ServiceConfig{
-		ServiceName:       serviceName,
-		Host:              valueOrDefault("AMANDACORE_SERVICE_HOST", "127.0.0.1"),
-		Port:              valueOrDefault("AMANDACORE_SERVICE_PORT", defaultPort),
-		Environment:       environment,
-		StoreBackend:      valueOrDefault("AMANDACORE_STORE_BACKEND", "file"),
-		StorePath:         valueOrDefault("AMANDACORE_STORE_PATH", defaultStorePath()),
-		SQLitePath:        os.Getenv("AMANDACORE_SQLITE_PATH"),
-		LocalSeedFile:     localSeedFile,
-		AdminSeedUsername: valueOrDefault("AMANDACORE_ADMIN_SEED_USERNAME", "amanda"),
-		AdminSeedPassword: os.Getenv("AMANDACORE_ADMIN_SEED_PASSWORD"),
-		AdminToolsEnabled: adminToolsEnabled(environment),
-		BuildID:           valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-alpha-0.1-local"),
-		WorldEndpoint:     valueOrDefault("AMANDACORE_WORLD_ENDPOINT", "http://127.0.0.1:8085"),
+		ServiceName:                serviceName,
+		Host:                       valueOrDefault("AMANDACORE_SERVICE_HOST", "127.0.0.1"),
+		Port:                       valueOrDefault("AMANDACORE_SERVICE_PORT", defaultPort),
+		Environment:                environment,
+		StoreBackend:               valueOrDefault("AMANDACORE_STORE_BACKEND", "file"),
+		StorePath:                  valueOrDefault("AMANDACORE_STORE_PATH", defaultStorePath()),
+		SQLitePath:                 os.Getenv("AMANDACORE_SQLITE_PATH"),
+		RequireMigrations:          boolValueOrDefault("AMANDACORE_REQUIRE_MIGRATIONS", defaultRequireMigrations(environment)),
+		AllowFileStoreInProduction: boolValueOrDefault("AMANDACORE_ALLOW_FILE_STORE_IN_PRODUCTION", false),
+		LocalSeedFile:              localSeedFile,
+		AdminSeedUsername:          valueOrDefault("AMANDACORE_ADMIN_SEED_USERNAME", "amanda"),
+		AdminSeedPassword:          os.Getenv("AMANDACORE_ADMIN_SEED_PASSWORD"),
+		AdminToolsEnabled:          adminToolsEnabled(environment),
+		BuildID:                    valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-alpha-0.1-local"),
+		WorldEndpoint:              valueOrDefault("AMANDACORE_WORLD_ENDPOINT", "http://127.0.0.1:8085"),
 	}
 }
 
@@ -89,9 +93,15 @@ func (c ServiceConfig) Validate() error {
 		if strings.TrimSpace(c.StorePath) == "" {
 			validationErrors = append(validationErrors, errors.New("AMANDACORE_STORE_PATH is required for file store backend"))
 		}
+		if isCutoverGuardedEnvironment(c.Environment) && !c.AllowFileStoreInProduction {
+			validationErrors = append(validationErrors, errors.New("file store backend is not allowed in staging or production unless AMANDACORE_ALLOW_FILE_STORE_IN_PRODUCTION=true"))
+		}
 	case "sqlite":
 		if strings.TrimSpace(c.SQLitePath) == "" {
 			validationErrors = append(validationErrors, errors.New("AMANDACORE_SQLITE_PATH is required for sqlite store backend"))
+		}
+		if isCutoverGuardedEnvironment(c.Environment) && !c.RequireMigrations {
+			validationErrors = append(validationErrors, errors.New("staging and production sqlite backends require AMANDACORE_REQUIRE_MIGRATIONS=true"))
 		}
 	default:
 		validationErrors = append(validationErrors, fmt.Errorf("unsupported store backend %q", c.StoreBackend))
@@ -148,9 +158,26 @@ func adminToolsEnabled(environment string) bool {
 	}
 }
 
+func (c ServiceConfig) NormalizedEnvironment() string {
+	return strings.ToLower(strings.TrimSpace(c.Environment))
+}
+
+func (c ServiceConfig) NormalizedStoreBackend() string {
+	return strings.ToLower(strings.TrimSpace(c.StoreBackend))
+}
+
 func isKnownEnvironment(environment string) bool {
 	switch strings.ToLower(strings.TrimSpace(environment)) {
 	case "development", "dev", "local", "test", "testing", "staging", "stage", "production", "prod":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCutoverGuardedEnvironment(environment string) bool {
+	switch strings.ToLower(strings.TrimSpace(environment)) {
+	case "staging", "stage", "production", "prod":
 		return true
 	default:
 		return false
@@ -164,6 +191,10 @@ func isProductionEnvironment(environment string) bool {
 	default:
 		return false
 	}
+}
+
+func defaultRequireMigrations(environment string) bool {
+	return isCutoverGuardedEnvironment(environment)
 }
 
 func isWeakSecret(value string) bool {
@@ -208,6 +239,28 @@ func valueOrDefault(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func firstValueOrDefault(fallback string, keys ...string) string {
+	for _, key := range keys {
+		value := os.Getenv(key)
+		if value != "" {
+			return value
+		}
+	}
+	return fallback
+}
+
+func boolValueOrDefault(key string, fallback bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	switch value {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func defaultStorePath() string {

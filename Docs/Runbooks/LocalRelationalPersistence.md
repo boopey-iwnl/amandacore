@@ -66,9 +66,15 @@ Re-running migrations is a no-op. Editing a migration after it has been applied 
 
 ## Store Backend Configuration
 
-Milestone 2 does not add `AMANDACORE_STORE_BACKEND` or `AMANDACORE_SQLITE_PATH` to service startup. That selector is intentionally deferred so Alpha 0.15 gameplay and local service scripts keep the existing file-backed behavior.
+Milestone 10 adds explicit configuration keys for cutover validation:
 
-Milestone 3 and Milestone 7 do not add runtime backend selection. SQLite remains test-only through the `sqlstore` package.
+- `AMANDACORE_ENV=local|staging|production`
+- `AMANDACORE_STORE_BACKEND=file|sqlite`
+- `AMANDACORE_SQLITE_PATH=<path>`
+- `AMANDACORE_REQUIRE_MIGRATIONS=true|false`
+- `AMANDACORE_ALLOW_FILE_STORE_IN_PRODUCTION=false`
+
+Local gameplay still defaults to `file`. Staging and production reject file-backed storage unless explicitly overridden. SQLite can be selected for migration status/check/apply tooling, and service startup verifies SQLite migration state before refusing runtime use because the HTTP route adapters still depend on `FileStore`.
 
 ## Transactional Character-State Behavior
 
@@ -98,7 +104,7 @@ These helpers use fake local/test values only. They do not read secrets and do n
 
 Milestone 2, Milestone 3, and Milestone 7 do not migrate runtime data. If a local SQLite experiment fails, discard the test database file and continue using `platform-state.json`.
 
-If later milestones enable SQL service startup, capture the migration status and back up the database before any import or cutover. Do not mix file-store and SQL writers for the same runtime environment.
+Before later milestones enable SQL service startup, capture the migration status and back up the database before any import or cutover. Do not mix file-store and SQL writers for the same runtime environment.
 
 ## Clean-Room Boundary
 

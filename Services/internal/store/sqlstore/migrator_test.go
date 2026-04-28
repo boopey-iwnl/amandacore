@@ -64,6 +64,49 @@ func TestMigratorDetectsChecksumMismatch(t *testing.T) {
 	}
 }
 
+func TestMigratorCheckReportsPendingOnCleanDatabase(t *testing.T) {
+	store, err := OpenWithOptions(filepath.Join(t.TempDir(), "pending.sqlite"), OpenOptions{ApplyMigrations: false})
+	if err != nil {
+		t.Fatalf("failed to open sqlite db: %v", err)
+	}
+	defer store.Close()
+
+	migrator, err := store.Migrator()
+	if err != nil {
+		t.Fatalf("failed to create migrator: %v", err)
+	}
+	check, err := migrator.Check(context.Background())
+	if err != nil {
+		t.Fatalf("check failed: %v", err)
+	}
+	if len(check.Pending) != len(migrator.Migrations()) {
+		t.Fatalf("expected all migrations pending, got %#v", check)
+	}
+	if len(check.Applied) != 0 {
+		t.Fatalf("expected no applied migrations, got %#v", check)
+	}
+}
+
+func TestMigratorCheckDetectsChecksumMismatch(t *testing.T) {
+	store := newTestStore(t)
+
+	if _, err := store.DB().Exec(`UPDATE ac_schema_migrations SET checksum = 'changed' WHERE id = '000001'`); err != nil {
+		t.Fatalf("failed to corrupt checksum: %v", err)
+	}
+
+	migrator, err := store.Migrator()
+	if err != nil {
+		t.Fatalf("failed to create migrator: %v", err)
+	}
+	check, err := migrator.Check(context.Background())
+	if !errors.Is(err, ErrChecksumMismatch) {
+		t.Fatalf("expected checksum mismatch, got %v", err)
+	}
+	if len(check.ChecksumMismatches) != 1 || check.ChecksumMismatches[0].ID != "000001" {
+		t.Fatalf("expected mismatch for 000001, got %#v", check)
+	}
+}
+
 func TestMigratorStatusReturnsAppliedMigrations(t *testing.T) {
 	store := newTestStore(t)
 

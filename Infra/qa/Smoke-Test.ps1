@@ -392,7 +392,12 @@ Test-PathRequired -Name "Alpha package script" -Path (Join-Path $repoRoot "Infra
 foreach ($script in @(
     @{ Name = "diagnostics"; Path = Join-Path $PSScriptRoot "Collect-Diagnostics.ps1" },
     @{ Name = "seed account"; Path = Join-Path $PSScriptRoot "Seed-TestAccount.ps1" },
-    @{ Name = "reset state"; Path = Join-Path $PSScriptRoot "Reset-LocalTestState.ps1" }
+    @{ Name = "reset state"; Path = Join-Path $PSScriptRoot "Reset-LocalTestState.ps1" },
+    @{ Name = "migration check"; Path = Join-Path $PSScriptRoot "Check-Migrations.ps1" },
+    @{ Name = "legacy state import"; Path = Join-Path $PSScriptRoot "Import-LegacyState.ps1" },
+    @{ Name = "release package assert"; Path = Join-Path $PSScriptRoot "Assert-ReleasePackage.ps1" },
+    @{ Name = "scale soak"; Path = Join-Path $PSScriptRoot "Run-ScaleSoak.ps1" },
+    @{ Name = "release candidate validation"; Path = Join-Path $PSScriptRoot "Validate-ReleaseCandidate.ps1" }
 )) {
     Test-PathRequired -Name "$($script.Name) script" -Path $script.Path
     Invoke-ScriptSelfTest -Name $script.Name -ScriptPath $script.Path

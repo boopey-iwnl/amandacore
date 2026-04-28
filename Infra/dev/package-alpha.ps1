@@ -2,9 +2,12 @@ param(
     [string]$OutputRoot = "",
     [string]$PackageName = "",
     [string]$Channel = "alpha-0.1-rc",
+    [string]$BuildLabel = "",
+    [string]$ReleaseNotesPath = "",
     [switch]$SkipBuild,
     [switch]$SkipArchive,
     [switch]$SkipSmoke,
+    [switch]$SkipPackageAssert,
     [switch]$AllowDirty
 )
 
@@ -16,9 +19,19 @@ $versionManifestScript = Join-Path $PSScriptRoot "write-version-manifest.ps1"
 $versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
 $smokeScript = Join-Path $repoRoot "Infra\qa\Smoke-Test.ps1"
 $forbiddenScanScript = Join-Path $repoRoot "Infra\qa\Scan-ForbiddenArtifacts.ps1"
+$packageAssertScript = Join-Path $repoRoot "Infra\qa\Assert-ReleasePackage.ps1"
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path ([System.IO.Path]::GetTempPath()) "AmandaCore\$Channel"
+}
+if ([string]::IsNullOrWhiteSpace($BuildLabel)) {
+    $BuildLabel = $Channel
+}
+if ([string]::IsNullOrWhiteSpace($ReleaseNotesPath)) {
+    $ReleaseNotesPath = Join-Path $repoRoot "Docs\QA\ReleaseNotes.md"
+}
+if (-not (Test-Path $ReleaseNotesPath)) {
+    throw "Release notes path is missing: $ReleaseNotesPath"
 }
 
 function Invoke-Native {
@@ -74,6 +87,19 @@ function Assert-ChildPath {
     }
 }
 
+function ConvertTo-LongPath {
+    param([string]$Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    if ($fullPath.StartsWith("\\?\", [System.StringComparison]::Ordinal)) {
+        return $fullPath
+    }
+    if ($fullPath.StartsWith("\\", [System.StringComparison]::Ordinal)) {
+        return "\\?\UNC\" + $fullPath.Substring(2)
+    }
+    return "\\?\" + $fullPath
+}
+
 function ConvertTo-PackageSafeName {
     param([string]$Value)
     $safe = [regex]::Replace($Value.ToLowerInvariant(), "[^a-z0-9._-]+", "-").Trim("-")
@@ -118,16 +144,16 @@ function Copy-PackageFile {
     }
 
     $destination = Join-Path $script:stagingRoot $RelativePath
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+    [System.IO.Directory]::CreateDirectory((ConvertTo-LongPath (Split-Path -Parent $destination))) | Out-Null
 
     if ($ScrubRepoPath) {
         $content = Get-Content -Path $SourcePath -Raw
         $content = $content.Replace($repoRoot, "%AMANDACORE_PACKAGE_ROOT%")
         $content = $content.Replace($repoRoot.Replace("\", "\\"), "%AMANDACORE_PACKAGE_ROOT%")
-        Set-Content -Path $destination -Value $content -Encoding UTF8
+        [System.IO.File]::WriteAllText((ConvertTo-LongPath $destination), $content, [System.Text.UTF8Encoding]::new($false))
     }
     else {
-        Copy-Item -Path $SourcePath -Destination $destination -Force
+        [System.IO.File]::Copy((ConvertTo-LongPath $SourcePath), (ConvertTo-LongPath $destination), $true)
     }
 
     return $true
@@ -228,6 +254,37 @@ function Set-PackagedO3deBootstrapOffline {
     return $updated
 }
 
+function Get-PackageAssetDigest {
+    param([string]$PackageRoot)
+
+    $assetRoots = @("Content\Art", "Content\Packs", "Content\Schemas")
+    $files = @()
+    foreach ($assetRoot in $assetRoots) {
+        $fullRoot = Join-Path $PackageRoot $assetRoot
+        if (-not (Test-Path $fullRoot)) {
+            continue
+        }
+        Get-ChildItem -Path $fullRoot -Recurse -File -Force | Sort-Object FullName | ForEach-Object {
+            $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+            $files += [pscustomobject]@{
+                path = (Get-PackageRelativePath -Root $PackageRoot -Path $_.FullName).Replace("\", "/")
+                sha256 = $hash.Hash.ToLowerInvariant()
+                bytes = $_.Length
+            }
+        }
+    }
+
+    $digestPayload = ($files | ConvertTo-Json -Depth 4 -Compress)
+    $digestBytes = [System.Text.Encoding]::UTF8.GetBytes($digestPayload)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $digest = ([System.BitConverter]::ToString($sha.ComputeHash($digestBytes))).Replace("-", "").ToLowerInvariant()
+    [pscustomobject]@{
+        algorithm = "SHA256"
+        digest = $digest
+        files = $files
+    }
+}
+
 if (-not $SkipBuild) {
     & $buildScript
 }
@@ -248,9 +305,10 @@ if (Test-Path $forbiddenScanScript) {
 }
 
 $sourceBranch = Get-GitValue -Arguments @("branch", "--show-current") -Fallback "nogit"
-$sourceCommit = Get-GitValue -Arguments @("rev-parse", "--short=12", "HEAD") -Fallback "nogit"
+$sourceCommit = Get-GitValue -Arguments @("rev-parse", "HEAD") -Fallback "nogit"
+$sourceCommitShort = Get-GitValue -Arguments @("rev-parse", "--short=12", "HEAD") -Fallback "nogit"
 if ([string]::IsNullOrWhiteSpace($PackageName)) {
-    $PackageName = ConvertTo-PackageSafeName ("amandacore-" + $Channel + "-" + $sourceCommit)
+    $PackageName = ConvertTo-PackageSafeName ("amandacore-" + $Channel + "-" + $sourceCommitShort)
 }
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
@@ -310,12 +368,14 @@ foreach ($runtimePath in $runtimePaths) {
 }
 
 $packagedBootstrapFiles = Set-PackagedO3deBootstrapOffline -PackageRoot $script:stagingRoot
+$assetDigest = Get-PackageAssetDigest -PackageRoot $script:stagingRoot
 
 $packageManifest = [ordered]@{
     schemaVersion = 1
     packageName = $PackageName
     packageKind = "$Channel-release-candidate"
     channel = $Channel
+    buildLabel = $BuildLabel
     createdAtUtc = (Get-Date).ToUniversalTime().ToString("o")
     sourceBranch = $sourceBranch
     sourceCommit = $sourceCommit
@@ -326,6 +386,8 @@ $packageManifest = [ordered]@{
     sourceFilesCopied = 0
     runtimePaths = $runtimeSummary
     packagedBootstrapFiles = $packagedBootstrapFiles
+    releaseNotesPath = (Get-PackageRelativePath -Root $repoRoot -Path $ReleaseNotesPath).Replace("\", "/")
+    assetDigest = $assetDigest
     excludedAreas = @(
         ".git",
         ".secrets",
@@ -349,6 +411,20 @@ if (-not $SkipArchive) {
     Compress-Archive -Path (Join-Path $script:stagingRoot "*") -DestinationPath $archivePath -Force
     $hash = Get-FileHash -Path $archivePath -Algorithm SHA256
     "{0}  {1}" -f $hash.Hash.ToLowerInvariant(), (Split-Path -Leaf $archivePath) | Set-Content -Path $hashPath -Encoding ASCII
+}
+
+if (-not $SkipPackageAssert -and (Test-Path $packageAssertScript)) {
+    $assertArgs = @("-ReleaseNotesPath", $ReleaseNotesPath)
+    if ($SkipArchive) {
+        $assertArgs += @("-PackageRoot", $script:stagingRoot)
+    }
+    else {
+        $assertArgs += @("-ArchivePath", $archivePath)
+    }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $packageAssertScript @assertArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Release package assertion failed."
+    }
 }
 
 if (-not $SkipSmoke) {

@@ -3,6 +3,7 @@
 ## Source Control
 
 - Release source is on `main` only after approved merge from `develop`.
+- `develop` release-candidate validation passed with `Infra/qa/Validate-ReleaseCandidate.ps1`.
 - Tag creation is explicitly approved.
 - Release tag points to the source commit used to build the artifact.
 - No feature branch is deleted before proving it is merged and explicitly approving deletion.
@@ -13,7 +14,8 @@
 - O3DE client build and verification pass when applicable.
 - Forbidden artifact scanner passes.
 - Release package is built from the intended source commit.
-- Package manifest records source commit, version, channel, and build time.
+- Package manifest records source commit, source branch, build label, version, channel, build time, release notes path, and asset digest.
+- `Infra/qa/Assert-ReleasePackage.ps1` passes on the archive or clean extraction.
 - Package smoke passes on a clean extracted package.
 
 ## Artifact Contents
@@ -41,7 +43,17 @@
 
 ## Publish
 
-- Download the public artifact after publishing.
+- Create a draft prerelease first when practical.
+- Download the draft artifact before publishing.
 - Extract into a clean location.
 - Repeat package smoke and a short gameplay test.
 - Record package hash in release notes.
+- Publish only after final human approval.
+
+## Cutover
+
+- Local/dev file-store mode still works.
+- Staging/production file-store mode is rejected unless explicitly overridden.
+- SQLite migration status/check/apply commands pass on a test database.
+- Legacy state dry-run inventory has been reviewed if carrying forward local dev state.
+- Rollback path is documented for the candidate.
