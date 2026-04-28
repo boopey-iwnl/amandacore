@@ -72,6 +72,46 @@ func TestValidateRejectsUnsafeProductionDefaults(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsFileStoreInStagingWithoutOverride(t *testing.T) {
+	cfg := validTestConfig()
+	cfg.Environment = "staging"
+	cfg.AdminToolsEnabled = false
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "file store backend is not allowed") {
+		t.Fatalf("expected staging file-store rejection, got %v", err)
+	}
+}
+
+func TestValidateAcceptsExplicitStagingFileStoreOverride(t *testing.T) {
+	cfg := validTestConfig()
+	cfg.Environment = "staging"
+	cfg.AdminToolsEnabled = false
+	cfg.AllowFileStoreInProduction = true
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected explicit staging file-store override to validate, got %v", err)
+	}
+}
+
+func TestValidateRequiresMigrationsForProductionSQLite(t *testing.T) {
+	cfg := validTestConfig()
+	cfg.Environment = "production"
+	cfg.StoreBackend = "sqlite"
+	cfg.SQLitePath = t.TempDir() + "/amandacore.db"
+	cfg.StorePath = ""
+	cfg.AdminToolsEnabled = false
+	cfg.AdminSeedUsername = "ops-admin"
+	cfg.AdminSeedPassword = "long-enough-admin-secret"
+	cfg.LocalSeedFile = "ops.env"
+	cfg.RequireMigrations = false
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "require AMANDACORE_REQUIRE_MIGRATIONS=true") {
+		t.Fatalf("expected production sqlite migration requirement, got %v", err)
+	}
+}
+
 func TestValidateAcceptsSQLiteWhenPathProvided(t *testing.T) {
 	cfg := validTestConfig()
 	cfg.StoreBackend = "sqlite"
@@ -79,6 +119,22 @@ func TestValidateAcceptsSQLiteWhenPathProvided(t *testing.T) {
 
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("expected sqlite config to validate, got %v", err)
+	}
+}
+
+func TestLoadSupportsEnvironmentAlias(t *testing.T) {
+	t.Setenv("AMANDACORE_ENV", "staging")
+	t.Setenv("AMANDACORE_ALLOW_FILE_STORE_IN_PRODUCTION", "true")
+
+	cfg := Load("auth-service", "8081")
+	if cfg.Environment != "staging" {
+		t.Fatalf("expected AMANDACORE_ENV alias to win, got %q", cfg.Environment)
+	}
+	if !cfg.RequireMigrations {
+		t.Fatal("expected staging to require migrations by default")
+	}
+	if !cfg.AllowFileStoreInProduction {
+		t.Fatal("expected file-store override flag to parse")
 	}
 }
 

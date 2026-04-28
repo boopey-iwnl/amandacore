@@ -114,7 +114,7 @@ Milestone 7 adds separate SQL repository tests for social and economy transactio
 
 - No full authoritative world shard loop.
 - No SQL production cutover.
-- No service-wide `AMANDACORE_STORE_BACKEND` selector.
+- No writable SQL service runtime. Milestone 10 adds a guarded `AMANDACORE_STORE_BACKEND` selector for validation and migration checks only.
 - No runtime auction, guild, mail, or full economy cutover.
 - No external MMO schemas, table layouts, packet layouts, opcodes, IDs, command names, or module structures.
 

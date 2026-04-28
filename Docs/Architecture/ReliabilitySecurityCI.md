@@ -16,6 +16,8 @@ Local validation still uses `Infra/dev/build-local.ps1`, `Infra/dev/build-o3de-c
 
 `Infra/dev/package-alpha.ps1` and `Infra/qa/Smoke-Test.ps1` remain the release package path. Package gates must verify required launcher, Local Ops, client, runtime, content, icon, and manifest assets while excluding secrets, logs, local state, caches, diagnostics, nested archives, and local machine paths.
 
+Milestone 10 adds `Infra/qa/Assert-ReleasePackage.ps1` and `Infra/qa/Validate-ReleaseCandidate.ps1` so package assertions and release-candidate validation can run before any tag or public release is created.
+
 ## Current Config and Secret Handling
 
 Service startup now has explicit validation through `config.LoadValidated`. Local development defaults remain accepted. Production mode rejects local admin tools, local `.secrets` seed reliance, weak admin seed passwords, unsupported store backends, invalid service ports, and malformed world endpoints.
@@ -35,6 +37,8 @@ Milestone 9 adds stable security/reliability event names for login failures, rat
 ## Current Load/Soak Coverage
 
 Existing loadsim and loadtest-client flows cover movement, reconnect pressure, combat, abilities, quests, multizone traversal, and mixed client behavior. M9 documents short local reliability smoke usage and keeps longer soak runs opt-in.
+
+Milestone 10 wraps these paths with `Infra/qa/Run-ScaleSoak.ps1`, which keeps small defaults fast and makes longer HTTP/runtime soak explicit.
 
 ## Known Reliability Gaps
 

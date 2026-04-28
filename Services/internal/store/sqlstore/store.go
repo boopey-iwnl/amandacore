@@ -25,7 +25,15 @@ type Tx struct {
 	store *Store
 }
 
+type OpenOptions struct {
+	ApplyMigrations bool
+}
+
 func Open(path string) (*Store, error) {
+	return OpenWithOptions(path, OpenOptions{ApplyMigrations: true})
+}
+
+func OpenWithOptions(path string, options OpenOptions) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
@@ -36,14 +44,16 @@ func Open(path string) (*Store, error) {
 	}
 
 	store := New(db)
-	migrator, err := NewMigrator(db)
-	if err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	if _, err := migrator.Apply(context.Background()); err != nil {
-		_ = db.Close()
-		return nil, err
+	if options.ApplyMigrations {
+		migrator, err := NewMigrator(db)
+		if err != nil {
+			_ = db.Close()
+			return nil, err
+		}
+		if _, err := migrator.Apply(context.Background()); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
 	}
 	return store, nil
 }

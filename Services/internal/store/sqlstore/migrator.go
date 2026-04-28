@@ -20,11 +20,11 @@ var embeddedMigrations embed.FS
 var ErrChecksumMismatch = errors.New("sql migration checksum mismatch")
 
 type Migration struct {
-	ID       string
-	Name     string
-	Path     string
-	Checksum string
-	SQL      string
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Checksum string `json:"checksum"`
+	SQL      string `json:"-"`
 }
 
 type MigrationRecord struct {
@@ -41,9 +41,15 @@ type MigrationStatus struct {
 	Record    *MigrationRecord
 }
 
+type MigrationCheckResult struct {
+	Applied            []MigrationRecord `json:"applied"`
+	Pending            []Migration       `json:"pending"`
+	ChecksumMismatches []Migration       `json:"checksumMismatches"`
+}
+
 type MigrationResult struct {
-	Applied        []MigrationRecord
-	AlreadyApplied []MigrationRecord
+	Applied        []MigrationRecord `json:"applied"`
+	AlreadyApplied []MigrationRecord `json:"alreadyApplied"`
 }
 
 type Migrator struct {
@@ -106,6 +112,31 @@ func (m *Migrator) Status(ctx context.Context) ([]MigrationStatus, error) {
 		statuses = append(statuses, status)
 	}
 	return statuses, nil
+}
+
+func (m *Migrator) Check(ctx context.Context) (MigrationCheckResult, error) {
+	applied, err := m.appliedRecords(ctx)
+	if err != nil {
+		return MigrationCheckResult{}, err
+	}
+
+	result := MigrationCheckResult{}
+	for _, migration := range m.migrations {
+		record, ok := applied[migration.ID]
+		if !ok {
+			result.Pending = append(result.Pending, migration)
+			continue
+		}
+		if record.Checksum != migration.Checksum {
+			result.ChecksumMismatches = append(result.ChecksumMismatches, migration)
+			continue
+		}
+		result.Applied = append(result.Applied, record)
+	}
+	if len(result.ChecksumMismatches) > 0 {
+		return result, ErrChecksumMismatch
+	}
+	return result, nil
 }
 
 func (m *Migrator) AppliedRecords(ctx context.Context) ([]MigrationRecord, error) {
