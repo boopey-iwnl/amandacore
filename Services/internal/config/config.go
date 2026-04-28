@@ -2,9 +2,13 @@ package config
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -13,7 +17,9 @@ type ServiceConfig struct {
 	Host              string
 	Port              string
 	Environment       string
+	StoreBackend      string
 	StorePath         string
+	SQLitePath        string
 	LocalSeedFile     string
 	AdminSeedUsername string
 	AdminSeedPassword string
@@ -23,22 +29,96 @@ type ServiceConfig struct {
 }
 
 func Load(serviceName string, defaultPort string) ServiceConfig {
+	environment := valueOrDefault("AMANDACORE_ENVIRONMENT", "development")
 	localSeedFile := valueOrDefault("AMANDACORE_LOCAL_SEED_FILE", filepath.Clean(".secrets/amandacore.dev.env"))
-	loadEnvFileIfPresent(localSeedFile)
+	if !isProductionEnvironment(environment) {
+		loadEnvFileIfPresent(localSeedFile)
+		environment = valueOrDefault("AMANDACORE_ENVIRONMENT", environment)
+	}
 
 	return ServiceConfig{
 		ServiceName:       serviceName,
 		Host:              valueOrDefault("AMANDACORE_SERVICE_HOST", "127.0.0.1"),
 		Port:              valueOrDefault("AMANDACORE_SERVICE_PORT", defaultPort),
-		Environment:       valueOrDefault("AMANDACORE_ENVIRONMENT", "development"),
+		Environment:       environment,
+		StoreBackend:      valueOrDefault("AMANDACORE_STORE_BACKEND", "file"),
 		StorePath:         valueOrDefault("AMANDACORE_STORE_PATH", defaultStorePath()),
+		SQLitePath:        os.Getenv("AMANDACORE_SQLITE_PATH"),
 		LocalSeedFile:     localSeedFile,
 		AdminSeedUsername: valueOrDefault("AMANDACORE_ADMIN_SEED_USERNAME", "amanda"),
 		AdminSeedPassword: os.Getenv("AMANDACORE_ADMIN_SEED_PASSWORD"),
-		AdminToolsEnabled: adminToolsEnabled(valueOrDefault("AMANDACORE_ENVIRONMENT", "development")),
+		AdminToolsEnabled: adminToolsEnabled(environment),
 		BuildID:           valueOrDefault("AMANDACORE_BUILD_ID", "amandacore-alpha-0.1-local"),
 		WorldEndpoint:     valueOrDefault("AMANDACORE_WORLD_ENDPOINT", "http://127.0.0.1:8085"),
 	}
+}
+
+func LoadValidated(serviceName string, defaultPort string) (ServiceConfig, error) {
+	cfg := Load(serviceName, defaultPort)
+	if err := cfg.Validate(); err != nil {
+		return ServiceConfig{}, err
+	}
+	return cfg, nil
+}
+
+func (c ServiceConfig) Validate() error {
+	var validationErrors []error
+
+	if strings.TrimSpace(c.ServiceName) == "" {
+		validationErrors = append(validationErrors, errors.New("service name is required"))
+	}
+	if strings.TrimSpace(c.Environment) == "" {
+		validationErrors = append(validationErrors, errors.New("environment is required"))
+	} else if !isKnownEnvironment(c.Environment) {
+		validationErrors = append(validationErrors, fmt.Errorf("unsupported environment %q", c.Environment))
+	}
+	if strings.ContainsAny(c.Host, " \t\r\n") {
+		validationErrors = append(validationErrors, fmt.Errorf("service host %q must not contain whitespace", c.Host))
+	}
+	if _, err := strconv.Atoi(strings.TrimSpace(c.Port)); err != nil {
+		validationErrors = append(validationErrors, fmt.Errorf("service port %q must be numeric", c.Port))
+	} else {
+		port, _ := strconv.Atoi(strings.TrimSpace(c.Port))
+		if port < 0 || port > 65535 {
+			validationErrors = append(validationErrors, fmt.Errorf("service port %d is outside 0-65535", port))
+		}
+	}
+
+	switch strings.ToLower(strings.TrimSpace(c.StoreBackend)) {
+	case "file":
+		if strings.TrimSpace(c.StorePath) == "" {
+			validationErrors = append(validationErrors, errors.New("AMANDACORE_STORE_PATH is required for file store backend"))
+		}
+	case "sqlite":
+		if strings.TrimSpace(c.SQLitePath) == "" {
+			validationErrors = append(validationErrors, errors.New("AMANDACORE_SQLITE_PATH is required for sqlite store backend"))
+		}
+	default:
+		validationErrors = append(validationErrors, fmt.Errorf("unsupported store backend %q", c.StoreBackend))
+	}
+
+	if strings.TrimSpace(c.WorldEndpoint) == "" {
+		validationErrors = append(validationErrors, errors.New("world endpoint is required"))
+	} else if parsed, err := url.Parse(c.WorldEndpoint); err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		validationErrors = append(validationErrors, fmt.Errorf("world endpoint %q must be an absolute http or https URL", c.WorldEndpoint))
+	}
+
+	if isProductionEnvironment(c.Environment) {
+		if c.AdminToolsEnabled {
+			validationErrors = append(validationErrors, errors.New("admin tools must be disabled in production"))
+		}
+		if strings.TrimSpace(c.LocalSeedFile) == "" || strings.Contains(filepath.ToSlash(c.LocalSeedFile), ".secrets/") {
+			validationErrors = append(validationErrors, errors.New("production must not rely on the local dev seed file"))
+		}
+		if strings.TrimSpace(c.AdminSeedPassword) != "" && isWeakSecret(c.AdminSeedPassword) {
+			validationErrors = append(validationErrors, errors.New("production admin seed password is too weak"))
+		}
+		if strings.EqualFold(strings.TrimSpace(c.AdminSeedUsername), "amanda") && strings.TrimSpace(c.AdminSeedPassword) != "" {
+			validationErrors = append(validationErrors, errors.New("production admin seed username must not use the local default"))
+		}
+	}
+
+	return errors.Join(validationErrors...)
 }
 
 func (c ServiceConfig) ListenAddress() string {
@@ -66,6 +146,33 @@ func adminToolsEnabled(environment string) bool {
 	default:
 		return false
 	}
+}
+
+func isKnownEnvironment(environment string) bool {
+	switch strings.ToLower(strings.TrimSpace(environment)) {
+	case "development", "dev", "local", "test", "testing", "staging", "stage", "production", "prod":
+		return true
+	default:
+		return false
+	}
+}
+
+func isProductionEnvironment(environment string) bool {
+	switch strings.ToLower(strings.TrimSpace(environment)) {
+	case "production", "prod":
+		return true
+	default:
+		return false
+	}
+}
+
+func isWeakSecret(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if len(trimmed) < 16 {
+		return true
+	}
+	lower := strings.ToLower(trimmed)
+	return strings.Contains(lower, "password") || strings.Contains(lower, "changeme") || strings.Contains(lower, "amanda")
 }
 
 func loadEnvFileIfPresent(path string) {

@@ -8,7 +8,16 @@ import (
 
 const (
 	EventAccountRegistered       = "account.registered"
+	EventAuthLoginFailed         = "auth.login_failed"
+	EventAuthRateLimited         = "auth.rate_limited"
 	EventAuthSessionIssued       = "auth.session_issued"
+	EventAuthSessionRejected     = "auth.session_rejected"
+	EventAdminUnauthorized       = "admin.unauthorized"
+	EventSecurityConfigRejected  = "security.config_rejected"
+	EventHTTPRequestRejected     = "http.request_rejected"
+	EventPersistenceTxFailed     = "persistence.transaction_failed"
+	EventPersistenceRetrySeen    = "persistence.retry_detected"
+	EventPackageSmokeFailed      = "package.smoke_failed"
 	EventCharacterCreated        = "character.created"
 	EventCharacterSelected       = "character.selected"
 	EventWorldJoinTicketIssued   = "world.join_ticket_issued"
@@ -104,7 +113,16 @@ const (
 func StableEventNames() []string {
 	return []string{
 		EventAccountRegistered,
+		EventAuthLoginFailed,
+		EventAuthRateLimited,
 		EventAuthSessionIssued,
+		EventAuthSessionRejected,
+		EventAdminUnauthorized,
+		EventSecurityConfigRejected,
+		EventHTTPRequestRejected,
+		EventPersistenceTxFailed,
+		EventPersistenceRetrySeen,
+		EventPackageSmokeFailed,
 		EventCharacterCreated,
 		EventCharacterSelected,
 		EventWorldJoinTicketIssued,

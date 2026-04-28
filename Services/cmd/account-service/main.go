@@ -11,7 +11,10 @@ import (
 )
 
 func main() {
-	cfg := config.Load("account-service", "8082")
+	cfg, err := config.LoadValidated("account-service", "8082")
+	if err != nil {
+		log.Fatal(err)
+	}
 	fileStore, err := store.NewFileStore(cfg.StorePath, cfg.BuildID, cfg.WorldEndpoint)
 	if err != nil {
 		log.Fatal(err)

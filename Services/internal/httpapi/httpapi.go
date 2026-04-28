@@ -1,13 +1,21 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"strings"
 
+	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
 )
+
+const DefaultMaxJSONBodyBytes int64 = 1 << 20
 
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -24,7 +32,35 @@ func Error(w http.ResponseWriter, status int, code string, message string) {
 
 func DecodeJSON(r *http.Request, target any) error {
 	defer r.Body.Close()
-	return json.NewDecoder(r.Body).Decode(target)
+
+	if contentType := strings.TrimSpace(r.Header.Get("Content-Type")); contentType != "" {
+		mediaType, _, err := mime.ParseMediaType(contentType)
+		if err != nil || mediaType != "application/json" {
+			return fmt.Errorf("content-type must be application/json")
+		}
+	}
+
+	payload, err := io.ReadAll(io.LimitReader(r.Body, DefaultMaxJSONBodyBytes+1))
+	if err != nil {
+		return err
+	}
+	if int64(len(payload)) > DefaultMaxJSONBodyBytes {
+		return fmt.Errorf("request body exceeds %d bytes", DefaultMaxJSONBodyBytes)
+	}
+	if len(bytes.TrimSpace(payload)) == 0 {
+		return errors.New("request body is required")
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return errors.New("request body must contain one JSON value")
+	}
+	return nil
 }
 
 func ReadBearerToken(r *http.Request) string {
@@ -45,12 +81,22 @@ func RequireSession(store *store.FileStore, next func(http.ResponseWriter, *http
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := ReadBearerToken(r)
 		if token == "" {
+			observability.LogEvent("httpapi", observability.EventAuthSessionRejected, map[string]any{
+				"path":   r.URL.Path,
+				"method": r.Method,
+				"reason": "missing_token",
+			})
 			Error(w, http.StatusUnauthorized, "missing_token", "A bearer token is required.")
 			return
 		}
 
 		session, err := store.ValidateAccessToken(token)
 		if err != nil {
+			observability.LogEvent("httpapi", observability.EventAuthSessionRejected, map[string]any{
+				"path":   r.URL.Path,
+				"method": r.Method,
+				"reason": "invalid_token",
+			})
 			Error(w, http.StatusUnauthorized, "invalid_token", err.Error())
 			return
 		}
@@ -74,6 +120,12 @@ func RequireRole(store *store.FileStore, required platform.Role, next func(http.
 			}
 		}
 
+		observability.LogEvent("httpapi", observability.EventAdminUnauthorized, map[string]any{
+			"path":      r.URL.Path,
+			"method":    r.Method,
+			"accountId": account.ID,
+			"role":      required,
+		})
 		Error(w, http.StatusForbidden, "missing_role", "The current session does not have the required role.")
 	})
 }
@@ -87,6 +139,12 @@ func RequirePermission(store *store.FileStore, required platform.Permission, nex
 		}
 
 		if !platform.HasPermission(account.Roles, required) {
+			observability.LogEvent("httpapi", observability.EventAdminUnauthorized, map[string]any{
+				"path":       r.URL.Path,
+				"method":     r.Method,
+				"accountId":  account.ID,
+				"permission": required,
+			})
 			Error(w, http.StatusForbidden, "missing_permission", "The current session does not have the required permission.")
 			return
 		}

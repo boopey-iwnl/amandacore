@@ -2,12 +2,16 @@ package authn
 
 import (
 	"net/http"
+	"strings"
+	"time"
 
 	"amandacore/services/internal/httpapi"
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
 )
+
+const authMutationLimit = 10
 
 type registerRequest struct {
 	Username string `json:"username"`
@@ -33,10 +37,22 @@ type recoverPasswordRequest struct {
 }
 
 func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
+	authLimiter := httpapi.NewRateLimiter(authMutationLimit, time.Minute)
+	recoveryLimiter := httpapi.NewRateLimiter(5, time.Minute)
+
 	mux.HandleFunc("POST /v1/accounts/register", func(w http.ResponseWriter, r *http.Request) {
 		var request registerRequest
 		if err := httpapi.DecodeJSON(r, &request); err != nil {
 			httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+			return
+		}
+		if !authLimiter.Allow(rateLimitKey(r, "register", request.Username), time.Now()) {
+			observability.LogEvent("auth-service", observability.EventAuthRateLimited, map[string]any{
+				"operation": "register",
+				"username":  strings.ToLower(strings.TrimSpace(request.Username)),
+				"client":    httpapi.ClientAddressKey(r),
+			})
+			httpapi.Error(w, http.StatusTooManyRequests, "rate_limited", "Too many registration attempts. Try again later.")
 			return
 		}
 
@@ -63,9 +79,22 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
 			return
 		}
+		if !authLimiter.Allow(rateLimitKey(r, "login", request.Username), time.Now()) {
+			observability.LogEvent("auth-service", observability.EventAuthRateLimited, map[string]any{
+				"operation": "login",
+				"username":  strings.ToLower(strings.TrimSpace(request.Username)),
+				"client":    httpapi.ClientAddressKey(r),
+			})
+			httpapi.Error(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
+			return
+		}
 
 		account, err := fileStore.Authenticate(request.Username, request.Password)
 		if err != nil {
+			observability.LogEvent("auth-service", observability.EventAuthLoginFailed, map[string]any{
+				"username": strings.ToLower(strings.TrimSpace(request.Username)),
+				"client":   httpapi.ClientAddressKey(r),
+			})
 			httpapi.Error(w, http.StatusUnauthorized, "login_failed", err.Error())
 			return
 		}
@@ -141,6 +170,15 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
 			return
 		}
+		if !recoveryLimiter.Allow(rateLimitKey(r, "password_recover", request.Username), time.Now()) {
+			observability.LogEvent("auth-service", observability.EventAuthRateLimited, map[string]any{
+				"operation": "password_recover",
+				"username":  strings.ToLower(strings.TrimSpace(request.Username)),
+				"client":    httpapi.ClientAddressKey(r),
+			})
+			httpapi.Error(w, http.StatusTooManyRequests, "rate_limited", "Too many password recovery attempts. Try again later.")
+			return
+		}
 
 		ticket, err := fileStore.StartPasswordReset(request.Username)
 		if err != nil {
@@ -153,4 +191,12 @@ func RegisterRoutes(mux *http.ServeMux, fileStore *store.FileStore) {
 			"expiresAt":     ticket.ExpiresAt,
 		})
 	})
+}
+
+func rateLimitKey(r *http.Request, operation string, username string) string {
+	return strings.Join([]string{
+		httpapi.ClientAddressKey(r),
+		operation,
+		strings.ToLower(strings.TrimSpace(username)),
+	}, "|")
 }

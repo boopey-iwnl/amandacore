@@ -1,0 +1,45 @@
+name: Security Sanity
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  forbidden-artifacts:
+    name: Forbidden Artifacts and Secret Patterns
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run scanner self-test
+        shell: pwsh
+        run: .\Infra\qa\Scan-ForbiddenArtifacts.ps1 -SelfTest
+
+      - name: Scan repository
+        shell: pwsh
+        run: .\Infra\qa\Scan-ForbiddenArtifacts.ps1
+
+      - name: Verify release gate docs exist
+        shell: pwsh
+        run: |
+          $required = @(
+            ".\Docs\Runbooks\ReliabilitySecurityLocalChecks.md",
+            ".\Docs\Runbooks\ReleaseGateChecklist.md",
+            ".\Docs\Engineering\PRValidationPolicy.md",
+            ".\Docs\QA\AlphaReleaseChecklist.md"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Missing required reliability/security document: $path"
+            }
+          }
