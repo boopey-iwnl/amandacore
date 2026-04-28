@@ -7,15 +7,20 @@ import (
 	"amandacore/services/internal/config"
 	"amandacore/services/internal/httpapi"
 	"amandacore/services/internal/realms"
-	"amandacore/services/internal/store"
+	"amandacore/services/internal/servicehost"
 )
 
 func main() {
-	cfg := config.Load("realm-service", "8083")
-	fileStore, err := store.NewFileStore(cfg.StorePath, cfg.BuildID, cfg.WorldEndpoint)
+	cfg, err := config.LoadValidated("realm-service", "8083")
 	if err != nil {
 		log.Fatal(err)
 	}
+	fileStore, storageReport, err := servicehost.OpenPlatformStore(cfg)
+	if err != nil {
+		log.Printf("%s storage backend=%s environment=%s migrations=%s pending=%d", cfg.ServiceName, storageReport.Backend, storageReport.Environment, storageReport.MigrationState, storageReport.PendingCount)
+		log.Fatal(err)
+	}
+	log.Printf("%s storage backend=%s environment=%s migrations=%s", cfg.ServiceName, storageReport.Backend, storageReport.Environment, storageReport.MigrationState)
 
 	if err := fileStore.EnsureAdminSeed(cfg.AdminSeedUsername, cfg.AdminSeedPassword); err != nil {
 		log.Fatal(err)

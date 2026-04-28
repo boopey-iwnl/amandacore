@@ -6,16 +6,21 @@ import (
 
 	"amandacore/services/internal/config"
 	"amandacore/services/internal/httpapi"
-	"amandacore/services/internal/store"
+	"amandacore/services/internal/servicehost"
 	"amandacore/services/internal/worlds"
 )
 
 func main() {
-	cfg := config.Load("world-service", "8085")
-	fileStore, err := store.NewFileStore(cfg.StorePath, cfg.BuildID, cfg.WorldEndpoint)
+	cfg, err := config.LoadValidated("world-service", "8085")
 	if err != nil {
 		log.Fatal(err)
 	}
+	fileStore, storageReport, err := servicehost.OpenPlatformStore(cfg)
+	if err != nil {
+		log.Printf("%s storage backend=%s environment=%s migrations=%s pending=%d", cfg.ServiceName, storageReport.Backend, storageReport.Environment, storageReport.MigrationState, storageReport.PendingCount)
+		log.Fatal(err)
+	}
+	log.Printf("%s storage backend=%s environment=%s migrations=%s", cfg.ServiceName, storageReport.Backend, storageReport.Environment, storageReport.MigrationState)
 
 	if err := fileStore.EnsureAdminSeed(cfg.AdminSeedUsername, cfg.AdminSeedPassword); err != nil {
 		log.Fatal(err)

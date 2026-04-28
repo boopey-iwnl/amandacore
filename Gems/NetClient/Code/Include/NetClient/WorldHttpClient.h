@@ -52,6 +52,37 @@ namespace NetClient
         AZStd::string m_summary;
     };
 
+    struct ReplicationCursorState
+    {
+        AZStd::string m_shardId;
+        AZStd::string m_zoneId;
+        AZ::s64 m_stateVersion = 0;
+        AZ::s64 m_sequence = 0;
+        AZ::s64 m_tick = 0;
+    };
+
+    struct ReplicationChangedFieldState
+    {
+        AZStd::string m_domain;
+        AZStd::string m_entityId;
+        AZStd::vector<AZStd::string> m_fields;
+        AZ::s64 m_version = 0;
+    };
+
+    struct ReplicationMetadataState
+    {
+        AZStd::string m_protocolVersion;
+        AZStd::string m_kind;
+        AZStd::string m_cursor;
+        ReplicationCursorState m_cursorState;
+        AZ::s64 m_snapshotVersion = 0;
+        AZ::s64 m_deltaVersion = 0;
+        bool m_fullSnapshot = false;
+        bool m_resyncRequired = false;
+        AZStd::string m_reason;
+        AZStd::vector<ReplicationChangedFieldState> m_changed;
+    };
+
     struct VisibleEntity
     {
         AZStd::string m_id;
@@ -458,6 +489,7 @@ namespace NetClient
         AZStd::vector<KillCreditState> m_killCredits;
         AZStd::vector<WorldEventEntry> m_domainEvents;
         AZStd::vector<WorldEventEntry> m_stateDiffs;
+        ReplicationMetadataState m_replication;
         AZStd::vector<VisibleEntity> m_entities;
     };
 
@@ -637,6 +669,7 @@ namespace NetClient
         virtual bool State(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
+            const AZStd::string& cursor,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 

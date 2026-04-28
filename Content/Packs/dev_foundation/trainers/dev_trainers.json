@@ -1,0 +1,24 @@
+{
+  "trainers": [
+    {
+      "trainer_id": "trainer_dev_pathfinder",
+      "display_name": "Pathfinder Field Lessons",
+      "npc_id": "provider_dev_pathfinder",
+      "abilities": [
+        {
+          "ability_id": "dev_pathfinder_focus",
+          "cost_copper": 0,
+          "required_level": 1,
+          "tags": [
+            "dev",
+            "starter"
+          ]
+        }
+      ],
+      "tags": [
+        "dev",
+        "trainer"
+      ]
+    }
+  ]
+}

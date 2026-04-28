@@ -21,6 +21,24 @@ func TestValidatedDevPackageActivatesIntoRuntimeContentRegistry(t *testing.T) {
 	if _, found := server.contentRegistry.Items["dev_stalker_fang"]; !found {
 		t.Fatalf("expected dev_stalker_fang in runtime registry")
 	}
+	if _, found := server.contentRegistry.Vendors["vendor_dev_pathfinder_cache"]; !found {
+		t.Fatalf("expected dev vendor in runtime registry")
+	}
+	if _, found := server.contentRegistry.Trainers["trainer_dev_pathfinder"]; !found {
+		t.Fatalf("expected dev trainer in runtime registry")
+	}
+	if _, found := server.contentRegistry.Dialogues["dialogue_dev_pathfinder_intro"]; !found {
+		t.Fatalf("expected dev dialogue in runtime registry")
+	}
+	if _, found := server.contentRegistry.HookBindings["hook_dev_first_hunt_accept"]; !found {
+		t.Fatalf("expected dev hook binding in runtime registry")
+	}
+	if server.contentActivation.CatalogsLoaded["vendors"] != 1 ||
+		server.contentActivation.CatalogsLoaded["trainers"] != 1 ||
+		server.contentActivation.CatalogsLoaded["dialogues"] != 1 ||
+		server.contentActivation.CatalogsLoaded["hooks"] != 3 {
+		t.Fatalf("expected content activation to report new catalog counts, got %#v", server.contentActivation.CatalogsLoaded)
+	}
 }
 
 func TestZoneRuntimeCreatedFromLoadedZoneDefinition(t *testing.T) {

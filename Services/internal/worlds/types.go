@@ -10,6 +10,7 @@ import (
 	"amandacore/services/internal/observability"
 	"amandacore/services/internal/platform"
 	"amandacore/services/internal/store"
+	worldloop "amandacore/services/internal/worlds/loop"
 )
 
 const (
@@ -709,6 +710,7 @@ type mobState struct {
 	CurrentTargetCharacter string
 	LastDamagedByCharacter string
 	LastDamagedByEntityID  string
+	ThreatByCharacter      map[string]float64
 	LastAttackAtMs         int64
 	DeathTick              int64
 	RespawnAtMs            int64
@@ -814,6 +816,7 @@ type worldServer struct {
 	store                  *store.FileStore
 	metrics                *worldMetrics
 	runtime                *WorldRuntime
+	stonewakeLoop          *worldloop.ShardLoop
 	mutex                  sync.Mutex
 	sessionsByToken        map[string]*worldSessionState
 	sessionTokenByChar     map[string]string
@@ -893,6 +896,7 @@ func newWorldServerWithContentPackage(fileStore *store.FileStore, contentPackage
 	server.ensureGatheringNodesLocked()
 	server.emitWorldEventLocked(eventItemCatalogLoaded, map[string]any{"itemCount": len(itemDefinitions)})
 	server.emitWorldEventLocked(eventLootTableLoaded, map[string]any{"lootTableCount": len(devLootTables)})
+	server.startStonewakeLoop()
 	return server
 }
 

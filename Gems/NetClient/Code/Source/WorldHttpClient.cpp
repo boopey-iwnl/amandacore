@@ -481,6 +481,87 @@ namespace NetClient
             }
         }
 
+        void ParseReplicationCursor(const rapidjson::Value& source, ReplicationCursorState& outCursor)
+        {
+            if (!source.IsObject())
+            {
+                return;
+            }
+            ReadString(source, "shardId", outCursor.m_shardId);
+            ReadString(source, "zoneId", outCursor.m_zoneId);
+            ReadInt64(source, "stateVersion", outCursor.m_stateVersion);
+            ReadInt64(source, "sequence", outCursor.m_sequence);
+            ReadInt64(source, "tick", outCursor.m_tick);
+        }
+
+        void ParseReplicationChangedArray(const rapidjson::Value& source, AZStd::vector<ReplicationChangedFieldState>& outChanged)
+        {
+            outChanged.clear();
+            if (!source.IsArray())
+            {
+                return;
+            }
+            for (const rapidjson::Value& changeValue : source.GetArray())
+            {
+                if (!changeValue.IsObject())
+                {
+                    continue;
+                }
+                ReplicationChangedFieldState change;
+                ReadString(changeValue, "domain", change.m_domain);
+                ReadString(changeValue, "entityId", change.m_entityId);
+                ReadInt64(changeValue, "version", change.m_version);
+                if (changeValue.HasMember("fields") && changeValue["fields"].IsArray())
+                {
+                    for (const rapidjson::Value& fieldValue : changeValue["fields"].GetArray())
+                    {
+                        if (fieldValue.IsString())
+                        {
+                            change.m_fields.push_back(fieldValue.GetString());
+                        }
+                    }
+                }
+                outChanged.push_back(AZStd::move(change));
+            }
+        }
+
+        void ParseReplicationMetadata(const rapidjson::Value& document, ReplicationMetadataState& outReplication)
+        {
+            outReplication = ReplicationMetadataState{};
+            ReadInt64(document, "snapshotVersion", outReplication.m_snapshotVersion);
+            ReadInt64(document, "deltaVersion", outReplication.m_deltaVersion);
+            ReadString(document, "cursor", outReplication.m_cursor);
+            ReadBool(document, "fullSnapshot", outReplication.m_fullSnapshot);
+            ReadBool(document, "resyncRequired", outReplication.m_resyncRequired);
+            if (document.HasMember("changed"))
+            {
+                ParseReplicationChangedArray(document["changed"], outReplication.m_changed);
+            }
+
+            if (!document.HasMember("replication") || !document["replication"].IsObject())
+            {
+                return;
+            }
+
+            const rapidjson::Value& replication = document["replication"];
+            ReadString(replication, "protocolVersion", outReplication.m_protocolVersion);
+            ReadString(replication, "kind", outReplication.m_kind);
+            ReadString(replication, "cursor", outReplication.m_cursor);
+            ReadString(replication, "reason", outReplication.m_reason);
+            ReadInt64(replication, "snapshotVersion", outReplication.m_snapshotVersion);
+            ReadInt64(replication, "deltaVersion", outReplication.m_deltaVersion);
+            ReadBool(replication, "fullSnapshot", outReplication.m_fullSnapshot);
+            ReadBool(replication, "resyncRequired", outReplication.m_resyncRequired);
+            if (replication.HasMember("cursorState"))
+            {
+                ParseReplicationCursor(replication["cursorState"], outReplication.m_cursorState);
+            }
+            if (replication.HasMember("changed"))
+            {
+                ParseReplicationChangedArray(replication["changed"], outReplication.m_changed);
+            }
+        }
+
         void ParseQuestState(const rapidjson::Value& quest, QuestState& outQuest)
         {
             ReadString(quest, "id", outQuest.m_id);
@@ -855,6 +936,7 @@ namespace NetClient
             {
                 ParseWorldEventArray(document["stateDiffs"], outResponse.m_stateDiffs, true);
             }
+            ParseReplicationMetadata(document, outResponse.m_replication);
             if (document.HasMember("quest") && document["quest"].IsObject())
             {
                 ParseQuestState(document["quest"], outResponse.m_quest);
@@ -1565,12 +1647,18 @@ namespace NetClient
     bool StateRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
+        const AZStd::string& cursor,
         WorldSessionResponse& outResponse,
         AZStd::string& outError)
     {
         AZStd::string responseBody;
         AZ::u32 statusCode = 0;
-        const AZStd::wstring path = ToWideString(AZStd::string::format("/v1/world/state?worldSessionToken=%s", worldSessionToken.c_str()));
+        AZStd::string pathText = AZStd::string::format("/v1/world/state?worldSessionToken=%s", JsonEscape(worldSessionToken).c_str());
+        if (!cursor.empty())
+        {
+            pathText += AZStd::string::format("&since=%s", JsonEscape(cursor).c_str());
+        }
+        const AZStd::wstring path = ToWideString(pathText);
         if (!PerformRequest(worldEndpoint, L"GET", path, {}, responseBody, statusCode, outError))
         {
             return false;

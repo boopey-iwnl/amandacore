@@ -22,6 +22,23 @@ go run ./cmd/dbmigrate --status
 
 Use `--store <path>` or `-Store <path>` to target a specific local state file. Use `--json` or `-Json` for machine-readable output.
 
+SQLite migration status/check/apply uses an explicit database path:
+
+```powershell
+$db = Join-Path $env:TEMP "amandacore-cutover.sqlite"
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\run-db-migrations.ps1 -Backend sqlite -SQLitePath $db -Status
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\run-db-migrations.ps1 -Backend sqlite -SQLitePath $db
+powershell -ExecutionPolicy Bypass -File .\Infra\qa\Check-Migrations.ps1 -Backend sqlite -SQLitePath $db
+```
+
+From `Services`:
+
+```powershell
+go run ./cmd/dbmigrate --backend sqlite --sqlite $db --status
+go run ./cmd/dbmigrate --backend sqlite --sqlite $db
+go run ./cmd/dbmigrate --backend sqlite --sqlite $db --check
+```
+
 ## Migration Rules
 
 - Migration IDs are stable and ordered.
@@ -48,27 +65,11 @@ Suggested local-only override:
 $env:AMANDACORE_STORE_PATH = "$env:TEMP\amandacore\platform-state.json"
 ```
 
-## Future Postgres Adapter
+## Relational SQLite Foundation
 
-The next implementation step is to map the repository and unit-of-work interfaces to a database adapter with real SQL transactions. The schema must remain AmandaCore-native and should be documented before implementation.
+Milestone 2 adds a separate relational migration foundation under `Services/internal/store/sqlstore`. These migrations are embedded by Go tests, use AmandaCore-owned `ac_*` table names, and are documented in `Docs/Architecture/PersistenceRedesign.md` and `Docs/Runbooks/LocalRelationalPersistence.md`.
 
-Recommended future tables:
-
-- `amanda_schema_migrations`
-- `accounts`
-- `sessions`
-- `realms`
-- `characters`
-- `character_runtime_state`
-- `character_inventory_slots`
-- `character_equipment_slots`
-- `character_quest_progress`
-- `character_action_bar_slots`
-- `world_join_tickets`
-- `account_progress`
-- `audit_events`
-
-These names are AmandaCore-owned and are not derived from emulator schemas.
+The service runtime still defaults to the file-backed store. Milestone 10 adds explicit backend selection for validation, but HTTP services verify SQLite migrations and then refuse SQLite runtime use until service adapters are enabled. Do not point production or shared development service processes at SQLite as a live gameplay backend yet.
 
 ## Clean-Room Reference Boundary
 

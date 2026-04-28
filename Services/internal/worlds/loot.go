@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+
+	"amandacore/services/internal/observability"
 )
 
 const (
@@ -264,6 +266,13 @@ func (s *worldServer) createLootContainerForMobDeathLocked(killer *worldSessionS
 	}
 	s.lootContainers[containerID] = container
 	s.lootContainerOrder = append(s.lootContainerOrder, containerID)
+	observability.LogEvent("world-service", observability.EventLootGenerated, map[string]any{
+		"lootContainerId":   container.LootContainerID,
+		"sourceEntityId":    container.SourceEntityID,
+		"sourceArchetypeId": container.SourceArchetypeID,
+		"ownerCharacterId":  container.OwnerCharacterID,
+		"itemCount":         len(container.Items),
+	})
 	s.emitWorldEventLocked(eventLootContainerCreated, map[string]any{
 		"lootContainerId":   container.LootContainerID,
 		"sourceEntityId":    container.SourceEntityID,
@@ -304,6 +313,11 @@ func (s *worldServer) claimLootLocked(session *worldSessionState, containerID st
 			"lootContainerId": containerID,
 			"reason":          lootRejectReason(err),
 		})
+		observability.LogEvent("world-service", observability.EventLootClaimRejected, map[string]any{
+			"characterId":     characterIDOrEmpty(session),
+			"lootContainerId": containerID,
+			"reason":          lootRejectReason(err),
+		})
 		return err
 	}
 
@@ -322,6 +336,12 @@ func (s *worldServer) claimLootLocked(session *worldSessionState, containerID st
 			"reason":          "InventoryFull",
 			"error":           err.Error(),
 		}, lootClaimResultDelta(container, false, "InventoryFull"))
+		observability.LogEvent("world-service", observability.EventLootClaimRejected, map[string]any{
+			"characterId":     session.CharacterID,
+			"lootContainerId": containerID,
+			"reason":          "InventoryFull",
+			"error":           err.Error(),
+		})
 		return fmt.Errorf("InventoryFull: %w", err)
 	}
 
@@ -333,6 +353,11 @@ func (s *worldServer) claimLootLocked(session *worldSessionState, containerID st
 		"lootContainerId": containerID,
 		"itemCount":       len(container.Items),
 	}, lootContainerUpdatedDelta(container), lootClaimResultDelta(container, true, ""))
+	observability.LogEvent("world-service", observability.EventLootClaimed, map[string]any{
+		"characterId":     session.CharacterID,
+		"lootContainerId": containerID,
+		"itemCount":       len(container.Items),
+	})
 	return nil
 }
 

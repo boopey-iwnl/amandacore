@@ -1,5 +1,7 @@
 # Runtime Contract
 
+Milestone 1 contract-freeze inventory lives in `Docs/Contracts/Milestone1-ContractInventory.md`. The registered HTTP route manifest lives in `Docs/Contracts/http-api-v1.json` and is checked by `Services/internal/contracts` tests.
+
 This is the current playable single-zone contract used by the launcher, the O3DE client/runtime, and the backend services. It stays intentionally limited to the single-realm local slice:
 
 - realm: `sunset-frontier-dev`

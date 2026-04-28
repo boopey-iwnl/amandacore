@@ -113,3 +113,33 @@ Temporary branches may be deleted only after all of the following are true:
 - Branch deletion is explicitly approved.
 
 Do not delete branches as part of release publication unless branch deletion was separately approved.
+
+## Recommended Required Checks
+
+Before merge to `develop`:
+
+- Go service tests.
+- Contract/content compiler tests.
+- Forbidden artifact scan.
+- Local build check where practical.
+- Focused package/assertion checks when packaging scripts changed.
+
+Before merge to `main`:
+
+- All `develop` checks.
+- `Infra/qa/Validate-ReleaseCandidate.ps1 -SkipO3DE`.
+- O3DE build/verify when client/runtime assets changed.
+- Package assertion and smoke from a clean extracted candidate.
+- Human gameplay checklist approval for release branches.
+
+## Review Policy
+
+Require at least one human review for release branches, hotfixes, branch-policy changes, release scripts, migration tooling, and security-sensitive changes. Codex-created milestone branches should remain draft until validation output and known gaps are documented.
+
+## Branch Protection Recommendations
+
+Protect `main` with required status checks, required review, no force-push, and no direct pushes except explicitly approved maintainers. Protect `develop` with required CI and no force-push. Do not change repository branch protection settings from an automation task unless separately approved.
+
+## Future-Work Branches
+
+Keep future-work branches only when they contain unmerged, intentionally deferred work with a named owner and documented next step. Do not keep branches as archives, backups, or release records.

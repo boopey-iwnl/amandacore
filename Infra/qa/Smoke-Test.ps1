@@ -110,6 +110,44 @@ function Test-PackageDoesNotContain {
     Add-Result -Name $Name -Passed ($violations.Count -eq 0) -Detail $(if ($violations.Count -eq 0) { $PackageRoot } else { ($violations | Select-Object -First 20) -join "; " })
 }
 
+function Test-PackageTextDoesNotContainSecretPatterns {
+    param(
+        [string]$PackageRoot
+    )
+
+    $patterns = @(
+        '-----BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----',
+        '(?i)(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}',
+        'AKIA[0-9A-Z]{16}',
+        '(?i)xox[baprs]-[A-Za-z0-9-]{20,}'
+    )
+    $binaryExtensions = @(".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".dds", ".tga", ".bmp", ".wav", ".mp3", ".ogg", ".fbx", ".pak", ".dll", ".exe", ".pdb")
+    $violations = @()
+
+    foreach ($file in Get-ChildItem -Path $PackageRoot -Recurse -File -Force -ErrorAction SilentlyContinue) {
+        if ($binaryExtensions -contains $file.Extension.ToLowerInvariant()) {
+            continue
+        }
+        if ($file.Length -gt 2MB) {
+            continue
+        }
+        try {
+            $content = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
+        }
+        catch {
+            continue
+        }
+        foreach ($pattern in $patterns) {
+            if ($content -match $pattern) {
+                $violations += (Get-RelativePackagePath -Root $PackageRoot -Path $file.FullName).Replace("\", "/")
+                break
+            }
+        }
+    }
+
+    Add-Result -Name "package text has no high-confidence secrets" -Passed ($violations.Count -eq 0) -Detail $(if ($violations.Count -eq 0) { $PackageRoot } else { ($violations | Select-Object -First 20) -join "; " })
+}
+
 function Test-BinaryFileContainsAscii {
     param(
         [string]$Name,
@@ -354,7 +392,12 @@ Test-PathRequired -Name "Alpha package script" -Path (Join-Path $repoRoot "Infra
 foreach ($script in @(
     @{ Name = "diagnostics"; Path = Join-Path $PSScriptRoot "Collect-Diagnostics.ps1" },
     @{ Name = "seed account"; Path = Join-Path $PSScriptRoot "Seed-TestAccount.ps1" },
-    @{ Name = "reset state"; Path = Join-Path $PSScriptRoot "Reset-LocalTestState.ps1" }
+    @{ Name = "reset state"; Path = Join-Path $PSScriptRoot "Reset-LocalTestState.ps1" },
+    @{ Name = "migration check"; Path = Join-Path $PSScriptRoot "Check-Migrations.ps1" },
+    @{ Name = "legacy state import"; Path = Join-Path $PSScriptRoot "Import-LegacyState.ps1" },
+    @{ Name = "release package assert"; Path = Join-Path $PSScriptRoot "Assert-ReleasePackage.ps1" },
+    @{ Name = "scale soak"; Path = Join-Path $PSScriptRoot "Run-ScaleSoak.ps1" },
+    @{ Name = "release candidate validation"; Path = Join-Path $PSScriptRoot "Validate-ReleaseCandidate.ps1" }
 )) {
     Test-PathRequired -Name "$($script.Name) script" -Path $script.Path
     Invoke-ScriptSelfTest -Name $script.Name -ScriptPath $script.Path
@@ -415,6 +458,7 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
         '(?i)\.(log|tmp)$',
         '(?i)^(?!Content/Art/).*\.(png|jpg|jpeg)$'
     )
+    Test-PackageTextDoesNotContainSecretPatterns -PackageRoot $PackageRoot
 
     if ($RunO3deLevelSmoke) {
         Invoke-PackageO3deLevelSmoke -PackageRoot $PackageRoot

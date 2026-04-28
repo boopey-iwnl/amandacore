@@ -8,7 +8,16 @@ import (
 
 const (
 	EventAccountRegistered       = "account.registered"
+	EventAuthLoginFailed         = "auth.login_failed"
+	EventAuthRateLimited         = "auth.rate_limited"
 	EventAuthSessionIssued       = "auth.session_issued"
+	EventAuthSessionRejected     = "auth.session_rejected"
+	EventAdminUnauthorized       = "admin.unauthorized"
+	EventSecurityConfigRejected  = "security.config_rejected"
+	EventHTTPRequestRejected     = "http.request_rejected"
+	EventPersistenceTxFailed     = "persistence.transaction_failed"
+	EventPersistenceRetrySeen    = "persistence.retry_detected"
+	EventPackageSmokeFailed      = "package.smoke_failed"
 	EventCharacterCreated        = "character.created"
 	EventCharacterSelected       = "character.selected"
 	EventWorldJoinTicketIssued   = "world.join_ticket_issued"
@@ -17,37 +26,103 @@ const (
 	EventWorldCharacterSaved     = "world.character_saved"
 	EventWorldReconnected        = "world.reconnected"
 
-	EventWorldTickStarted         = "world.tick.started"
-	EventWorldTickCompleted       = "world.tick.completed"
-	EventWorldTickSlow            = "world.tick.slow"
-	EventWorldCommandEnqueued     = "world.command.enqueued"
-	EventWorldCommandRejected     = "world.command.rejected"
-	EventWorldZoneLoaded          = "world.zone.loaded"
-	EventWorldZoneUnloaded        = "world.zone.unloaded"
-	EventWorldEntitySpawned       = "world.entity.spawned"
-	EventWorldEntityDespawned     = "world.entity.despawned"
-	EventCombatIntentSubmitted    = "combat.intent_submitted"
-	EventCombatAbilityResolved    = "combat.ability_resolved"
-	EventAbilityCastStarted       = "ability.cast_started"
-	EventAbilityCastCompleted     = "ability.cast_completed"
-	EventAbilityCastInterrupted   = "ability.cast_interrupted"
-	EventAbilityEffectResolved    = "ability.effect_resolved"
-	EventAuraApplied              = "aura.applied"
-	EventAuraRefreshed            = "aura.refreshed"
-	EventAuraTicked               = "aura.ticked"
-	EventAuraExpired              = "aura.expired"
-	EventCooldownStarted          = "cooldown.started"
-	EventCooldownReady            = "cooldown.ready"
-	EventNPCSpawned               = "npc.spawned"
-	EventAdminActionRequested     = "admin.action_requested"
-	EventAdminActionApplied       = "admin.action_applied"
-	EventPersistenceSnapshotSaved = "persistence.snapshot_saved"
+	EventWorldTickStarted             = "world.tick.started"
+	EventWorldTickCompleted           = "world.tick.completed"
+	EventWorldTickSlow                = "world.tick.slow"
+	EventWorldCommandEnqueued         = "world.command.enqueued"
+	EventWorldCommandRejected         = "world.command.rejected"
+	EventWorldLoopStarted             = "world.loop_started"
+	EventWorldLoopStopped             = "world.loop_stopped"
+	EventWorldCommandAccepted         = "world.command_accepted"
+	EventWorldCommandApplied          = "world.command_applied"
+	EventWorldSnapshotEmitted         = "world.snapshot_emitted"
+	EventWorldReplayRecorded          = "world.replay_recorded"
+	EventWorldReconnectRestored       = "world.reconnect_restored"
+	EventWorldCommandTimeout          = "world.command_timeout"
+	EventWorldZoneLoaded              = "world.zone.loaded"
+	EventWorldZoneUnloaded            = "world.zone.unloaded"
+	EventWorldEntitySpawned           = "world.entity.spawned"
+	EventWorldEntityDespawned         = "world.entity.despawned"
+	EventCombatIntentSubmitted        = "combat.intent_submitted"
+	EventCombatTargetSelected         = "combat.target_selected"
+	EventCombatAutoAttackStarted      = "combat.auto_attack_started"
+	EventCombatAbilityResolved        = "combat.ability_resolved"
+	EventCombatDamageApplied          = "combat.damage_applied"
+	EventCombatEntityDefeated         = "combat.entity_defeated"
+	EventThreatUpdated                = "threat.updated"
+	EventQuestObjectiveProgressed     = "quest.objective_progressed"
+	EventQuestCompleted               = "quest.completed"
+	EventQuestRewardClaimed           = "quest.reward_claimed"
+	EventLootGenerated                = "loot.generated"
+	EventLootClaimed                  = "loot.claimed"
+	EventLootClaimRejected            = "loot.claim_rejected"
+	EventWorldGameplayCommandApplied  = "world.loop_gameplay_command_applied"
+	EventWorldGameplayCommandRejected = "world.loop_gameplay_command_rejected"
+	EventReplicationSnapshotEmitted   = "replication.snapshot_emitted"
+	EventReplicationDeltaEmitted      = "replication.delta_emitted"
+	EventReplicationCursorAccepted    = "replication.cursor_accepted"
+	EventReplicationCursorStale       = "replication.cursor_stale"
+	EventReplicationResyncRequired    = "replication.resync_required"
+	EventReplicationClientConverged   = "replication.client_converged"
+	EventReplicationClientDiverged    = "replication.client_diverged"
+	EventReplicationFrameDropped      = "replication.frame_dropped"
+	EventSocialFriendAdded            = "social.friend_added"
+	EventSocialFriendRemoved          = "social.friend_removed"
+	EventSocialPartyInviteCreated     = "social.party_invite_created"
+	EventSocialPartyInviteAccepted    = "social.party_invite_accepted"
+	EventSocialPartyMemberRemoved     = "social.party_member_removed"
+	EventSocialGuildCreated           = "social.guild_created"
+	EventSocialGuildInviteCreated     = "social.guild_invite_created"
+	EventSocialGuildInviteAccepted    = "social.guild_invite_accepted"
+	EventSocialChatMessageSent        = "social.chat_message_sent"
+	EventEconomyCurrencyMutated       = "economy.currency_mutated"
+	EventEconomyVendorPurchase        = "economy.vendor_purchase_completed"
+	EventEconomyVendorSale            = "economy.vendor_sale_completed"
+	EventEconomyAuctionListed         = "economy.auction_listed"
+	EventEconomyAuctionBought         = "economy.auction_bought"
+	EventEconomyAuctionCancelled      = "economy.auction_cancelled"
+	EventEconomyMailCreated           = "economy.mail_created"
+	EventEconomyMailClaimed           = "economy.mail_claimed"
+	EventEconomyDuplicateRejected     = "economy.duplicate_mutation_rejected"
+	EventContentPackageLoaded         = "content.package_loaded"
+	EventContentValidationFailed      = "content.package_validation_failed"
+	EventContentPackageCompiled       = "content.package_compiled"
+	EventContentRegistryReady         = "content.registry_ready"
+	EventContentReferenceMissing      = "content.reference_missing"
+	EventContentHookInvoked           = "content.hook_invoked"
+	EventContentHookRejected          = "content.hook_rejected"
+	EventContentQuestDefinitionLoaded = "content.quest_definition_loaded"
+	EventContentLootTableLoaded       = "content.loot_table_loaded"
+	EventContentNPCDefinitionLoaded   = "content.npc_definition_loaded"
+	EventAbilityCastStarted           = "ability.cast_started"
+	EventAbilityCastCompleted         = "ability.cast_completed"
+	EventAbilityCastInterrupted       = "ability.cast_interrupted"
+	EventAbilityEffectResolved        = "ability.effect_resolved"
+	EventAuraApplied                  = "aura.applied"
+	EventAuraRefreshed                = "aura.refreshed"
+	EventAuraTicked                   = "aura.ticked"
+	EventAuraExpired                  = "aura.expired"
+	EventCooldownStarted              = "cooldown.started"
+	EventCooldownReady                = "cooldown.ready"
+	EventNPCSpawned                   = "npc.spawned"
+	EventAdminActionRequested         = "admin.action_requested"
+	EventAdminActionApplied           = "admin.action_applied"
+	EventPersistenceSnapshotSaved     = "persistence.snapshot_saved"
 )
 
 func StableEventNames() []string {
 	return []string{
 		EventAccountRegistered,
+		EventAuthLoginFailed,
+		EventAuthRateLimited,
 		EventAuthSessionIssued,
+		EventAuthSessionRejected,
+		EventAdminUnauthorized,
+		EventSecurityConfigRejected,
+		EventHTTPRequestRejected,
+		EventPersistenceTxFailed,
+		EventPersistenceRetrySeen,
+		EventPackageSmokeFailed,
 		EventCharacterCreated,
 		EventCharacterSelected,
 		EventWorldJoinTicketIssued,
@@ -60,12 +135,69 @@ func StableEventNames() []string {
 		EventWorldTickSlow,
 		EventWorldCommandEnqueued,
 		EventWorldCommandRejected,
+		EventWorldLoopStarted,
+		EventWorldLoopStopped,
+		EventWorldCommandAccepted,
+		EventWorldCommandApplied,
+		EventWorldSnapshotEmitted,
+		EventWorldReplayRecorded,
+		EventWorldReconnectRestored,
+		EventWorldCommandTimeout,
 		EventWorldZoneLoaded,
 		EventWorldZoneUnloaded,
 		EventWorldEntitySpawned,
 		EventWorldEntityDespawned,
 		EventCombatIntentSubmitted,
+		EventCombatTargetSelected,
+		EventCombatAutoAttackStarted,
 		EventCombatAbilityResolved,
+		EventCombatDamageApplied,
+		EventCombatEntityDefeated,
+		EventThreatUpdated,
+		EventQuestObjectiveProgressed,
+		EventQuestCompleted,
+		EventQuestRewardClaimed,
+		EventLootGenerated,
+		EventLootClaimed,
+		EventLootClaimRejected,
+		EventWorldGameplayCommandApplied,
+		EventWorldGameplayCommandRejected,
+		EventReplicationSnapshotEmitted,
+		EventReplicationDeltaEmitted,
+		EventReplicationCursorAccepted,
+		EventReplicationCursorStale,
+		EventReplicationResyncRequired,
+		EventReplicationClientConverged,
+		EventReplicationClientDiverged,
+		EventReplicationFrameDropped,
+		EventSocialFriendAdded,
+		EventSocialFriendRemoved,
+		EventSocialPartyInviteCreated,
+		EventSocialPartyInviteAccepted,
+		EventSocialPartyMemberRemoved,
+		EventSocialGuildCreated,
+		EventSocialGuildInviteCreated,
+		EventSocialGuildInviteAccepted,
+		EventSocialChatMessageSent,
+		EventEconomyCurrencyMutated,
+		EventEconomyVendorPurchase,
+		EventEconomyVendorSale,
+		EventEconomyAuctionListed,
+		EventEconomyAuctionBought,
+		EventEconomyAuctionCancelled,
+		EventEconomyMailCreated,
+		EventEconomyMailClaimed,
+		EventEconomyDuplicateRejected,
+		EventContentPackageLoaded,
+		EventContentValidationFailed,
+		EventContentPackageCompiled,
+		EventContentRegistryReady,
+		EventContentReferenceMissing,
+		EventContentHookInvoked,
+		EventContentHookRejected,
+		EventContentQuestDefinitionLoaded,
+		EventContentLootTableLoaded,
+		EventContentNPCDefinitionLoaded,
 		EventAbilityCastStarted,
 		EventAbilityCastCompleted,
 		EventAbilityCastInterrupted,

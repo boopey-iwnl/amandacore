@@ -33,6 +33,7 @@ namespace NetClient
     bool StateRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
+        const AZStd::string& cursor,
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
@@ -337,10 +338,11 @@ namespace NetClient
     bool NetClientSystemComponent::State(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
+        const AZStd::string& cursor,
         WorldSessionResponse& outResponse,
         AZStd::string& outError)
     {
-        return StateRequest(worldEndpoint, worldSessionToken, outResponse, outError);
+        return StateRequest(worldEndpoint, worldSessionToken, cursor, outResponse, outError);
     }
 
     bool NetClientSystemComponent::SocialState(

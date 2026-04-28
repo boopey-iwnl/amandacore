@@ -1,0 +1,25 @@
+{
+  "vendors": [
+    {
+      "vendor_id": "vendor_dev_pathfinder_cache",
+      "display_name": "Pathfinder Cache",
+      "npc_id": "provider_dev_pathfinder",
+      "items": [
+        {
+          "item_id": "dev_field_ration",
+          "price_copper": 3,
+          "stack_limit": 5,
+          "available": true,
+          "tags": [
+            "dev",
+            "starter"
+          ]
+        }
+      ],
+      "tags": [
+        "dev",
+        "vendor"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "contractId": "amandacore.replication.v1",
+  "status": "milestone-6-draft",
+  "scope": "Stonewake Vale HTTP polling compatibility and future push/delta handoff",
+  "cleanRoom": "AmandaCore-owned snapshot, delta, cursor, and acknowledgement contract.",
+  "cursor": {
+    "tokenFormat": "shardId:zoneId:stateVersion:sequence:tick",
+    "fields": {
+      "shardId": "string",
+      "zoneId": "string",
+      "stateVersion": "uint64 monotonic when authoritative state changes",
+      "sequence": "uint64 monotonic command sequence",
+      "tick": "uint64 loop tick at frame emission"
+    }
+  },
+  "worldSessionResponseAdditiveFields": {
+    "snapshotVersion": "uint64",
+    "deltaVersion": "uint64",
+    "cursor": "string",
+    "fullSnapshot": "bool",
+    "resyncRequired": "bool",
+    "changed": "ChangedFields[]",
+    "replication": "ReplicationFrame"
+  },
+  "changedFields": {
+    "domain": "world|player|npc|loot",
+    "entityId": "string",
+    "fields": "string[]",
+    "version": "uint64"
+  },
+  "replicationFrame": {
+    "protocolVersion": "amandacore.replication.v1",
+    "kind": "snapshot|delta|noop",
+    "snapshotVersion": "uint64",
+    "deltaVersion": "uint64",
+    "cursor": "string",
+    "cursorState": "Cursor",
+    "fullSnapshot": "bool",
+    "resyncRequired": "bool",
+    "changed": "ChangedFields[]",
+    "reason": "string",
+    "snapshot": "optional full authoritative Stonewake snapshot",
+    "delta": "optional delta from a prior cursor"
+  },
+  "compatibility": [
+    "Existing HTTP routes remain unchanged.",
+    "Existing clients may ignore all replication fields.",
+    "GET /v1/world/state accepts optional since=<cursor> for delta metadata.",
+    "When a cursor is missing, invalid, too new, or outside retention, the server emits or requires a full snapshot."
+  ]
+}

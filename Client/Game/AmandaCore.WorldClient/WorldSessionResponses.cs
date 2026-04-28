@@ -23,6 +23,12 @@ internal sealed class WorldSessionResponse
     public List<KillCreditEntry> KillCredits { get; set; } = [];
     public List<DomainEventEntry> DomainEvents { get; set; } = [];
     public List<StateDiffEntry> StateDiffs { get; set; } = [];
+    public long SnapshotVersion { get; set; }
+    public long DeltaVersion { get; set; }
+    public string Cursor { get; set; } = string.Empty;
+    public bool FullSnapshot { get; set; }
+    public bool ResyncRequired { get; set; }
+    public ReplicationMetadata Replication { get; set; } = new();
     public StreamingStateResponse? Streaming { get; set; } = new();
     public List<VisibleEntity> Entities { get; set; } = [];
 
@@ -50,6 +56,37 @@ internal sealed class WorldSessionResponse
         var deltaY = entity.Y - Position.Y;
         return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
     }
+}
+
+internal sealed class ReplicationMetadata
+{
+    public string ProtocolVersion { get; set; } = string.Empty;
+    public string Kind { get; set; } = string.Empty;
+    public long SnapshotVersion { get; set; }
+    public long DeltaVersion { get; set; }
+    public string Cursor { get; set; } = string.Empty;
+    public CursorState CursorState { get; set; } = new();
+    public bool FullSnapshot { get; set; }
+    public bool ResyncRequired { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public List<ReplicationChangedField> Changed { get; set; } = [];
+}
+
+internal sealed class CursorState
+{
+    public string ShardId { get; set; } = string.Empty;
+    public string ZoneId { get; set; } = string.Empty;
+    public long StateVersion { get; set; }
+    public long Sequence { get; set; }
+    public long Tick { get; set; }
+}
+
+internal sealed class ReplicationChangedField
+{
+    public string Domain { get; set; } = string.Empty;
+    public string EntityId { get; set; } = string.Empty;
+    public List<string> Fields { get; set; } = [];
+    public long Version { get; set; }
 }
 
 internal sealed class Position

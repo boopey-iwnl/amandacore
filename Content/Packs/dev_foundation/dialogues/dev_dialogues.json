@@ -1,0 +1,38 @@
+{
+  "dialogues": [
+    {
+      "dialogue_id": "dialogue_dev_pathfinder_intro",
+      "speaker_id": "provider_dev_pathfinder",
+      "entries": [
+        {
+          "entry_id": "intro",
+          "text": "Keep to the marked path and report anything that moves against the wind.",
+          "next_entry_ids": [
+            "lesson"
+          ],
+          "hook_binding_ids": [
+            "hook_dev_first_hunt_accept"
+          ],
+          "tags": [
+            "dev",
+            "intro"
+          ]
+        },
+        {
+          "entry_id": "lesson",
+          "text": "A steady breath matters more than a hurried strike.",
+          "next_entry_ids": [],
+          "hook_binding_ids": [],
+          "tags": [
+            "dev",
+            "training"
+          ]
+        }
+      ],
+      "tags": [
+        "dev",
+        "dialogue"
+      ]
+    }
+  ]
+}
