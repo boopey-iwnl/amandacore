@@ -107,3 +107,7 @@ The command names, threat rules, loot/reward semantics, replay behavior, tests, 
 - Future replication must define exact snapshot/delta contracts for combat, loot, quest, inventory, and action-bar state.
 - Persistence failures inside loop command closures can still block the shard queue.
 - Client convergence tests need to compare repeated polling/reconnect snapshots against the authoritative loop mirror.
+
+## Milestone 8 Content Boundary Note
+
+The Milestone 8 content compiler adds validated quest, NPC, loot, ability, vendor, trainer, dialogue, and hook catalogs to the existing package loader. Combat, loot, and quest loop code should prefer `RuntimeContentRegistry` catalog interfaces for new package-backed behavior, but this document still describes the current Stonewake runtime path. Full package-backed gameplay cutover is intentionally separate from the compiler foundation.

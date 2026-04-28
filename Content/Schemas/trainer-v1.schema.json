@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/trainer-v1.schema.json",
+  "title": "AmandaCore Trainer Catalog v1",
+  "type": "object",
+  "required": ["trainers"],
+  "additionalProperties": false,
+  "properties": {
+    "trainers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trainer_id", "display_name", "abilities"],
+        "properties": {
+          "trainer_id": { "$ref": "#/$defs/content_id" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "npc_id": { "$ref": "#/$defs/content_id" },
+          "abilities": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["ability_id"],
+              "properties": {
+                "ability_id": { "$ref": "#/$defs/content_id" },
+                "cost_copper": { "type": "integer", "minimum": 0 },
+                "required_level": { "type": "integer", "minimum": 0 },
+                "tags": { "$ref": "#/$defs/string_list" }
+              }
+            }
+          },
+          "tags": { "$ref": "#/$defs/string_list" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "string_list": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }
+}

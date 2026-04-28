@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/zone-v1.schema.json",
+  "title": "AmandaCore Zone Definition v1",
+  "type": "object",
+  "required": ["zone_id", "display_name", "bounds", "runtime"],
+  "additionalProperties": true,
+  "properties": {
+    "zone_id": { "$ref": "#/$defs/content_id" },
+    "display_name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "continent_id": { "$ref": "#/$defs/content_id" },
+    "bounds": { "$ref": "#/$defs/bounds" },
+    "entry_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entry_id", "position"],
+        "properties": {
+          "entry_id": { "$ref": "#/$defs/content_id" },
+          "position": { "$ref": "#/$defs/position" },
+          "facing_yaw": { "type": "number" }
+        }
+      }
+    },
+    "spawn_groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["spawn_group_id", "npc_archetype_id", "loot_table_id", "spawn_points"],
+        "properties": {
+          "spawn_group_id": { "$ref": "#/$defs/content_id" },
+          "npc_archetype_id": { "$ref": "#/$defs/content_id" },
+          "loot_table_id": { "$ref": "#/$defs/content_id" },
+          "spawn_points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["spawn_point_id", "position"],
+              "properties": {
+                "spawn_point_id": { "$ref": "#/$defs/content_id" },
+                "position": { "$ref": "#/$defs/position" },
+                "facing_yaw": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "quest_providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["provider_id", "display_name", "position"],
+        "properties": {
+          "provider_id": { "$ref": "#/$defs/content_id" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "position": { "$ref": "#/$defs/position" },
+          "offered_quest_ids": { "$ref": "#/$defs/id_list" }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "tick_ms": { "type": "integer", "minimum": 16, "maximum": 250 },
+        "max_players": { "type": "integer", "minimum": 1 },
+        "max_entities": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "content_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "id_list": { "type": "array", "items": { "$ref": "#/$defs/content_id" }, "uniqueItems": true },
+    "position": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "required": ["min_x", "min_y", "min_z", "max_x", "max_y", "max_z"],
+      "properties": {
+        "min_x": { "type": "number" },
+        "min_y": { "type": "number" },
+        "min_z": { "type": "number" },
+        "max_x": { "type": "number" },
+        "max_y": { "type": "number" },
+        "max_z": { "type": "number" }
+      }
+    }
+  }
+}

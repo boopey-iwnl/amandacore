@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/ability-v1.schema.json",
+  "title": "AmandaCore Ability Catalog v1",
+  "type": "object",
+  "required": ["abilities"],
+  "additionalProperties": false,
+  "properties": {
+    "abilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ability_id", "display_name", "school", "target_rule", "timing", "cooldown_ms", "effects"],
+        "properties": {
+          "ability_id": { "$ref": "#/$defs/content_id" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "school": { "enum": ["physical", "primal", "spirit", "arcane", "none"] },
+          "target_rule": { "enum": ["self", "enemy", "ally", "none"] },
+          "range": { "type": "number", "minimum": 0 },
+          "timing": {
+            "type": "object",
+            "properties": {
+              "cast_ms": { "type": "integer", "minimum": 0 },
+              "channel_ms": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "cooldown_ms": { "type": "integer", "minimum": 0 },
+          "cooldown_category": { "$ref": "#/$defs/content_id" },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "properties": {
+                "kind": { "enum": ["direct_damage", "heal", "apply_aura"] },
+                "aura_id": { "$ref": "#/$defs/content_id" },
+                "magnitude": { "type": "number" }
+              }
+            }
+          },
+          "tags": { "$ref": "#/$defs/string_list" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "string_list": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }
+}

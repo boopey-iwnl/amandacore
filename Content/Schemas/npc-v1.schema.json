@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amandacore.local/schemas/npc-v1.schema.json",
+  "title": "AmandaCore NPC Catalog v1",
+  "type": "object",
+  "required": ["npcs"],
+  "additionalProperties": false,
+  "properties": {
+    "npcs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["archetype_id", "display_name", "level", "max_health", "disposition"],
+        "properties": {
+          "archetype_id": { "$ref": "#/$defs/content_id" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "level": { "type": "integer", "minimum": 1 },
+          "max_health": { "type": "number", "exclusiveMinimum": 0 },
+          "disposition": { "enum": ["hostile", "neutral", "friendly"] },
+          "attack_range": { "type": "number", "minimum": 0 },
+          "aggro_range": { "type": "number", "minimum": 0 },
+          "leash_range": { "type": "number", "minimum": 0 },
+          "base_damage": { "type": "number", "minimum": 0 },
+          "attack_interval_ms": { "type": "integer", "minimum": 1 },
+          "default_ability_ids": { "$ref": "#/$defs/id_list" },
+          "tags": { "$ref": "#/$defs/string_list" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "id_list": { "type": "array", "items": { "$ref": "#/$defs/content_id" }, "uniqueItems": true },
+    "string_list": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }
+}

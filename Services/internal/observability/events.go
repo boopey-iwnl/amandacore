@@ -75,6 +75,16 @@ const (
 	EventEconomyMailCreated           = "economy.mail_created"
 	EventEconomyMailClaimed           = "economy.mail_claimed"
 	EventEconomyDuplicateRejected     = "economy.duplicate_mutation_rejected"
+	EventContentPackageLoaded         = "content.package_loaded"
+	EventContentValidationFailed      = "content.package_validation_failed"
+	EventContentPackageCompiled       = "content.package_compiled"
+	EventContentRegistryReady         = "content.registry_ready"
+	EventContentReferenceMissing      = "content.reference_missing"
+	EventContentHookInvoked           = "content.hook_invoked"
+	EventContentHookRejected          = "content.hook_rejected"
+	EventContentQuestDefinitionLoaded = "content.quest_definition_loaded"
+	EventContentLootTableLoaded       = "content.loot_table_loaded"
+	EventContentNPCDefinitionLoaded   = "content.npc_definition_loaded"
 	EventAbilityCastStarted           = "ability.cast_started"
 	EventAbilityCastCompleted         = "ability.cast_completed"
 	EventAbilityCastInterrupted       = "ability.cast_interrupted"
@@ -160,6 +170,16 @@ func StableEventNames() []string {
 		EventEconomyMailCreated,
 		EventEconomyMailClaimed,
 		EventEconomyDuplicateRejected,
+		EventContentPackageLoaded,
+		EventContentValidationFailed,
+		EventContentPackageCompiled,
+		EventContentRegistryReady,
+		EventContentReferenceMissing,
+		EventContentHookInvoked,
+		EventContentHookRejected,
+		EventContentQuestDefinitionLoaded,
+		EventContentLootTableLoaded,
+		EventContentNPCDefinitionLoaded,
 		EventAbilityCastStarted,
 		EventAbilityCastCompleted,
 		EventAbilityCastInterrupted,

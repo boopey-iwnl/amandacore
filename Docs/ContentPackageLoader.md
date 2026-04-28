@@ -20,6 +20,10 @@ Content/Packs/dev_foundation/
   quests/dev_quests.json
   abilities/dev_abilities.json
   auras/dev_auras.json
+  vendors/dev_vendors.json
+  trainers/dev_trainers.json
+  dialogues/dev_dialogues.json
+  hooks/dev_hooks.json
 ```
 
 The first multi-zone package lives at:
@@ -76,6 +80,10 @@ Relative paths are resolved from the current working directory first, then by wa
 - `quest_catalogs`
 - `ability_catalogs`
 - `aura_catalogs`
+- `vendor_catalogs`
+- `trainer_catalogs`
+- `dialogue_catalogs`
+- `hook_catalogs`
 - `tags`
 
 `schema_version` is currently `1`. Unsupported schema versions are rejected before runtime activation.
@@ -154,6 +162,26 @@ Quest catalogs define quest metadata, prerequisite quest IDs, objective graph no
 
 Ability catalogs define ability ID, school, target rule, range, timing, cooldown, effects, and tags. Aura catalogs define aura ID, kind, duration, stack behavior, tick rule, modifiers, and tags. Content-loaded abilities and auras are validated and registered, but the current combat runtime still uses the existing hardcoded ability catalog.
 
+Vendor catalogs define vendor IDs, display names, optional package NPC/provider IDs, and sellable item references. Trainer catalogs define trainer IDs, display names, optional package NPC/provider IDs, and learnable ability references. Dialogue catalogs define speaker-bound entries and optional hook binding references. Hook catalogs define declarative event bindings using AmandaCore-supported hook names and safe declarative actions.
+
+## Compiler
+
+Validate a package without writing output:
+
+```powershell
+cd Services
+go run ./cmd/content-compiler --package ..\Content\Packs\dev_foundation\package.json --check
+```
+
+Emit a deterministic compiled report to a temporary path:
+
+```powershell
+cd Services
+go run ./cmd/content-compiler --package ..\Content\Packs\dev_foundation\package.json --out $env:TEMP\dev_foundation.compiled.json
+```
+
+The compiled report lists package metadata, schema version, source catalog paths, sorted content IDs, hook summaries, catalog counts, and a deterministic SHA-256. It is a validation artifact, not a required committed runtime artifact.
+
 ## Validation
 
 The loader reports all practical errors without panicking. Error codes include:
@@ -173,6 +201,8 @@ The loader reports all practical errors without panicking. Error codes include:
 
 Package-level validation catches duplicate IDs, missing files, malformed JSON, broken spawn/NPC/loot/item/quest/ability/aura/map references, invalid numeric ranges, positions outside zone or map bounds, invalid runtime config, missing reciprocal adjacency where required, transition metadata mismatches, and quest objective dependency cycles.
 
+Milestone 8 also validates vendor item references, trainer ability references, dialogue speaker/hook references, hook source references, supported hook names, and declarative hook action targets.
+
 ## Runtime Activation
 
 Only validated content activates. Activation builds a `RuntimeContentRegistry`, creates `ZoneRuntime` records, converts package zones and transition points to current world zone definitions, attaches map export metadata to zone runtimes, registers quest providers as friendly NPCs, converts spawn groups to mob spawn definitions, registers simple quest projections, and merges package items into the current item lookup path.
@@ -188,6 +218,8 @@ For zones with map exports, `ZoneRuntime` includes:
 World responses include a `streaming` payload for the active zone. It exposes map ID, bounds, adjacent zones, transition hints, and placeholder streaming cells for future client wiring while keeping Go authoritative over traversal. The console world client now deserializes this payload and prints a nearest-transition preview.
 
 Existing hardcoded Stonewake and Brindlebrook flows remain as fallback. The content package is additive and does not replace the current starter content yet.
+
+The runtime registry now exposes catalog lookup methods for quests, NPCs, loot tables, abilities, vendors, trainers, and zones. These methods return value copies and typed missing-content errors so callers can use the registry without mutating package state.
 
 Structured events include:
 

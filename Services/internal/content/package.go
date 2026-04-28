@@ -79,23 +79,27 @@ const (
 )
 
 type ContentPackageManifest struct {
-	PackageID       string   `json:"package_id"`
-	DisplayName     string   `json:"display_name"`
-	Version         string   `json:"version"`
-	SchemaVersion   string   `json:"schema_version"`
-	Description     string   `json:"description"`
-	Authorship      string   `json:"authorship"`
-	ContinentFiles  []string `json:"continent_files"`
-	Zones           []string `json:"zones"`
-	MapExports      []string `json:"map_exports"`
-	NPCCatalogs     []string `json:"npc_catalogs"`
-	ItemCatalogs    []string `json:"item_catalogs"`
-	LootCatalogs    []string `json:"loot_catalogs"`
-	QuestCatalogs   []string `json:"quest_catalogs"`
-	AbilityCatalogs []string `json:"ability_catalogs"`
-	AuraCatalogs    []string `json:"aura_catalogs"`
-	Dependencies    []string `json:"dependencies"`
-	Tags            []string `json:"tags"`
+	PackageID        string   `json:"package_id"`
+	DisplayName      string   `json:"display_name"`
+	Version          string   `json:"version"`
+	SchemaVersion    string   `json:"schema_version"`
+	Description      string   `json:"description"`
+	Authorship       string   `json:"authorship"`
+	ContinentFiles   []string `json:"continent_files"`
+	Zones            []string `json:"zones"`
+	MapExports       []string `json:"map_exports"`
+	NPCCatalogs      []string `json:"npc_catalogs"`
+	ItemCatalogs     []string `json:"item_catalogs"`
+	LootCatalogs     []string `json:"loot_catalogs"`
+	QuestCatalogs    []string `json:"quest_catalogs"`
+	AbilityCatalogs  []string `json:"ability_catalogs"`
+	AuraCatalogs     []string `json:"aura_catalogs"`
+	VendorCatalogs   []string `json:"vendor_catalogs"`
+	TrainerCatalogs  []string `json:"trainer_catalogs"`
+	DialogueCatalogs []string `json:"dialogue_catalogs"`
+	HookCatalogs     []string `json:"hook_catalogs"`
+	Dependencies     []string `json:"dependencies"`
+	Tags             []string `json:"tags"`
 }
 
 type ContentPackageSource struct {
@@ -110,19 +114,23 @@ type ContentPackageLoadResult struct {
 }
 
 type LoadedContentPackage struct {
-	Manifest      ContentPackageManifest `json:"manifest"`
-	Source        ContentPackageSource   `json:"source"`
-	Continents    []ContinentDefinition  `json:"continents"`
-	Zones         []ZoneDefinition       `json:"zones"`
-	MapExports    []MapExportDefinition  `json:"map_exports"`
-	NPCs          []NpcArchetype         `json:"npcs"`
-	Items         []ItemDefinition       `json:"items"`
-	LootTables    []LootTableDefinition  `json:"loot_tables"`
-	Quests        []QuestDefinition      `json:"quests"`
-	Abilities     []AbilityDefinition    `json:"abilities"`
-	Auras         []AuraDefinition       `json:"auras"`
-	LoadedFiles   []string               `json:"loaded_files"`
-	CatalogCounts map[string]int         `json:"catalog_counts"`
+	Manifest      ContentPackageManifest  `json:"manifest"`
+	Source        ContentPackageSource    `json:"source"`
+	Continents    []ContinentDefinition   `json:"continents"`
+	Zones         []ZoneDefinition        `json:"zones"`
+	MapExports    []MapExportDefinition   `json:"map_exports"`
+	NPCs          []NpcArchetype          `json:"npcs"`
+	Items         []ItemDefinition        `json:"items"`
+	LootTables    []LootTableDefinition   `json:"loot_tables"`
+	Quests        []QuestDefinition       `json:"quests"`
+	Abilities     []AbilityDefinition     `json:"abilities"`
+	Auras         []AuraDefinition        `json:"auras"`
+	Vendors       []VendorDefinition      `json:"vendors"`
+	Trainers      []TrainerDefinition     `json:"trainers"`
+	Dialogues     []DialogueDefinition    `json:"dialogues"`
+	HookBindings  []HookBindingDefinition `json:"hook_bindings"`
+	LoadedFiles   []string                `json:"loaded_files"`
+	CatalogCounts map[string]int          `json:"catalog_counts"`
 }
 
 type ValidatedContentPackage struct {
@@ -143,6 +151,10 @@ type RuntimeContentRegistry struct {
 	Quests          map[string]QuestDefinition
 	Abilities       map[string]AbilityDefinition
 	Auras           map[string]AuraDefinition
+	Vendors         map[string]VendorDefinition
+	Trainers        map[string]TrainerDefinition
+	Dialogues       map[string]DialogueDefinition
+	HookBindings    map[string]HookBindingDefinition
 	QuestProvider   map[string]QuestProviderDefinition
 	SpawnPoints     map[string]ZoneSpawnPointDefinition
 	HandoffGates    map[string]HandoffGateDefinition
@@ -588,6 +600,21 @@ func (ContentPackageLoader) Load(manifestPath string) ContentPackageLoadResult {
 			"version":   manifest.Version,
 			"schema":    manifest.SchemaVersion,
 		})
+		observability.LogEvent("content-loader", observability.EventContentPackageLoaded, map[string]any{
+			"packageId": manifest.PackageID,
+			"version":   manifest.Version,
+			"schema":    manifest.SchemaVersion,
+		})
+		observability.LogEvent("content-loader", observability.EventContentRegistryReady, map[string]any{
+			"packageId":    manifest.PackageID,
+			"zoneCount":    len(registry.Zones),
+			"questCount":   len(registry.Quests),
+			"npcCount":     len(registry.NPCs),
+			"lootCount":    len(registry.LootTables),
+			"vendorCount":  len(registry.Vendors),
+			"trainerCount": len(registry.Trainers),
+			"hookCount":    len(registry.HookBindings),
+		})
 		return result
 	}
 
@@ -714,6 +741,50 @@ func loadFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
 		target.CatalogCounts["auras"] += len(file.Auras)
 		return nil
 	})
+	loadCatalogFiles(loaded.Manifest.VendorCatalogs, loaded, report, "vendor_catalogs", "vendor", func(target *LoadedContentPackage, payload []byte) error {
+		var file struct {
+			Vendors []VendorDefinition `json:"vendors"`
+		}
+		if err := json.Unmarshal(payload, &file); err != nil {
+			return err
+		}
+		target.Vendors = append(target.Vendors, file.Vendors...)
+		target.CatalogCounts["vendors"] += len(file.Vendors)
+		return nil
+	})
+	loadCatalogFiles(loaded.Manifest.TrainerCatalogs, loaded, report, "trainer_catalogs", "trainer", func(target *LoadedContentPackage, payload []byte) error {
+		var file struct {
+			Trainers []TrainerDefinition `json:"trainers"`
+		}
+		if err := json.Unmarshal(payload, &file); err != nil {
+			return err
+		}
+		target.Trainers = append(target.Trainers, file.Trainers...)
+		target.CatalogCounts["trainers"] += len(file.Trainers)
+		return nil
+	})
+	loadCatalogFiles(loaded.Manifest.DialogueCatalogs, loaded, report, "dialogue_catalogs", "dialogue", func(target *LoadedContentPackage, payload []byte) error {
+		var file struct {
+			Dialogues []DialogueDefinition `json:"dialogues"`
+		}
+		if err := json.Unmarshal(payload, &file); err != nil {
+			return err
+		}
+		target.Dialogues = append(target.Dialogues, file.Dialogues...)
+		target.CatalogCounts["dialogues"] += len(file.Dialogues)
+		return nil
+	})
+	loadCatalogFiles(loaded.Manifest.HookCatalogs, loaded, report, "hook_catalogs", "hook", func(target *LoadedContentPackage, payload []byte) error {
+		var file struct {
+			HookBindings []HookBindingDefinition `json:"hook_bindings"`
+		}
+		if err := json.Unmarshal(payload, &file); err != nil {
+			return err
+		}
+		target.HookBindings = append(target.HookBindings, file.HookBindings...)
+		target.CatalogCounts["hook_bindings"] += len(file.HookBindings)
+		return nil
+	})
 }
 
 func loadContinentFiles(loaded *LoadedContentPackage, report *ContentValidationReport) {
@@ -827,6 +898,10 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	questIDs := validateIDs("quests", loaded.Quests, func(quest QuestDefinition) string { return quest.QuestID }, &report)
 	abilityIDs := validateIDs("abilities", loaded.Abilities, func(ability AbilityDefinition) string { return ability.AbilityID }, &report)
 	auraIDs := validateIDs("auras", loaded.Auras, func(aura AuraDefinition) string { return aura.AuraID }, &report)
+	vendorIDs := validateIDs("vendors", loaded.Vendors, func(vendor VendorDefinition) string { return vendor.VendorID }, &report)
+	trainerIDs := validateIDs("trainers", loaded.Trainers, func(trainer TrainerDefinition) string { return trainer.TrainerID }, &report)
+	dialogueIDs := validateIDs("dialogues", loaded.Dialogues, func(dialogue DialogueDefinition) string { return dialogue.DialogueID }, &report)
+	hookBindingIDs := validateIDs("hook_bindings", loaded.HookBindings, func(binding HookBindingDefinition) string { return binding.BindingID }, &report)
 	spawnPointZones := collectPackageSpawnPointZones(loaded.Zones, &report)
 
 	zoneByID := collectZonesByID(loaded.Zones)
@@ -857,6 +932,18 @@ func ValidateLoadedContentPackage(loaded LoadedContentPackage) ContentValidation
 	}
 	for index, aura := range loaded.Auras {
 		validateAura(aura, index, &report)
+	}
+	for index, vendor := range loaded.Vendors {
+		validateVendor(vendor, index, itemIDs, &report)
+	}
+	for index, trainer := range loaded.Trainers {
+		validateTrainer(trainer, index, abilityIDs, &report)
+	}
+	for index, dialogue := range loaded.Dialogues {
+		validateDialogue(dialogue, index, npcIDs, providerIDs, hookBindingIDs, &report)
+	}
+	for index, binding := range loaded.HookBindings {
+		validateHookBinding(binding, index, npcIDs, providerIDs, questIDs, itemIDs, lootIDs, abilityIDs, vendorIDs, trainerIDs, dialogueIDs, &report)
 	}
 
 	return report
@@ -1599,6 +1686,10 @@ func NewRuntimeContentRegistry(loaded LoadedContentPackage) RuntimeContentRegist
 		Quests:          map[string]QuestDefinition{},
 		Abilities:       map[string]AbilityDefinition{},
 		Auras:           map[string]AuraDefinition{},
+		Vendors:         map[string]VendorDefinition{},
+		Trainers:        map[string]TrainerDefinition{},
+		Dialogues:       map[string]DialogueDefinition{},
+		HookBindings:    map[string]HookBindingDefinition{},
 		QuestProvider:   map[string]QuestProviderDefinition{},
 		SpawnPoints:     map[string]ZoneSpawnPointDefinition{},
 		HandoffGates:    map[string]HandoffGateDefinition{},
@@ -1649,6 +1740,18 @@ func NewRuntimeContentRegistry(loaded LoadedContentPackage) RuntimeContentRegist
 	}
 	for _, aura := range loaded.Auras {
 		registry.Auras[aura.AuraID] = aura
+	}
+	for _, vendor := range loaded.Vendors {
+		registry.Vendors[vendor.VendorID] = vendor
+	}
+	for _, trainer := range loaded.Trainers {
+		registry.Trainers[trainer.TrainerID] = trainer
+	}
+	for _, dialogue := range loaded.Dialogues {
+		registry.Dialogues[dialogue.DialogueID] = dialogue
+	}
+	for _, binding := range loaded.HookBindings {
+		registry.HookBindings[binding.BindingID] = binding
 	}
 	return registry
 }
@@ -1826,6 +1929,12 @@ func hasObjectiveCycle(nodes []QuestObjectiveNode) bool {
 
 func logBrokenReference(sourceKind string, sourceID string, targetKind string, targetID string) {
 	observability.LogEvent("content-loader", EventReferenceBroken, map[string]any{
+		"sourceKind": sourceKind,
+		"sourceId":   sourceID,
+		"targetKind": targetKind,
+		"targetId":   targetID,
+	})
+	observability.LogEvent("content-loader", observability.EventContentReferenceMissing, map[string]any{
 		"sourceKind": sourceKind,
 		"sourceId":   sourceID,
 		"targetKind": targetKind,

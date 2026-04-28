@@ -44,6 +44,28 @@
         "dev",
         "aura-check"
       ]
+    },
+    {
+      "ability_id": "dev_pathfinder_focus",
+      "display_name": "Pathfinder Focus",
+      "school": "spirit",
+      "target_rule": "self",
+      "range": 0,
+      "timing": {
+        "cast_ms": 0
+      },
+      "cooldown_ms": 3000,
+      "cooldown_category": "dev_training",
+      "effects": [
+        {
+          "kind": "heal",
+          "magnitude": 4
+        }
+      ],
+      "tags": [
+        "dev",
+        "trainer"
+      ]
     }
   ]
 }

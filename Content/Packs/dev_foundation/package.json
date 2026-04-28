@@ -26,6 +26,18 @@
   "aura_catalogs": [
     "auras/dev_auras.json"
   ],
+  "vendor_catalogs": [
+    "vendors/dev_vendors.json"
+  ],
+  "trainer_catalogs": [
+    "trainers/dev_trainers.json"
+  ],
+  "dialogue_catalogs": [
+    "dialogues/dev_dialogues.json"
+  ],
+  "hook_catalogs": [
+    "hooks/dev_hooks.json"
+  ],
   "tags": [
     "dev",
     "runtime-loader"

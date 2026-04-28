@@ -96,6 +96,10 @@ func (s *worldServer) activateValidatedContentPackageLocked(pkg contentpkg.Valid
 			"quests":      len(registry.Quests),
 			"abilities":   len(registry.Abilities),
 			"auras":       len(registry.Auras),
+			"vendors":     len(registry.Vendors),
+			"trainers":    len(registry.Trainers),
+			"dialogues":   len(registry.Dialogues),
+			"hooks":       len(registry.HookBindings),
 			"handoff":     len(registry.HandoffGates),
 		},
 	}
