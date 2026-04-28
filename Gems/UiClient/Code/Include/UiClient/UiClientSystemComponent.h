@@ -60,6 +60,10 @@ namespace UiClient
         bool SubmitChatInput(GameCore::IGameCoreRequests* gameCore, const AZStd::string& input);
         void BeginChatInput();
         void EndChatInput(bool clearBuffer);
+        void MarkGameplayPanelOpened(const char* panelId);
+        bool IsGameplayPanelOpen(const char* panelId) const;
+        bool CloseGameplayPanelById(const char* panelId, const char* reason);
+        void ResetHudLayout();
 
         AZStd::string m_lastQuestState;
         int m_lastQuestCount = -1;
@@ -72,6 +76,7 @@ namespace UiClient
         AZStd::string m_lastErrorMessage;
         AZStd::string m_activeInteractionEntityId;
         AZStd::string m_activeInteractionKind;
+        AZStd::string m_topGameplayPanel;
         AZStd::string m_questToast;
         AZStd::deque<AZStd::string> m_eventLog;
         AZ::u64 m_lastHandledInteractionSequence = 0;
@@ -89,6 +94,8 @@ namespace UiClient
         bool m_questLogOpen = false;
         bool m_mapOpen = false;
         bool m_talentsOpen = false;
+        bool m_uiEditMode = false;
+        bool m_uiLayoutDirty = false;
         int m_settingsTab = 0;
         bool m_extraUpperActionBarVisible = true;
         bool m_rightActionBarOneVisible = true;
@@ -127,5 +134,15 @@ namespace UiClient
         int m_auctionStackCount = 1;
         int m_pendingActionMoveSlot = -1;
         int m_pendingInventoryMoveSlot = -1;
+        float m_chatOffsetX = 0.0f;
+        float m_chatOffsetY = 0.0f;
+        float m_objectiveTrackerOffsetX = 0.0f;
+        float m_objectiveTrackerOffsetY = 0.0f;
+        float m_actionBarOffsetX = 0.0f;
+        float m_actionBarOffsetY = 0.0f;
+        float m_bagOffsetX = 0.0f;
+        float m_bagOffsetY = 0.0f;
+        float m_minimapOffsetX = 0.0f;
+        float m_minimapOffsetY = 0.0f;
     };
 }

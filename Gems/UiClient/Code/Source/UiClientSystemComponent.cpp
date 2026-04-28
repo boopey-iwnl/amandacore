@@ -61,6 +61,14 @@ namespace UiClient
         constexpr const char* ActionBarSlotPayloadType = "AmandaCoreActionBarSlot";
         constexpr const char* InventorySlotPayloadType = "AmandaCoreInventorySlot";
         constexpr int ActionBarSlotCount = 48;
+        constexpr const char* PanelCharacter = "character";
+        constexpr const char* PanelSpellbook = "spellbook";
+        constexpr const char* PanelQuestLog = "questLog";
+        constexpr const char* PanelMap = "map";
+        constexpr const char* PanelBag = "bag";
+        constexpr const char* PanelSettings = "settings";
+        constexpr const char* PanelSocial = "social";
+        constexpr const char* PanelTalents = "talents";
 
         struct SpellbookAbilityDragPayload
         {
@@ -1218,13 +1226,70 @@ namespace UiClient
             return ImVec2(width, HudButtonHeight);
         }
 
+        ImVec2 ClampHudPosition(const ImVec2& position, const ImVec2& size, const ImVec2& displaySize)
+        {
+            const float maxX = AZ::GetMax(8.0f, displaySize.x - size.x - 8.0f);
+            const float maxY = AZ::GetMax(8.0f, displaySize.y - size.y - 8.0f);
+            return ImVec2(
+                AZ::GetClamp(position.x, 8.0f, maxX),
+                AZ::GetClamp(position.y, 8.0f, maxY));
+        }
+
+        ImVec2 ApplyHudOffset(
+            const ImVec2& defaultPosition,
+            float offsetX,
+            float offsetY,
+            const ImVec2& size,
+            const ImVec2& displaySize)
+        {
+            return ClampHudPosition(ImVec2(defaultPosition.x + offsetX, defaultPosition.y + offsetY), size, displaySize);
+        }
+
+        bool CaptureHudOffset(
+            const ImVec2& defaultPosition,
+            const ImVec2& size,
+            const ImVec2& displaySize,
+            float& offsetX,
+            float& offsetY)
+        {
+            const ImVec2 clampedPosition = ClampHudPosition(ImGui::GetWindowPos(), size, displaySize);
+            const float nextOffsetX = clampedPosition.x - defaultPosition.x;
+            const float nextOffsetY = clampedPosition.y - defaultPosition.y;
+            const float deltaX = nextOffsetX > offsetX ? nextOffsetX - offsetX : offsetX - nextOffsetX;
+            const float deltaY = nextOffsetY > offsetY ? nextOffsetY - offsetY : offsetY - nextOffsetY;
+            const bool changed = deltaX > 0.5f || deltaY > 0.5f;
+            if (changed)
+            {
+                offsetX = nextOffsetX;
+                offsetY = nextOffsetY;
+            }
+            return changed;
+        }
+
+        bool DrawHudPanelCloseButton()
+        {
+            const ImVec2 windowPosition = ImGui::GetWindowPos();
+            const ImVec2 windowSize = ImGui::GetWindowSize();
+            const ImVec2 previousCursor = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos(ImVec2(windowPosition.x + windowSize.x - 33.0f, windowPosition.y + 6.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.24f, 0.09f, 0.08f, 0.92f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.42f, 0.15f, 0.12f, 0.95f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.54f, 0.20f, 0.16f, 1.0f));
+            const bool pressed = ImGui::Button("X", ImVec2(24.0f, 22.0f));
+            ImGui::PopStyleColor(3);
+            ImGui::SetCursorScreenPos(previousCursor);
+            return pressed;
+        }
+
         bool BeginHudPanel(
             const char* identifier,
             const char* title,
             const ImVec2& position,
             const ImVec2& size,
             bool compact = false,
-            bool allowScroll = false)
+            bool allowScroll = false,
+            bool movable = false,
+            bool editMode = false)
         {
             ImGui::SetNextWindowPos(position, ImGuiCond_Always);
             ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -1234,9 +1299,12 @@ namespace UiClient
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, compact ? 8.0f : 16.0f);
             ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse |
                 ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoMove |
                 ImGuiWindowFlags_NoTitleBar |
                 ImGuiWindowFlags_NoSavedSettings;
+            if (!movable)
+            {
+                flags |= ImGuiWindowFlags_NoMove;
+            }
             if (!allowScroll)
             {
                 flags |= ImGuiWindowFlags_NoScrollbar;
@@ -1271,6 +1339,21 @@ namespace UiClient
                     AddVec2(windowPosition, windowSize),
                     title);
                 ImGui::SetCursorScreenPos(ImVec2(windowPosition.x + 14.0f, windowPosition.y + 40.0f));
+            }
+            if (editMode)
+            {
+                const ImVec2 windowMax = AddVec2(windowPosition, windowSize);
+                ImGui::GetWindowDrawList()->AddRect(
+                    ImVec2(windowPosition.x + 2.0f, windowPosition.y + 2.0f),
+                    ImVec2(windowMax.x - 2.0f, windowMax.y - 2.0f),
+                    ColorU32(95, 198, 205, 245),
+                    compact ? 8.0f : 16.0f,
+                    0,
+                    2.0f);
+                ImGui::GetWindowDrawList()->AddText(
+                    ImVec2(windowPosition.x + 10.0f, windowMax.y - 21.0f),
+                    ColorU32(143, 225, 229),
+                    "EDIT");
             }
             return visible;
         }
@@ -2777,7 +2860,7 @@ namespace UiClient
                     ImGui::EndDragDropTarget();
                 }
 
-                if (hasAbility && ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                if (hasAbility && editMode && ImGui::IsItemClicked(ImGuiMouseButton_Right))
                 {
                     if (gameCore->ClearActionBarSlot(slotIndex))
                     {
@@ -2817,11 +2900,11 @@ namespace UiClient
                     }
                     if (editMode)
                     {
-                        tooltip += "\nSHIFT-click to arm move, drag to move, or right-click to clear.";
+                        tooltip += "\nClick to arm move, drag to move, or right-click to clear.";
                     }
                     else
                     {
-                        tooltip += "\nDrag to move this ability, or right-click to clear.";
+                        tooltip += "\nDrag to move this ability. Hold SHIFT or enable Edit Mode to clear.";
                     }
                     ImGui::SetTooltip("%s", tooltip.c_str());
                 }
@@ -3728,6 +3811,7 @@ namespace UiClient
             bool& upperBarVisible,
             bool& rightBarOneVisible,
             bool& rightBarTwoVisible,
+            bool& uiEditMode,
             AZStd::array<AZStd::string, ActionBarSlotCount>& actionSlotBindings,
             AZStd::string& spellbookBinding,
             AZStd::string& bagBinding,
@@ -3737,7 +3821,8 @@ namespace UiClient
             AZStd::string& settingsBinding,
             AZStd::string& interactBinding,
             AZStd::string& targetHostileBinding,
-            AZStd::string& pendingKeybindActionId)
+            AZStd::string& pendingKeybindActionId,
+            bool& resetHudLayoutRequested)
         {
             bool changed = false;
             if (ImGui::BeginTabBar("##settings_tabs"))
@@ -3750,47 +3835,63 @@ namespace UiClient
                     changed |= ImGui::Checkbox("Right action bar 2", &rightBarTwoVisible);
                     ImGui::Spacing();
                     ImGui::TextWrapped("These bars use the same live action-slot payload as the main bar.");
-                    ImGui::TextWrapped("Bars stay locked during normal play. Hold SHIFT to drag learned abilities from the spellbook, move existing buttons, or clear slots.");
-                    ImGui::Separator();
-                    if (ImGui::TreeNodeEx("Keybindings", ImGuiTreeNodeFlags_DefaultOpen))
+                    ImGui::TextWrapped("Bars stay locked during normal play. Hold SHIFT or enable UI edit mode to drag learned abilities from the spellbook, move existing buttons, or clear slots.");
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Keybinds"))
+                {
+                    ImGui::TextUnformatted("Built-in keybind mode");
+                    ImGui::TextWrapped("Click a binding, then press a replacement key. Rebinding a key removes it from any conflicting first-party action.");
+                    if (!pendingKeybindActionId.empty())
                     {
-                        ImGui::TextWrapped("Click a binding, then press a replacement key. Rebinding a key removes it from any conflicting action.");
-                        if (!pendingKeybindActionId.empty())
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
+                        ImGui::Text("Waiting for key: %s", pendingKeybindActionId.c_str());
+                        ImGui::PopStyleColor();
+                    }
+                    ImGui::Separator();
+                    changed |= DrawKeyBindingRow("Spellbook", "spellbook", spellbookBinding, pendingKeybindActionId);
+                    changed |= DrawKeyBindingRow("Bag", "bag", bagBinding, pendingKeybindActionId);
+                    changed |= DrawKeyBindingRow("Character", "character", characterBinding, pendingKeybindActionId);
+                    changed |= DrawKeyBindingRow("Quest Log", "questLog", questLogBinding, pendingKeybindActionId);
+                    changed |= DrawKeyBindingRow("Map", "map", mapBinding, pendingKeybindActionId);
+                    changed |= DrawKeyBindingRow("Settings/Menu", "settings", settingsBinding, pendingKeybindActionId);
+                    changed |= DrawKeyBindingRow("Interact", "interact", interactBinding, pendingKeybindActionId);
+                    changed |= DrawKeyBindingRow("Target Hostile", "targetHostile", targetHostileBinding, pendingKeybindActionId);
+                    ImGui::Separator();
+                    if (ImGui::TreeNodeEx("Action Bar Slots", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        ImGui::BeginChild("##action_keybind_scroll", ImVec2(0.0f, 220.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                        for (int slotIndex = 0; slotIndex < ActionBarSlotCount; ++slotIndex)
                         {
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
-                            ImGui::Text("Waiting for key: %s", pendingKeybindActionId.c_str());
-                            ImGui::PopStyleColor();
+                            const char* barName = slotIndex < 12
+                                ? "Main"
+                                : slotIndex < 24
+                                    ? "Upper"
+                                    : slotIndex < 36
+                                        ? "Right 1"
+                                        : "Right 2";
+                            const AZStd::string label = AZStd::string::format("%s slot %02d", barName, (slotIndex % 12) + 1);
+                            const AZStd::string actionId = SlotActionId(slotIndex);
+                            changed |= DrawKeyBindingRow(label.c_str(), actionId.c_str(), actionSlotBindings[slotIndex], pendingKeybindActionId);
                         }
-                        changed |= DrawKeyBindingRow("Spellbook", "spellbook", spellbookBinding, pendingKeybindActionId);
-                        changed |= DrawKeyBindingRow("Bag", "bag", bagBinding, pendingKeybindActionId);
-                        changed |= DrawKeyBindingRow("Character", "character", characterBinding, pendingKeybindActionId);
-                        changed |= DrawKeyBindingRow("Quest Log", "questLog", questLogBinding, pendingKeybindActionId);
-                        changed |= DrawKeyBindingRow("Map", "map", mapBinding, pendingKeybindActionId);
-                        changed |= DrawKeyBindingRow("Settings/Menu", "settings", settingsBinding, pendingKeybindActionId);
-                        changed |= DrawKeyBindingRow("Interact", "interact", interactBinding, pendingKeybindActionId);
-                        changed |= DrawKeyBindingRow("Target Hostile", "targetHostile", targetHostileBinding, pendingKeybindActionId);
-                        ImGui::Separator();
-                        if (ImGui::TreeNodeEx("Action Bar Slots", ImGuiTreeNodeFlags_DefaultOpen))
-                        {
-                            ImGui::BeginChild("##action_keybind_scroll", ImVec2(0.0f, 170.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-                            for (int slotIndex = 0; slotIndex < ActionBarSlotCount; ++slotIndex)
-                            {
-                                const char* barName = slotIndex < 12
-                                    ? "Main"
-                                    : slotIndex < 24
-                                        ? "Upper"
-                                        : slotIndex < 36
-                                            ? "Right 1"
-                                            : "Right 2";
-                                const AZStd::string label = AZStd::string::format("%s slot %02d", barName, (slotIndex % 12) + 1);
-                                const AZStd::string actionId = SlotActionId(slotIndex);
-                                changed |= DrawKeyBindingRow(label.c_str(), actionId.c_str(), actionSlotBindings[slotIndex], pendingKeybindActionId);
-                            }
-                            ImGui::EndChild();
-                            ImGui::TreePop();
-                        }
+                        ImGui::EndChild();
                         ImGui::TreePop();
                     }
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("UI Layout"))
+                {
+                    ImGui::TextUnformatted("Built-in Edit Mode");
+                    ImGui::Separator();
+                    ImGui::Checkbox("Enable HUD edit mode", &uiEditMode);
+                    ImGui::TextWrapped("When enabled, supported HUD frames show cyan outlines and can be dragged. Normal gameplay mode keeps frames locked.");
+                    ImGui::TextWrapped("Supported frames in this milestone: chat, objectives, action bars, pack anchor, and navigator.");
+                    if (ImGui::Button("Reset HUD Layout", HudButtonSize(170.0f)))
+                    {
+                        resetHudLayoutRequested = true;
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("Restores default anchors for the supported frames.");
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Video"))
@@ -3804,15 +3905,25 @@ namespace UiClient
                     ImGui::TextWrapped("Resolution, fullscreen, and graphics presets are intentionally deferred instead of shown as fake controls.");
                     ImGui::EndTabItem();
                 }
-                if (ImGui::BeginTabItem("Sound"))
+                if (ImGui::BeginTabItem("Audio"))
                 {
-                    ImGui::TextUnformatted("Sound Settings");
+                    ImGui::TextUnformatted("Audio Settings");
                     ImGui::Separator();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
                     ImGui::TextUnformatted("Unavailable in this slice");
                     ImGui::PopStyleColor();
                     ImGui::TextWrapped("No live sound bus settings are wired in this slice yet.");
                     ImGui::TextWrapped("Volume controls are deferred until the audio path is active.");
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Gameplay"))
+                {
+                    ImGui::TextUnformatted("Gameplay Settings");
+                    ImGui::Separator();
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
+                    ImGui::TextUnformatted("Unavailable in this slice");
+                    ImGui::PopStyleColor();
+                    ImGui::TextWrapped("Movement, camera, combat, and server-authoritative gameplay controls remain owned by existing game systems.");
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
@@ -4483,7 +4594,7 @@ namespace UiClient
             }
         }
 
-        void DrawMicroMenuBar(
+        const char* DrawMicroMenuBar(
             bool& characterSheetOpen,
             bool& talentsOpen,
             bool& questLogOpen,
@@ -4500,14 +4611,16 @@ namespace UiClient
                 bool* m_toggle;
             };
 
-            talentsOpen = false;
+            AZ_UNUSED(talentsOpen);
+            AZ_UNUSED(socialOpen);
+            const char* toggledPanel = nullptr;
             MenuButtonState buttons[] = {
-                {"Char", "character", &characterSheetOpen},
-                {"Spells", "spells", &spellbookOpen},
-                {"Quests", "quests", &questLogOpen},
-                {"Map", "map", &mapOpen},
-                {"Bag", "bag", &bagOpen},
-                {"Settings", "settings", &settingsOpen},
+                {"Char", PanelCharacter, &characterSheetOpen},
+                {"Spells", PanelSpellbook, &spellbookOpen},
+                {"Quests", PanelQuestLog, &questLogOpen},
+                {"Map", PanelMap, &mapOpen},
+                {"Bag", PanelBag, &bagOpen},
+                {"Settings", PanelSettings, &settingsOpen},
             };
 
             for (size_t index = 0; index < AZ_ARRAY_SIZE(buttons); ++index)
@@ -4516,9 +4629,10 @@ namespace UiClient
                 {
                     ImGui::SameLine();
                 }
-                if (ImGui::Button(buttons[index].m_label, ImVec2(index == 5 ? 74.0f : 58.0f, 28.0f)))
+                if (ImGui::Button(buttons[index].m_label, ImVec2(index == 5 ? 88.0f : 66.0f, 30.0f)))
                 {
                     *buttons[index].m_toggle = !*buttons[index].m_toggle;
+                    toggledPanel = *buttons[index].m_toggle ? buttons[index].m_panelName : nullptr;
                     AZ_Printf(
                         "amandacore",
                         "client.utility_menu_toggle panel=%s open=%s source=button",
@@ -4526,7 +4640,7 @@ namespace UiClient
                         *buttons[index].m_toggle ? "true" : "false");
                 }
             }
-            socialOpen = false;
+            return toggledPanel;
         }
     } // namespace
 
@@ -4681,9 +4795,28 @@ namespace UiClient
                     value.pop_back();
                 }
             };
+            auto readFloat = [&line](const char* key, float& value)
+            {
+                const size_t keyLength = strlen(key);
+                if (strncmp(line, key, keyLength) != 0 || line[keyLength] != '=')
+                {
+                    return;
+                }
+                value = static_cast<float>(atof(line + keyLength + 1));
+            };
             readBool("upperActionBar", m_extraUpperActionBarVisible);
             readBool("rightActionBarOne", m_rightActionBarOneVisible);
             readBool("rightActionBarTwo", m_rightActionBarTwoVisible);
+            readFloat("layout.chat.x", m_chatOffsetX);
+            readFloat("layout.chat.y", m_chatOffsetY);
+            readFloat("layout.objectives.x", m_objectiveTrackerOffsetX);
+            readFloat("layout.objectives.y", m_objectiveTrackerOffsetY);
+            readFloat("layout.actionBar.x", m_actionBarOffsetX);
+            readFloat("layout.actionBar.y", m_actionBarOffsetY);
+            readFloat("layout.bag.x", m_bagOffsetX);
+            readFloat("layout.bag.y", m_bagOffsetY);
+            readFloat("layout.minimap.x", m_minimapOffsetX);
+            readFloat("layout.minimap.y", m_minimapOffsetY);
             readString("bind.spellbook", m_spellbookBinding);
             readString("bind.bag", m_bagBinding);
             readString("bind.character", m_characterBinding);
@@ -4722,6 +4855,16 @@ namespace UiClient
         fprintf(settingsFile, "upperActionBar=%d\n", m_extraUpperActionBarVisible ? 1 : 0);
         fprintf(settingsFile, "rightActionBarOne=%d\n", m_rightActionBarOneVisible ? 1 : 0);
         fprintf(settingsFile, "rightActionBarTwo=%d\n", m_rightActionBarTwoVisible ? 1 : 0);
+        fprintf(settingsFile, "layout.chat.x=%.1f\n", static_cast<double>(m_chatOffsetX));
+        fprintf(settingsFile, "layout.chat.y=%.1f\n", static_cast<double>(m_chatOffsetY));
+        fprintf(settingsFile, "layout.objectives.x=%.1f\n", static_cast<double>(m_objectiveTrackerOffsetX));
+        fprintf(settingsFile, "layout.objectives.y=%.1f\n", static_cast<double>(m_objectiveTrackerOffsetY));
+        fprintf(settingsFile, "layout.actionBar.x=%.1f\n", static_cast<double>(m_actionBarOffsetX));
+        fprintf(settingsFile, "layout.actionBar.y=%.1f\n", static_cast<double>(m_actionBarOffsetY));
+        fprintf(settingsFile, "layout.bag.x=%.1f\n", static_cast<double>(m_bagOffsetX));
+        fprintf(settingsFile, "layout.bag.y=%.1f\n", static_cast<double>(m_bagOffsetY));
+        fprintf(settingsFile, "layout.minimap.x=%.1f\n", static_cast<double>(m_minimapOffsetX));
+        fprintf(settingsFile, "layout.minimap.y=%.1f\n", static_cast<double>(m_minimapOffsetY));
         fprintf(settingsFile, "bind.spellbook=%s\n", m_spellbookBinding.c_str());
         fprintf(settingsFile, "bind.bag=%s\n", m_bagBinding.c_str());
         fprintf(settingsFile, "bind.character=%s\n", m_characterBinding.c_str());
@@ -4885,28 +5028,48 @@ namespace UiClient
         if (keyName == m_spellbookBinding)
         {
             m_spellbookOpen = !m_spellbookOpen;
+            if (m_spellbookOpen)
+            {
+                MarkGameplayPanelOpened(PanelSpellbook);
+            }
             AZ_Printf("amandacore", "client.spellbook_visible open=%s", m_spellbookOpen ? "true" : "false");
             return true;
         }
         if (keyName == m_bagBinding)
         {
             m_bagOpen = !m_bagOpen;
+            if (m_bagOpen)
+            {
+                MarkGameplayPanelOpened(PanelBag);
+            }
             AZ_Printf("amandacore", "client.inventory_visible open=%s", m_bagOpen ? "true" : "false");
             return true;
         }
         if (keyName == m_characterBinding)
         {
             m_characterSheetOpen = !m_characterSheetOpen;
+            if (m_characterSheetOpen)
+            {
+                MarkGameplayPanelOpened(PanelCharacter);
+            }
             return true;
         }
         if (keyName == m_questLogBinding)
         {
             m_questLogOpen = !m_questLogOpen;
+            if (m_questLogOpen)
+            {
+                MarkGameplayPanelOpened(PanelQuestLog);
+            }
             return true;
         }
         if (keyName == m_mapBinding)
         {
             m_mapOpen = !m_mapOpen;
+            if (m_mapOpen)
+            {
+                MarkGameplayPanelOpened(PanelMap);
+            }
             return true;
         }
         if (keyName == m_settingsBinding)
@@ -4920,6 +5083,10 @@ namespace UiClient
                 return true;
             }
             m_settingsOpen = !m_settingsOpen;
+            if (m_settingsOpen)
+            {
+                MarkGameplayPanelOpened(PanelSettings);
+            }
             AZ_Printf("amandacore", "client.settings_visible open=%s reason=esc", m_settingsOpen ? "true" : "false");
             return true;
         }
@@ -4982,34 +5149,152 @@ namespace UiClient
         return true;
     }
 
-    bool UiClientSystemComponent::CloseOpenGameplayPanel(const char* reason)
+    void UiClientSystemComponent::MarkGameplayPanelOpened(const char* panelId)
     {
-        const bool anyPanelOpen = m_spellbookOpen ||
-            m_bagOpen ||
-            m_socialOpen ||
-            m_characterSheetOpen ||
-            m_questLogOpen ||
-            m_mapOpen ||
-            m_talentsOpen ||
-            m_settingsOpen;
-        if (!anyPanelOpen)
+        if (panelId && panelId[0] != '\0' && IsGameplayPanelOpen(panelId))
+        {
+            m_topGameplayPanel = panelId;
+        }
+    }
+
+    bool UiClientSystemComponent::IsGameplayPanelOpen(const char* panelId) const
+    {
+        if (!panelId)
         {
             return false;
         }
+        if (strcmp(panelId, PanelSpellbook) == 0)
+        {
+            return m_spellbookOpen;
+        }
+        if (strcmp(panelId, PanelBag) == 0)
+        {
+            return m_bagOpen;
+        }
+        if (strcmp(panelId, PanelSocial) == 0)
+        {
+            return m_socialOpen;
+        }
+        if (strcmp(panelId, PanelCharacter) == 0)
+        {
+            return m_characterSheetOpen;
+        }
+        if (strcmp(panelId, PanelQuestLog) == 0)
+        {
+            return m_questLogOpen;
+        }
+        if (strcmp(panelId, PanelMap) == 0)
+        {
+            return m_mapOpen;
+        }
+        if (strcmp(panelId, PanelTalents) == 0)
+        {
+            return m_talentsOpen;
+        }
+        if (strcmp(panelId, PanelSettings) == 0)
+        {
+            return m_settingsOpen;
+        }
+        return false;
+    }
 
-        m_spellbookOpen = false;
-        m_bagOpen = false;
-        m_socialOpen = false;
-        m_characterSheetOpen = false;
-        m_questLogOpen = false;
-        m_mapOpen = false;
-        m_talentsOpen = false;
-        m_settingsOpen = false;
+    bool UiClientSystemComponent::CloseGameplayPanelById(const char* panelId, const char* reason)
+    {
+        const AZStd::string safePanelId = panelId ? panelId : "";
+        const char* panelName = safePanelId.c_str();
+        if (!IsGameplayPanelOpen(panelName))
+        {
+            return false;
+        }
+        if (strcmp(panelName, PanelSpellbook) == 0)
+        {
+            m_spellbookOpen = false;
+            m_pendingActionAssignmentAbilityId.clear();
+            m_pendingActionMoveSlot = -1;
+        }
+        else if (strcmp(panelName, PanelBag) == 0)
+        {
+            m_bagOpen = false;
+            m_pendingInventoryMoveSlot = -1;
+        }
+        else if (strcmp(panelName, PanelSocial) == 0)
+        {
+            m_socialOpen = false;
+        }
+        else if (strcmp(panelName, PanelCharacter) == 0)
+        {
+            m_characterSheetOpen = false;
+        }
+        else if (strcmp(panelName, PanelQuestLog) == 0)
+        {
+            m_questLogOpen = false;
+        }
+        else if (strcmp(panelName, PanelMap) == 0)
+        {
+            m_mapOpen = false;
+        }
+        else if (strcmp(panelName, PanelTalents) == 0)
+        {
+            m_talentsOpen = false;
+        }
+        else if (strcmp(panelName, PanelSettings) == 0)
+        {
+            m_settingsOpen = false;
+            m_pendingKeybindActionId.clear();
+        }
+        if (!m_topGameplayPanel.empty() && strcmp(m_topGameplayPanel.c_str(), panelName) == 0)
+        {
+            m_topGameplayPanel.clear();
+        }
         AZ_Printf(
             "amandacore",
-            "client.gameplay_panels_closed reason=%s",
+            "client.gameplay_panel_closed panel=%s reason=%s",
+            panelName,
             reason && reason[0] != '\0' ? reason : "closed");
         return true;
+    }
+
+    void UiClientSystemComponent::ResetHudLayout()
+    {
+        m_chatOffsetX = 0.0f;
+        m_chatOffsetY = 0.0f;
+        m_objectiveTrackerOffsetX = 0.0f;
+        m_objectiveTrackerOffsetY = 0.0f;
+        m_actionBarOffsetX = 0.0f;
+        m_actionBarOffsetY = 0.0f;
+        m_bagOffsetX = 0.0f;
+        m_bagOffsetY = 0.0f;
+        m_minimapOffsetX = 0.0f;
+        m_minimapOffsetY = 0.0f;
+        m_uiLayoutDirty = false;
+        AddHudEvent("HUD layout reset to default.");
+        AZ_Printf("amandacore", "client.hud_layout_reset");
+    }
+
+    bool UiClientSystemComponent::CloseOpenGameplayPanel(const char* reason)
+    {
+        if (!m_topGameplayPanel.empty() && CloseGameplayPanelById(m_topGameplayPanel.c_str(), reason))
+        {
+            return true;
+        }
+        const char* fallbackOrder[] = {
+            PanelSettings,
+            PanelMap,
+            PanelQuestLog,
+            PanelCharacter,
+            PanelSpellbook,
+            PanelBag,
+            PanelSocial,
+            PanelTalents,
+        };
+        for (const char* panelId : fallbackOrder)
+        {
+            if (CloseGameplayPanelById(panelId, reason))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool UiClientSystemComponent::InteractWithCurrentTarget(GameCore::IGameCoreRequests* gameCore)
@@ -5477,7 +5762,7 @@ namespace UiClient
         const auto* targetEntity = FindTargetEntity(worldState);
         const bool hasHostileTarget = targetEntity && targetEntity->m_kind == "hostile_mob";
         const auto& cameraState = gameCore->GetCameraState();
-        const bool actionEditMode = m_shiftHeld || ImGui::GetIO().KeyShift;
+        const bool actionEditMode = m_uiEditMode || m_shiftHeld || ImGui::GetIO().KeyShift;
 
         if (!m_loggedCombatHudReady)
         {
@@ -5670,19 +5955,27 @@ namespace UiClient
         const ImVec2 combatFeedPos(280.0f, 196.0f);
         const ImVec2 combatFeedSize(360.0f, 170.0f);
         const ImVec2 minimapSize(250.0f, 244.0f);
-        const ImVec2 minimapPos(displaySize.x - minimapSize.x - 18.0f, 18.0f);
+        const ImVec2 minimapDefaultPos(displaySize.x - minimapSize.x - 18.0f, 18.0f);
+        const ImVec2 minimapPos = ApplyHudOffset(minimapDefaultPos, m_minimapOffsetX, m_minimapOffsetY, minimapSize, displaySize);
         const ImVec2 rightActionBarSize(66.0f, AZ::GetClamp(displaySize.y - 330.0f, 360.0f, 748.0f));
         const ImVec2 rightActionBarOnePos(displaySize.x - rightActionBarSize.x - 12.0f, 312.0f);
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 4.0f, 312.0f);
         const ImVec2 trackerSize(292.0f, 292.0f);
-        const ImVec2 trackerPos(rightActionBarTwoPos.x - trackerSize.x - 12.0f, 286.0f);
+        const ImVec2 trackerDefaultPos(rightActionBarTwoPos.x - trackerSize.x - 12.0f, 286.0f);
+        const ImVec2 trackerPos = ApplyHudOffset(
+            trackerDefaultPos,
+            m_objectiveTrackerOffsetX,
+            m_objectiveTrackerOffsetY,
+            trackerSize,
+            displaySize);
         const ImVec2 actionBarSize(744.0f, 154.0f);
-        const ImVec2 actionBarPos(
+        const ImVec2 actionBarDefaultPos(
             (displaySize.x - actionBarSize.x) * 0.5f,
             displaySize.y - actionBarSize.y - 18.0f);
+        const ImVec2 actionBarPos = ApplyHudOffset(actionBarDefaultPos, m_actionBarOffsetX, m_actionBarOffsetY, actionBarSize, displaySize);
         const ImVec2 upperActionBarSize(744.0f, 72.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
-        const ImVec2 microMenuSize(410.0f, 42.0f);
+        const ImVec2 microMenuSize(472.0f, 44.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
         const bool microMenuFitsRight = microMenuRightX + microMenuSize.x < rightActionBarTwoPos.x - 12.0f;
         const ImVec2 microMenuPos(
@@ -5697,9 +5990,10 @@ namespace UiClient
             AZ::GetMax(18.0f, spellbookPos.x - trainerSize.x - 18.0f),
             AZ::GetMax(18.0f, displaySize.y - trainerSize.y - 176.0f));
         const ImVec2 inventorySize(330.0f, 430.0f);
-        const ImVec2 inventoryPos(
+        const ImVec2 inventoryDefaultPos(
             AZ::GetMax(18.0f, rightActionBarTwoPos.x - inventorySize.x - 14.0f),
             AZ::GetMax(18.0f, displaySize.y - inventorySize.y - 176.0f));
+        const ImVec2 inventoryPos = ApplyHudOffset(inventoryDefaultPos, m_bagOffsetX, m_bagOffsetY, inventorySize, displaySize);
         const ImVec2 settingsSize(680.0f, 520.0f);
         const ImVec2 settingsPos((displaySize.x - settingsSize.x) * 0.5f, (displaySize.y - settingsSize.y) * 0.5f);
         const ImVec2 characterSize(420.0f, 360.0f);
@@ -5716,7 +6010,8 @@ namespace UiClient
         const ImVec2 partyFramesPos(18.0f, 158.0f);
         const ImVec2 chatSize(displaySize.x < 1500.0f ? 360.0f : 440.0f, 230.0f);
         const bool chatWouldOverlapActionBar = 18.0f + chatSize.x > actionBarPos.x - 12.0f;
-        const ImVec2 chatPos(18.0f, chatWouldOverlapActionBar ? actionBarPos.y - chatSize.y - 8.0f : displaySize.y - chatSize.y - 18.0f);
+        const ImVec2 chatDefaultPos(18.0f, chatWouldOverlapActionBar ? actionBarPos.y - chatSize.y - 8.0f : displaySize.y - chatSize.y - 18.0f);
+        const ImVec2 chatPos = ApplyHudOffset(chatDefaultPos, m_chatOffsetX, m_chatOffsetY, chatSize, displaySize);
         const ImVec2 socialSize(430.0f, 430.0f);
         const ImVec2 socialPos(
             AZ::GetMax(18.0f, rightActionBarTwoPos.x - socialSize.x - 14.0f),
@@ -5814,7 +6109,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (BeginHudPanel("##chat_window", "Chat", chatPos, chatSize))
+        if (BeginHudPanel("##chat_window", "Chat", chatPos, chatSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             AZStd::string submittedInput;
             bool chatFieldActive = false;
@@ -5852,6 +6147,10 @@ namespace UiClient
             {
                 EndChatInput(false);
             }
+            if (m_uiEditMode && CaptureHudOffset(chatDefaultPos, chatSize, displaySize, m_chatOffsetX, m_chatOffsetY))
+            {
+                m_uiLayoutDirty = true;
+            }
         }
         ImGui::End();
 
@@ -5886,19 +6185,33 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (BeginHudPanel("##quest_tracker", "Objectives", trackerPos, trackerSize))
+        if (BeginHudPanel("##quest_tracker", "Objectives", trackerPos, trackerSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             DrawQuestTracker(worldState, nearCommandPoint, distanceToCommandPoint, distanceToEncounter);
+            if (m_uiEditMode &&
+                CaptureHudOffset(
+                    trackerDefaultPos,
+                    trackerSize,
+                    displaySize,
+                    m_objectiveTrackerOffsetX,
+                    m_objectiveTrackerOffsetY))
+            {
+                m_uiLayoutDirty = true;
+            }
         }
         ImGui::End();
 
-        if (BeginHudPanel("##stonewake_minimap", "Navigator", minimapPos, minimapSize))
+        if (BeginHudPanel("##stonewake_minimap", "Navigator", minimapPos, minimapSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             DrawMinimap(worldState, playerX, playerY);
+            if (m_uiEditMode && CaptureHudOffset(minimapDefaultPos, minimapSize, displaySize, m_minimapOffsetX, m_minimapOffsetY))
+            {
+                m_uiLayoutDirty = true;
+            }
         }
         ImGui::End();
 
-        if (BeginHudPanel("##action_bar", "Action Bar", actionBarPos, actionBarSize))
+        if (BeginHudPanel("##action_bar", "Action Bar", actionBarPos, actionBarSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             DrawActionBar(
                 gameCore,
@@ -5922,12 +6235,16 @@ namespace UiClient
                     m_rightActionBarTwoVisible ? "true" : "false");
                 m_loggedActionBarVisible = true;
             }
+            if (m_uiEditMode && CaptureHudOffset(actionBarDefaultPos, actionBarSize, displaySize, m_actionBarOffsetX, m_actionBarOffsetY))
+            {
+                m_uiLayoutDirty = true;
+            }
         }
         ImGui::End();
 
         if (BeginHudPanel("##micro_menu_bar", "", microMenuPos, microMenuSize, true))
         {
-            DrawMicroMenuBar(
+            if (const char* toggledPanel = DrawMicroMenuBar(
                 m_characterSheetOpen,
                 m_talentsOpen,
                 m_questLogOpen,
@@ -5935,7 +6252,10 @@ namespace UiClient
                 m_spellbookOpen,
                 m_bagOpen,
                 m_settingsOpen,
-                m_socialOpen);
+                m_socialOpen))
+            {
+                MarkGameplayPanelOpened(toggledPanel);
+            }
         }
         ImGui::End();
 
@@ -5993,139 +6313,236 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (m_bagOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize, false, true))
+        const bool bagPanelWasOpen = m_bagOpen;
+        if (bagPanelWasOpen && BeginHudPanel("##inventory_pack", "Pack", inventoryPos, inventorySize, false, true, m_uiEditMode, m_uiEditMode))
         {
-            DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot);
-        }
-        if (m_bagOpen)
-        {
-            ImGui::End();
-        }
-
-        if (m_socialOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize, false, true))
-        {
-            DrawSocialWindow(
-                gameCore,
-                worldState,
-                m_socialNameBuffer,
-                AZ_ARRAY_SIZE(m_socialNameBuffer),
-                m_guildNameBuffer,
-                AZ_ARRAY_SIZE(m_guildNameBuffer),
-                m_guildMotdBuffer,
-                AZ_ARRAY_SIZE(m_guildMotdBuffer));
-        }
-        if (m_socialOpen)
-        {
-            ImGui::End();
-        }
-
-        if (m_settingsOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize, false, true))
-        {
-            if (DrawSettingsWindow(
-                    gameCore,
-                    m_extraUpperActionBarVisible,
-                    m_rightActionBarOneVisible,
-                    m_rightActionBarTwoVisible,
-                    m_actionSlotBindings,
-                    m_spellbookBinding,
-                    m_bagBinding,
-                    m_characterBinding,
-                    m_questLogBinding,
-                    m_mapBinding,
-                    m_settingsBinding,
-                    m_interactBinding,
-                    m_targetHostileBinding,
-                    m_pendingKeybindActionId))
+            if (DrawHudPanelCloseButton())
             {
-                SaveUiSettings();
-                m_loggedActionBarVisible = false;
+                CloseGameplayPanelById(PanelBag, "close_button");
+            }
+            else
+            {
+                DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot);
+            }
+            if (m_uiEditMode && CaptureHudOffset(inventoryDefaultPos, inventorySize, displaySize, m_bagOffsetX, m_bagOffsetY))
+            {
+                m_uiLayoutDirty = true;
             }
         }
-        if (m_settingsOpen)
+        if (bagPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_spellbookOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize, false, true))
+        const bool socialPanelWasOpen = m_socialOpen;
+        if (socialPanelWasOpen && BeginHudPanel("##social_window", "Social", socialPos, socialSize, false, true))
         {
-            DrawSpellbook(worldState, actionEditMode, m_pendingActionAssignmentAbilityId);
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelSocial, "close_button");
+            }
+            else
+            {
+                DrawSocialWindow(
+                    gameCore,
+                    worldState,
+                    m_socialNameBuffer,
+                    AZ_ARRAY_SIZE(m_socialNameBuffer),
+                    m_guildNameBuffer,
+                    AZ_ARRAY_SIZE(m_guildNameBuffer),
+                    m_guildMotdBuffer,
+                    AZ_ARRAY_SIZE(m_guildMotdBuffer));
+            }
         }
-        if (m_spellbookOpen)
+        if (socialPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_characterSheetOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize, false, true))
+        const bool settingsPanelWasOpen = m_settingsOpen;
+        if (settingsPanelWasOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize, false, true))
         {
-            DrawCharacterSheetWindow(worldState);
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelSettings, "close_button");
+            }
+            else
+            {
+                bool resetHudLayoutRequested = false;
+                if (DrawSettingsWindow(
+                        gameCore,
+                        m_extraUpperActionBarVisible,
+                        m_rightActionBarOneVisible,
+                        m_rightActionBarTwoVisible,
+                        m_uiEditMode,
+                        m_actionSlotBindings,
+                        m_spellbookBinding,
+                        m_bagBinding,
+                        m_characterBinding,
+                        m_questLogBinding,
+                        m_mapBinding,
+                        m_settingsBinding,
+                        m_interactBinding,
+                        m_targetHostileBinding,
+                        m_pendingKeybindActionId,
+                        resetHudLayoutRequested))
+                {
+                    SaveUiSettings();
+                    m_loggedActionBarVisible = false;
+                }
+                if (resetHudLayoutRequested)
+                {
+                    ResetHudLayout();
+                    SaveUiSettings();
+                }
+            }
         }
-        if (m_characterSheetOpen)
+        if (settingsPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_talentsOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize, false, true))
+        const bool spellbookPanelWasOpen = m_spellbookOpen;
+        if (spellbookPanelWasOpen && BeginHudPanel("##spellbook", "Spellbook", spellbookPos, spellbookSize, false, true))
         {
-            DrawTalentWindow(gameCore, worldState);
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelSpellbook, "close_button");
+            }
+            else
+            {
+                DrawSpellbook(worldState, actionEditMode, m_pendingActionAssignmentAbilityId);
+            }
         }
-        if (m_talentsOpen)
+        if (spellbookPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_questLogOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize, false, true))
+        const bool characterPanelWasOpen = m_characterSheetOpen;
+        if (characterPanelWasOpen && BeginHudPanel("##character_sheet", "Character", characterPos, characterSize, false, true))
         {
-            DrawQuestLogWindow(gameCore, worldState);
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelCharacter, "close_button");
+            }
+            else
+            {
+                DrawCharacterSheetWindow(worldState);
+            }
         }
-        if (m_questLogOpen)
+        if (characterPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_mapOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize, false, true))
+        const bool talentsPanelWasOpen = m_talentsOpen;
+        if (talentsPanelWasOpen && BeginHudPanel("##talents", "Talents", talentsPos, talentsSize, false, true))
         {
-            DrawZoneMapWindow(gameCore, worldState, playerX, playerY);
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelTalents, "close_button");
+            }
+            else
+            {
+                DrawTalentWindow(gameCore, worldState);
+            }
         }
-        if (m_mapOpen)
+        if (talentsPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_auctionOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize, false, true))
+        const bool questLogPanelWasOpen = m_questLogOpen;
+        if (questLogPanelWasOpen && BeginHudPanel("##quest_log", "Quest Log", questLogPos, questLogSize, false, true))
         {
-            DrawAuctionWindow(
-                gameCore,
-                worldState,
-                m_auctionSearchBuffer,
-                AZ_ARRAY_SIZE(m_auctionSearchBuffer),
-                m_auctionBuyoutBuffer,
-                AZ_ARRAY_SIZE(m_auctionBuyoutBuffer),
-                m_pendingAuctionSellSlot,
-                m_auctionStackCount,
-                m_pendingAuctionBuyoutIndex);
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelQuestLog, "close_button");
+            }
+            else
+            {
+                DrawQuestLogWindow(gameCore, worldState);
+            }
         }
-        if (m_auctionOpen)
+        if (questLogPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_trainerOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize, false, true))
+        const bool mapPanelWasOpen = m_mapOpen;
+        if (mapPanelWasOpen && BeginHudPanel("##zone_map", "Zone Map", mapPos, mapSize, false, true))
         {
-            DrawTrainerWindow(gameCore, worldState);
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelMap, "close_button");
+            }
+            else
+            {
+                DrawZoneMapWindow(gameCore, worldState, playerX, playerY);
+            }
         }
-        if (m_trainerOpen)
+        if (mapPanelWasOpen)
         {
             ImGui::End();
         }
 
-        if (m_questGossipOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize, false, true))
+        const bool auctionPanelWasOpen = m_auctionOpen;
+        if (auctionPanelWasOpen && BeginHudPanel("##auction_house", "Market", auctionPos, auctionSize, false, true))
         {
-            if (const char* closeReason = DrawQuestGossipWindow(gameCore, worldState))
+            if (DrawHudPanelCloseButton())
+            {
+                CloseNpcInteraction("close_button");
+            }
+            else
+            {
+                DrawAuctionWindow(
+                    gameCore,
+                    worldState,
+                    m_auctionSearchBuffer,
+                    AZ_ARRAY_SIZE(m_auctionSearchBuffer),
+                    m_auctionBuyoutBuffer,
+                    AZ_ARRAY_SIZE(m_auctionBuyoutBuffer),
+                    m_pendingAuctionSellSlot,
+                    m_auctionStackCount,
+                    m_pendingAuctionBuyoutIndex);
+            }
+        }
+        if (auctionPanelWasOpen)
+        {
+            ImGui::End();
+        }
+
+        const bool trainerPanelWasOpen = m_trainerOpen;
+        if (trainerPanelWasOpen && BeginHudPanel("##trainer", "Trainer", trainerPos, trainerSize, false, true))
+        {
+            if (DrawHudPanelCloseButton())
+            {
+                CloseNpcInteraction("close_button");
+            }
+            else
+            {
+                DrawTrainerWindow(gameCore, worldState);
+            }
+        }
+        if (trainerPanelWasOpen)
+        {
+            ImGui::End();
+        }
+
+        const bool questGossipPanelWasOpen = m_questGossipOpen;
+        if (questGossipPanelWasOpen && BeginHudPanel("##quest_gossip", "Quest", trainerPos, trainerSize, false, true))
+        {
+            if (DrawHudPanelCloseButton())
+            {
+                CloseNpcInteraction("close_button");
+            }
+            else if (const char* closeReason = DrawQuestGossipWindow(gameCore, worldState))
             {
                 CloseNpcInteraction(closeReason);
             }
         }
-        if (m_questGossipOpen)
+        if (questGossipPanelWasOpen)
         {
             ImGui::End();
         }
@@ -6144,6 +6561,12 @@ namespace UiClient
                 ImGui::TextWrapped("%s", m_questToast.c_str());
             }
             ImGui::End();
+        }
+
+        if (m_uiLayoutDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        {
+            SaveUiSettings();
+            m_uiLayoutDirty = false;
         }
     }
 
