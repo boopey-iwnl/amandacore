@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  go-contracts-content:
+    name: Go, Contracts, Content
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: Services/go.mod
+          cache-dependency-path: Services/go.sum
+
+      - name: Diff whitespace check
+        shell: pwsh
+        run: git diff --check
+
+      - name: Forbidden artifact scan
+        shell: pwsh
+        run: .\Infra\qa\Scan-ForbiddenArtifacts.ps1
+
+      - name: Go tests
+        shell: pwsh
+        run: |
+          Push-Location Services
+          go test ./... -count=1 -timeout 15m
+          Pop-Location
+
+      - name: Content compiler check
+        shell: pwsh
+        run: |
+          Push-Location Services
+          go run ./cmd/content-compiler --package ..\Content\Packs\dev_foundation\package.json --check
+          Pop-Location
+
+  dotnet-clients:
+    name: .NET Clients
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build launcher
+        shell: pwsh
+        run: dotnet build .\Client\Launcher\AmandaCore.Launcher\AmandaCore.Launcher.csproj --configuration Release
+
+      - name: Build fallback world client
+        shell: pwsh
+        run: dotnet build .\Client\Game\AmandaCore.WorldClient\AmandaCore.WorldClient.csproj --configuration Release
+
+      - name: Build fallback client tests
+        shell: pwsh
+        run: dotnet build .\Client\Game\AmandaCore.WorldClient.Tests\AmandaCore.WorldClient.Tests.csproj --configuration Release
+
+      - name: Build local controls
+        shell: pwsh
+        run: dotnet build .\Client\Tools\AmandaCore.LocalControls\AmandaCore.LocalControls.csproj --configuration Release
+
+  o3de-local-gate:
+    name: O3DE Local Gate Placeholder
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify O3DE local gate scripts exist
+        shell: pwsh
+        run: |
+          $required = @(
+            ".\Infra\dev\build-o3de-client.ps1",
+            ".\Infra\dev\verify-o3de-client.ps1",
+            ".\Infra\dev\start-local.ps1"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Missing required local O3DE gate script: $path"
+            }
+          }
+          Write-Host "Full O3DE build remains a local release gate because hosted runners do not include the AmandaCore O3DE workspace/toolchain."

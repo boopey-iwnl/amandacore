@@ -11,7 +11,10 @@ import (
 )
 
 func main() {
-	cfg := config.Load("auth-service", "8081")
+	cfg, err := config.LoadValidated("auth-service", "8081")
+	if err != nil {
+		log.Fatal(err)
+	}
 	fileStore, err := store.NewFileStore(cfg.StorePath, cfg.BuildID, cfg.WorldEndpoint)
 	if err != nil {
 		log.Fatal(err)

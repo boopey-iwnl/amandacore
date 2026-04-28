@@ -15,6 +15,7 @@ $buildScript = Join-Path $PSScriptRoot "build-local.ps1"
 $versionManifestScript = Join-Path $PSScriptRoot "write-version-manifest.ps1"
 $versionManifestPath = Join-Path $PSScriptRoot "version-manifest.json"
 $smokeScript = Join-Path $repoRoot "Infra\qa\Smoke-Test.ps1"
+$forbiddenScanScript = Join-Path $repoRoot "Infra\qa\Scan-ForbiddenArtifacts.ps1"
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path ([System.IO.Path]::GetTempPath()) "AmandaCore\$Channel"
@@ -237,6 +238,13 @@ $versionManifest = Get-Content -Path $versionManifestPath -Raw | ConvertFrom-Jso
 $gitStatus = Get-GitValue -Arguments @("status", "--porcelain") -Fallback ""
 if (-not $AllowDirty -and -not [string]::IsNullOrWhiteSpace($gitStatus)) {
     throw "Refusing to create a release package from a dirty worktree. Commit or rerun with -AllowDirty for local validation."
+}
+
+if (Test-Path $forbiddenScanScript) {
+    & $forbiddenScanScript
+    if ($LASTEXITCODE -ne 0) {
+        throw "Forbidden artifact scan failed before packaging."
+    }
 }
 
 $sourceBranch = Get-GitValue -Arguments @("branch", "--show-current") -Fallback "nogit"

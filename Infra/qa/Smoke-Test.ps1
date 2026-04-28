@@ -110,6 +110,44 @@ function Test-PackageDoesNotContain {
     Add-Result -Name $Name -Passed ($violations.Count -eq 0) -Detail $(if ($violations.Count -eq 0) { $PackageRoot } else { ($violations | Select-Object -First 20) -join "; " })
 }
 
+function Test-PackageTextDoesNotContainSecretPatterns {
+    param(
+        [string]$PackageRoot
+    )
+
+    $patterns = @(
+        '-----BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----',
+        '(?i)(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}',
+        'AKIA[0-9A-Z]{16}',
+        '(?i)xox[baprs]-[A-Za-z0-9-]{20,}'
+    )
+    $binaryExtensions = @(".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".dds", ".tga", ".bmp", ".wav", ".mp3", ".ogg", ".fbx", ".pak", ".dll", ".exe", ".pdb")
+    $violations = @()
+
+    foreach ($file in Get-ChildItem -Path $PackageRoot -Recurse -File -Force -ErrorAction SilentlyContinue) {
+        if ($binaryExtensions -contains $file.Extension.ToLowerInvariant()) {
+            continue
+        }
+        if ($file.Length -gt 2MB) {
+            continue
+        }
+        try {
+            $content = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
+        }
+        catch {
+            continue
+        }
+        foreach ($pattern in $patterns) {
+            if ($content -match $pattern) {
+                $violations += (Get-RelativePackagePath -Root $PackageRoot -Path $file.FullName).Replace("\", "/")
+                break
+            }
+        }
+    }
+
+    Add-Result -Name "package text has no high-confidence secrets" -Passed ($violations.Count -eq 0) -Detail $(if ($violations.Count -eq 0) { $PackageRoot } else { ($violations | Select-Object -First 20) -join "; " })
+}
+
 function Test-BinaryFileContainsAscii {
     param(
         [string]$Name,
@@ -415,6 +453,7 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
         '(?i)\.(log|tmp)$',
         '(?i)^(?!Content/Art/).*\.(png|jpg|jpeg)$'
     )
+    Test-PackageTextDoesNotContainSecretPatterns -PackageRoot $PackageRoot
 
     if ($RunO3deLevelSmoke) {
         Invoke-PackageO3deLevelSmoke -PackageRoot $PackageRoot

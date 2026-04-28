@@ -11,7 +11,10 @@ import (
 )
 
 func main() {
-	cfg := config.Load("realm-service", "8083")
+	cfg, err := config.LoadValidated("realm-service", "8083")
+	if err != nil {
+		log.Fatal(err)
+	}
 	fileStore, err := store.NewFileStore(cfg.StorePath, cfg.BuildID, cfg.WorldEndpoint)
 	if err != nil {
 		log.Fatal(err)

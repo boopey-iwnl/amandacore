@@ -1,0 +1,57 @@
+name: Package Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_package_smoke:
+        description: "Run local package script on the hosted runner"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  package-smoke:
+    name: Package Smoke Gate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Forbidden artifact scan
+        shell: pwsh
+        run: .\Infra\qa\Scan-ForbiddenArtifacts.ps1
+
+      - name: Verify package smoke scripts exist
+        shell: pwsh
+        run: |
+          $required = @(
+            ".\Infra\dev\package-alpha.ps1",
+            ".\Infra\dev\build-local.ps1",
+            ".\Infra\dev\write-version-manifest.ps1",
+            ".\Infra\qa\Smoke-Test.ps1"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Missing package gate script: $path"
+            }
+          }
+
+      - name: Set up Go
+        if: ${{ inputs.run_package_smoke }}
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: Services/go.mod
+
+      - name: Set up .NET
+        if: ${{ inputs.run_package_smoke }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run package smoke
+        if: ${{ inputs.run_package_smoke }}
+        shell: pwsh
+        run: .\Infra\dev\package-alpha.ps1 -OutputRoot "$env:RUNNER_TEMP\AmandaCorePackageSmoke" -PackageName "amandacore-ci-smoke" -Channel "ci-smoke" -SkipArchive
