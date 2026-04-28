@@ -57,6 +57,24 @@ const (
 	EventReplicationClientConverged   = "replication.client_converged"
 	EventReplicationClientDiverged    = "replication.client_diverged"
 	EventReplicationFrameDropped      = "replication.frame_dropped"
+	EventSocialFriendAdded            = "social.friend_added"
+	EventSocialFriendRemoved          = "social.friend_removed"
+	EventSocialPartyInviteCreated     = "social.party_invite_created"
+	EventSocialPartyInviteAccepted    = "social.party_invite_accepted"
+	EventSocialPartyMemberRemoved     = "social.party_member_removed"
+	EventSocialGuildCreated           = "social.guild_created"
+	EventSocialGuildInviteCreated     = "social.guild_invite_created"
+	EventSocialGuildInviteAccepted    = "social.guild_invite_accepted"
+	EventSocialChatMessageSent        = "social.chat_message_sent"
+	EventEconomyCurrencyMutated       = "economy.currency_mutated"
+	EventEconomyVendorPurchase        = "economy.vendor_purchase_completed"
+	EventEconomyVendorSale            = "economy.vendor_sale_completed"
+	EventEconomyAuctionListed         = "economy.auction_listed"
+	EventEconomyAuctionBought         = "economy.auction_bought"
+	EventEconomyAuctionCancelled      = "economy.auction_cancelled"
+	EventEconomyMailCreated           = "economy.mail_created"
+	EventEconomyMailClaimed           = "economy.mail_claimed"
+	EventEconomyDuplicateRejected     = "economy.duplicate_mutation_rejected"
 	EventAbilityCastStarted           = "ability.cast_started"
 	EventAbilityCastCompleted         = "ability.cast_completed"
 	EventAbilityCastInterrupted       = "ability.cast_interrupted"
@@ -124,6 +142,24 @@ func StableEventNames() []string {
 		EventReplicationClientConverged,
 		EventReplicationClientDiverged,
 		EventReplicationFrameDropped,
+		EventSocialFriendAdded,
+		EventSocialFriendRemoved,
+		EventSocialPartyInviteCreated,
+		EventSocialPartyInviteAccepted,
+		EventSocialPartyMemberRemoved,
+		EventSocialGuildCreated,
+		EventSocialGuildInviteCreated,
+		EventSocialGuildInviteAccepted,
+		EventSocialChatMessageSent,
+		EventEconomyCurrencyMutated,
+		EventEconomyVendorPurchase,
+		EventEconomyVendorSale,
+		EventEconomyAuctionListed,
+		EventEconomyAuctionBought,
+		EventEconomyAuctionCancelled,
+		EventEconomyMailCreated,
+		EventEconomyMailClaimed,
+		EventEconomyDuplicateRejected,
 		EventAbilityCastStarted,
 		EventAbilityCastCompleted,
 		EventAbilityCastInterrupted,

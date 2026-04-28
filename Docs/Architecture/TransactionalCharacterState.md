@@ -108,12 +108,14 @@ Milestone 3 tests cover:
 
 Existing e2e tests continue to cover the active file-backed service path for account-to-world, reconnect, inventory, action bar, quest, combat, trainer, vendor, gathering, crafting, social, guild, housing, and travel flows. Milestone 5 adds loop-level replay and duplicate-mutation tests for combat, loot, quest rewards, item grants, and currency deltas while leaving the default runtime store path file-backed.
 
+Milestone 7 adds separate SQL repository tests for social and economy transactionality. Those tests cover party/guild membership, chat, currency ledger, vendor, auction, and mail attachment claim behavior, but do not change the active file-backed runtime path.
+
 ## Non-Goals
 
 - No full authoritative world shard loop.
 - No SQL production cutover.
 - No service-wide `AMANDACORE_STORE_BACKEND` selector.
-- No auction, guild, mail, or full economy rewrite.
+- No runtime auction, guild, mail, or full economy cutover.
 - No external MMO schemas, table layouts, packet layouts, opcodes, IDs, command names, or module structures.
 
 ## Risks For Milestone 4 World Loop
