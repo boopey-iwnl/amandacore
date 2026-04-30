@@ -104,6 +104,7 @@ namespace GameCore
         virtual bool SetTarget(const AZStd::string& targetId) = 0;
         virtual bool InteractWithEntity(const AZStd::string& entityId) = 0;
         virtual bool AcceptQuest(const AZStd::string& questId) = 0;
+        virtual bool CompleteQuest(const AZStd::string& questId) = 0;
         virtual bool EnterDungeon(const AZStd::string& dungeonId) = 0;
         virtual bool ExitDungeon() = 0;
         virtual bool TrackQuest(const AZStd::string& questId, bool tracked) = 0;

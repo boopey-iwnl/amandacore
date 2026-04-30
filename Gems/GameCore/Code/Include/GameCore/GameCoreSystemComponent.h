@@ -52,6 +52,7 @@ namespace GameCore
         bool SetTarget(const AZStd::string& targetId) override;
         bool InteractWithEntity(const AZStd::string& entityId) override;
         bool AcceptQuest(const AZStd::string& questId) override;
+        bool CompleteQuest(const AZStd::string& questId) override;
         bool EnterDungeon(const AZStd::string& dungeonId) override;
         bool ExitDungeon() override;
         bool TrackQuest(const AZStd::string& questId, bool tracked) override;

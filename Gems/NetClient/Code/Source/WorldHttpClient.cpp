@@ -580,6 +580,7 @@ namespace NetClient
             ReadString(quest, "title", outQuest.m_title);
             ReadString(quest, "category", outQuest.m_category);
             ReadString(quest, "statusBucket", outQuest.m_statusBucket);
+            ReadString(quest, "levelBand", outQuest.m_levelBand);
             ReadString(quest, "objectiveType", outQuest.m_objectiveType);
             ReadString(quest, "objectiveText", outQuest.m_objectiveText);
             ReadString(quest, "state", outQuest.m_state);
@@ -614,6 +615,55 @@ namespace NetClient
                 ReadDouble(objectiveArea, "centerX", outQuest.m_objectiveX);
                 ReadDouble(objectiveArea, "centerY", outQuest.m_objectiveY);
                 ReadDouble(objectiveArea, "radius", outQuest.m_objectiveRadius);
+            }
+            if (quest.HasMember("objectiveGraph") && quest["objectiveGraph"].IsArray())
+            {
+                for (const rapidjson::Value& nodeValue : quest["objectiveGraph"].GetArray())
+                {
+                    if (!nodeValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    QuestState::ObjectiveNode node;
+                    ReadString(nodeValue, "nodeId", node.m_nodeId);
+                    ReadString(nodeValue, "kind", node.m_kind);
+                    ReadString(nodeValue, "targetNpcArchetype", node.m_targetNpcArchetype);
+                    ReadString(nodeValue, "targetEntityId", node.m_targetEntityId);
+                    ReadString(nodeValue, "targetItemId", node.m_targetItemId);
+                    ReadInt(nodeValue, "currentCount", node.m_currentCount);
+                    ReadInt(nodeValue, "targetCount", node.m_targetCount);
+                    ReadBool(nodeValue, "completed", node.m_completed);
+                    ReadBool(nodeValue, "active", node.m_active);
+                    ReadBool(nodeValue, "terminal", node.m_terminal);
+                    if (nodeValue.HasMember("dependsOn") && nodeValue["dependsOn"].IsArray())
+                    {
+                        for (const rapidjson::Value& dependencyValue : nodeValue["dependsOn"].GetArray())
+                        {
+                            if (dependencyValue.IsString())
+                            {
+                                node.m_dependsOn.push_back(dependencyValue.GetString());
+                            }
+                        }
+                    }
+                    outQuest.m_objectiveGraph.push_back(AZStd::move(node));
+                }
+            }
+            if (quest.HasMember("rewardItems") && quest["rewardItems"].IsArray())
+            {
+                for (const rapidjson::Value& rewardValue : quest["rewardItems"].GetArray())
+                {
+                    if (!rewardValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    QuestState::RewardItem reward;
+                    ReadString(rewardValue, "itemId", reward.m_itemId);
+                    ReadString(rewardValue, "displayName", reward.m_displayName);
+                    ReadInt(rewardValue, "stackCount", reward.m_stackCount);
+                    outQuest.m_rewardItems.push_back(AZStd::move(reward));
+                }
             }
         }
 
@@ -2534,6 +2584,33 @@ namespace NetClient
             worldSessionToken.c_str(),
             questId.c_str());
         if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/quest/accept", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool CompleteQuestRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"questId\":\"%s\"}",
+            worldSessionToken.c_str(),
+            questId.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/quest/complete", requestBody, responseBody, statusCode, outError))
         {
             return false;
         }

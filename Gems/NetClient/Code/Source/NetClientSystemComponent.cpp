@@ -170,6 +170,13 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool CompleteQuestRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool EnterDungeonRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -676,6 +683,16 @@ namespace NetClient
         AZStd::string& outError)
     {
         return AcceptQuestRequest(worldEndpoint, worldSessionToken, questId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::CompleteQuest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return CompleteQuestRequest(worldEndpoint, worldSessionToken, questId, outResponse, outError);
     }
 
     bool NetClientSystemComponent::EnterDungeon(
