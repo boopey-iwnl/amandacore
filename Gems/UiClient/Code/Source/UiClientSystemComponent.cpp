@@ -61,6 +61,7 @@ namespace UiClient
         constexpr const char* SpellbookAbilityPayloadType = "AmandaCoreSpellbookAbility";
         constexpr const char* ActionBarSlotPayloadType = "AmandaCoreActionBarSlot";
         constexpr const char* InventorySlotPayloadType = "AmandaCoreInventorySlot";
+        constexpr const char* EquipmentSlotPayloadType = "AmandaCoreEquipmentSlot";
         constexpr int ActionBarSlotCount = 48;
         constexpr const char* PanelCharacter = "character";
         constexpr const char* PanelSpellbook = "spellbook";
@@ -85,6 +86,11 @@ namespace UiClient
         struct InventorySlotDragPayload
         {
             int m_sourceSlotIndex = -1;
+        };
+
+        struct EquipmentSlotDragPayload
+        {
+            char m_slot[32]{};
         };
 
         struct MapLabelRect
@@ -3314,6 +3320,11 @@ namespace UiClient
             return nullptr;
         }
 
+        void DrawInventoryItemTooltip(
+            const NetClient::InventorySlotState& slot,
+            const NetClient::WorldSessionResponse& session,
+            bool includeMoveHelp);
+
         void DrawInventoryWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState, int& pendingInventoryMoveSlot)
         {
             const int slotCount = worldState.m_session.m_inventory.m_slotCount > 0
@@ -3411,6 +3422,18 @@ namespace UiClient
                             pendingInventoryMoveSlot = -1;
                         }
                     }
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(EquipmentSlotPayloadType))
+                    {
+                        const auto* drag = static_cast<const EquipmentSlotDragPayload*>(payload->Data);
+                        if (drag && gameCore && gameCore->UnequipInventorySlot(drag->m_slot))
+                        {
+                            AZ_Printf(
+                                "amandacore",
+                                "client.inventory_unequip_requested equipmentSlot=%s",
+                                drag->m_slot);
+                            pendingInventoryMoveSlot = -1;
+                        }
+                    }
                     ImGui::EndDragDropTarget();
                 }
                 if (pressed)
@@ -3440,11 +3463,270 @@ namespace UiClient
                 }
                 if (slotState && !slotState->m_itemId.empty() && slotState->m_stackCount > 0 && ImGui::IsItemHovered())
                 {
-                    ImGui::SetTooltip("%s x%d\nDrag or click, then click a destination slot.", slotState->m_displayName.c_str(), slotState->m_stackCount);
+                    DrawInventoryItemTooltip(*slotState, worldState.m_session, true);
                 }
                 ImGui::PopID();
             }
             ImGui::EndChild();
+        }
+
+        AZStd::string EquipmentSlotLabel(const AZStd::string& slot)
+        {
+            if (slot == "head")
+            {
+                return "Head";
+            }
+            if (slot == "shoulders")
+            {
+                return "Shoulders";
+            }
+            if (slot == "chest")
+            {
+                return "Chest";
+            }
+            if (slot == "hands")
+            {
+                return "Hands";
+            }
+            if (slot == "waist")
+            {
+                return "Waist";
+            }
+            if (slot == "legs")
+            {
+                return "Legs";
+            }
+            if (slot == "feet")
+            {
+                return "Feet";
+            }
+            if (slot == "main_hand")
+            {
+                return "Main Hand";
+            }
+            if (slot == "off_hand")
+            {
+                return "Off Hand";
+            }
+            if (slot == "ranged_or_focus")
+            {
+                return "Focus";
+            }
+            if (slot == "accessory_1")
+            {
+                return "Accessory I";
+            }
+            if (slot == "accessory_2")
+            {
+                return "Accessory II";
+            }
+            if (slot == "trinket_1")
+            {
+                return "Keepsake I";
+            }
+            if (slot == "trinket_2")
+            {
+                return "Keepsake II";
+            }
+            if (slot == "cloak_or_back")
+            {
+                return "Back";
+            }
+            return slot.empty() ? AZStd::string("Slot") : slot;
+        }
+
+        AZStd::string EquipmentIconKind(const NetClient::EquipmentSlotState& slot)
+        {
+            if (!slot.m_iconKind.empty())
+            {
+                return slot.m_iconKind;
+            }
+            if (slot.m_itemType == "weapon")
+            {
+                return "ability_auto_attack";
+            }
+            if (slot.m_itemType == "armor")
+            {
+                return "item_padded_vest";
+            }
+            return "icon_missing";
+        }
+
+        const NetClient::EquipmentSlotState* FindEquipmentSlot(
+            const NetClient::EquipmentState& equipment,
+            const AZStd::string& slotId)
+        {
+            for (const auto& slot : equipment.m_slots)
+            {
+                if (slot.m_slot == slotId)
+                {
+                    return &slot;
+                }
+            }
+            return nullptr;
+        }
+
+        const NetClient::EquipmentSlotState* FindEquippedComparison(
+            const NetClient::WorldSessionResponse& session,
+            const NetClient::InventorySlotState& item)
+        {
+            if (item.m_equipSlot.empty())
+            {
+                return nullptr;
+            }
+            const NetClient::EquipmentSlotState* equipped = FindEquipmentSlot(session.m_equipment, item.m_equipSlot);
+            return equipped && !equipped->m_itemId.empty() ? equipped : nullptr;
+        }
+
+        bool InventoryItemCanEquipToSlot(const NetClient::InventorySlotState& item, const AZStd::string& equipmentSlot)
+        {
+            return !item.m_itemId.empty() &&
+                item.m_stackCount == 1 &&
+                !item.m_equipSlot.empty() &&
+                item.m_equipSlot == equipmentSlot;
+        }
+
+        ImVec4 QualityTextColor(const AZStd::string& quality)
+        {
+            if (quality == "poor")
+            {
+                return ImVec4(0.60f, 0.60f, 0.58f, 1.0f);
+            }
+            if (quality == "uncommon")
+            {
+                return ImVec4(0.36f, 0.86f, 0.45f, 1.0f);
+            }
+            if (quality == "rare")
+            {
+                return ImVec4(0.39f, 0.62f, 1.0f, 1.0f);
+            }
+            if (quality == "epic_placeholder")
+            {
+                return ImVec4(0.78f, 0.52f, 1.0f, 1.0f);
+            }
+            return ImVec4(0.95f, 0.92f, 0.82f, 1.0f);
+        }
+
+        void DrawItemMetadataLines(
+            const AZStd::string& itemType,
+            const AZStd::string& itemSubtype,
+            const AZStd::string& equipSlot,
+            const AZStd::string& requiredArchetype,
+            int requiredLevel,
+            int sellPriceCopper,
+            int strength,
+            int stamina,
+            int armor,
+            const AZStd::string& description)
+        {
+            if (!itemType.empty() || !itemSubtype.empty())
+            {
+                ImGui::TextDisabled("%s%s%s",
+                    itemType.c_str(),
+                    !itemType.empty() && !itemSubtype.empty() ? " / " : "",
+                    itemSubtype.c_str());
+            }
+            if (!equipSlot.empty())
+            {
+                ImGui::Text("Slot: %s", EquipmentSlotLabel(equipSlot).c_str());
+            }
+            if (strength != 0)
+            {
+                ImGui::Text("+%d Strength", strength);
+            }
+            if (stamina != 0)
+            {
+                ImGui::Text("+%d Stamina", stamina);
+            }
+            if (armor != 0)
+            {
+                ImGui::Text("+%d Armor", armor);
+            }
+            if (!requiredArchetype.empty())
+            {
+                ImGui::TextDisabled("Requires archetype: %s", requiredArchetype.c_str());
+            }
+            if (requiredLevel > 0)
+            {
+                ImGui::TextDisabled("Requires level %d", requiredLevel);
+            }
+            if (sellPriceCopper > 0)
+            {
+                ImGui::TextDisabled("Sell value: %d copper", sellPriceCopper);
+            }
+            if (!description.empty())
+            {
+                ImGui::Separator();
+                ImGui::TextWrapped("%s", description.c_str());
+            }
+        }
+
+        void DrawInventoryItemTooltip(
+            const NetClient::InventorySlotState& slot,
+            const NetClient::WorldSessionResponse& session,
+            bool includeMoveHelp)
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextColored(QualityTextColor(slot.m_quality), "%s x%d", slot.m_displayName.c_str(), slot.m_stackCount);
+            DrawItemMetadataLines(
+                slot.m_itemType,
+                slot.m_itemSubtype,
+                slot.m_equipSlot,
+                slot.m_requiredArchetype,
+                slot.m_requiredLevel,
+                slot.m_sellPriceCopper,
+                slot.m_strength,
+                slot.m_stamina,
+                slot.m_armor,
+                slot.m_description);
+            if (const NetClient::EquipmentSlotState* equipped = FindEquippedComparison(session, slot))
+            {
+                ImGui::Separator();
+                ImGui::TextDisabled("Equipped %s", EquipmentSlotLabel(equipped->m_slot).c_str());
+                ImGui::TextColored(QualityTextColor(equipped->m_quality), "%s", equipped->m_displayName.c_str());
+                DrawItemMetadataLines(
+                    equipped->m_itemType,
+                    equipped->m_itemSubtype,
+                    equipped->m_equipSlot,
+                    equipped->m_requiredArchetype,
+                    equipped->m_requiredLevel,
+                    equipped->m_sellPriceCopper,
+                    equipped->m_strength,
+                    equipped->m_stamina,
+                    equipped->m_armor,
+                    equipped->m_description);
+            }
+            else if (!slot.m_equipSlot.empty())
+            {
+                ImGui::Separator();
+                ImGui::TextDisabled("No equipped comparison for this slot.");
+            }
+            if (includeMoveHelp)
+            {
+                ImGui::Separator();
+                ImGui::TextDisabled("Drag to move, or click then click a destination slot.");
+            }
+            ImGui::EndTooltip();
+        }
+
+        void DrawEquipmentItemTooltip(const NetClient::EquipmentSlotState& slot)
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextColored(QualityTextColor(slot.m_quality), "%s", slot.m_displayName.c_str());
+            DrawItemMetadataLines(
+                slot.m_itemType,
+                slot.m_itemSubtype,
+                slot.m_equipSlot,
+                slot.m_requiredArchetype,
+                slot.m_requiredLevel,
+                slot.m_sellPriceCopper,
+                slot.m_strength,
+                slot.m_stamina,
+                slot.m_armor,
+                slot.m_description);
+            ImGui::Separator();
+            ImGui::TextDisabled("Drag to the pack to unequip.");
+            ImGui::EndTooltip();
         }
 
         AZStd::string FormatCopperAmount(int totalCopper)
@@ -3952,37 +4234,272 @@ namespace UiClient
             return changed;
         }
 
-        void DrawCharacterSheetWindow(const GameCore::ClientWorldState& worldState)
+        void DrawCharacterPreviewPane(const GameCore::ClientWorldState& worldState)
         {
-            ImGui::TextUnformatted(worldState.m_session.m_displayName.c_str());
+            const ImVec2 previewMin = ImGui::GetCursorScreenPos();
+            const ImVec2 previewSize(250.0f, 300.0f);
+            const ImVec2 previewMax = AddVec2(previewMin, previewSize);
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            drawList->AddRectFilled(previewMin, previewMax, ColorU32(13, 18, 24, 235), 10.0f);
+            drawList->AddRect(previewMin, previewMax, ColorU32(145, 113, 59, 220), 10.0f, 0, 1.5f);
+
+            const ImVec2 center((previewMin.x + previewMax.x) * 0.5f, previewMin.y + 136.0f);
+            drawList->AddCircleFilled(center, 42.0f, ColorU32(48, 74, 88, 255), 48);
+            drawList->AddCircle(center, 42.0f, ColorU32(212, 174, 93, 235), 48, 2.0f);
+            drawList->AddRectFilled(
+                ImVec2(center.x - 39.0f, center.y + 42.0f),
+                ImVec2(center.x + 39.0f, center.y + 116.0f),
+                ColorU32(42, 67, 78, 255),
+                14.0f);
+            drawList->AddLine(
+                ImVec2(center.x - 34.0f, center.y + 66.0f),
+                ImVec2(center.x + 34.0f, center.y + 66.0f),
+                ColorU32(205, 159, 76, 230),
+                2.0f);
+
+            ImGui::Dummy(previewSize);
+            ImGui::TextWrapped("%s", worldState.m_session.m_displayName.c_str());
+            ImGui::TextDisabled(
+                "Archetype: %s",
+                worldState.m_session.m_archetypeId.empty() ? "Unavailable" : worldState.m_session.m_archetypeId.c_str());
+            ImGui::TextDisabled("Zone: %s", worldState.m_session.m_zoneId.empty() ? "Unavailable" : worldState.m_session.m_zoneId.c_str());
+            ImGui::TextDisabled("3D inspection uses the live world model when that renderer surface is available.");
+        }
+
+        void DrawEquipmentSlotButton(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            const AZStd::string& slotId,
+            AZStd::string& characterPanelNotice)
+        {
+            const NetClient::EquipmentSlotState* slot = FindEquipmentSlot(worldState.m_session.m_equipment, slotId);
+            const bool hasItem = slot && !slot->m_itemId.empty();
+            ImGui::PushID(slotId.c_str());
+            ImGui::TextDisabled("%s", EquipmentSlotLabel(slotId).c_str());
+            const ImVec2 slotSize(64.0f, 64.0f);
+            const bool pressed = ImGui::Button("##equipment_slot", slotSize);
+            const ImVec2 slotMin = ImGui::GetItemRectMin();
+            const ImVec2 slotMax = ImGui::GetItemRectMax();
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            drawList->AddRectFilled(slotMin, slotMax, hasItem ? ColorU32(21, 30, 38, 240) : ColorU32(20, 22, 25, 190), 8.0f);
+            if (hasItem)
+            {
+                DrawProceduralIcon(
+                    drawList,
+                    ImVec2(slotMin.x + 5.0f, slotMin.y + 5.0f),
+                    ImVec2(slotMax.x - 5.0f, slotMax.y - 5.0f),
+                    EquipmentIconKind(*slot));
+            }
+            else
+            {
+                DrawProceduralIcon(
+                    drawList,
+                    ImVec2(slotMin.x + 10.0f, slotMin.y + 10.0f),
+                    ImVec2(slotMax.x - 10.0f, slotMax.y - 10.0f),
+                    "icon_missing",
+                    true);
+            }
+            drawList->AddRect(slotMin, slotMax, ColorU32(153, 119, 56, 230), 8.0f, 0, 1.8f);
+
+            if (hasItem && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+            {
+                EquipmentSlotDragPayload payload{};
+                std::snprintf(payload.m_slot, sizeof(payload.m_slot), "%s", slotId.c_str());
+                ImGui::SetDragDropPayload(EquipmentSlotPayloadType, &payload, sizeof(payload));
+                ImGui::Text("Unequip %s", slot->m_displayName.c_str());
+                ImGui::Text("Drop on the pack.");
+                ImGui::EndDragDropSource();
+            }
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(InventorySlotPayloadType))
+                {
+                    const auto* drag = static_cast<const InventorySlotDragPayload*>(payload->Data);
+                    const NetClient::InventorySlotState* source =
+                        drag ? FindInventorySlot(worldState.m_session.m_inventory, drag->m_sourceSlotIndex) : nullptr;
+                    if (!source || source->m_itemId.empty())
+                    {
+                        characterPanelNotice = "That pack slot is empty.";
+                    }
+                    else if (!InventoryItemCanEquipToSlot(*source, slotId))
+                    {
+                        characterPanelNotice = source->m_equipSlot.empty()
+                            ? AZStd::string("That item cannot be equipped.")
+                            : AZStd::string::format(
+                                "That item belongs in %s, not %s.",
+                                EquipmentSlotLabel(source->m_equipSlot).c_str(),
+                                EquipmentSlotLabel(slotId).c_str());
+                    }
+                    else if (gameCore && gameCore->EquipInventorySlot(drag->m_sourceSlotIndex))
+                    {
+                        characterPanelNotice.clear();
+                        AZ_Printf(
+                            "amandacore",
+                            "client.inventory_equip_requested sourceSlot=%d equipmentSlot=%s",
+                            drag->m_sourceSlotIndex,
+                            slotId.c_str());
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
+            if (hasItem && ImGui::IsItemHovered())
+            {
+                DrawEquipmentItemTooltip(*slot);
+            }
+            else if (!hasItem && ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Empty %s slot.", EquipmentSlotLabel(slotId).c_str());
+            }
+            if (pressed && hasItem)
+            {
+                characterPanelNotice = "Drag equipped items to the pack to unequip.";
+            }
+            ImGui::PopID();
+        }
+
+        void DrawCharacterEquipmentTab(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            AZStd::string& characterPanelNotice)
+        {
+            ImGui::Text("%s", worldState.m_session.m_displayName.c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("Level %d", worldState.m_session.m_level);
+            if (!characterPanelNotice.empty())
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("| %s", characterPanelNotice.c_str());
+            }
             ImGui::Separator();
-            ImGui::Columns(2, "##character_columns", false);
-            ImGui::Text("Race: Human");
-            ImGui::Text("Class: Warrior");
-            ImGui::Text("Level: %d", worldState.m_session.m_level);
-            ImGui::Text("Currency: %s", FormatCurrency(worldState.m_session.m_currency).c_str());
-            ImGui::Spacing();
-            ImGui::TextUnformatted("Supported equipment");
-            ImGui::BulletText("Main hand");
-            ImGui::BulletText("Chest");
-            ImGui::BulletText("Hands");
-            ImGui::BulletText("Legs");
-            ImGui::BulletText("Feet");
+
+            ImGui::Columns(3, "##paper_doll_columns", false);
+            ImGui::SetColumnWidth(0, 122.0f);
+            ImGui::SetColumnWidth(1, 386.0f);
+            const char* leftSlots[] = {"head", "shoulders", "chest", "hands", "waist", "legs", "feet"};
+            for (const char* slotId : leftSlots)
+            {
+                DrawEquipmentSlotButton(gameCore, worldState, slotId, characterPanelNotice);
+                ImGui::Spacing();
+            }
             ImGui::NextColumn();
-            ImGui::TextUnformatted("Stats");
+            DrawCharacterPreviewPane(worldState);
+            ImGui::NextColumn();
+            const char* rightSlots[] = {
+                "main_hand",
+                "off_hand",
+                "ranged_or_focus",
+                "accessory_1",
+                "accessory_2",
+                "trinket_1",
+                "trinket_2",
+                "cloak_or_back",
+            };
+            for (const char* slotId : rightSlots)
+            {
+                DrawEquipmentSlotButton(gameCore, worldState, slotId, characterPanelNotice);
+                ImGui::Spacing();
+            }
+            ImGui::Columns(1);
+        }
+
+        void DrawStatsTab(const GameCore::ClientWorldState& worldState)
+        {
+            ImGui::TextUnformatted("Vitals");
+            ImGui::Separator();
+            ImGui::Text("Health: %.0f / %.0f", worldState.m_session.m_health, worldState.m_session.m_maxHealth);
+            ImGui::Text(
+                "%s: %.0f / %.0f",
+                worldState.m_session.m_resourceName.empty() ? "Resource" : worldState.m_session.m_resourceName.c_str(),
+                worldState.m_session.m_resource,
+                worldState.m_session.m_maxResource);
+            ImGui::Spacing();
+            ImGui::TextUnformatted("Primary");
             ImGui::Separator();
             ImGui::Text("Strength: %d", worldState.m_session.m_stats.m_strength);
             ImGui::Text("Stamina: %d", worldState.m_session.m_stats.m_stamina);
+            ImGui::Spacing();
+            ImGui::TextUnformatted("Combat");
+            ImGui::Separator();
             ImGui::Text("Armor: %d", worldState.m_session.m_stats.m_armor);
             ImGui::Text("Attack Power: %.1f", worldState.m_session.m_stats.m_attackPower);
             ImGui::Text("Armor Reduction: %.1f%%", worldState.m_session.m_stats.m_armorReductionPct * 100.0);
-            ImGui::Columns(1);
+            ImGui::Spacing();
+            ImGui::TextDisabled("Unavailable stats stay hidden until the server exposes real values.");
+        }
+
+        void DrawCurrencyTab(const GameCore::ClientWorldState& worldState)
+        {
+            ImGui::TextUnformatted("Wallet");
             ImGui::Separator();
+            ImGui::Text("Total: %s", FormatCurrency(worldState.m_session.m_currency).c_str());
+            ImGui::TextDisabled("Gold %d  Silver %d  Copper %d",
+                worldState.m_session.m_currency.m_gold,
+                worldState.m_session.m_currency.m_silver,
+                worldState.m_session.m_currency.m_copper);
+            ImGui::Spacing();
+            ImGui::TextDisabled("No additional live currency ledgers are available in this runtime payload.");
+        }
+
+        void DrawReputationTab()
+        {
+            ImGui::TextUnformatted("Reputation");
+            ImGui::Separator();
+            ImGui::TextDisabled("No faction standings available yet.");
+        }
+
+        void DrawDetailsTab(const GameCore::ClientWorldState& worldState)
+        {
+            ImGui::TextUnformatted("Character Details");
+            ImGui::Separator();
+            ImGui::Text("Display name: %s", worldState.m_session.m_displayName.c_str());
+            ImGui::Text("Archetype: %s", worldState.m_session.m_archetypeId.empty() ? "Unavailable" : worldState.m_session.m_archetypeId.c_str());
+            ImGui::Text("Level: %d", worldState.m_session.m_level);
+            ImGui::Text("Zone: %s", worldState.m_session.m_zoneId.empty() ? "Unavailable" : worldState.m_session.m_zoneId.c_str());
+            ImGui::TextDisabled("Lineage/origin: unavailable");
+            ImGui::Spacing();
             ImGui::Text(
                 "Position: %.1f, %.1f, %.1f",
                 worldState.m_session.m_position.m_x,
                 worldState.m_session.m_position.m_y,
                 worldState.m_session.m_position.m_z);
+            ImGui::Spacing();
+            ImGui::TextDisabled("This panel is built-in AmandaCore UI. Addons and arbitrary UI scripts are not supported.");
+        }
+
+        void DrawCharacterSheetWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            AZStd::string& characterPanelNotice)
+        {
+            if (ImGui::BeginTabBar("##character_sheet_tabs"))
+            {
+                if (ImGui::BeginTabItem("Character"))
+                {
+                    DrawCharacterEquipmentTab(gameCore, worldState, characterPanelNotice);
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Stats"))
+                {
+                    DrawStatsTab(worldState);
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Currency"))
+                {
+                    DrawCurrencyTab(worldState);
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Reputation"))
+                {
+                    DrawReputationTab();
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Details"))
+                {
+                    DrawDetailsTab(worldState);
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
         }
 
         void DrawTalentWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
@@ -4711,6 +5228,7 @@ namespace UiClient
         m_pendingActionAssignmentAbilityId.clear();
         m_pendingActionMoveSlot = -1;
         m_pendingInventoryMoveSlot = -1;
+        m_characterPanelNotice.clear();
         m_pendingAuctionSellSlot = -1;
         m_pendingAuctionBuyoutIndex = -1;
         m_auctionStackCount = 1;
@@ -6502,8 +7020,8 @@ namespace UiClient
         const ImVec2 inventoryPos = ApplyHudOffset(inventoryDefaultPos, m_bagOffsetX, m_bagOffsetY, inventorySize, displaySize);
         const ImVec2 settingsSize(680.0f, 520.0f);
         const ImVec2 settingsPos((displaySize.x - settingsSize.x) * 0.5f, (displaySize.y - settingsSize.y) * 0.5f);
-        const ImVec2 characterSize(420.0f, 360.0f);
-        const ImVec2 characterPos(280.0f, AZ::GetMax(18.0f, displaySize.y - characterSize.y - 176.0f));
+        const ImVec2 characterSize(690.0f, 540.0f);
+        const ImVec2 characterPos(80.0f, AZ::GetMax(18.0f, displaySize.y - characterSize.y - 176.0f));
         const ImVec2 talentsSize(440.0f, 430.0f);
         const ImVec2 talentsPos(
             AZ::GetMin(characterPos.x + characterSize.x + 18.0f, displaySize.x - talentsSize.x - 18.0f),
@@ -6934,7 +7452,7 @@ namespace UiClient
             }
             else
             {
-                DrawCharacterSheetWindow(worldState);
+                DrawCharacterSheetWindow(gameCore, worldState, m_characterPanelNotice);
             }
         }
         if (characterPanelWasOpen)

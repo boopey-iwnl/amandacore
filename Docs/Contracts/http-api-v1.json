@@ -11,6 +11,51 @@
     "It is not an OpenAPI schema and does not change runtime behavior.",
     "Routes are AmandaCore-owned clean-room service contracts."
   ],
+  "responseShapes": [
+    {
+      "name": "worldSession.inventory.slots[]",
+      "surface": "world-inventory",
+      "fields": [
+        "slotIndex",
+        "itemId",
+        "displayName",
+        "stackCount",
+        "itemType",
+        "itemSubtype",
+        "quality",
+        "iconKind",
+        "description",
+        "equipSlot",
+        "requiredArchetype",
+        "requiredLevel",
+        "sellPriceCopper",
+        "strength",
+        "stamina",
+        "armor"
+      ]
+    },
+    {
+      "name": "worldSession.equipment.slots[]",
+      "surface": "world-inventory",
+      "fields": [
+        "slot",
+        "itemId",
+        "displayName",
+        "itemType",
+        "itemSubtype",
+        "quality",
+        "iconKind",
+        "description",
+        "equipSlot",
+        "requiredArchetype",
+        "requiredLevel",
+        "sellPriceCopper",
+        "strength",
+        "stamina",
+        "armor"
+      ]
+    }
+  ],
   "routes": [
     { "method": "GET", "path": "/health", "surface": "service-health" },
     { "method": "GET", "path": "/v1/account/me", "surface": "account" },
@@ -114,6 +159,7 @@
     { "method": "POST", "path": "/v1/world/housing/storage/withdraw", "surface": "world-housing" },
     { "method": "POST", "path": "/v1/world/inventory/equip", "surface": "world-inventory" },
     { "method": "POST", "path": "/v1/world/inventory/move", "surface": "world-inventory" },
+    { "method": "POST", "path": "/v1/world/inventory/unequip", "surface": "world-inventory" },
     { "method": "POST", "path": "/v1/world/join-ticket", "surface": "world-session", "launcherCritical": true },
     { "method": "POST", "path": "/v1/world/loot/claim", "surface": "world-loot" },
     { "method": "POST", "path": "/v1/world/loot/inspect", "surface": "world-loot" },

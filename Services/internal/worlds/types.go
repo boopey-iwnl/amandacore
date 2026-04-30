@@ -304,6 +304,11 @@ type inventoryEquipRequest struct {
 	SlotIndex         int    `json:"slotIndex"`
 }
 
+type inventoryUnequipRequest struct {
+	WorldSessionToken string `json:"worldSessionToken"`
+	Slot              string `json:"slot"`
+}
+
 type lootInspectRequest struct {
 	WorldSessionToken string `json:"worldSessionToken"`
 	LootContainerID   string `json:"lootContainerId"`
@@ -561,18 +566,44 @@ type inventoryResponse struct {
 }
 
 type inventorySlotResponse struct {
-	SlotIndex   int    `json:"slotIndex"`
-	ItemID      string `json:"itemId"`
-	DisplayName string `json:"displayName"`
-	StackCount  int    `json:"stackCount"`
-	ItemType    string `json:"itemType,omitempty"`
-	ItemSubtype string `json:"itemSubtype,omitempty"`
-	Quality     string `json:"quality,omitempty"`
-	IconKind    string `json:"iconKind,omitempty"`
+	SlotIndex         int    `json:"slotIndex"`
+	ItemID            string `json:"itemId"`
+	DisplayName       string `json:"displayName"`
+	StackCount        int    `json:"stackCount"`
+	ItemType          string `json:"itemType,omitempty"`
+	ItemSubtype       string `json:"itemSubtype,omitempty"`
+	Quality           string `json:"quality,omitempty"`
+	IconKind          string `json:"iconKind,omitempty"`
+	Description       string `json:"description,omitempty"`
+	EquipSlot         string `json:"equipSlot,omitempty"`
+	RequiredArchetype string `json:"requiredArchetype,omitempty"`
+	RequiredLevel     int    `json:"requiredLevel,omitempty"`
+	SellPriceCopper   int    `json:"sellPriceCopper,omitempty"`
+	Strength          int    `json:"strength,omitempty"`
+	Stamina           int    `json:"stamina,omitempty"`
+	Armor             int    `json:"armor,omitempty"`
 }
 
 type equipmentResponse struct {
-	Slots []platform.CharacterEquipmentSlot `json:"slots"`
+	Slots []equipmentSlotResponse `json:"slots"`
+}
+
+type equipmentSlotResponse struct {
+	Slot              string `json:"slot"`
+	ItemID            string `json:"itemId"`
+	DisplayName       string `json:"displayName"`
+	ItemType          string `json:"itemType,omitempty"`
+	ItemSubtype       string `json:"itemSubtype,omitempty"`
+	Quality           string `json:"quality,omitempty"`
+	IconKind          string `json:"iconKind,omitempty"`
+	Description       string `json:"description,omitempty"`
+	EquipSlot         string `json:"equipSlot,omitempty"`
+	RequiredArchetype string `json:"requiredArchetype,omitempty"`
+	RequiredLevel     int    `json:"requiredLevel,omitempty"`
+	SellPriceCopper   int    `json:"sellPriceCopper,omitempty"`
+	Strength          int    `json:"strength,omitempty"`
+	Stamina           int    `json:"stamina,omitempty"`
+	Armor             int    `json:"armor,omitempty"`
 }
 
 type statBlockResponse struct {
@@ -626,6 +657,7 @@ type worldSessionState struct {
 	CharacterID        string
 	DisplayName        string
 	ClassID            string
+	ArchetypeID        string
 	Level              int
 	RealmID            string
 	ZoneID             string

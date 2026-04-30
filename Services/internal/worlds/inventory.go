@@ -73,11 +73,7 @@ func buildInventorySlotsResponse(inventory []platform.CharacterInventorySlot) []
 		}
 		if slot.ItemID != "" && slot.StackCount > 0 {
 			if item, found := findItemDefinition(slot.ItemID); found {
-				response.DisplayName = item.DisplayName
-				response.ItemType = item.Type
-				response.ItemSubtype = item.Subtype
-				response.Quality = item.Quality
-				response.IconKind = itemIconKind(item)
+				enrichInventorySlotResponse(&response, item)
 			} else {
 				response.IconKind = "item"
 			}
@@ -85,6 +81,57 @@ func buildInventorySlotsResponse(inventory []platform.CharacterInventorySlot) []
 		slots = append(slots, response)
 	}
 	return slots
+}
+
+func buildEquipmentSlotsResponse(equipment []platform.CharacterEquipmentSlot) []equipmentSlotResponse {
+	normalized := platform.NormalizeEquipmentSlots(equipment)
+	slots := make([]equipmentSlotResponse, 0, len(normalized))
+	for _, slot := range normalized {
+		response := equipmentSlotResponse{
+			Slot:        slot.Slot,
+			ItemID:      slot.ItemID,
+			DisplayName: slot.DisplayName,
+		}
+		if slot.ItemID != "" {
+			if item, found := findItemDefinition(slot.ItemID); found {
+				enrichEquipmentSlotResponse(&response, item)
+			}
+		}
+		slots = append(slots, response)
+	}
+	return slots
+}
+
+func enrichInventorySlotResponse(response *inventorySlotResponse, item itemDefinition) {
+	response.DisplayName = item.DisplayName
+	response.ItemType = item.Type
+	response.ItemSubtype = item.Subtype
+	response.Quality = item.Quality
+	response.IconKind = itemIconKind(item)
+	response.Description = item.Description
+	response.EquipSlot = item.EquipSlot
+	response.RequiredArchetype = item.RequiredArchetype
+	response.RequiredLevel = item.RequiredLevel
+	response.SellPriceCopper = item.SellPriceCopper
+	response.Strength = item.Strength
+	response.Stamina = item.Stamina
+	response.Armor = item.Armor
+}
+
+func enrichEquipmentSlotResponse(response *equipmentSlotResponse, item itemDefinition) {
+	response.DisplayName = item.DisplayName
+	response.ItemType = item.Type
+	response.ItemSubtype = item.Subtype
+	response.Quality = item.Quality
+	response.IconKind = itemIconKind(item)
+	response.Description = item.Description
+	response.EquipSlot = item.EquipSlot
+	response.RequiredArchetype = item.RequiredArchetype
+	response.RequiredLevel = item.RequiredLevel
+	response.SellPriceCopper = item.SellPriceCopper
+	response.Strength = item.Strength
+	response.Stamina = item.Stamina
+	response.Armor = item.Armor
 }
 
 func (s *worldServer) persistSessionEconomyLocked(session *worldSessionState) error {
@@ -492,6 +539,9 @@ func (s *worldServer) equipInventorySlotLocked(session *worldSessionState, slotI
 	if item.EquipSlot == "" || (item.Type != itemTypeWeapon && item.Type != itemTypeArmor) {
 		return fmt.Errorf("item cannot be equipped")
 	}
+	if item.RequiredArchetype != "" && session.ArchetypeID != "" && item.RequiredArchetype != session.ArchetypeID {
+		return fmt.Errorf("wrong archetype for this item")
+	}
 	if item.RequiredClass != "" && item.RequiredClass != session.ClassID {
 		return fmt.Errorf("wrong class for this item")
 	}
@@ -542,6 +592,69 @@ func (s *worldServer) equipInventorySlotLocked(session *worldSessionState, slotI
 		"itemId":            item.ItemID,
 		"equipSlot":         item.EquipSlot,
 		"sourceSlotIndex":   slotIndex,
+		"updatedAt":         time.Now().Unix(),
+	})
+	return nil
+}
+
+func (s *worldServer) unequipEquipmentSlotLocked(session *worldSessionState, slotID string) error {
+	if session == nil {
+		return fmt.Errorf("world session token was not found")
+	}
+	if slotID == "" {
+		return fmt.Errorf("equipment slot is required")
+	}
+
+	equipment := platform.NormalizeEquipmentSlots(session.Equipment)
+	equipmentSlotIndex := -1
+	for index, equipmentSlot := range equipment {
+		if equipmentSlot.Slot == slotID {
+			equipmentSlotIndex = index
+			break
+		}
+	}
+	if equipmentSlotIndex < 0 {
+		return fmt.Errorf("equipment slot is unavailable")
+	}
+
+	previousEquipment := equipment[equipmentSlotIndex]
+	if previousEquipment.ItemID == "" {
+		return fmt.Errorf("equipment slot is empty")
+	}
+
+	inventory := platform.NormalizeInventorySlots(session.Inventory)
+	targetSlotIndex := -1
+	for index, slot := range inventory {
+		if slot.ItemID == "" || slot.StackCount <= 0 {
+			targetSlotIndex = index
+			break
+		}
+	}
+	if targetSlotIndex < 0 {
+		return fmt.Errorf("inventory is full")
+	}
+
+	inventory[targetSlotIndex] = platform.CharacterInventorySlot{
+		SlotIndex:   targetSlotIndex,
+		ItemID:      previousEquipment.ItemID,
+		DisplayName: previousEquipment.DisplayName,
+		StackCount:  1,
+	}
+	equipment[equipmentSlotIndex] = platform.CharacterEquipmentSlot{Slot: previousEquipment.Slot}
+
+	session.Inventory = inventory
+	session.Equipment = equipment
+	if err := s.persistSessionEconomyLocked(session); err != nil {
+		return err
+	}
+
+	observability.LogEvent("world-service", "world.item_unequipped", map[string]any{
+		"worldSessionToken": session.Token,
+		"accountId":         session.AccountID,
+		"characterId":       session.CharacterID,
+		"itemId":            previousEquipment.ItemID,
+		"equipSlot":         previousEquipment.Slot,
+		"targetSlotIndex":   targetSlotIndex,
 		"updatedAt":         time.Now().Unix(),
 	})
 	return nil

@@ -672,6 +672,7 @@ namespace NetClient
             outResponse.m_resource = document["resource"].GetDouble();
             outResponse.m_maxResource = document["maxResource"].GetDouble();
             ReadString(document, "resourceName", outResponse.m_resourceName);
+            ReadString(document, "archetypeId", outResponse.m_archetypeId);
             ReadInt(document, "level", outResponse.m_level);
             ReadInt(document, "experience", outResponse.m_experience);
             ReadInt(document, "currencyCopper", outResponse.m_currency.m_totalCopper);
@@ -704,13 +705,54 @@ namespace NetClient
                         ReadString(slotValue, "itemSubtype", slot.m_itemSubtype);
                         ReadString(slotValue, "quality", slot.m_quality);
                         ReadString(slotValue, "iconKind", slot.m_iconKind);
+                        ReadString(slotValue, "description", slot.m_description);
+                        ReadString(slotValue, "equipSlot", slot.m_equipSlot);
+                        ReadString(slotValue, "requiredArchetype", slot.m_requiredArchetype);
                         ReadInt(slotValue, "stackCount", slot.m_stackCount);
+                        ReadInt(slotValue, "requiredLevel", slot.m_requiredLevel);
+                        ReadInt(slotValue, "sellPriceCopper", slot.m_sellPriceCopper);
+                        ReadInt(slotValue, "strength", slot.m_strength);
+                        ReadInt(slotValue, "stamina", slot.m_stamina);
+                        ReadInt(slotValue, "armor", slot.m_armor);
                         outResponse.m_inventory.m_slots.push_back(AZStd::move(slot));
                     }
                 }
                 if (outResponse.m_inventory.m_slotCount <= 0)
                 {
                     outResponse.m_inventory.m_slotCount = static_cast<int>(outResponse.m_inventory.m_slots.size());
+                }
+            }
+            outResponse.m_equipment.m_slots.clear();
+            if (document.HasMember("equipment") && document["equipment"].IsObject())
+            {
+                const rapidjson::Value& equipment = document["equipment"];
+                if (equipment.HasMember("slots") && equipment["slots"].IsArray())
+                {
+                    for (const rapidjson::Value& slotValue : equipment["slots"].GetArray())
+                    {
+                        if (!slotValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        EquipmentSlotState slot;
+                        ReadString(slotValue, "slot", slot.m_slot);
+                        ReadString(slotValue, "itemId", slot.m_itemId);
+                        ReadString(slotValue, "displayName", slot.m_displayName);
+                        ReadString(slotValue, "itemType", slot.m_itemType);
+                        ReadString(slotValue, "itemSubtype", slot.m_itemSubtype);
+                        ReadString(slotValue, "quality", slot.m_quality);
+                        ReadString(slotValue, "iconKind", slot.m_iconKind);
+                        ReadString(slotValue, "description", slot.m_description);
+                        ReadString(slotValue, "equipSlot", slot.m_equipSlot);
+                        ReadString(slotValue, "requiredArchetype", slot.m_requiredArchetype);
+                        ReadInt(slotValue, "requiredLevel", slot.m_requiredLevel);
+                        ReadInt(slotValue, "sellPriceCopper", slot.m_sellPriceCopper);
+                        ReadInt(slotValue, "strength", slot.m_strength);
+                        ReadInt(slotValue, "stamina", slot.m_stamina);
+                        ReadInt(slotValue, "armor", slot.m_armor);
+                        outResponse.m_equipment.m_slots.push_back(AZStd::move(slot));
+                    }
                 }
             }
             if (document.HasMember("stats") && document["stats"].IsObject())
@@ -2724,6 +2766,60 @@ namespace NetClient
             fromSlotIndex,
             toSlotIndex);
         if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/inventory/move", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool EquipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"slotIndex\":%d}",
+            worldSessionToken.c_str(),
+            slotIndex);
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/inventory/equip", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool UnequipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& equipmentSlot,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"slot\":\"%s\"}",
+            worldSessionToken.c_str(),
+            equipmentSlot.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/inventory/unequip", requestBody, responseBody, statusCode, outError))
         {
             return false;
         }

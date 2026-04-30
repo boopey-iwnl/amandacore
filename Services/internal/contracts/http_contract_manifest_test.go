@@ -11,14 +11,20 @@ import (
 )
 
 type httpContractManifest struct {
-	ContractID string              `json:"contractId"`
-	Status     string              `json:"status"`
-	Routes     []httpContractRoute `json:"routes"`
+	ContractID     string                      `json:"contractId"`
+	Status         string                      `json:"status"`
+	Routes         []httpContractRoute         `json:"routes"`
+	ResponseShapes []httpContractResponseShape `json:"responseShapes"`
 }
 
 type httpContractRoute struct {
 	Method string `json:"method"`
 	Path   string `json:"path"`
+}
+
+type httpContractResponseShape struct {
+	Name   string   `json:"name"`
+	Fields []string `json:"fields"`
 }
 
 func TestHTTPContractManifestMatchesRegisteredRoutes(t *testing.T) {
@@ -46,6 +52,70 @@ func TestHTTPContractManifestIsSortedAndUnique(t *testing.T) {
 			t.Fatalf("manifest routes must be sorted by method then path: %s appears after %s", key, previous)
 		}
 		previous = key
+	}
+}
+
+func TestHTTPContractManifestDocumentsInventoryEquipmentPayloads(t *testing.T) {
+	repoRoot := findRepoRoot(t)
+	manifest := loadManifest(t, filepath.Join(repoRoot, "Docs", "Contracts", "http-api-v1.json"))
+
+	requiredShapes := map[string][]string{
+		"worldSession.inventory.slots[]": {
+			"slotIndex",
+			"itemId",
+			"displayName",
+			"stackCount",
+			"itemType",
+			"itemSubtype",
+			"quality",
+			"iconKind",
+			"description",
+			"equipSlot",
+			"requiredArchetype",
+			"requiredLevel",
+			"sellPriceCopper",
+			"strength",
+			"stamina",
+			"armor",
+		},
+		"worldSession.equipment.slots[]": {
+			"slot",
+			"itemId",
+			"displayName",
+			"itemType",
+			"itemSubtype",
+			"quality",
+			"iconKind",
+			"description",
+			"equipSlot",
+			"requiredArchetype",
+			"requiredLevel",
+			"sellPriceCopper",
+			"strength",
+			"stamina",
+			"armor",
+		},
+	}
+
+	shapesByName := map[string]map[string]bool{}
+	for _, shape := range manifest.ResponseShapes {
+		fields := map[string]bool{}
+		for _, field := range shape.Fields {
+			fields[field] = true
+		}
+		shapesByName[shape.Name] = fields
+	}
+
+	for name, fields := range requiredShapes {
+		shapeFields, found := shapesByName[name]
+		if !found {
+			t.Fatalf("response shape %s is not documented", name)
+		}
+		for _, field := range fields {
+			if !shapeFields[field] {
+				t.Fatalf("response shape %s missing field %s", name, field)
+			}
+		}
 	}
 }
 

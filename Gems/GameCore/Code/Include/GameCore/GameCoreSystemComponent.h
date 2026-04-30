@@ -68,6 +68,8 @@ namespace GameCore
         bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) override;
         bool ClearActionBarSlot(int slotIndex) override;
         bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) override;
+        bool EquipInventorySlot(int slotIndex) override;
+        bool UnequipInventorySlot(const AZStd::string& equipmentSlot) override;
         bool BrowseAuctions(
             const AZStd::string& search,
             const AZStd::string& itemType,

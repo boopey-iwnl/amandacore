@@ -1747,6 +1747,60 @@ namespace GameCore
         return true;
     }
 
+    bool GameCoreSystemComponent::EquipInventorySlot(int slotIndex)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->EquipInventorySlot(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                slotIndex,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "EquipInventorySlot failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "inventory_equip");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::UnequipInventorySlot(const AZStd::string& equipmentSlot)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->UnequipInventorySlot(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                equipmentSlot,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "UnequipInventorySlot failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "inventory_unequip");
+        return true;
+    }
+
     bool GameCoreSystemComponent::BrowseAuctions(
         const AZStd::string& search,
         const AZStd::string& itemType,

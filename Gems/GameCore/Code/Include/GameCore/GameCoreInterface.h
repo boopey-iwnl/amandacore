@@ -120,6 +120,8 @@ namespace GameCore
         virtual bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) = 0;
         virtual bool ClearActionBarSlot(int slotIndex) = 0;
         virtual bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) = 0;
+        virtual bool EquipInventorySlot(int slotIndex) = 0;
+        virtual bool UnequipInventorySlot(const AZStd::string& equipmentSlot) = 0;
         virtual bool BrowseAuctions(
             const AZStd::string& search,
             const AZStd::string& itemType,

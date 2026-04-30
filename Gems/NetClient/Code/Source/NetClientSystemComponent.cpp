@@ -267,6 +267,20 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool EquipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool UnequipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& equipmentSlot,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool AuctionStateRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -835,6 +849,36 @@ namespace NetClient
             worldSessionToken,
             fromSlotIndex,
             toSlotIndex,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::EquipInventorySlot(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return EquipInventorySlotRequest(
+            worldEndpoint,
+            worldSessionToken,
+            slotIndex,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::UnequipInventorySlot(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& equipmentSlot,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return UnequipInventorySlotRequest(
+            worldEndpoint,
+            worldSessionToken,
+            equipmentSlot,
             outResponse,
             outError);
     }
