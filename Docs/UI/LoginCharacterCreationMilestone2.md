@@ -44,4 +44,4 @@ Launcher login, realm list, character list/create, join ticket, and client launc
 
 This milestone adds no addon API, Lua loading, AddOns folder, plugin runtime, user-installed modules, or arbitrary UI script execution.
 
-`C:\Users\forwo\Downloads\textures` remains a read-only source asset pool. No textures are imported by default, and runtime/package references must stay repo-relative only.
+The local texture source folder remains a read-only source asset pool. No textures are imported by default, and runtime/package references must stay repo-relative only.

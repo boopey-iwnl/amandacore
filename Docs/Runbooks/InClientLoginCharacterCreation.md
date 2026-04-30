@@ -40,6 +40,6 @@ Character deletion remains disabled because there is no safe backend delete cont
 Before commit and push, verify:
 
 - no secrets, logs, diagnostics, screenshots, zips, local DBs, runtime tickets, generated packages, Cache/build output, or temp files are staged
-- no runtime/package reference to `C:\Users\forwo\Downloads\textures`
+- no runtime/package reference to the local texture source folder
 - no AddOns folder, addon API, Lua addon loading, plugin runtime, user-installed UI modules, or arbitrary UI script execution
 - no copied external game assets, private-server code, addon code, or protected UI trade dress
