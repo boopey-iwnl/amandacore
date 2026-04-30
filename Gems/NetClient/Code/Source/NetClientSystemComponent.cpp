@@ -6,6 +6,42 @@
 
 namespace NetClient
 {
+    bool LoginRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& username,
+        const AZStd::string& password,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool ListRealmsRequest(
+        const AZStd::string& realmEndpoint,
+        AZStd::vector<RealmDescriptor>& outRealms,
+        AZStd::string& outError);
+
+    bool ListCharactersRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        AZStd::vector<CharacterSummary>& outCharacters,
+        AZStd::string& outError);
+
+    bool CreateCharacterRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& displayName,
+        const AZStd::string& archetypeId,
+        CharacterSummary& outCharacter,
+        AZStd::string& outError);
+
+    bool CreateJoinTicketRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& characterId,
+        WorldJoinTicketResponse& outTicket,
+        AZStd::string& outError);
+
     bool ConnectRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& ticketId,
@@ -297,6 +333,57 @@ namespace NetClient
         {
             IWorldHttpClient::Unregister(this);
         }
+    }
+
+    bool NetClientSystemComponent::Login(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& username,
+        const AZStd::string& password,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return LoginRequest(authEndpoint, username, password, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::ListRealms(
+        const AZStd::string& realmEndpoint,
+        AZStd::vector<RealmDescriptor>& outRealms,
+        AZStd::string& outError)
+    {
+        return ListRealmsRequest(realmEndpoint, outRealms, outError);
+    }
+
+    bool NetClientSystemComponent::ListCharacters(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        AZStd::vector<CharacterSummary>& outCharacters,
+        AZStd::string& outError)
+    {
+        return ListCharactersRequest(characterEndpoint, accessToken, realmId, outCharacters, outError);
+    }
+
+    bool NetClientSystemComponent::CreateCharacter(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& displayName,
+        const AZStd::string& archetypeId,
+        CharacterSummary& outCharacter,
+        AZStd::string& outError)
+    {
+        return CreateCharacterRequest(characterEndpoint, accessToken, realmId, displayName, archetypeId, outCharacter, outError);
+    }
+
+    bool NetClientSystemComponent::CreateJoinTicket(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& characterId,
+        WorldJoinTicketResponse& outTicket,
+        AZStd::string& outError)
+    {
+        return CreateJoinTicketRequest(worldEndpoint, accessToken, realmId, characterId, outTicket, outError);
     }
 
     bool NetClientSystemComponent::Connect(

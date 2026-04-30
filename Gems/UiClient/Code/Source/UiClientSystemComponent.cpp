@@ -18,6 +18,7 @@
 #include <imgui/imgui_internal.h>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -5618,6 +5619,450 @@ namespace UiClient
         ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, false);
     }
 
+    void UiClientSystemComponent::ResetCharacterCreationDraft()
+    {
+        m_characterNameBuffer[0] = '\0';
+        m_createLineageIndex = 0;
+        m_createBodyIndex = 0;
+        m_createSkinIndex = 0;
+        m_createFaceIndex = 0;
+        m_createHairIndex = 0;
+        m_createHairColorIndex = 0;
+        m_createMarkingIndex = 0;
+        m_previewYaw = 0.0f;
+        m_previewZoom = 1.0f;
+    }
+
+    void UiClientSystemComponent::DrawPreWorldFrontend(GameCore::IGameCoreRequests* gameCore, const ImVec2& displaySize)
+    {
+        const auto& frontend = gameCore->GetClientFrontendState();
+        const bool busy = frontend.m_requestInFlight;
+        ImDrawList* background = ImGui::GetBackgroundDrawList();
+        background->AddRectFilledMultiColor(
+            ImVec2(0.0f, 0.0f),
+            displaySize,
+            ColorU32(11, 16, 21),
+            ColorU32(23, 29, 34),
+            ColorU32(18, 24, 28),
+            ColorU32(8, 11, 16));
+        background->AddCircleFilled(
+            ImVec2(displaySize.x * 0.16f, displaySize.y * 0.22f),
+            74.0f,
+            ColorU32(79, 110, 118, 38),
+            40);
+        background->AddRectFilled(
+            ImVec2(0.0f, displaySize.y - 92.0f),
+            displaySize,
+            ColorU32(80, 62, 35, 54));
+
+        auto drawStatus = [&frontend]()
+        {
+            if (!frontend.m_errorMessage.empty())
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.58f, 0.44f, 1.0f));
+                ImGui::TextWrapped("%s", frontend.m_errorMessage.c_str());
+                ImGui::PopStyleColor();
+            }
+            else if (!frontend.m_statusMessage.empty())
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.70f, 0.86f, 0.80f, 1.0f));
+                ImGui::TextWrapped("%s", frontend.m_statusMessage.c_str());
+                ImGui::PopStyleColor();
+            }
+        };
+
+        auto drawDisabledButton = [busy](const char* label, const ImVec2& size)
+        {
+            if (busy)
+            {
+                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.45f);
+            }
+            const bool pressed = ImGui::Button(label, size);
+            if (busy)
+            {
+                ImGui::PopStyleVar();
+            }
+            return pressed && !busy;
+        };
+
+        auto drawSettings = [&]()
+        {
+            if (!m_preWorldSettingsOpen)
+            {
+                return;
+            }
+            const ImVec2 settingsSize(560.0f, 440.0f);
+            const ImVec2 settingsPos(
+                AZ::GetMax(18.0f, (displaySize.x - settingsSize.x) * 0.5f),
+                AZ::GetMax(18.0f, (displaySize.y - settingsSize.y) * 0.5f));
+            if (BeginHudPanel("##preworld_settings", "Settings", settingsPos, settingsSize, false, true))
+            {
+                if (DrawHudPanelCloseButton())
+                {
+                    m_preWorldSettingsOpen = false;
+                }
+                else
+                {
+                    bool resetHudLayoutRequested = false;
+                    if (DrawSettingsWindow(
+                            gameCore,
+                            m_extraUpperActionBarVisible,
+                            m_rightActionBarOneVisible,
+                            m_rightActionBarTwoVisible,
+                            m_uiEditMode,
+                            m_actionSlotBindings,
+                            m_spellbookBinding,
+                            m_bagBinding,
+                            m_characterBinding,
+                            m_questLogBinding,
+                            m_mapBinding,
+                            m_settingsBinding,
+                            m_interactBinding,
+                            m_targetHostileBinding,
+                            m_pendingKeybindActionId,
+                            resetHudLayoutRequested))
+                    {
+                        SaveUiSettings();
+                    }
+                    if (resetHudLayoutRequested)
+                    {
+                        ResetHudLayout();
+                        SaveUiSettings();
+                    }
+                }
+            }
+            ImGui::End();
+        };
+
+        auto drawPreview = [&]()
+        {
+            const ImVec2 regionMin = ImGui::GetCursorScreenPos();
+            const ImVec2 regionSize(AZ::GetMax(260.0f, ImGui::GetContentRegionAvail().x), 360.0f);
+            ImGui::InvisibleButton("##creation_preview", regionSize);
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImVec2 regionMax = AddVec2(regionMin, regionSize);
+            drawList->AddRectFilled(regionMin, regionMax, ColorU32(15, 21, 25, 235), 12.0f);
+            drawList->AddRect(regionMin, regionMax, ColorU32(128, 117, 74, 210), 12.0f, 0, 1.2f);
+            const float scale = AZ::GetClamp(m_previewZoom, 0.75f, 1.35f);
+            const float centerX = (regionMin.x + regionMax.x) * 0.5f;
+            const float baseY = regionMax.y - 54.0f;
+            const float sway = std::sin(m_previewYaw) * 18.0f;
+            const ImU32 skinColors[] = {
+                ColorU32(181, 131, 96),
+                ColorU32(126, 82, 58),
+                ColorU32(216, 171, 126),
+                ColorU32(93, 102, 100),
+            };
+            const ImU32 hairColors[] = {
+                ColorU32(44, 33, 27),
+                ColorU32(117, 82, 39),
+                ColorU32(204, 181, 116),
+                ColorU32(76, 79, 86),
+            };
+            const ImU32 outfitColors[] = {
+                ColorU32(54, 91, 101),
+                ColorU32(91, 75, 47),
+                ColorU32(87, 49, 56),
+            };
+            const ImU32 skin = skinColors[m_createSkinIndex % AZ_ARRAY_SIZE(skinColors)];
+            const ImU32 hair = hairColors[m_createHairColorIndex % AZ_ARRAY_SIZE(hairColors)];
+            const ImU32 outfit = outfitColors[m_createBodyIndex % AZ_ARRAY_SIZE(outfitColors)];
+            drawList->PathClear();
+            for (int point = 0; point < 28; ++point)
+            {
+                const float angle = (static_cast<float>(point) / 28.0f) * 6.2831853f;
+                drawList->PathLineTo(ImVec2(
+                    centerX + (std::cos(angle) * 86.0f * scale),
+                    baseY + 12.0f + (std::sin(angle) * 18.0f * scale)));
+            }
+            drawList->PathFillConvex(ColorU32(0, 0, 0, 85));
+            drawList->AddRectFilled(
+                ImVec2(centerX - (34.0f * scale) + (sway * 0.18f), baseY - (152.0f * scale)),
+                ImVec2(centerX + (34.0f * scale) + (sway * 0.18f), baseY - (56.0f * scale)),
+                outfit,
+                18.0f);
+            drawList->AddCircleFilled(ImVec2(centerX + (sway * 0.35f), baseY - (194.0f * scale)), 35.0f * scale, skin, 32);
+            drawList->AddCircleFilled(ImVec2(centerX + (sway * 0.35f), baseY - (217.0f * scale)), 25.0f * scale, hair, 28);
+            drawList->AddRectFilled(
+                ImVec2(centerX - (74.0f * scale) + sway, baseY - (144.0f * scale)),
+                ImVec2(centerX - (42.0f * scale) + sway, baseY - (54.0f * scale)),
+                skin,
+                14.0f);
+            drawList->AddRectFilled(
+                ImVec2(centerX + (42.0f * scale) + sway, baseY - (144.0f * scale)),
+                ImVec2(centerX + (74.0f * scale) + sway, baseY - (54.0f * scale)),
+                skin,
+                14.0f);
+            drawList->AddRectFilled(
+                ImVec2(centerX - (31.0f * scale), baseY - (58.0f * scale)),
+                ImVec2(centerX - (9.0f * scale), baseY + (2.0f * scale)),
+                ColorU32(41, 50, 54),
+                8.0f);
+            drawList->AddRectFilled(
+                ImVec2(centerX + (9.0f * scale), baseY - (58.0f * scale)),
+                ImVec2(centerX + (31.0f * scale), baseY + (2.0f * scale)),
+                ColorU32(41, 50, 54),
+                8.0f);
+            if (m_createMarkingIndex > 0)
+            {
+                drawList->AddLine(
+                    ImVec2(centerX - (18.0f * scale) + sway, baseY - (196.0f * scale)),
+                    ImVec2(centerX + (18.0f * scale) + sway, baseY - (186.0f * scale)),
+                    ColorU32(211, 218, 204, 210),
+                    2.0f);
+            }
+            const AZStd::string caption = AZStd::string::format("Preview yaw %.0f", m_previewYaw * 57.2958f);
+            drawList->AddText(ImVec2(regionMin.x + 16.0f, regionMin.y + 14.0f), ColorU32(219, 210, 177), caption.c_str());
+        };
+
+        const bool loginScreen = frontend.m_screen == "login";
+        const bool realmScreen = frontend.m_screen == "realm_select";
+        const bool characterScreen = frontend.m_screen == "character_select";
+        const bool createScreen = frontend.m_screen == "character_create";
+        const bool connectingScreen = frontend.m_screen == "connecting";
+        const ImVec2 panelSize = createScreen ? ImVec2(880.0f, 600.0f) : ImVec2(560.0f, 430.0f);
+        const ImVec2 panelPos(
+            AZ::GetMax(18.0f, (displaySize.x - panelSize.x) * 0.5f),
+            AZ::GetMax(18.0f, (displaySize.y - panelSize.y) * 0.48f));
+        const char* panelTitle = loginScreen ? "AmandaCore" :
+            realmScreen ? "Realm Select" :
+            characterScreen ? "Character Select" :
+            createScreen ? "Character Creation" :
+            "Connecting";
+
+        if (BeginHudPanel("##preworld_frontend", panelTitle, panelPos, panelSize, false, true))
+        {
+            if (loginScreen)
+            {
+                ImGui::TextUnformatted("AmandaCore");
+                ImGui::Separator();
+                ImGui::InputText("Account", m_loginUsernameBuffer, AZ_ARRAY_SIZE(m_loginUsernameBuffer));
+                const bool enterPressed = ImGui::InputText(
+                    "Password",
+                    m_loginPasswordBuffer,
+                    AZ_ARRAY_SIZE(m_loginPasswordBuffer),
+                    ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
+                if ((drawDisabledButton("Login", ImVec2(150.0f, 30.0f)) || enterPressed) && !busy)
+                {
+                    gameCore->SubmitFrontendLogin(m_loginUsernameBuffer, m_loginPasswordBuffer);
+                    m_loginPasswordBuffer[0] = '\0';
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Settings", ImVec2(120.0f, 30.0f)))
+                {
+                    m_preWorldSettingsOpen = true;
+                }
+                ImGui::Spacing();
+                drawStatus();
+            }
+            else if (realmScreen)
+            {
+                ImGui::TextUnformatted("Available realms");
+                ImGui::Separator();
+                for (size_t index = 0; index < frontend.m_realms.size(); ++index)
+                {
+                    const auto& realm = frontend.m_realms[index];
+                    const bool selected = static_cast<int>(index) == frontend.m_selectedRealmIndex;
+                    AZStd::string label = AZStd::string::format(
+                        "%s  |  %s  |  %d online",
+                        realm.m_displayName.empty() ? realm.m_id.c_str() : realm.m_displayName.c_str(),
+                        realm.m_online ? "Online" : "Offline",
+                        realm.m_onlinePlayers);
+                    if (ImGui::Selectable(label.c_str(), selected))
+                    {
+                        gameCore->SelectFrontendRealm(static_cast<int>(index));
+                    }
+                }
+                ImGui::Spacing();
+                if (drawDisabledButton("Continue", ImVec2(150.0f, 30.0f)))
+                {
+                    gameCore->SelectFrontendRealm(frontend.m_selectedRealmIndex);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Back", ImVec2(100.0f, 30.0f)))
+                {
+                    gameCore->NavigateFrontendBack();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Settings", ImVec2(120.0f, 30.0f)))
+                {
+                    m_preWorldSettingsOpen = true;
+                }
+                drawStatus();
+            }
+            else if (characterScreen)
+            {
+                const float listWidth = 245.0f;
+                ImGui::BeginChild("##character_list", ImVec2(listWidth, 260.0f), true);
+                if (frontend.m_characters.empty())
+                {
+                    ImGui::TextWrapped("No characters on this realm.");
+                }
+                for (size_t index = 0; index < frontend.m_characters.size(); ++index)
+                {
+                    const auto& character = frontend.m_characters[index];
+                    const bool selected = static_cast<int>(index) == frontend.m_selectedCharacterIndex;
+                    if (ImGui::Selectable(character.m_displayName.c_str(), selected))
+                    {
+                        gameCore->SelectFrontendCharacter(static_cast<int>(index));
+                    }
+                }
+                ImGui::EndChild();
+                ImGui::SameLine();
+                ImGui::BeginChild("##character_details", ImVec2(0.0f, 260.0f), true);
+                if (frontend.m_selectedCharacterIndex >= 0 &&
+                    frontend.m_selectedCharacterIndex < static_cast<int>(frontend.m_characters.size()))
+                {
+                    const auto& character = frontend.m_characters[frontend.m_selectedCharacterIndex];
+                    ImGui::Text("%s", character.m_displayName.c_str());
+                    ImGui::Text("Archetype: %s", character.m_archetypeId.empty() ? "wayfarer_warden" : character.m_archetypeId.c_str());
+                    ImGui::Text("Level: %d", character.m_level <= 0 ? 1 : character.m_level);
+                    ImGui::Text("Zone: %s", character.m_zoneId.empty() ? "starting zone" : character.m_zoneId.c_str());
+                    ImGui::Separator();
+                    ImGui::TextWrapped("Appearance customization is preview-only in this milestone.");
+                }
+                else
+                {
+                    ImGui::TextWrapped("Create a character to enter the world.");
+                }
+                ImGui::EndChild();
+                if (drawDisabledButton("Enter World", ImVec2(145.0f, 30.0f)))
+                {
+                    gameCore->EnterWorldWithSelectedCharacter();
+                }
+                ImGui::SameLine();
+                if (drawDisabledButton("Create New", ImVec2(130.0f, 30.0f)))
+                {
+                    ResetCharacterCreationDraft();
+                    gameCore->OpenFrontendCharacterCreation();
+                }
+                ImGui::SameLine();
+                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.45f);
+                ImGui::Button("Delete", ImVec2(100.0f, 30.0f));
+                ImGui::PopStyleVar();
+                ImGui::SameLine();
+                if (ImGui::Button("Back", ImVec2(90.0f, 30.0f)))
+                {
+                    gameCore->NavigateFrontendBack();
+                }
+                drawStatus();
+            }
+            else if (createScreen)
+            {
+                constexpr const char* lineages[] = { "Stonewake Native", "Roadborn", "Harbor Kin" };
+                constexpr const char* bodyTypes[] = { "Field", "Scout", "Vanguard" };
+                constexpr const char* skinTones[] = { "Warm", "Deep", "Sunlit", "Ash" };
+                constexpr const char* faces[] = { "Calm", "Keen", "Weathered" };
+                constexpr const char* hairStyles[] = { "Short", "Braided", "Swept" };
+                constexpr const char* hairColors[] = { "Umber", "Chestnut", "Straw", "Iron" };
+                constexpr const char* markings[] = { "None", "Trail Mark" };
+
+                ImGui::BeginChild("##creation_controls", ImVec2(330.0f, 455.0f), true);
+                ImGui::Combo("Lineage", &m_createLineageIndex, lineages, AZ_ARRAY_SIZE(lineages));
+                ImGui::Text("Archetype: Wayfarer Warden");
+                ImGui::Combo("Body", &m_createBodyIndex, bodyTypes, AZ_ARRAY_SIZE(bodyTypes));
+                ImGui::Combo("Skin", &m_createSkinIndex, skinTones, AZ_ARRAY_SIZE(skinTones));
+                ImGui::Combo("Face", &m_createFaceIndex, faces, AZ_ARRAY_SIZE(faces));
+                ImGui::Combo("Hair", &m_createHairIndex, hairStyles, AZ_ARRAY_SIZE(hairStyles));
+                ImGui::Combo("Hair Color", &m_createHairColorIndex, hairColors, AZ_ARRAY_SIZE(hairColors));
+                ImGui::Combo("Marking", &m_createMarkingIndex, markings, AZ_ARRAY_SIZE(markings));
+                ImGui::InputText("Name", m_characterNameBuffer, AZ_ARRAY_SIZE(m_characterNameBuffer));
+                ImGui::Spacing();
+                if (ImGui::Button("Randomize", ImVec2(120.0f, 28.0f)))
+                {
+                    const int seed = static_cast<int>((NowMs() / 97) & 0x7fffffff);
+                    m_createLineageIndex = seed % AZ_ARRAY_SIZE(lineages);
+                    m_createBodyIndex = (seed / 3) % AZ_ARRAY_SIZE(bodyTypes);
+                    m_createSkinIndex = (seed / 5) % AZ_ARRAY_SIZE(skinTones);
+                    m_createFaceIndex = (seed / 7) % AZ_ARRAY_SIZE(faces);
+                    m_createHairIndex = (seed / 11) % AZ_ARRAY_SIZE(hairStyles);
+                    m_createHairColorIndex = (seed / 13) % AZ_ARRAY_SIZE(hairColors);
+                    m_createMarkingIndex = (seed / 17) % AZ_ARRAY_SIZE(markings);
+                }
+                ImGui::EndChild();
+                ImGui::SameLine();
+                ImGui::BeginChild("##creation_preview_column", ImVec2(0.0f, 455.0f), false);
+                drawPreview();
+                if (ImGui::Button("Rotate Left", ImVec2(112.0f, 28.0f)))
+                {
+                    m_previewYaw -= 0.35f;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Rotate Right", ImVec2(112.0f, 28.0f)))
+                {
+                    m_previewYaw += 0.35f;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Zoom -", ImVec2(76.0f, 28.0f)))
+                {
+                    m_previewZoom = AZ::GetMax(0.75f, m_previewZoom - 0.1f);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Zoom +", ImVec2(76.0f, 28.0f)))
+                {
+                    m_previewZoom = AZ::GetMin(1.35f, m_previewZoom + 0.1f);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Reset", ImVec2(78.0f, 28.0f)))
+                {
+                    m_previewYaw = 0.0f;
+                    m_previewZoom = 1.0f;
+                }
+                ImGui::EndChild();
+
+                AZStd::string nameMessage;
+                const bool nameValid = [&]()
+                {
+                    const AZStd::string name(m_characterNameBuffer);
+                    const size_t first = name.find_first_not_of(" \t\r\n");
+                    if (first == AZStd::string::npos)
+                    {
+                        nameMessage = "Name required.";
+                        return false;
+                    }
+                    const size_t length = name.find_last_not_of(" \t\r\n") - first + 1;
+                    if (length < 3 || length > 16)
+                    {
+                        nameMessage = "Use 3 to 16 letters.";
+                        return false;
+                    }
+                    for (size_t i = first; i < first + length; ++i)
+                    {
+                        const char c = name[i];
+                        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
+                        {
+                            nameMessage = "Letters only.";
+                            return false;
+                        }
+                    }
+                    nameMessage = "Name ready.";
+                    return true;
+                }();
+                ImGui::TextWrapped("%s", nameMessage.c_str());
+                if (nameValid && drawDisabledButton("Create", ImVec2(140.0f, 30.0f)))
+                {
+                    if (gameCore->CreateFrontendCharacter(m_characterNameBuffer, "wayfarer_warden"))
+                    {
+                        ResetCharacterCreationDraft();
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Back", ImVec2(100.0f, 30.0f)))
+                {
+                    gameCore->NavigateFrontendBack();
+                }
+                drawStatus();
+            }
+            else if (connectingScreen)
+            {
+                ImGui::TextUnformatted("Entering world...");
+                drawStatus();
+            }
+        }
+        ImGui::End();
+        drawSettings();
+    }
+
     bool UiClientSystemComponent::OnInputChannelEventFiltered(const AzFramework::InputChannel& inputChannel)
     {
         const auto& channelId = inputChannel.GetInputChannelId();
@@ -5640,6 +6085,23 @@ namespace UiClient
 
         auto* gameCore = GameCore::IGameCoreRequests::Get();
         const AZStd::string keyName = channelId.GetName();
+
+        if (gameCore && gameCore->IsPreWorldFrontendActive())
+        {
+            if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape)
+            {
+                if (m_preWorldSettingsOpen)
+                {
+                    m_preWorldSettingsOpen = false;
+                }
+                else
+                {
+                    gameCore->NavigateFrontendBack();
+                }
+                return true;
+            }
+            return false;
+        }
 
         if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape && m_chatInputActive)
         {
@@ -5711,6 +6173,28 @@ namespace UiClient
             return;
         }
         SuppressStockImGuiChrome();
+        const bool preWorldActive = gameCore->IsPreWorldFrontendActive();
+        if (preWorldActive != m_preWorldDiscreteInputEnabled)
+        {
+            m_preWorldDiscreteInputEnabled = preWorldActive;
+            ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, preWorldActive);
+        }
+        if (preWorldActive)
+        {
+            CloseNpcInteraction("pre_world");
+            m_talentsOpen = false;
+            DrawPreWorldFrontend(gameCore, displaySize);
+            m_lastWorldConnected = false;
+            m_loggedActionBarVisible = false;
+            m_loggedActionBarCooldownRendered = false;
+            m_loggedCombatHudReady = false;
+            m_loggedPlayableZoneReady = false;
+            m_lastTargetFrameSummary.clear();
+            m_lastKillCreditSummary.clear();
+            m_lastCombatDomainEventSequence = 0;
+            m_lastCombatStateDiffSequence = 0;
+            return;
+        }
         if (!m_loggedPlayableZoneReady)
         {
             AZ_Printf(

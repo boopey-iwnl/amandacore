@@ -33,7 +33,19 @@ namespace GameCore
 
         const ClientLaunchOptions& GetLaunchOptions() const override;
         const ClientWorldState& GetClientWorldState() const override;
+        const ClientFrontendState& GetClientFrontendState() const override;
         const ClientCameraState& GetCameraState() const override;
+        bool IsPreWorldFrontendActive() const override;
+        bool SubmitFrontendLogin(const AZStd::string& username, const AZStd::string& password) override;
+        bool RefreshFrontendRealms() override;
+        bool SelectFrontendRealm(int realmIndex) override;
+        bool RefreshFrontendCharacters() override;
+        bool SelectFrontendCharacter(int characterIndex) override;
+        bool OpenFrontendCharacterCreation() override;
+        bool CreateFrontendCharacter(const AZStd::string& displayName, const AZStd::string& archetypeId) override;
+        bool EnterWorldWithSelectedCharacter() override;
+        bool NavigateFrontendBack() override;
+        void ClearFrontendError() override;
         bool SubmitMove(double deltaX, double deltaY) override;
         bool SetTarget(const AZStd::string& targetId) override;
         bool InteractWithEntity(const AZStd::string& entityId) override;
@@ -91,6 +103,12 @@ namespace GameCore
         bool RequestStartupLevelLoad();
         void MarkLevelReady(const char* levelName);
         void AttemptInitialWorldConnect();
+        void SetFrontendBusy(bool busy, const char* statusMessage);
+        void SetFrontendError(const AZStd::string& errorMessage);
+        bool HasFrontendSession() const;
+        bool HasSelectedRealm() const;
+        bool HasSelectedCharacter() const;
+        void SelectCreatedCharacterIfPresent();
         bool ApplyWorldSessionResponse(NetClient::WorldSessionResponse&& response, const char* source);
         bool ApplySocialStateResponse(NetClient::SocialStateResponse&& response, const char* source);
         bool ApplyAuctionStateResponse(NetClient::AuctionStateResponse&& response, const char* source);
@@ -104,6 +122,7 @@ namespace GameCore
 
         ClientLaunchOptions m_launchOptions;
         ClientWorldState m_worldState;
+        ClientFrontendState m_frontendState;
         ClientCameraState m_cameraState;
         bool m_levelReady = false;
         bool m_startupLevelLoadPending = false;

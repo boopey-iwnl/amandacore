@@ -24,6 +24,42 @@ namespace NetClient
         void Activate() override;
         void Deactivate() override;
 
+        bool Login(
+            const AZStd::string& authEndpoint,
+            const AZStd::string& username,
+            const AZStd::string& password,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool ListRealms(
+            const AZStd::string& realmEndpoint,
+            AZStd::vector<RealmDescriptor>& outRealms,
+            AZStd::string& outError) override;
+
+        bool ListCharacters(
+            const AZStd::string& characterEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            AZStd::vector<CharacterSummary>& outCharacters,
+            AZStd::string& outError) override;
+
+        bool CreateCharacter(
+            const AZStd::string& characterEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            const AZStd::string& displayName,
+            const AZStd::string& archetypeId,
+            CharacterSummary& outCharacter,
+            AZStd::string& outError) override;
+
+        bool CreateJoinTicket(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            const AZStd::string& characterId,
+            WorldJoinTicketResponse& outTicket,
+            AZStd::string& outError) override;
+
         bool Connect(
             const AZStd::string& worldEndpoint,
             const AZStd::string& ticketId,
