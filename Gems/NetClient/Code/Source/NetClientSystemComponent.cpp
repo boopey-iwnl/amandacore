@@ -13,6 +13,12 @@ namespace NetClient
         AuthSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool RefreshSessionRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& refreshToken,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool ListRealmsRequest(
         const AZStd::string& realmEndpoint,
         AZStd::vector<RealmDescriptor>& outRealms,
@@ -343,6 +349,15 @@ namespace NetClient
         AZStd::string& outError)
     {
         return LoginRequest(authEndpoint, username, password, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::RefreshSession(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& refreshToken,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return RefreshSessionRequest(authEndpoint, refreshToken, outResponse, outError);
     }
 
     bool NetClientSystemComponent::ListRealms(

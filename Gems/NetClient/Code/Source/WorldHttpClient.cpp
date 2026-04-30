@@ -1556,7 +1556,11 @@ namespace NetClient
             return payload;
         }
 
-        bool ParseAuthSessionJson(const AZStd::string& payload, AuthSessionResponse& outResponse, AZStd::string& outError)
+        bool ParseAuthSessionJson(
+            const AZStd::string& payload,
+            bool requireAccountId,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError)
         {
             outResponse = AuthSessionResponse{};
             rapidjson::Document document;
@@ -1567,9 +1571,12 @@ namespace NetClient
                 return false;
             }
 
-            if (!ReadString(document, "accessToken", outResponse.m_accessToken) ||
-                !ReadString(document, "refreshToken", outResponse.m_refreshToken) ||
-                !ReadString(document, "accountId", outResponse.m_accountId))
+            ReadString(document, "accessToken", outResponse.m_accessToken);
+            ReadString(document, "refreshToken", outResponse.m_refreshToken);
+            ReadString(document, "accountId", outResponse.m_accountId);
+            if (outResponse.m_accessToken.empty() ||
+                outResponse.m_refreshToken.empty() ||
+                (requireAccountId && outResponse.m_accountId.empty()))
             {
                 outError = "Login response was missing required fields.";
                 return false;
@@ -1732,7 +1739,30 @@ namespace NetClient
             outError = ExtractErrorMessage(responseBody);
             return false;
         }
-        return ParseAuthSessionJson(responseBody, outResponse, outError);
+        return ParseAuthSessionJson(responseBody, true, outResponse, outError);
+    }
+
+    bool RefreshSessionRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& refreshToken,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"refreshToken\":\"%s\"}",
+            JsonEscape(refreshToken).c_str());
+        if (!PerformRequest(authEndpoint, L"POST", L"/v1/auth/refresh", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseAuthSessionJson(responseBody, false, outResponse, outError);
     }
 
     bool ListRealmsRequest(

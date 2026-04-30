@@ -5842,6 +5842,11 @@ namespace UiClient
                     m_loginPasswordBuffer,
                     AZ_ARRAY_SIZE(m_loginPasswordBuffer),
                     ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
+                bool rememberLogin = frontend.m_rememberLogin;
+                if (ImGui::Checkbox("Keep me logged in", &rememberLogin))
+                {
+                    gameCore->SetFrontendRememberLogin(rememberLogin);
+                }
                 if ((drawDisabledButton("Login", ImVec2(150.0f, 30.0f)) || enterPressed) && !busy)
                 {
                     gameCore->SubmitFrontendLogin(m_loginUsernameBuffer, m_loginPasswordBuffer);
@@ -5851,6 +5856,14 @@ namespace UiClient
                 if (ImGui::Button("Settings", ImVec2(120.0f, 30.0f)))
                 {
                     m_preWorldSettingsOpen = true;
+                }
+                if (frontend.m_rememberedSessionAvailable)
+                {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Forget Login", ImVec2(130.0f, 30.0f)))
+                    {
+                        gameCore->ForgetFrontendRememberedSession();
+                    }
                 }
                 ImGui::Spacing();
                 drawStatus();
@@ -5882,6 +5895,11 @@ namespace UiClient
                 if (ImGui::Button("Back", ImVec2(100.0f, 30.0f)))
                 {
                     gameCore->NavigateFrontendBack();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Logout", ImVec2(100.0f, 30.0f)))
+                {
+                    gameCore->ForgetFrontendRememberedSession();
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Settings", ImVec2(120.0f, 30.0f)))
@@ -5944,6 +5962,10 @@ namespace UiClient
                 if (ImGui::Button("Back", ImVec2(90.0f, 30.0f)))
                 {
                     gameCore->NavigateFrontendBack();
+                }
+                if (ImGui::Button("Logout", ImVec2(100.0f, 30.0f)))
+                {
+                    gameCore->ForgetFrontendRememberedSession();
                 }
                 drawStatus();
             }

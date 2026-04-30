@@ -5,9 +5,25 @@
 #include <AzCore/Debug/Trace.h>
 #include <AzCore/Serialization/SerializeContext.h>
 #include <AzCore/std/algorithm.h>
+#include <AzCore/std/containers/vector.h>
 #include <AzFramework/API/ApplicationAPI.h>
 #include <AzFramework/CommandLine/CommandLine.h>
 #include <NetClient/WorldHttpClient.h>
+
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <iterator>
+#include <vector>
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#include <wincrypt.h>
 
 namespace GameCore
 {
@@ -25,6 +41,251 @@ namespace GameCore
         constexpr const char* FrontendScreenCharacterCreate = "character_create";
         constexpr const char* FrontendScreenConnecting = "connecting";
         constexpr const char* DefaultCharacterArchetypeId = "wayfarer_warden";
+        constexpr const char* RememberedSessionEntropy = "AmandaCore.ClientRememberedSession.v1";
+
+        struct RememberedClientSession
+        {
+            AZStd::string m_authEndpoint;
+            AZStd::string m_accountId;
+            AZStd::string m_refreshToken;
+        };
+
+        bool ContainsLineBreak(const AZStd::string& text)
+        {
+            return text.find('\n') != AZStd::string::npos || text.find('\r') != AZStd::string::npos;
+        }
+
+        AZStd::string FormatWindowsError(const char* operation)
+        {
+            return AZStd::string::format("%s failed with Windows error %lu.", operation, GetLastError());
+        }
+
+        AZStd::string GetRememberedSessionDirectory()
+        {
+            char localAppData[MAX_PATH]{};
+            const DWORD length = GetEnvironmentVariableA("LOCALAPPDATA", localAppData, MAX_PATH);
+            if (length == 0 || length >= MAX_PATH)
+            {
+                return {};
+            }
+            return AZStd::string::format("%s\\amandacore", localAppData);
+        }
+
+        AZStd::string GetRememberedSessionPath()
+        {
+            const AZStd::string directory = GetRememberedSessionDirectory();
+            if (directory.empty())
+            {
+                return {};
+            }
+            return directory + "\\client-session.dpapi";
+        }
+
+        bool RememberedSessionExists()
+        {
+            const AZStd::string path = GetRememberedSessionPath();
+            return !path.empty() && GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES;
+        }
+
+        bool EnsureRememberedSessionDirectory(AZStd::string& outError)
+        {
+            const AZStd::string directory = GetRememberedSessionDirectory();
+            if (directory.empty())
+            {
+                outError = "Local application data folder is unavailable.";
+                return false;
+            }
+            if (CreateDirectoryA(directory.c_str(), nullptr) ||
+                GetLastError() == ERROR_ALREADY_EXISTS)
+            {
+                return true;
+            }
+            outError = FormatWindowsError("CreateDirectory");
+            return false;
+        }
+
+        AZStd::string SerializeRememberedSession(const RememberedClientSession& session)
+        {
+            return "v1\n" + session.m_authEndpoint + "\n" + session.m_accountId + "\n" + session.m_refreshToken + "\n";
+        }
+
+        bool ReadRememberedSessionLine(const AZStd::string& payload, size_t& cursor, AZStd::string& outLine)
+        {
+            if (cursor > payload.size())
+            {
+                return false;
+            }
+            const size_t next = payload.find('\n', cursor);
+            if (next == AZStd::string::npos)
+            {
+                outLine = payload.substr(cursor);
+                cursor = payload.size() + 1;
+                return true;
+            }
+            outLine = payload.substr(cursor, next - cursor);
+            cursor = next + 1;
+            return true;
+        }
+
+        bool DeserializeRememberedSession(
+            const AZStd::string& payload,
+            RememberedClientSession& outSession,
+            AZStd::string& outError)
+        {
+            size_t cursor = 0;
+            AZStd::string version;
+            if (!ReadRememberedSessionLine(payload, cursor, version) || version != "v1" ||
+                !ReadRememberedSessionLine(payload, cursor, outSession.m_authEndpoint) ||
+                !ReadRememberedSessionLine(payload, cursor, outSession.m_accountId) ||
+                !ReadRememberedSessionLine(payload, cursor, outSession.m_refreshToken))
+            {
+                outError = "Saved login data is not readable.";
+                return false;
+            }
+            if (outSession.m_authEndpoint.empty() || outSession.m_refreshToken.empty())
+            {
+                outError = "Saved login data is incomplete.";
+                return false;
+            }
+            return true;
+        }
+
+        bool ProtectRememberedSessionPlaintext(
+            const AZStd::string& plaintext,
+            std::vector<unsigned char>& outCiphertext,
+            AZStd::string& outError)
+        {
+            DATA_BLOB plainBlob{};
+            plainBlob.cbData = static_cast<DWORD>(plaintext.size());
+            plainBlob.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(plaintext.data()));
+
+            DATA_BLOB entropyBlob{};
+            entropyBlob.cbData = static_cast<DWORD>(strlen(RememberedSessionEntropy));
+            entropyBlob.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(RememberedSessionEntropy));
+
+            DATA_BLOB cipherBlob{};
+            if (!CryptProtectData(
+                    &plainBlob,
+                    L"AmandaCore remembered login",
+                    &entropyBlob,
+                    nullptr,
+                    nullptr,
+                    CRYPTPROTECT_UI_FORBIDDEN,
+                    &cipherBlob))
+            {
+                outError = FormatWindowsError("CryptProtectData");
+                return false;
+            }
+
+            outCiphertext.assign(cipherBlob.pbData, cipherBlob.pbData + cipherBlob.cbData);
+            LocalFree(cipherBlob.pbData);
+            return true;
+        }
+
+        bool UnprotectRememberedSessionPlaintext(
+            const std::vector<unsigned char>& ciphertext,
+            AZStd::string& outPlaintext,
+            AZStd::string& outError)
+        {
+            if (ciphertext.empty())
+            {
+                outError = "Saved login data is empty.";
+                return false;
+            }
+
+            DATA_BLOB cipherBlob{};
+            cipherBlob.cbData = static_cast<DWORD>(ciphertext.size());
+            cipherBlob.pbData = const_cast<BYTE*>(ciphertext.data());
+
+            DATA_BLOB entropyBlob{};
+            entropyBlob.cbData = static_cast<DWORD>(strlen(RememberedSessionEntropy));
+            entropyBlob.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(RememberedSessionEntropy));
+
+            DATA_BLOB plainBlob{};
+            if (!CryptUnprotectData(
+                    &cipherBlob,
+                    nullptr,
+                    &entropyBlob,
+                    nullptr,
+                    nullptr,
+                    CRYPTPROTECT_UI_FORBIDDEN,
+                    &plainBlob))
+            {
+                outError = FormatWindowsError("CryptUnprotectData");
+                return false;
+            }
+
+            outPlaintext.assign(reinterpret_cast<const char*>(plainBlob.pbData), plainBlob.cbData);
+            LocalFree(plainBlob.pbData);
+            return true;
+        }
+
+        bool SaveRememberedClientSession(const RememberedClientSession& session, AZStd::string& outError)
+        {
+            if (session.m_authEndpoint.empty() || session.m_refreshToken.empty() ||
+                ContainsLineBreak(session.m_authEndpoint) ||
+                ContainsLineBreak(session.m_accountId) ||
+                ContainsLineBreak(session.m_refreshToken))
+            {
+                outError = "Saved login data contained unsupported values.";
+                return false;
+            }
+            if (!EnsureRememberedSessionDirectory(outError))
+            {
+                return false;
+            }
+
+            std::vector<unsigned char> ciphertext;
+            if (!ProtectRememberedSessionPlaintext(SerializeRememberedSession(session), ciphertext, outError))
+            {
+                return false;
+            }
+
+            const AZStd::string path = GetRememberedSessionPath();
+            std::ofstream file(path.c_str(), std::ios::binary | std::ios::trunc);
+            if (!file)
+            {
+                outError = "Saved login data could not be written.";
+                return false;
+            }
+            file.write(reinterpret_cast<const char*>(ciphertext.data()), static_cast<std::streamsize>(ciphertext.size()));
+            return static_cast<bool>(file);
+        }
+
+        bool LoadRememberedClientSession(RememberedClientSession& outSession, AZStd::string& outError)
+        {
+            const AZStd::string path = GetRememberedSessionPath();
+            if (path.empty())
+            {
+                outError = "Local application data folder is unavailable.";
+                return false;
+            }
+
+            std::ifstream file(path.c_str(), std::ios::binary);
+            if (!file)
+            {
+                outError = "No saved login was found.";
+                return false;
+            }
+            std::vector<unsigned char> ciphertext(
+                (std::istreambuf_iterator<char>(file)),
+                std::istreambuf_iterator<char>());
+            AZStd::string plaintext;
+            if (!UnprotectRememberedSessionPlaintext(ciphertext, plaintext, outError))
+            {
+                return false;
+            }
+            return DeserializeRememberedSession(plaintext, outSession, outError);
+        }
+
+        void ClearRememberedClientSession()
+        {
+            const AZStd::string path = GetRememberedSessionPath();
+            if (!path.empty())
+            {
+                DeleteFileA(path.c_str());
+            }
+        }
 
         const char* ResolveRegisteredStartupLevelPath()
         {
@@ -477,6 +738,93 @@ namespace GameCore
         m_frontendState.m_errorMessage = FriendlyFrontendError(errorMessage);
     }
 
+    void GameCoreSystemComponent::ResetFrontendToLogin(const char* statusMessage)
+    {
+        const bool rememberLogin = m_frontendState.m_rememberLogin;
+        const bool rememberedSessionAvailable = RememberedSessionExists();
+        m_frontendState = ClientFrontendState{};
+        m_frontendState.m_preWorldActive = true;
+        m_frontendState.m_screen = FrontendScreenLogin;
+        m_frontendState.m_rememberLogin = rememberLogin && rememberedSessionAvailable;
+        m_frontendState.m_rememberedSessionAvailable = rememberedSessionAvailable;
+        m_frontendState.m_statusMessage = statusMessage ? statusMessage : "";
+        m_worldState.m_errorMessage.clear();
+    }
+
+    bool GameCoreSystemComponent::TryRestoreRememberedFrontendSession()
+    {
+        m_frontendState.m_rememberedSessionAvailable = RememberedSessionExists();
+        if (!m_frontendState.m_rememberedSessionAvailable)
+        {
+            return false;
+        }
+
+        RememberedClientSession remembered;
+        AZStd::string error;
+        if (!LoadRememberedClientSession(remembered, error))
+        {
+            ClearRememberedClientSession();
+            m_frontendState.m_rememberedSessionAvailable = false;
+            m_frontendState.m_rememberLogin = false;
+            m_frontendState.m_statusMessage = "Saved login could not be restored. Log in again.";
+            return false;
+        }
+        if (remembered.m_authEndpoint != m_launchOptions.m_authEndpoint)
+        {
+            ClearRememberedClientSession();
+            m_frontendState.m_rememberedSessionAvailable = false;
+            m_frontendState.m_rememberLogin = false;
+            m_frontendState.m_statusMessage = "Saved login was for a different service. Log in again.";
+            return false;
+        }
+
+        auto* httpClient = NetClient::IWorldHttpClient::Get();
+        if (!httpClient)
+        {
+            m_frontendState.m_statusMessage = "Network client is unavailable. Log in again.";
+            return false;
+        }
+
+        SetFrontendBusy(true, "Restoring saved login...");
+        NetClient::AuthSessionResponse session;
+        if (!httpClient->RefreshSession(m_launchOptions.m_authEndpoint, remembered.m_refreshToken, session, error))
+        {
+            ClearRememberedClientSession();
+            m_frontendState.m_rememberedSessionAvailable = false;
+            m_frontendState.m_rememberLogin = false;
+            SetFrontendError("Saved login expired. Log in again.");
+            return false;
+        }
+        if (session.m_accountId.empty())
+        {
+            session.m_accountId = remembered.m_accountId;
+        }
+
+        m_frontendState.m_authSession = AZStd::move(session);
+        m_frontendState.m_rememberLogin = true;
+        m_frontendState.m_rememberedSessionAvailable = true;
+        if (!m_frontendState.m_authSession.m_refreshToken.empty())
+        {
+            RememberedClientSession updated;
+            updated.m_authEndpoint = m_launchOptions.m_authEndpoint;
+            updated.m_accountId = m_frontendState.m_authSession.m_accountId;
+            updated.m_refreshToken = m_frontendState.m_authSession.m_refreshToken;
+            AZStd::string saveError;
+            if (!SaveRememberedClientSession(updated, saveError))
+            {
+                ClearRememberedClientSession();
+                m_frontendState.m_rememberedSessionAvailable = false;
+                m_frontendState.m_rememberLogin = false;
+                SetFrontendError("Saved login could not be updated. Log in again.");
+                return false;
+            }
+        }
+        m_frontendState.m_statusMessage = "Saved login restored.";
+        m_frontendState.m_requestInFlight = false;
+        AZ_Printf("amandacore", "client.in_client_login_restored accountId=%s", m_frontendState.m_authSession.m_accountId.c_str());
+        return RefreshFrontendRealms();
+    }
+
     bool GameCoreSystemComponent::HasFrontendSession() const
     {
         return !m_frontendState.m_authSession.m_accessToken.empty();
@@ -537,6 +885,29 @@ namespace GameCore
             return false;
         }
         m_frontendState.m_authSession = AZStd::move(session);
+        if (m_frontendState.m_rememberLogin)
+        {
+            RememberedClientSession remembered;
+            remembered.m_authEndpoint = m_launchOptions.m_authEndpoint;
+            remembered.m_accountId = m_frontendState.m_authSession.m_accountId;
+            remembered.m_refreshToken = m_frontendState.m_authSession.m_refreshToken;
+            AZStd::string saveError;
+            if (!SaveRememberedClientSession(remembered, saveError))
+            {
+                ClearRememberedClientSession();
+                m_frontendState.m_rememberedSessionAvailable = false;
+                m_frontendState.m_rememberLogin = false;
+                SetFrontendError("Saved login could not be stored. Log in without remember enabled.");
+                return false;
+            }
+            m_frontendState.m_rememberedSessionAvailable = true;
+        }
+        else
+        {
+            ClearRememberedClientSession();
+            m_frontendState.m_rememberedSessionAvailable = false;
+        }
+        m_frontendState.m_requestInFlight = false;
         m_frontendState.m_statusMessage = "Login complete.";
         AZ_Printf("amandacore", "client.in_client_login_succeeded accountId=%s", m_frontendState.m_authSession.m_accountId.c_str());
         return RefreshFrontendRealms();
@@ -782,13 +1153,39 @@ namespace GameCore
         }
         if (m_frontendState.m_screen == FrontendScreenRealmSelect)
         {
-            m_frontendState = ClientFrontendState{};
-            m_frontendState.m_preWorldActive = true;
-            m_frontendState.m_screen = FrontendScreenLogin;
-            m_worldState.m_errorMessage.clear();
+            ResetFrontendToLogin("Logged out of the current session.");
             return true;
         }
         return false;
+    }
+
+    void GameCoreSystemComponent::SetFrontendRememberLogin(bool rememberLogin)
+    {
+        if (!IsPreWorldFrontendActive())
+        {
+            return;
+        }
+        m_frontendState.m_rememberLogin = rememberLogin;
+        if (!rememberLogin)
+        {
+            ClearRememberedClientSession();
+            m_frontendState.m_rememberedSessionAvailable = false;
+        }
+    }
+
+    bool GameCoreSystemComponent::ForgetFrontendRememberedSession()
+    {
+        if (!IsPreWorldFrontendActive())
+        {
+            return false;
+        }
+        ClearRememberedClientSession();
+        m_frontendState = ClientFrontendState{};
+        m_frontendState.m_preWorldActive = true;
+        m_frontendState.m_screen = FrontendScreenLogin;
+        m_frontendState.m_statusMessage = "Saved login cleared.";
+        m_worldState.m_errorMessage.clear();
+        return true;
     }
 
     void GameCoreSystemComponent::ClearFrontendError()
@@ -2058,6 +2455,12 @@ namespace GameCore
         m_worldState.m_launchOptionsPresent = m_launchOptions.IsValid();
         m_frontendState.m_preWorldActive = !m_launchOptions.IsValid();
         m_frontendState.m_screen = m_frontendState.m_preWorldActive ? FrontendScreenLogin : FrontendScreenConnecting;
+        m_frontendState.m_rememberedSessionAvailable = RememberedSessionExists();
+        m_frontendState.m_rememberLogin = m_frontendState.m_rememberedSessionAvailable;
+        if (m_frontendState.m_preWorldActive)
+        {
+            TryRestoreRememberedFrontendSession();
+        }
     }
 
     void GameCoreSystemComponent::MarkLevelReady(const char* levelName)

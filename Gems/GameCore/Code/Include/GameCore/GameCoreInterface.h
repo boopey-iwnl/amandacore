@@ -29,6 +29,8 @@ namespace GameCore
         AZStd::string m_screen = "login";
         AZStd::string m_statusMessage;
         AZStd::string m_errorMessage;
+        bool m_rememberLogin = false;
+        bool m_rememberedSessionAvailable = false;
         NetClient::AuthSessionResponse m_authSession;
         AZStd::vector<NetClient::RealmDescriptor> m_realms;
         AZStd::vector<NetClient::CharacterSummary> m_characters;
@@ -95,6 +97,8 @@ namespace GameCore
         virtual bool CreateFrontendCharacter(const AZStd::string& displayName, const AZStd::string& archetypeId) = 0;
         virtual bool EnterWorldWithSelectedCharacter() = 0;
         virtual bool NavigateFrontendBack() = 0;
+        virtual void SetFrontendRememberLogin(bool rememberLogin) = 0;
+        virtual bool ForgetFrontendRememberedSession() = 0;
         virtual void ClearFrontendError() = 0;
         virtual bool SubmitMove(double deltaX, double deltaY) = 0;
         virtual bool SetTarget(const AZStd::string& targetId) = 0;

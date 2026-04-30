@@ -45,6 +45,8 @@ namespace GameCore
         bool CreateFrontendCharacter(const AZStd::string& displayName, const AZStd::string& archetypeId) override;
         bool EnterWorldWithSelectedCharacter() override;
         bool NavigateFrontendBack() override;
+        void SetFrontendRememberLogin(bool rememberLogin) override;
+        bool ForgetFrontendRememberedSession() override;
         void ClearFrontendError() override;
         bool SubmitMove(double deltaX, double deltaY) override;
         bool SetTarget(const AZStd::string& targetId) override;
@@ -105,6 +107,8 @@ namespace GameCore
         void AttemptInitialWorldConnect();
         void SetFrontendBusy(bool busy, const char* statusMessage);
         void SetFrontendError(const AZStd::string& errorMessage);
+        bool TryRestoreRememberedFrontendSession();
+        void ResetFrontendToLogin(const char* statusMessage);
         bool HasFrontendSession() const;
         bool HasSelectedRealm() const;
         bool HasSelectedCharacter() const;

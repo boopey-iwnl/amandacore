@@ -690,6 +690,12 @@ namespace NetClient
             AuthSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 
+        virtual bool RefreshSession(
+            const AZStd::string& authEndpoint,
+            const AZStd::string& refreshToken,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
         virtual bool ListRealms(
             const AZStd::string& realmEndpoint,
             AZStd::vector<RealmDescriptor>& outRealms,

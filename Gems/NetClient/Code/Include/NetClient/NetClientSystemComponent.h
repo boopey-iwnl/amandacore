@@ -31,6 +31,12 @@ namespace NetClient
             AuthSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool RefreshSession(
+            const AZStd::string& authEndpoint,
+            const AZStd::string& refreshToken,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool ListRealms(
             const AZStd::string& realmEndpoint,
             AZStd::vector<RealmDescriptor>& outRealms,

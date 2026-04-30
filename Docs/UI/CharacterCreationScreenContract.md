@@ -34,6 +34,8 @@ Create submits only the fields supported by the current backend contract: `realm
 
 Appearance choices are not persisted in Milestone 2 and must not be displayed as saved character appearance data after creation.
 
+Character creation is reached only through the in-client pre-world flow. The launcher no longer creates characters or requests world join tickets in the normal player path.
+
 ## Non-Goals
 
 This milestone does not add backend appearance persistence, character deletion, addon support, Lua, user-installed UI modules, plugin runtime, or texture import.
