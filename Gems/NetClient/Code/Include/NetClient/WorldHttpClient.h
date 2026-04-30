@@ -259,13 +259,45 @@ namespace NetClient
         AZStd::string m_itemSubtype;
         AZStd::string m_quality;
         AZStd::string m_iconKind;
+        AZStd::string m_description;
+        AZStd::string m_equipSlot;
+        AZStd::string m_requiredArchetype;
         int m_stackCount = 0;
+        int m_requiredLevel = 0;
+        int m_sellPriceCopper = 0;
+        int m_strength = 0;
+        int m_stamina = 0;
+        int m_armor = 0;
     };
 
     struct InventoryState
     {
         int m_slotCount = 0;
         AZStd::vector<InventorySlotState> m_slots;
+    };
+
+    struct EquipmentSlotState
+    {
+        AZStd::string m_slot;
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        AZStd::string m_itemType;
+        AZStd::string m_itemSubtype;
+        AZStd::string m_quality;
+        AZStd::string m_iconKind;
+        AZStd::string m_description;
+        AZStd::string m_equipSlot;
+        AZStd::string m_requiredArchetype;
+        int m_requiredLevel = 0;
+        int m_sellPriceCopper = 0;
+        int m_strength = 0;
+        int m_stamina = 0;
+        int m_armor = 0;
+    };
+
+    struct EquipmentState
+    {
+        AZStd::vector<EquipmentSlotState> m_slots;
     };
 
     struct MailItemAttachmentState
@@ -497,6 +529,7 @@ namespace NetClient
         AZStd::string m_realmId;
         AZStd::string m_zoneId;
         AZStd::string m_displayName;
+        AZStd::string m_archetypeId;
         int m_level = 0;
         WorldPosition m_position;
         double m_health = 0.0;
@@ -507,6 +540,7 @@ namespace NetClient
         int m_experience = 0;
         CurrencyState m_currency;
         InventoryState m_inventory;
+        EquipmentState m_equipment;
         StatBlockState m_stats;
         TalentState m_talents;
         AZStd::vector<AZStd::string> m_learnedAbilityIds;
@@ -1016,6 +1050,20 @@ namespace NetClient
             const AZStd::string& worldSessionToken,
             int fromSlotIndex,
             int toSlotIndex,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool EquipInventorySlot(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            int slotIndex,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool UnequipInventorySlot(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& equipmentSlot,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 

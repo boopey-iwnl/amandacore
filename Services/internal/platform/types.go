@@ -88,19 +88,39 @@ const (
 )
 
 var EquipmentSlots = []string{
-	EquipmentSlotMainHand,
+	EquipmentSlotHead,
+	EquipmentSlotShoulders,
 	EquipmentSlotChest,
 	EquipmentSlotHands,
+	EquipmentSlotWaist,
 	EquipmentSlotLegs,
 	EquipmentSlotFeet,
+	EquipmentSlotMainHand,
+	EquipmentSlotOffHand,
+	EquipmentSlotRangedOrFocus,
+	EquipmentSlotAccessory1,
+	EquipmentSlotAccessory2,
+	EquipmentSlotTrinket1,
+	EquipmentSlotTrinket2,
+	EquipmentSlotCloakOrBack,
 }
 
 const (
-	EquipmentSlotMainHand = "main_hand"
-	EquipmentSlotChest    = "chest"
-	EquipmentSlotHands    = "hands"
-	EquipmentSlotLegs     = "legs"
-	EquipmentSlotFeet     = "feet"
+	EquipmentSlotHead          = "head"
+	EquipmentSlotShoulders     = "shoulders"
+	EquipmentSlotChest         = "chest"
+	EquipmentSlotHands         = "hands"
+	EquipmentSlotWaist         = "waist"
+	EquipmentSlotLegs          = "legs"
+	EquipmentSlotFeet          = "feet"
+	EquipmentSlotMainHand      = "main_hand"
+	EquipmentSlotOffHand       = "off_hand"
+	EquipmentSlotRangedOrFocus = "ranged_or_focus"
+	EquipmentSlotAccessory1    = "accessory_1"
+	EquipmentSlotAccessory2    = "accessory_2"
+	EquipmentSlotTrinket1      = "trinket_1"
+	EquipmentSlotTrinket2      = "trinket_2"
+	EquipmentSlotCloakOrBack   = "cloak_or_back"
 )
 
 type CharacterInventorySlot struct {

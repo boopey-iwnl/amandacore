@@ -150,6 +150,7 @@ namespace UiClient
         int m_createMarkingIndex = 0;
         int m_pendingActionMoveSlot = -1;
         int m_pendingInventoryMoveSlot = -1;
+        AZStd::string m_characterPanelNotice;
         float m_previewYaw = 0.0f;
         float m_previewZoom = 1.0f;
         float m_chatOffsetX = 0.0f;

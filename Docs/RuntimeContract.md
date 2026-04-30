@@ -376,6 +376,16 @@ Server:
 - Reward is granted automatically on completion; there is no turn-in step in this milestone.
 - Quest accept is valid only while the player is within the frontier command-post radius around `(12, 12)` in `west_approach`.
 
+## Additive UI Milestone 3 character panel notes
+
+- World session responses include `archetypeId` for in-world character identity display.
+- `inventory.slots[]` and `equipment.slots[]` expose optional item metadata for built-in Character panel tooltips.
+- Item metadata prefers AmandaCore terminology such as `requiredArchetype`; legacy internal class checks remain server-side compatibility details.
+- Equipment mutations remain server-authoritative.
+- `POST /v1/world/inventory/equip` equips a single item from an inventory slot after validating compatibility.
+- `POST /v1/world/inventory/unequip` unequips an occupied equipment slot into the first empty inventory slot and rejects full bags.
+- Reputation UI remains an empty/read-only shell unless real runtime faction standings are added.
+
 ### `POST /v1/world/quest/accept`
 
 Request:

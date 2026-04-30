@@ -285,6 +285,7 @@ func sessionFromCharacter(character platform.Character, token string) *worldSess
 		CharacterID:       character.ID,
 		DisplayName:       character.DisplayName,
 		ClassID:           character.ClassID,
+		ArchetypeID:       character.ArchetypeID,
 		Level:             character.Level,
 		RealmID:           character.RealmID,
 		ZoneID:            secondZoneID,

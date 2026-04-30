@@ -88,6 +88,7 @@ func (s *worldServer) applyCharacterProgressionLocked(session *worldSessionState
 	session.Experience = character.Experience
 	session.Level = character.Level
 	session.ClassID = character.ClassID
+	session.ArchetypeID = character.ArchetypeID
 	session.CurrencyCopper = character.CurrencyCopper
 	session.Inventory = platform.NormalizeInventorySlots(character.Inventory)
 	session.Equipment = platform.NormalizeEquipmentSlots(character.Equipment)

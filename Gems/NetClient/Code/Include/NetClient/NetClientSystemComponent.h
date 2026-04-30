@@ -360,6 +360,20 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool EquipInventorySlot(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            int slotIndex,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool UnequipInventorySlot(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& equipmentSlot,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool BrowseAuctions(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
