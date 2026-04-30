@@ -13,6 +13,47 @@ namespace NetClient
         double m_z = 0.0;
     };
 
+    struct AuthSessionResponse
+    {
+        AZStd::string m_accessToken;
+        AZStd::string m_refreshToken;
+        AZStd::string m_accountId;
+    };
+
+    struct RealmDescriptor
+    {
+        AZStd::string m_id;
+        AZStd::string m_displayName;
+        AZStd::string m_region;
+        AZStd::string m_endpoint;
+        AZStd::string m_supportedBuild;
+        int m_onlinePlayers = 0;
+        bool m_online = false;
+    };
+
+    struct CharacterSummary
+    {
+        AZStd::string m_id;
+        AZStd::string m_realmId;
+        AZStd::string m_displayName;
+        AZStd::string m_raceId;
+        AZStd::string m_classId;
+        AZStd::string m_archetypeId;
+        int m_level = 0;
+        AZStd::string m_zoneId;
+    };
+
+    struct WorldJoinTicketResponse
+    {
+        AZStd::string m_ticketId;
+        AZStd::string m_sessionId;
+        AZStd::string m_accountId;
+        AZStd::string m_characterId;
+        AZStd::string m_realmId;
+        AZStd::string m_worldEndpoint;
+        AZ::s64 m_expiresAt = 0;
+    };
+
     struct NpcServiceState
     {
         AZStd::string m_type;
@@ -641,6 +682,48 @@ namespace NetClient
         {
             AZ::Interface<IWorldHttpClient>::Unregister(instance);
         }
+
+        virtual bool Login(
+            const AZStd::string& authEndpoint,
+            const AZStd::string& username,
+            const AZStd::string& password,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool RefreshSession(
+            const AZStd::string& authEndpoint,
+            const AZStd::string& refreshToken,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool ListRealms(
+            const AZStd::string& realmEndpoint,
+            AZStd::vector<RealmDescriptor>& outRealms,
+            AZStd::string& outError) = 0;
+
+        virtual bool ListCharacters(
+            const AZStd::string& characterEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            AZStd::vector<CharacterSummary>& outCharacters,
+            AZStd::string& outError) = 0;
+
+        virtual bool CreateCharacter(
+            const AZStd::string& characterEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            const AZStd::string& displayName,
+            const AZStd::string& archetypeId,
+            CharacterSummary& outCharacter,
+            AZStd::string& outError) = 0;
+
+        virtual bool CreateJoinTicket(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            const AZStd::string& characterId,
+            WorldJoinTicketResponse& outTicket,
+            AZStd::string& outError) = 0;
 
         virtual bool Connect(
             const AZStd::string& worldEndpoint,

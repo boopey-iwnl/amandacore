@@ -2,22 +2,24 @@
 
 This directory is the handoff point for the O3DE client project. The runtime gameplay seams are split across Gems in `Gems/`, and shared gameplay/platform contracts live in `Shared/AmandaCoreShared`.
 
-The launcher authenticates against the backend, fetches realms and characters, and starts the game client with a short-lived world join ticket. The in-engine login and world bootstrap flow should use the same shared message and ticket contracts as the backend services.
+The launcher acts as a patch/build status and bootstrapper surface. It starts the O3DE game client without player credentials or a world join ticket. The game client owns account login, remembered-session restore, realm selection, character selection/creation, join-ticket request, and world entry.
 
 ## Runtime paths
 
 - Preferred Milestone 2 client: `build/o3de-windows/bin/profile/amandacore.GameLauncher.exe`
 - Fallback client during stabilization: `Client/Game/AmandaCore.WorldClient/bin/Debug/net8.0/AmandaCore.WorldClient.exe`
 
-The launcher should prefer the O3DE `GameLauncher` build when it exists and fall back to the minimal `.NET` client only when the O3DE path is unavailable.
+The launcher should prefer the O3DE `GameLauncher` build. The fallback `.NET` client is diagnostic-only and is not used for the normal in-client login flow.
 
 ## O3DE launch handoff
 
-The launcher starts the O3DE client with:
+The launcher starts the O3DE client with safe service endpoint arguments and existing O3DE runtime arguments, for example:
 
 ```text
---join-ticket <ticketId> --world-endpoint <endpoint>
+--auth-endpoint <endpoint> --realm-endpoint <endpoint> --character-endpoint <endpoint> --world-service-endpoint <endpoint>
 ```
+
+The legacy `--join-ticket <ticketId> --world-endpoint <endpoint>` handoff remains a development/backward-compatible direct-world path only.
 
 The O3DE client path remains the preferred playable slice. The fallback `.NET` client is diagnostic only, and now proves both movement and the server-authoritative combat command path:
 

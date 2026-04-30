@@ -74,7 +74,8 @@ namespace NetClient
             const AZStd::string& requestBody,
             AZStd::string& responseBody,
             AZ::u32& outStatusCode,
-            AZStd::string& outError)
+            AZStd::string& outError,
+            const AZStd::string& bearerToken = {})
         {
             ParsedEndpoint parsedEndpoint;
             if (!ParseEndpoint(endpoint, parsedEndpoint, outError))
@@ -119,12 +120,23 @@ namespace NetClient
                 return false;
             }
 
-            const wchar_t* headers = L"Content-Type: application/json\r\n";
-            const DWORD headerLength = requestBody.empty() ? 0 : static_cast<DWORD>(wcslen(headers));
+            AZStd::wstring headers;
+            if (!requestBody.empty())
+            {
+                headers += L"Content-Type: application/json\r\n";
+            }
+            if (!bearerToken.empty())
+            {
+                headers += L"Authorization: Bearer ";
+                headers += ToWideString(bearerToken);
+                headers += L"\r\n";
+            }
+
+            const DWORD headerLength = headers.empty() ? 0 : static_cast<DWORD>(headers.size());
             const DWORD bodyLength = static_cast<DWORD>(requestBody.size());
             if (!WinHttpSendRequest(
                     request,
-                    requestBody.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers,
+                    headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
                     headerLength,
                     requestBody.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(requestBody.data()),
                     bodyLength,
@@ -1543,7 +1555,334 @@ namespace NetClient
 
             return payload;
         }
+
+        bool ParseAuthSessionJson(
+            const AZStd::string& payload,
+            bool requireAccountId,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError)
+        {
+            outResponse = AuthSessionResponse{};
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Login response was not valid JSON.";
+                return false;
+            }
+
+            ReadString(document, "accessToken", outResponse.m_accessToken);
+            ReadString(document, "refreshToken", outResponse.m_refreshToken);
+            ReadString(document, "accountId", outResponse.m_accountId);
+            if (outResponse.m_accessToken.empty() ||
+                outResponse.m_refreshToken.empty() ||
+                (requireAccountId && outResponse.m_accountId.empty()))
+            {
+                outError = "Login response was missing required fields.";
+                return false;
+            }
+            return true;
+        }
+
+        void ParseRealmDescriptor(const rapidjson::Value& realmValue, RealmDescriptor& outRealm)
+        {
+            ReadString(realmValue, "id", outRealm.m_id);
+            ReadString(realmValue, "displayName", outRealm.m_displayName);
+            ReadString(realmValue, "region", outRealm.m_region);
+            ReadString(realmValue, "endpoint", outRealm.m_endpoint);
+            ReadString(realmValue, "supportedBuild", outRealm.m_supportedBuild);
+            ReadInt(realmValue, "onlinePlayers", outRealm.m_onlinePlayers);
+            ReadBool(realmValue, "online", outRealm.m_online);
+        }
+
+        bool ParseRealmListJson(const AZStd::string& payload, AZStd::vector<RealmDescriptor>& outRealms, AZStd::string& outError)
+        {
+            outRealms.clear();
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Realm list response was not valid JSON.";
+                return false;
+            }
+            if (!document.HasMember("realms") || !document["realms"].IsArray())
+            {
+                outError = "Realm list response was missing realms.";
+                return false;
+            }
+
+            for (const rapidjson::Value& realmValue : document["realms"].GetArray())
+            {
+                if (!realmValue.IsObject())
+                {
+                    continue;
+                }
+                RealmDescriptor realm;
+                ParseRealmDescriptor(realmValue, realm);
+                if (!realm.m_id.empty())
+                {
+                    outRealms.push_back(AZStd::move(realm));
+                }
+            }
+            return true;
+        }
+
+        void ParseCharacterSummary(const rapidjson::Value& characterValue, CharacterSummary& outCharacter)
+        {
+            ReadString(characterValue, "id", outCharacter.m_id);
+            ReadString(characterValue, "realmId", outCharacter.m_realmId);
+            ReadString(characterValue, "displayName", outCharacter.m_displayName);
+            ReadString(characterValue, "raceId", outCharacter.m_raceId);
+            ReadString(characterValue, "classId", outCharacter.m_classId);
+            ReadString(characterValue, "archetypeId", outCharacter.m_archetypeId);
+            ReadInt(characterValue, "level", outCharacter.m_level);
+            ReadString(characterValue, "zoneId", outCharacter.m_zoneId);
+        }
+
+        bool ParseCharacterListJson(const AZStd::string& payload, AZStd::vector<CharacterSummary>& outCharacters, AZStd::string& outError)
+        {
+            outCharacters.clear();
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Character list response was not valid JSON.";
+                return false;
+            }
+            if (!document.HasMember("characters") || !document["characters"].IsArray())
+            {
+                outError = "Character list response was missing characters.";
+                return false;
+            }
+
+            for (const rapidjson::Value& characterValue : document["characters"].GetArray())
+            {
+                if (!characterValue.IsObject())
+                {
+                    continue;
+                }
+                CharacterSummary character;
+                ParseCharacterSummary(characterValue, character);
+                if (!character.m_id.empty())
+                {
+                    outCharacters.push_back(AZStd::move(character));
+                }
+            }
+            return true;
+        }
+
+        bool ParseCharacterSummaryJson(const AZStd::string& payload, CharacterSummary& outCharacter, AZStd::string& outError)
+        {
+            outCharacter = CharacterSummary{};
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Character response was not valid JSON.";
+                return false;
+            }
+            ParseCharacterSummary(document, outCharacter);
+            if (outCharacter.m_id.empty())
+            {
+                outError = "Character response was missing required fields.";
+                return false;
+            }
+            return true;
+        }
+
+        bool ParseJoinTicketJson(const AZStd::string& payload, WorldJoinTicketResponse& outTicket, AZStd::string& outError)
+        {
+            outTicket = WorldJoinTicketResponse{};
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Join ticket response was not valid JSON.";
+                return false;
+            }
+
+            ReadString(document, "ticketId", outTicket.m_ticketId);
+            ReadString(document, "sessionId", outTicket.m_sessionId);
+            ReadString(document, "accountId", outTicket.m_accountId);
+            ReadString(document, "characterId", outTicket.m_characterId);
+            ReadString(document, "realmId", outTicket.m_realmId);
+            ReadString(document, "worldEndpoint", outTicket.m_worldEndpoint);
+            ReadInt64(document, "expiresAt", outTicket.m_expiresAt);
+            if (outTicket.m_ticketId.empty() || outTicket.m_worldEndpoint.empty())
+            {
+                outError = "Join ticket response was missing required fields.";
+                return false;
+            }
+            return true;
+        }
     } // namespace
+
+    bool LoginRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& username,
+        const AZStd::string& password,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"username\":\"%s\",\"password\":\"%s\"}",
+            JsonEscape(username).c_str(),
+            JsonEscape(password).c_str());
+        if (!PerformRequest(authEndpoint, L"POST", L"/v1/auth/login", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseAuthSessionJson(responseBody, true, outResponse, outError);
+    }
+
+    bool RefreshSessionRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& refreshToken,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"refreshToken\":\"%s\"}",
+            JsonEscape(refreshToken).c_str());
+        if (!PerformRequest(authEndpoint, L"POST", L"/v1/auth/refresh", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseAuthSessionJson(responseBody, false, outResponse, outError);
+    }
+
+    bool ListRealmsRequest(
+        const AZStd::string& realmEndpoint,
+        AZStd::vector<RealmDescriptor>& outRealms,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        if (!PerformRequest(realmEndpoint, L"GET", L"/v1/realms", {}, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseRealmListJson(responseBody, outRealms, outError);
+    }
+
+    bool ListCharactersRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        AZStd::vector<CharacterSummary>& outCharacters,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string path = AZStd::string::format("/v1/characters?realmId=%s", JsonEscape(realmId).c_str());
+        if (!PerformRequest(
+                characterEndpoint,
+                L"GET",
+                ToWideString(path),
+                {},
+                responseBody,
+                statusCode,
+                outError,
+                accessToken))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseCharacterListJson(responseBody, outCharacters, outError);
+    }
+
+    bool CreateCharacterRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& displayName,
+        const AZStd::string& archetypeId,
+        CharacterSummary& outCharacter,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"realmId\":\"%s\",\"displayName\":\"%s\",\"archetypeId\":\"%s\"}",
+            JsonEscape(realmId).c_str(),
+            JsonEscape(displayName).c_str(),
+            JsonEscape(archetypeId).c_str());
+        if (!PerformRequest(
+                characterEndpoint,
+                L"POST",
+                L"/v1/characters",
+                requestBody,
+                responseBody,
+                statusCode,
+                outError,
+                accessToken))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseCharacterSummaryJson(responseBody, outCharacter, outError);
+    }
+
+    bool CreateJoinTicketRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& characterId,
+        WorldJoinTicketResponse& outTicket,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"realmId\":\"%s\",\"characterId\":\"%s\"}",
+            JsonEscape(realmId).c_str(),
+            JsonEscape(characterId).c_str());
+        if (!PerformRequest(
+                worldEndpoint,
+                L"POST",
+                L"/v1/world/join-ticket",
+                requestBody,
+                responseBody,
+                statusCode,
+                outError,
+                accessToken))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseJoinTicketJson(responseBody, outTicket, outError);
+    }
 
     bool ConnectRequest(
         const AZStd::string& worldEndpoint,

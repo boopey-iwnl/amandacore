@@ -8,6 +8,8 @@
 #include <GameCore/GameCoreInterface.h>
 #include <ImGuiBus.h>
 
+struct ImVec2;
+
 namespace UiClient
 {
     class UiClientSystemComponent final
@@ -64,6 +66,8 @@ namespace UiClient
         bool IsGameplayPanelOpen(const char* panelId) const;
         bool CloseGameplayPanelById(const char* panelId, const char* reason);
         void ResetHudLayout();
+        void DrawPreWorldFrontend(GameCore::IGameCoreRequests* gameCore, const ImVec2& displaySize);
+        void ResetCharacterCreationDraft();
 
         AZStd::string m_lastQuestState;
         int m_lastQuestCount = -1;
@@ -121,7 +125,12 @@ namespace UiClient
         AZStd::string m_chatChannel = "say";
         bool m_chatFocusRequested = false;
         bool m_chatInputActive = false;
+        bool m_preWorldDiscreteInputEnabled = false;
+        bool m_preWorldSettingsOpen = false;
         char m_chatInputBuffer[257]{};
+        char m_loginUsernameBuffer[65]{};
+        char m_loginPasswordBuffer[65]{};
+        char m_characterNameBuffer[65]{};
         char m_chatWhisperTargetBuffer[65]{};
         char m_socialNameBuffer[65]{};
         char m_guildNameBuffer[65]{};
@@ -132,8 +141,17 @@ namespace UiClient
         int m_pendingAuctionSellSlot = -1;
         int m_pendingAuctionBuyoutIndex = -1;
         int m_auctionStackCount = 1;
+        int m_createLineageIndex = 0;
+        int m_createBodyIndex = 0;
+        int m_createSkinIndex = 0;
+        int m_createFaceIndex = 0;
+        int m_createHairIndex = 0;
+        int m_createHairColorIndex = 0;
+        int m_createMarkingIndex = 0;
         int m_pendingActionMoveSlot = -1;
         int m_pendingInventoryMoveSlot = -1;
+        float m_previewYaw = 0.0f;
+        float m_previewZoom = 1.0f;
         float m_chatOffsetX = 0.0f;
         float m_chatOffsetY = 0.0f;
         float m_objectiveTrackerOffsetX = 0.0f;

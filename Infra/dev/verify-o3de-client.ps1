@@ -75,7 +75,7 @@ if (-not $runtimeLog) {
     $runtimeLog = $candidateClientLogs |
         Where-Object {
             $content = Get-Content -Path $_.FullName -Raw -ErrorAction SilentlyContinue
-            $content -match "client\\.world_connect_started" -or $content -match "client\\.level_ready" -or $content -match "client\\.world_connected"
+            $content -match "client\\.world_connect_started" -or $content -match "client\\.in_client_join_ticket_issued" -or $content -match "client\\.level_ready" -or $content -match "client\\.world_connected"
         } |
         Select-Object -First 1
 }
@@ -91,7 +91,7 @@ if (-not $runtimeLog) {
     Write-Host "No O3DE runtime log with client world events was found yet."
     Write-Host "Manual runtime verification is required:"
     Write-Host "  1. Start the local stack and launcher."
-    Write-Host "  2. Join the world through the launcher and confirm the O3DE GameLauncher is selected."
+    Write-Host "  2. Press Play in the launcher, log in inside the game client, select a realm and character, then enter the world."
     Write-Host "  3. Confirm the Stonewake scene loads and the player remains grounded."
     Write-Host "  4. Accept a starter quest, confirm the NPC window closes cleanly, complete an objective, and confirm rewards grant once."
     Write-Host "  5. Disconnect/reconnect and restart the stack to confirm position, quest, and interaction-state persistence."
@@ -100,16 +100,25 @@ if (-not $runtimeLog) {
 
 $runtimeContent = Get-Content -Path $runtimeLog.FullName -Raw
 $connectStartedIndex = $runtimeContent.IndexOf("client.world_connect_started")
+$inClientJoinIssuedIndex = $runtimeContent.IndexOf("client.in_client_join_ticket_issued")
 $levelReadyIndex = $runtimeContent.IndexOf("client.level_ready")
 $worldConnectedIndex = $runtimeContent.IndexOf("client.world_connected")
 $playerSpawnedIndex = $runtimeContent.IndexOf("client.player_spawned")
 
-if ($connectStartedIndex -lt 0 -or $levelReadyIndex -lt 0 -or $worldConnectedIndex -lt 0) {
-    throw "Runtime log is missing one or more required events. Log: $($runtimeLog.FullName)"
-}
+$legacyDirectWorldFlow = $connectStartedIndex -ge 0 -and
+    $levelReadyIndex -ge 0 -and
+    $worldConnectedIndex -ge 0 -and
+    $connectStartedIndex -lt $levelReadyIndex -and
+    $levelReadyIndex -lt $worldConnectedIndex
 
-if (!($connectStartedIndex -lt $levelReadyIndex -and $levelReadyIndex -lt $worldConnectedIndex)) {
-    throw "Runtime log events are out of order. Expected client.world_connect_started -> client.level_ready -> client.world_connected. Log: $($runtimeLog.FullName)"
+$inClientWorldFlow = $levelReadyIndex -ge 0 -and
+    $inClientJoinIssuedIndex -ge 0 -and
+    $worldConnectedIndex -ge 0 -and
+    $levelReadyIndex -lt $inClientJoinIssuedIndex -and
+    $inClientJoinIssuedIndex -lt $worldConnectedIndex
+
+if (!($legacyDirectWorldFlow -or $inClientWorldFlow)) {
+    throw "Runtime log is missing required events or has them out of order. Expected legacy direct-world flow client.world_connect_started -> client.level_ready -> client.world_connected, or in-client flow client.level_ready -> client.in_client_join_ticket_issued -> client.world_connected. Log: $($runtimeLog.FullName)"
 }
 
 if ($playerSpawnedIndex -lt 0 -or $worldConnectedIndex -gt $playerSpawnedIndex) {
@@ -127,5 +136,10 @@ Write-Host "Runtime log: $($runtimeLog.FullName)"
 Write-Host ""
 Write-Host "Verified runtime phases:"
 Write-Host "  1. GameLauncher starts and the runtime level loads."
-Write-Host "  2. World bootstrap/connect runs after level-ready."
+if ($legacyDirectWorldFlow) {
+    Write-Host "  2. Legacy direct-world bootstrap/connect starts before level-ready and completes after level-ready."
+}
+else {
+    Write-Host "  2. In-client login flow requests a join ticket after level-ready and completes world connect."
+}
 Write-Host "  3. Player spawn occurs after successful world connect."
