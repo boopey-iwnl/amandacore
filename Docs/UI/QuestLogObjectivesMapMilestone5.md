@@ -18,17 +18,20 @@ Milestone 5 polishes AmandaCore's first-party questing shell without adding addo
 - Objective Tracker shows tracked/current quests compactly below the navigator, highlights ready-to-turn-in state, supports collapse/expand, and can open the selected quest in the Quest Log.
 - Quest gossip selects the relevant quest for the targeted NPC, shows available/active/ready states, previews real rewards, accepts through the authoritative accept route, and completes/turns in through the authoritative complete route.
 - Zone Map clicks on quest markers or quest areas select the quest and open the Quest Log. Track requests are sent only for supported quest states.
-- Map and minimap markers remain procedural first-party shapes and colors. No external map art, marker art, or copied MMO UI assets are introduced.
+- The authored Dawnwake follow-up adds repo-local map art for the Dawnwake world map and copied zone maps. Stonewake Vale is calibrated for v1 runtime overlays; other zone art is display-reference until those zones are authored.
+- Map and minimap markers remain procedural first-party shapes and colors. No external marker art or copied MMO UI assets are introduced.
+- The playable Stonewake Vale layout now uses the same v1 anchors as the map overlay: Hearthwatch Yard, ValeFurrow Farms, Brookside Crossing, Stonehewn Quarry, Tiderown Ruins, Lightkeeper's Point, Whispering Cave, and the main road loop.
 
 ## Limitations And Follow-Up
 
 - Full branching dialogue UI remains a later content-driven dialogue milestone. M5 documents the contract and keeps quest gossip compatible with current content.
 - Quest abandon is not exposed because there is no current authoritative abandon endpoint in the world service.
 - Overhead 3D quest markers are limited to existing first-party friendly NPC nameplate roles and map/minimap indicators.
-- Detailed painted world map art is not required for M5. The current schematic map shell uses server-authored roads, landmarks, areas, player position, and markers.
+- Stonewake calibration is a first pass. Linear bounds-based placement is suitable for v1 map overlays and manual navigation, but later terrain authoring should replace proxy geometry with authored meshes/heightfields.
+- Non-Stonewake zone PNGs are copied and manifest-tracked but remain display-only until their runtime zone bounds, anchors, and service/quest data are calibrated.
 
 ## Safety Notes
 
 - No addon API, Lua loader, AddOns folder, user-installed UI module, plugin runtime, or arbitrary UI script execution is added.
-- The local texture source folder remains a read-only source pool only. M5 does not import textures by default and must not create runtime, package, manifest, material, code, or docs-as-config dependencies on that machine-local path.
+- The local texture source folder remains a read-only source pool only. The authored map follow-up copies curated PNGs into `Content/Art/UI/Maps/**` and must not create runtime, package, manifest, material, code, or docs-as-config dependencies on that machine-local path.
 - Quest text and map labels come from AmandaCore repo content only.

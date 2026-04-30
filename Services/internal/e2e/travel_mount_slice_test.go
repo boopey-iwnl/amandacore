@@ -86,7 +86,7 @@ func TestTravelMountSliceBindRecallTravelMountAndPersistence(t *testing.T) {
 		"sourcePointId":      travelMountHighmerePointID,
 		"destinationPointId": travelMountHearthwatchPointID,
 	}, http.StatusOK, &state)
-	assertWorldPosition(t, state, travelMountStonewakeZoneID, 13, 10)
+	assertWorldPosition(t, state, travelMountStonewakeZoneID, 232, 130)
 	if copper := int(state["currencyCopper"].(float64)); copper != 105 {
 		t.Fatalf("expected 105 copper after route cost, got %d", copper)
 	}

@@ -84,8 +84,8 @@ func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
 
 	for _, npcID := range []string{npcScoutRowanID, npcRoadwardenIlyaID, objWatchLanternID, npcQuartermasterLyraID} {
 		npc := server.friendlyNPCs[npcID]
-		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance < 80.0 {
-			t.Fatalf("expected progression NPC %s outside spawn view, distance %.1f", npcID, distance)
+		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance < 54.0 {
+			t.Fatalf("expected progression NPC %s beyond the immediate hub, distance %.1f", npcID, distance)
 		}
 	}
 
@@ -95,16 +95,16 @@ func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
 		}
 	}
 
-	assertMobAreaCenter(t, server, mobTrainingDummyTypeID, 58.0, 32.0, 10.0)
-	assertMobAreaCenter(t, server, mobDitchRatTypeID, 119.0, 62.0, 24.0)
-	assertMobAreaCenter(t, server, mobFieldBoarTypeID, 163.0, 86.0, 32.0)
-	assertMobAreaCenter(t, server, mobRidgeCrowTypeID, 240.0, 127.0, 34.0)
-	assertMobAreaCenter(t, server, mobAshbandScoutTypeID, 313.0, 170.0, 34.0)
-	assertMobAreaCenter(t, server, mobAshbandPoacherTypeID, 375.0, 210.0, 42.0)
+	assertMobAreaCenter(t, server, mobTrainingDummyTypeID, 268.0, 146.0, 10.0)
+	assertMobAreaCenter(t, server, mobDitchRatTypeID, 361.0, 157.0, 24.0)
+	assertMobAreaCenter(t, server, mobFieldBoarTypeID, 197.0, 74.0, 32.0)
+	assertMobAreaCenter(t, server, mobRidgeCrowTypeID, 318.0, 96.0, 34.0)
+	assertMobAreaCenter(t, server, mobAshbandScoutTypeID, 380.0, 231.0, 34.0)
+	assertMobAreaCenter(t, server, mobAshbandPoacherTypeID, 375.0, 77.0, 42.0)
 
 	bram := server.mobs["mob_bram_kettle_01"]
-	if distance := math.Hypot(bram.X-420.0, bram.Y-224.0); distance > 1.0 {
-		t.Fatalf("expected Bram Kettle in isolated wagon stand, got %.1f, %.1f", bram.X, bram.Y)
+	if distance := math.Hypot(bram.X-358.0, bram.Y-39.0); distance > 1.0 {
+		t.Fatalf("expected Bram Kettle in Tiderown Ruins, got %.1f, %.1f", bram.X, bram.Y)
 	}
 }
 

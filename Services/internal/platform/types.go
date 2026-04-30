@@ -35,8 +35,8 @@ const (
 	StarterCurrencyCopper   = 125
 	PrimaryProfessionLimit  = 2
 	DefaultStarterZoneID    = "stonewake_vale"
-	DefaultStarterSpawnX    = 10.0
-	DefaultStarterSpawnY    = 10.0
+	DefaultStarterSpawnX    = 232.0
+	DefaultStarterSpawnY    = 130.0
 	DefaultStarterSpawnZ    = 0.0
 
 	DefaultRaceID             = "human"
@@ -63,8 +63,8 @@ const (
 	DefaultBindDisplayName = "Hearthwatch Yard"
 	DefaultTravelPointID   = "travel_hearthwatch_yard"
 	DefaultBindZoneID      = DefaultStarterZoneID
-	DefaultBindPositionX   = 13.0
-	DefaultBindPositionY   = 10.0
+	DefaultBindPositionX   = 232.0
+	DefaultBindPositionY   = 130.0
 	DefaultBindPositionZ   = 0.0
 
 	AchievementScopeAccount   = "account"
@@ -813,7 +813,13 @@ func NormalizeCharacter(character Character) Character {
 		character.PositionX >= 11.99 && character.PositionX <= 12.01 &&
 		character.PositionY >= 11.99 && character.PositionY <= 12.01 &&
 		character.PositionZ >= -0.01 && character.PositionZ <= 0.01
-	if character.ZoneID == "" || legacyDefaultSpawn {
+	legacyStonewakeBlockoutSpawn := character.ZoneID == DefaultStarterZoneID &&
+		character.Level <= 1 &&
+		!hasStarterQuestProgress &&
+		character.PositionX >= 9.99 && character.PositionX <= 10.01 &&
+		character.PositionY >= 9.99 && character.PositionY <= 10.01 &&
+		character.PositionZ >= -0.01 && character.PositionZ <= 0.01
+	if character.ZoneID == "" || legacyDefaultSpawn || legacyStonewakeBlockoutSpawn {
 		character.ZoneID = DefaultStarterZoneID
 		character.PositionX = DefaultStarterSpawnX
 		character.PositionY = DefaultStarterSpawnY
@@ -852,6 +858,15 @@ func NormalizeCharacterBindPoint(characterID string, bindPoint CharacterBindPoin
 		bindPoint.DisplayName = DefaultBindDisplayName
 	}
 	if bindPoint.X == 0 && bindPoint.Y == 0 && bindPoint.Z == 0 {
+		bindPoint.X = DefaultBindPositionX
+		bindPoint.Y = DefaultBindPositionY
+		bindPoint.Z = DefaultBindPositionZ
+	}
+	if bindPoint.ZoneID == DefaultBindZoneID &&
+		bindPoint.BindLocationID == DefaultBindLocationID &&
+		bindPoint.X >= 12.99 && bindPoint.X <= 13.01 &&
+		bindPoint.Y >= 9.99 && bindPoint.Y <= 10.01 &&
+		bindPoint.Z >= -0.01 && bindPoint.Z <= 0.01 {
 		bindPoint.X = DefaultBindPositionX
 		bindPoint.Y = DefaultBindPositionY
 		bindPoint.Z = DefaultBindPositionZ
