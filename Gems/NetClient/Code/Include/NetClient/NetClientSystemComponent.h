@@ -329,6 +329,14 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool LearnProfession(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& trainerId,
+            const AZStd::string& professionId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool AssignActionBarSlot(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,

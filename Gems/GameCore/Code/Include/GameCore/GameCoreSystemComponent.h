@@ -64,6 +64,7 @@ namespace GameCore
         bool SurrenderDuel(const AZStd::string& duelId) override;
         bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) override;
         bool SelectTalent(const AZStd::string& talentId) override;
+        bool LearnProfession(const AZStd::string& trainerId, const AZStd::string& professionId) override;
         bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) override;
         bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) override;
         bool ClearActionBarSlot(int slotIndex) override;

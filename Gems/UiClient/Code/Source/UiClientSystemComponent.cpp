@@ -56,8 +56,15 @@ namespace UiClient
         constexpr const char* OverhandCutAbilityId = "overhand_cut";
         constexpr const char* IronResolveAbilityId = "iron_resolve";
         constexpr const char* TrainerNpcKind = "trainer_npc";
+        constexpr const char* ProfessionTrainerNpcKind = "profession_trainer_npc";
         constexpr const char* QuestGiverNpcKind = "quest_giver_npc";
         constexpr const char* QuestGiverNpcId = "npc_commander_elian_rook";
+        constexpr const char* TrainerServiceType = "trainer";
+        constexpr const char* ProfessionTrainerServiceType = "profession_trainer";
+        constexpr const char* QuestServiceType = "quest";
+        constexpr const char* AuctionServiceType = "auction";
+        constexpr const char* DungeonEntranceServiceType = "dungeon_entrance";
+        constexpr const char* DungeonExitServiceType = "dungeon_exit";
         constexpr const char* SpellbookAbilityPayloadType = "AmandaCoreSpellbookAbility";
         constexpr const char* ActionBarSlotPayloadType = "AmandaCoreActionBarSlot";
         constexpr const char* InventorySlotPayloadType = "AmandaCoreInventorySlot";
@@ -71,6 +78,7 @@ namespace UiClient
         constexpr const char* PanelSettings = "settings";
         constexpr const char* PanelSocial = "social";
         constexpr const char* PanelTalents = "talents";
+        constexpr const char* PanelProfessions = "professions";
 
         struct SpellbookAbilityDragPayload
         {
@@ -210,6 +218,52 @@ namespace UiClient
             }
 
             return keyName;
+        }
+
+        AZStd::string DisplayPlayableClassName(const AZStd::string& classId, const AZStd::string& archetypeId = {})
+        {
+            const AZStd::string id = classId.empty() ? archetypeId : classId;
+            if (id.empty() || id == "warrior" || id == "wayfarer_warden")
+            {
+                return "Warrior";
+            }
+            if (id == "paladin")
+            {
+                return "Paladin";
+            }
+            if (id == "hunter")
+            {
+                return "Hunter";
+            }
+            if (id == "rogue")
+            {
+                return "Rogue";
+            }
+            if (id == "priest")
+            {
+                return "Priest";
+            }
+            if (id == "shaman")
+            {
+                return "Shaman";
+            }
+            if (id == "mage")
+            {
+                return "Mage";
+            }
+            if (id == "warlock")
+            {
+                return "Warlock";
+            }
+            if (id == "druid")
+            {
+                return "Druid";
+            }
+            if (id == "necromancer" || id == "death_knight")
+            {
+                return "Necromancer";
+            }
+            return id;
         }
 
         bool IsBindableKeyboardChannel(const AzFramework::InputChannelId& channelId)
@@ -936,11 +990,6 @@ namespace UiClient
             return nullptr;
         }
 
-        bool IsFriendlyNpc(const NetClient::VisibleEntity& entity)
-        {
-            return entity.m_kind == TrainerNpcKind || entity.m_kind == QuestGiverNpcKind || !entity.m_services.empty();
-        }
-
         bool EntityHasService(const NetClient::VisibleEntity& entity, const char* serviceType)
         {
             for (const auto& service : entity.m_services)
@@ -967,12 +1016,39 @@ namespace UiClient
 
         bool IsTrainerNpc(const NetClient::VisibleEntity& entity)
         {
-            return entity.m_kind == TrainerNpcKind || EntityHasService(entity, "trainer");
+            return entity.m_kind == TrainerNpcKind || EntityHasService(entity, TrainerServiceType);
+        }
+
+        bool IsProfessionTrainerNpc(const NetClient::VisibleEntity& entity)
+        {
+            return entity.m_kind == ProfessionTrainerNpcKind || EntityHasService(entity, ProfessionTrainerServiceType);
         }
 
         bool IsQuestGiverNpc(const NetClient::VisibleEntity& entity)
         {
-            return entity.m_kind == QuestGiverNpcKind || entity.m_id == QuestGiverNpcId || EntityHasService(entity, "quest");
+            return entity.m_kind == QuestGiverNpcKind || entity.m_id == QuestGiverNpcId || EntityHasService(entity, QuestServiceType);
+        }
+
+        bool IsFriendlyNpc(const NetClient::VisibleEntity& entity)
+        {
+            return IsTrainerNpc(entity) || IsProfessionTrainerNpc(entity) || IsQuestGiverNpc(entity) || !entity.m_services.empty();
+        }
+
+        const char* FriendlyNpcRoleLabel(const NetClient::VisibleEntity& entity)
+        {
+            if (IsTrainerNpc(entity))
+            {
+                return "Trainer";
+            }
+            if (IsProfessionTrainerNpc(entity))
+            {
+                return "Profession";
+            }
+            if (IsQuestGiverNpc(entity))
+            {
+                return "Quest";
+            }
+            return "Service";
         }
 
         bool ShouldOpenQuestForEntity(const GameCore::ClientWorldState& worldState, const NetClient::VisibleEntity& entity)
@@ -1061,6 +1137,68 @@ namespace UiClient
             }
 
             return nullptr;
+        }
+
+        const NetClient::SpellbookEntryState* FindSpellbookEntry(
+            const NetClient::WorldSessionResponse& session,
+            const AZStd::string& abilityId)
+        {
+            for (const auto& entry : session.m_spellbookEntries)
+            {
+                if (entry.m_id == abilityId)
+                {
+                    return &entry;
+                }
+            }
+
+            return nullptr;
+        }
+
+        bool IsPassiveAbility(const AZStd::string& abilityType, bool passive)
+        {
+            return passive || abilityType == "passive";
+        }
+
+        const char* AbilityKindLabel(const AZStd::string& abilityType, bool passive)
+        {
+            return IsPassiveAbility(abilityType, passive) ? "Passive" : "Active";
+        }
+
+        bool SpellbookEntryCanAssignToActionBar(const NetClient::SpellbookEntryState& entry)
+        {
+            if (!entry.m_learned || IsPassiveAbility(entry.m_abilityType, entry.m_passive))
+            {
+                return false;
+            }
+
+            return entry.m_actionBarAssignable || entry.m_abilityType.empty();
+        }
+
+        bool SpellbookEntryMatchesTab(const NetClient::SpellbookEntryState& entry, const char* tabId)
+        {
+            const bool passive = IsPassiveAbility(entry.m_abilityType, entry.m_passive);
+            const AZStd::string category = entry.m_category.empty() ? (passive ? "Passive" : "Warrior") : entry.m_category;
+            if (strcmp(tabId, "all") == 0)
+            {
+                return true;
+            }
+            if (strcmp(tabId, "active") == 0)
+            {
+                return !passive;
+            }
+            if (strcmp(tabId, "passive") == 0)
+            {
+                return passive;
+            }
+            if (strcmp(tabId, "utility") == 0)
+            {
+                return category == "Utility";
+            }
+            if (strcmp(tabId, "warrior") == 0)
+            {
+                return category == "Warrior";
+            }
+            return true;
         }
 
         AZStd::string BuildActionBarHelpText(
@@ -1162,6 +1300,119 @@ namespace UiClient
                 offer.m_resourceGeneration,
                 offer.m_cooldownMs,
                 offer.m_rangeMeters);
+        }
+
+        void ShowTooltipText(const AZStd::string& tooltip)
+        {
+            if (tooltip.empty())
+            {
+                return;
+            }
+
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+            ImGui::TextUnformatted(tooltip.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+
+        AZStd::string BuildAbilityTooltip(
+            const AZStd::string& displayName,
+            const AZStd::string& category,
+            const AZStd::string& abilityType,
+            bool passive,
+            const AZStd::string& description,
+            const AZStd::string& facts,
+            const AZStd::string& tooltipText,
+            const AZStd::string& stateText)
+        {
+            AZStd::string tooltip = displayName.empty() ? "Ability" : displayName;
+            tooltip += "\n";
+            tooltip += AbilityKindLabel(abilityType, passive);
+            if (!category.empty())
+            {
+                tooltip += "  |  ";
+                tooltip += category;
+            }
+            if (!facts.empty())
+            {
+                tooltip += "\n";
+                tooltip += facts;
+            }
+            if (!description.empty())
+            {
+                tooltip += "\n";
+                tooltip += description;
+            }
+            if (!tooltipText.empty())
+            {
+                tooltip += "\n";
+                tooltip += tooltipText;
+            }
+            if (!stateText.empty())
+            {
+                tooltip += "\n";
+                tooltip += stateText;
+            }
+            return tooltip;
+        }
+
+        AZStd::string BuildSpellbookTooltip(const NetClient::SpellbookEntryState& entry, bool editMode)
+        {
+            AZStd::string stateText;
+            if (!entry.m_learned)
+            {
+                stateText = entry.m_requirementText.empty() ? "Not available yet." : entry.m_requirementText;
+            }
+            else if (IsPassiveAbility(entry.m_abilityType, entry.m_passive))
+            {
+                stateText = "Passive abilities are learned automatically when available and cannot be placed on action bars.";
+            }
+            else if (SpellbookEntryCanAssignToActionBar(entry))
+            {
+                stateText = editMode ? "Drag to an action slot, or click to arm placement." : "Drag to an action slot.";
+            }
+            else
+            {
+                stateText = "This ability cannot be assigned to the action bar.";
+            }
+
+            return BuildAbilityTooltip(
+                entry.m_displayName,
+                entry.m_category,
+                entry.m_abilityType,
+                entry.m_passive,
+                entry.m_description,
+                FormatAbilityFacts(entry),
+                entry.m_tooltipText,
+                stateText);
+        }
+
+        AZStd::string BuildTrainerOfferTooltip(const NetClient::TrainerOfferState& offer)
+        {
+            AZStd::string stateText = offer.m_requirementText;
+            if (offer.m_learned)
+            {
+                stateText = "Already learned.";
+            }
+            else if (offer.m_canLearn)
+            {
+                stateText = "Ready to learn from this trainer.";
+            }
+            else if (stateText.empty())
+            {
+                stateText = "Not available yet.";
+            }
+
+            return BuildAbilityTooltip(
+                offer.m_displayName,
+                offer.m_category,
+                offer.m_abilityType,
+                offer.m_passive,
+                offer.m_description,
+                FormatAbilityFacts(offer),
+                offer.m_tooltipText,
+                stateText);
         }
 
         void SuppressStockImGuiWindow(const char* windowName)
@@ -1776,14 +2027,23 @@ namespace UiClient
             if (IsFriendlyNpc(*targetEntity))
             {
                 const bool isTrainer = IsTrainerNpc(*targetEntity);
-                DrawPortraitBadge(isTrainer ? "T" : "Q", ImVec2(origin.x + 34.0f, origin.y + 42.0f), isTrainer ? ColorU32(44, 103, 167) : ColorU32(42, 136, 84));
+                const bool isProfessionTrainer = IsProfessionTrainerNpc(*targetEntity);
+                const char* badgeLabel = isTrainer ? "T" : (isProfessionTrainer ? "P" : "Q");
+                const ImU32 badgeColor = isTrainer
+                    ? ColorU32(44, 103, 167)
+                    : (isProfessionTrainer ? ColorU32(104, 76, 154) : ColorU32(42, 136, 84));
+                DrawPortraitBadge(badgeLabel, ImVec2(origin.x + 34.0f, origin.y + 42.0f), badgeColor);
                 ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
                 ImGui::TextUnformatted(targetEntity->m_displayName.c_str());
-                ImGui::TextUnformatted(isTrainer ? "Friendly Warrior Trainer" : "Friendly Quest Giver");
+                ImGui::TextUnformatted(
+                    isTrainer ? "Friendly Warrior Trainer" : (isProfessionTrainer ? "Friendly Profession Trainer" : "Friendly Quest Giver"));
                 ImGui::Text("Range %.1fm  |  %s", distanceToTarget, distanceToTarget <= CommandPointRadius ? "interactable" : "move closer");
                 if (distanceToTarget <= CommandPointRadius)
                 {
-                    ImGui::TextUnformatted(isTrainer ? "Right-click the NPC model to train." : "Right-click the NPC model for field orders.");
+                    ImGui::TextUnformatted(
+                        isTrainer || isProfessionTrainer
+                            ? "Right-click the NPC model to train."
+                            : "Right-click the NPC model for field orders.");
                 }
                 else
                 {
@@ -2375,19 +2635,23 @@ namespace UiClient
                 }
 
                 const bool isTrainer = IsTrainerNpc(entity);
+                const bool isProfessionTrainer = IsProfessionTrainerNpc(entity);
+                const char* roleLabel = FriendlyNpcRoleLabel(entity);
                 const AZStd::string label = AZStd::string::format(
                     "%s  %s",
-                    isTrainer ? "Trainer" : "Quest",
+                    roleLabel,
                     entity.m_displayName.c_str());
                 const ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
                 const ImVec2 panelMin(screenPosition.x - (textSize.x * 0.5f) - 10.0f, screenPosition.y - 12.0f);
                 const ImVec2 panelMax(screenPosition.x + (textSize.x * 0.5f) + 10.0f, screenPosition.y + textSize.y + 6.0f);
                 const ImU32 fillColor = isTrainer
                     ? ColorU32(20, 55, 98, isSelected ? 242 : 220)
-                    : ColorU32(20, 79, 46, isSelected ? 242 : 220);
+                    : (isProfessionTrainer ? ColorU32(72, 54, 105, isSelected ? 242 : 220)
+                        : ColorU32(20, 79, 46, isSelected ? 242 : 220));
                 const ImU32 borderColor = isSelected
                     ? ColorU32(248, 224, 128)
-                    : (isTrainer ? ColorU32(101, 174, 238) : ColorU32(98, 224, 150));
+                    : (isTrainer ? ColorU32(101, 174, 238)
+                        : (isProfessionTrainer ? ColorU32(177, 139, 235) : ColorU32(98, 224, 150)));
 
                 drawList->AddRectFilled(panelMin, panelMax, fillColor, 10.0f);
                 drawList->AddRect(panelMin, panelMax, borderColor, 10.0f, 0, 2.0f);
@@ -2635,6 +2899,10 @@ namespace UiClient
 
         bool BeginSpellbookAbilityDrag(const NetClient::SpellbookEntryState& entry)
         {
+            if (!SpellbookEntryCanAssignToActionBar(entry))
+            {
+                return false;
+            }
             if (!ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
             {
                 return false;
@@ -2673,7 +2941,10 @@ namespace UiClient
                 const int slotIndex = firstSlot + localSlotIndex;
                 ImGui::PushID(slotIndex);
                 const NetClient::ActionBarSlotState* slotState = FindActionBarSlot(worldState.m_session, slotIndex);
-                const bool hasAbility = slotState && slotState->m_learned && !slotState->m_abilityId.empty();
+                const bool slotAssignable = slotState &&
+                    !IsPassiveAbility(slotState->m_abilityType, slotState->m_passive) &&
+                    (slotState->m_actionBarAssignable || slotState->m_abilityType.empty());
+                const bool hasAbility = slotState && slotState->m_learned && !slotState->m_abilityId.empty() && slotAssignable;
                 const AZ::s64 nowMs = NowMs();
                 AZ::s64 abilityCooldownRemainingMs = 0;
                 if (slotState)
@@ -2839,7 +3110,12 @@ namespace UiClient
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(SpellbookAbilityPayloadType))
                     {
                         const auto* drag = static_cast<const SpellbookAbilityDragPayload*>(payload->Data);
-                        if (drag && drag->m_abilityId[0] != '\0' && gameCore->AssignActionBarSlot(slotIndex, drag->m_abilityId))
+                        const NetClient::SpellbookEntryState* draggedEntry =
+                            drag && drag->m_abilityId[0] != '\0'
+                            ? FindSpellbookEntry(worldState.m_session, drag->m_abilityId)
+                            : nullptr;
+                        if (draggedEntry && SpellbookEntryCanAssignToActionBar(*draggedEntry) &&
+                            gameCore->AssignActionBarSlot(slotIndex, drag->m_abilityId))
                         {
                             AZ_Printf(
                                 "amandacore",
@@ -2847,6 +3123,14 @@ namespace UiClient
                                 slotIndex,
                                 drag->m_abilityId);
                             pendingActionAssignmentAbilityId.clear();
+                        }
+                        else if (drag && drag->m_abilityId[0] != '\0')
+                        {
+                            AZ_Printf(
+                                "amandacore",
+                                "client.action_bar_assignment_rejected slot=%d abilityId=%s reason=not_assignable",
+                                slotIndex,
+                                drag->m_abilityId);
                         }
                     }
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ActionBarSlotPayloadType))
@@ -2885,18 +3169,15 @@ namespace UiClient
 
                 if (slotState && !slotState->m_displayName.empty() && ImGui::IsItemHovered())
                 {
-                    AZStd::string tooltip = slotState->m_displayName;
-                    const AZStd::string facts = FormatAbilityFacts(*slotState);
-                    if (!facts.empty())
-                    {
-                        tooltip += "\n";
-                        tooltip += facts;
-                    }
-                    if (!slotState->m_tooltipText.empty())
-                    {
-                        tooltip += "\n";
-                        tooltip += slotState->m_tooltipText;
-                    }
+                    AZStd::string tooltip = BuildAbilityTooltip(
+                        slotState->m_displayName,
+                        slotState->m_category,
+                        slotState->m_abilityType,
+                        slotState->m_passive,
+                        {},
+                        FormatAbilityFacts(*slotState),
+                        slotState->m_tooltipText,
+                        {});
                     if (blockedByCooldown)
                     {
                         tooltip += AZStd::string::format("\nReady in %.1fs.", static_cast<double>(blockedRemainingMs) / 1000.0);
@@ -2913,7 +3194,7 @@ namespace UiClient
                     {
                         tooltip += "\nDrag to move this ability. Hold SHIFT or enable Edit Mode to clear.";
                     }
-                    ImGui::SetTooltip("%s", tooltip.c_str());
+                    ShowTooltipText(tooltip);
                 }
                 else if (ImGui::IsItemHovered())
                 {
@@ -3054,7 +3335,7 @@ namespace UiClient
         {
             ImGui::TextUnformatted("Spellbook");
             ImGui::SameLine();
-            ImGui::TextDisabled("  |  Warrior / General");
+            ImGui::TextDisabled("  |  Warrior / Utility");
             ImGui::Separator();
             if (editMode && !pendingActionAssignmentAbilityId.empty())
             {
@@ -3065,102 +3346,140 @@ namespace UiClient
                 ImGui::TextWrapped("Drag abilities to action slots. Hold SHIFT for click-to-place.");
             }
             ImGui::Spacing();
-            ImGui::BeginChild(
-                "##spellbook_scroll",
-                ImVec2(0.0f, 0.0f),
-                false,
-                ImGuiWindowFlags_AlwaysVerticalScrollbar);
-            ImGui::Columns(2, "##spellbook_pages", false);
-            ImGui::TextUnformatted("Class Abilities");
-            ImGui::Separator();
-            for (const auto& entry : worldState.m_session.m_spellbookEntries)
+
+            struct SpellbookTab
             {
-                if (!entry.m_learned)
-                {
-                    continue;
-                }
+                const char* m_id;
+                const char* m_label;
+            };
+            const SpellbookTab tabs[] = {
+                {"all", "All"},
+                {"active", "Active"},
+                {"passive", "Passive"},
+                {"utility", "Utility"},
+                {"warrior", "Warrior"},
+            };
 
-                ImGui::PushID(entry.m_id.c_str());
-                const ImVec2 cardStart = ImGui::GetCursorScreenPos();
-                ImGui::InvisibleButton("##spell_card_icon", ImVec2(42.0f, 42.0f));
-                BeginSpellbookAbilityDrag(entry);
-                DrawProceduralIcon(
-                    ImGui::GetWindowDrawList(),
-                    cardStart,
-                    AddVec2(cardStart, ImVec2(42.0f, 42.0f)),
-                    entry.m_iconKind.empty() ? AbilityIconKind(entry.m_id) : entry.m_iconKind);
-                ImGui::SameLine();
-                ImGui::BeginGroup();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.90f, 0.76f, 1.0f));
-                const bool selected = pendingActionAssignmentAbilityId == entry.m_id;
-                if (ImGui::Selectable(entry.m_displayName.c_str(), selected, ImGuiSelectableFlags_SpanAvailWidth) && editMode)
-                {
-                    pendingActionAssignmentAbilityId = entry.m_id;
-                    AZ_Printf("amandacore", "client.spellbook_assignment_armed abilityId=%s", entry.m_id.c_str());
-                }
-                BeginSpellbookAbilityDrag(entry);
-                ImGui::PopStyleColor();
-                ImGui::TextWrapped("%s", entry.m_description.c_str());
-                const AZStd::string learnedFacts = FormatAbilityFacts(entry);
-                if (!learnedFacts.empty())
-                {
-                    ImGui::TextWrapped("%s", learnedFacts.c_str());
-                }
-                if (!entry.m_tooltipText.empty())
-                {
-                    ImGui::TextDisabled("%s", entry.m_tooltipText.c_str());
-                }
-                ImGui::TextDisabled("Known  |  level %d", entry.m_requiredLevel);
-                ImGui::EndGroup();
-                if (ImGui::IsItemHovered())
-                {
-                    ImGui::SetTooltip(editMode ? "Drag to an action slot, or click to select then click a slot." : "Drag to an action slot.");
-                }
-                ImGui::Separator();
-                ImGui::PopID();
-            }
-
-            ImGui::NextColumn();
-            ImGui::TextUnformatted("Training Preview");
-            ImGui::Separator();
-            for (const auto& entry : worldState.m_session.m_spellbookEntries)
+            auto drawEntry = [&](const NetClient::SpellbookEntryState& entry, bool learned)
             {
-                if (entry.m_learned)
-                {
-                    continue;
-                }
-
                 ImGui::PushID(entry.m_id.c_str());
+                const bool assignable = SpellbookEntryCanAssignToActionBar(entry);
                 const ImVec2 cardStart = ImGui::GetCursorScreenPos();
-                ImGui::InvisibleButton("##locked_spell_icon", ImVec2(42.0f, 42.0f));
+                ImGui::InvisibleButton(learned ? "##spell_card_icon" : "##locked_spell_icon", ImVec2(42.0f, 42.0f));
+                BeginSpellbookAbilityDrag(entry);
                 DrawProceduralIcon(
                     ImGui::GetWindowDrawList(),
                     cardStart,
                     AddVec2(cardStart, ImVec2(42.0f, 42.0f)),
                     entry.m_iconKind.empty() ? AbilityIconKind(entry.m_id) : entry.m_iconKind,
-                    true);
+                    !learned || !assignable);
+                if (ImGui::IsItemHovered())
+                {
+                    ShowTooltipText(BuildSpellbookTooltip(entry, editMode));
+                }
                 ImGui::SameLine();
                 ImGui::BeginGroup();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.80f, 0.66f, 0.38f, 1.0f));
-                ImGui::Text("%s", entry.m_displayName.c_str());
+                const ImVec4 nameColor = learned
+                    ? (assignable ? ImVec4(0.86f, 0.90f, 0.76f, 1.0f) : ImVec4(0.78f, 0.82f, 0.72f, 1.0f))
+                    : ImVec4(0.80f, 0.66f, 0.38f, 1.0f);
+                ImGui::PushStyleColor(ImGuiCol_Text, nameColor);
+                const bool selected = pendingActionAssignmentAbilityId == entry.m_id;
+                if (learned && assignable)
+                {
+                    if (ImGui::Selectable(entry.m_displayName.c_str(), selected, ImGuiSelectableFlags_SpanAvailWidth) && editMode)
+                    {
+                        pendingActionAssignmentAbilityId = entry.m_id;
+                        AZ_Printf("amandacore", "client.spellbook_assignment_armed abilityId=%s", entry.m_id.c_str());
+                    }
+                    BeginSpellbookAbilityDrag(entry);
+                }
+                else
+                {
+                    ImGui::TextUnformatted(entry.m_displayName.c_str());
+                }
                 ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered())
+                {
+                    ShowTooltipText(BuildSpellbookTooltip(entry, editMode));
+                }
+                ImGui::TextDisabled(
+                    "%s  |  %s",
+                    AbilityKindLabel(entry.m_abilityType, entry.m_passive),
+                    entry.m_category.empty() ? "Warrior" : entry.m_category.c_str());
                 ImGui::TextWrapped("%s", entry.m_description.c_str());
-                const AZStd::string previewFacts = FormatAbilityFacts(entry);
-                if (!previewFacts.empty())
+                const AZStd::string facts = FormatAbilityFacts(entry);
+                if (!facts.empty())
                 {
-                    ImGui::TextWrapped("%s", previewFacts.c_str());
+                    ImGui::TextWrapped("%s", facts.c_str());
                 }
-                if (!entry.m_tooltipText.empty())
+                if (learned)
                 {
-                    ImGui::TextDisabled("%s", entry.m_tooltipText.c_str());
+                    ImGui::TextDisabled(assignable ? "Known  |  draggable" : "Known  |  passive");
                 }
-                ImGui::TextWrapped("%s", entry.m_requirementText.c_str());
+                else
+                {
+                    ImGui::TextWrapped("%s", entry.m_requirementText.empty() ? "Not available yet." : entry.m_requirementText.c_str());
+                }
                 ImGui::EndGroup();
                 ImGui::Separator();
                 ImGui::PopID();
+            };
+
+            if (ImGui::BeginTabBar("##spellbook_tabs"))
+            {
+                for (const SpellbookTab& tab : tabs)
+                {
+                    if (!ImGui::BeginTabItem(tab.m_label))
+                    {
+                        continue;
+                    }
+
+                    ImGui::BeginChild(
+                        "##spellbook_scroll",
+                        ImVec2(0.0f, 0.0f),
+                        false,
+                        ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    ImGui::Columns(2, "##spellbook_pages", false);
+                    ImGui::TextUnformatted("Learned");
+                    ImGui::Separator();
+                    int learnedCount = 0;
+                    for (const auto& entry : worldState.m_session.m_spellbookEntries)
+                    {
+                        if (!entry.m_learned || !SpellbookEntryMatchesTab(entry, tab.m_id))
+                        {
+                            continue;
+                        }
+                        ++learnedCount;
+                        drawEntry(entry, true);
+                    }
+                    if (learnedCount == 0)
+                    {
+                        ImGui::TextDisabled("No learned abilities in this category.");
+                    }
+
+                    ImGui::NextColumn();
+                    ImGui::TextUnformatted("Training Preview");
+                    ImGui::Separator();
+                    int previewCount = 0;
+                    for (const auto& entry : worldState.m_session.m_spellbookEntries)
+                    {
+                        if (entry.m_learned || !SpellbookEntryMatchesTab(entry, tab.m_id))
+                        {
+                            continue;
+                        }
+                        ++previewCount;
+                        drawEntry(entry, false);
+                    }
+                    if (previewCount == 0)
+                    {
+                        ImGui::TextDisabled("No unavailable abilities in this category.");
+                    }
+                    ImGui::Columns(1);
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
             }
-            ImGui::Columns(1);
-            ImGui::EndChild();
         }
 
         void DrawTrainerWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
@@ -3197,9 +3516,21 @@ namespace UiClient
                     AddVec2(iconStart, ImVec2(38.0f, 38.0f)),
                     offer.m_iconKind.empty() ? AbilityIconKind(offer.m_abilityId) : offer.m_iconKind,
                     offer.m_learned || !offer.m_canLearn);
+                if (ImGui::IsItemHovered())
+                {
+                    ShowTooltipText(BuildTrainerOfferTooltip(offer));
+                }
                 ImGui::SameLine();
                 ImGui::BeginGroup();
                 ImGui::Text("%s", offer.m_displayName.c_str());
+                if (ImGui::IsItemHovered())
+                {
+                    ShowTooltipText(BuildTrainerOfferTooltip(offer));
+                }
+                ImGui::TextDisabled(
+                    "%s  |  %s",
+                    AbilityKindLabel(offer.m_abilityType, offer.m_passive),
+                    offer.m_category.empty() ? "Warrior" : offer.m_category.c_str());
                 ImGui::TextWrapped("%s", offer.m_description.c_str());
                 const AZStd::string offerFacts = FormatAbilityFacts(offer);
                 if (!offerFacts.empty())
@@ -3241,6 +3572,176 @@ namespace UiClient
                 ImGui::PopID();
             }
             ImGui::EndChild();
+        }
+
+        void DrawProfessionRecipeSummary(const NetClient::ProfessionRecipeState& recipe)
+        {
+            ImGui::BulletText("%s", recipe.m_displayName.empty() ? "Recipe" : recipe.m_displayName.c_str());
+            if (!recipe.m_outputDisplayName.empty())
+            {
+                ImGui::TextDisabled(
+                    "Output: %s x%d  |  requires skill %d",
+                    recipe.m_outputDisplayName.c_str(),
+                    recipe.m_outputQuantity > 0 ? recipe.m_outputQuantity : 1,
+                    recipe.m_requiredSkill);
+            }
+            if (!recipe.m_requiredMaterials.empty())
+            {
+                AZStd::string materials;
+                for (const auto& material : recipe.m_requiredMaterials)
+                {
+                    if (!materials.empty())
+                    {
+                        materials += ", ";
+                    }
+                    materials += material.m_displayName.empty() ? material.m_itemId : material.m_displayName;
+                    materials += AZStd::string::format(" x%d", material.m_quantity);
+                }
+                ImGui::TextDisabled("Materials: %s", materials.c_str());
+            }
+            ImGui::TextDisabled("Recipe summary only. Crafting is not enabled in this milestone.");
+        }
+
+        void DrawProfessionEntrySummary(const NetClient::ProfessionEntryState& profession, bool showRecipes)
+        {
+            ImGui::PushID(profession.m_professionId.c_str());
+            ImGui::Text("%s", profession.m_displayName.empty() ? profession.m_professionId.c_str() : profession.m_displayName.c_str());
+            ImGui::TextDisabled(
+                "%s  |  skill %d/%d  |  %s",
+                profession.m_category.empty() ? "Profession" : profession.m_category.c_str(),
+                profession.m_skillValue,
+                profession.m_maxStarterSkill,
+                profession.m_implemented ? "available" : "not available");
+            if (!profession.m_unavailableReason.empty())
+            {
+                ImGui::TextWrapped("%s", profession.m_unavailableReason.c_str());
+            }
+            if (showRecipes)
+            {
+                if (profession.m_knownRecipes.empty())
+                {
+                    ImGui::TextDisabled("No recipe summaries are available.");
+                }
+                else
+                {
+                    for (const auto& recipe : profession.m_knownRecipes)
+                    {
+                        DrawProfessionRecipeSummary(recipe);
+                    }
+                }
+            }
+            ImGui::Separator();
+            ImGui::PopID();
+        }
+
+        void DrawProfessionsWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        {
+            const auto& professions = worldState.m_session.m_professions;
+            const auto& trainer = worldState.m_session.m_professionTrainer;
+            ImGui::Text(
+                "Professions  |  learned %zu / %d",
+                professions.m_learned.size(),
+                professions.m_primaryLimit);
+            ImGui::SameLine();
+            ImGui::TextDisabled("  |  learn and view only");
+            ImGui::Separator();
+            if (professions.m_catalog.empty() && professions.m_learned.empty() && trainer.m_offers.empty())
+            {
+                ImGui::TextWrapped("Professions are not available in this alpha build.");
+                return;
+            }
+
+            if (ImGui::BeginTabBar("##professions_tabs"))
+            {
+                if (ImGui::BeginTabItem("Known"))
+                {
+                    ImGui::BeginChild("##known_professions", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    if (professions.m_learned.empty())
+                    {
+                        ImGui::TextDisabled("No professions learned yet.");
+                    }
+                    else
+                    {
+                        for (const auto& profession : professions.m_learned)
+                        {
+                            DrawProfessionEntrySummary(profession, true);
+                        }
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Catalog"))
+                {
+                    ImGui::BeginChild("##profession_catalog", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    if (professions.m_catalog.empty())
+                    {
+                        ImGui::TextDisabled("No profession catalog is available.");
+                    }
+                    else
+                    {
+                        for (const auto& profession : professions.m_catalog)
+                        {
+                            DrawProfessionEntrySummary(profession, false);
+                        }
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Trainer"))
+                {
+                    ImGui::BeginChild("##profession_trainer", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    if (trainer.m_id.empty())
+                    {
+                        ImGui::TextWrapped("Target and interact with a profession trainer to learn starter professions.");
+                    }
+                    else
+                    {
+                        ImGui::TextUnformatted(trainer.m_displayName.empty() ? "Profession Trainer" : trainer.m_displayName.c_str());
+                        if (!trainer.m_interactionHint.empty())
+                        {
+                            ImGui::TextWrapped("%s", trainer.m_interactionHint.c_str());
+                        }
+                        ImGui::TextUnformatted(trainer.m_inRange ? "Status: ready to train" : "Status: move closer to the trainer");
+                        ImGui::Separator();
+                        for (const auto& offer : trainer.m_offers)
+                        {
+                            ImGui::PushID(offer.m_professionId.c_str());
+                            ImGui::Text("%s", offer.m_displayName.empty() ? offer.m_professionId.c_str() : offer.m_displayName.c_str());
+                            ImGui::TextDisabled(
+                                "%s  |  max starter skill %d",
+                                offer.m_category.empty() ? "Profession" : offer.m_category.c_str(),
+                                offer.m_maxStarterSkill);
+                            ImGui::Text("Cost: %s", FormatTrainerCost(offer.m_costCopper).c_str());
+                            if (offer.m_learned)
+                            {
+                                ImGui::TextDisabled("Already learned");
+                            }
+                            else if (offer.m_canLearn && gameCore)
+                            {
+                                if (ImGui::Button("Learn", HudButtonSize(92.0f)))
+                                {
+                                    gameCore->LearnProfession(trainer.m_id, offer.m_professionId);
+                                }
+                            }
+                            else
+                            {
+                                ImGui::TextWrapped(
+                                    "%s",
+                                    !offer.m_requirementText.empty()
+                                        ? offer.m_requirementText.c_str()
+                                        : (offer.m_unavailableReason.empty() ? "Not available yet." : offer.m_unavailableReason.c_str()));
+                            }
+                            ImGui::Separator();
+                            ImGui::PopID();
+                        }
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
         }
 
         const char* DrawQuestGossipWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
@@ -4260,8 +4761,8 @@ namespace UiClient
             ImGui::Dummy(previewSize);
             ImGui::TextWrapped("%s", worldState.m_session.m_displayName.c_str());
             ImGui::TextDisabled(
-                "Archetype: %s",
-                worldState.m_session.m_archetypeId.empty() ? "Unavailable" : worldState.m_session.m_archetypeId.c_str());
+                "Class: %s",
+                DisplayPlayableClassName(AZStd::string{}, worldState.m_session.m_archetypeId).c_str());
             ImGui::TextDisabled("Zone: %s", worldState.m_session.m_zoneId.empty() ? "Unavailable" : worldState.m_session.m_zoneId.c_str());
             ImGui::TextDisabled("3D inspection uses the live world model when that renderer surface is available.");
         }
@@ -4452,7 +4953,7 @@ namespace UiClient
             ImGui::TextUnformatted("Character Details");
             ImGui::Separator();
             ImGui::Text("Display name: %s", worldState.m_session.m_displayName.c_str());
-            ImGui::Text("Archetype: %s", worldState.m_session.m_archetypeId.empty() ? "Unavailable" : worldState.m_session.m_archetypeId.c_str());
+            ImGui::Text("Class: %s", DisplayPlayableClassName(AZStd::string{}, worldState.m_session.m_archetypeId).c_str());
             ImGui::Text("Level: %d", worldState.m_session.m_level);
             ImGui::Text("Zone: %s", worldState.m_session.m_zoneId.empty() ? "Unavailable" : worldState.m_session.m_zoneId.c_str());
             ImGui::TextDisabled("Lineage/origin: unavailable");
@@ -5115,6 +5616,7 @@ namespace UiClient
         const char* DrawMicroMenuBar(
             bool& characterSheetOpen,
             bool& talentsOpen,
+            bool& professionsOpen,
             bool& questLogOpen,
             bool& mapOpen,
             bool& spellbookOpen,
@@ -5129,12 +5631,13 @@ namespace UiClient
                 bool* m_toggle;
             };
 
-            AZ_UNUSED(talentsOpen);
             AZ_UNUSED(socialOpen);
             const char* toggledPanel = nullptr;
             MenuButtonState buttons[] = {
                 {"Char", PanelCharacter, &characterSheetOpen},
                 {"Spells", PanelSpellbook, &spellbookOpen},
+                {"Talents", PanelTalents, &talentsOpen},
+                {"Prof", PanelProfessions, &professionsOpen},
                 {"Quests", PanelQuestLog, &questLogOpen},
                 {"Map", PanelMap, &mapOpen},
                 {"Bag", PanelBag, &bagOpen},
@@ -5147,7 +5650,10 @@ namespace UiClient
                 {
                     ImGui::SameLine();
                 }
-                if (ImGui::Button(buttons[index].m_label, ImVec2(index == 5 ? 88.0f : 66.0f, 30.0f)))
+                const float buttonWidth = strcmp(buttons[index].m_label, "Settings") == 0
+                    ? 88.0f
+                    : (strcmp(buttons[index].m_label, "Talents") == 0 ? 78.0f : 66.0f);
+                if (ImGui::Button(buttons[index].m_label, ImVec2(buttonWidth, 30.0f)))
                 {
                     *buttons[index].m_toggle = !*buttons[index].m_toggle;
                     toggledPanel = *buttons[index].m_toggle ? buttons[index].m_panelName : nullptr;
@@ -5220,6 +5726,7 @@ namespace UiClient
         m_lastHandledInteractionSequence = 0;
         m_questGossipOpen = false;
         m_auctionOpen = false;
+        m_professionsOpen = false;
         m_lastNearCommandPoint = false;
         m_lastWorldConnected = false;
         m_loggedActionBarVisible = false;
@@ -5637,7 +6144,8 @@ namespace UiClient
         const bool questWasOpen = m_questGossipOpen;
         const bool trainerWasOpen = m_trainerOpen;
         const bool auctionWasOpen = m_auctionOpen;
-        if (!questWasOpen && !trainerWasOpen && !auctionWasOpen)
+        const bool professionsWasOpen = m_professionsOpen && m_activeInteractionKind == "profession_trainer";
+        if (!questWasOpen && !trainerWasOpen && !auctionWasOpen && !professionsWasOpen)
         {
             m_activeInteractionEntityId.clear();
             m_activeInteractionKind.clear();
@@ -5663,6 +6171,7 @@ namespace UiClient
         m_questGossipOpen = false;
         m_trainerOpen = false;
         m_auctionOpen = false;
+        m_professionsOpen = false;
         m_activeInteractionEntityId.clear();
         m_activeInteractionKind.clear();
         return true;
@@ -5710,6 +6219,10 @@ namespace UiClient
         {
             return m_talentsOpen;
         }
+        if (strcmp(panelId, PanelProfessions) == 0)
+        {
+            return m_professionsOpen;
+        }
         if (strcmp(panelId, PanelSettings) == 0)
         {
             return m_settingsOpen;
@@ -5755,6 +6268,10 @@ namespace UiClient
         else if (strcmp(panelName, PanelTalents) == 0)
         {
             m_talentsOpen = false;
+        }
+        else if (strcmp(panelName, PanelProfessions) == 0)
+        {
+            m_professionsOpen = false;
         }
         else if (strcmp(panelName, PanelSettings) == 0)
         {
@@ -5805,6 +6322,7 @@ namespace UiClient
             PanelBag,
             PanelSocial,
             PanelTalents,
+            PanelProfessions,
         };
         for (const char* panelId : fallbackOrder)
         {
@@ -5871,9 +6389,9 @@ namespace UiClient
             CloseNpcInteraction("target_changed");
         }
 
-        if (EntityHasService(entity, "dungeon_entrance"))
+        if (EntityHasService(entity, DungeonEntranceServiceType))
         {
-            const AZStd::string dungeonId = EntityServiceId(entity, "dungeon_entrance");
+            const AZStd::string dungeonId = EntityServiceId(entity, DungeonEntranceServiceType);
             if (dungeonId.empty())
             {
                 AddHudEvent("Dungeon entrance is unavailable");
@@ -5890,7 +6408,7 @@ namespace UiClient
             return false;
         }
 
-        if (EntityHasService(entity, "dungeon_exit"))
+        if (EntityHasService(entity, DungeonExitServiceType))
         {
             if (gameCore->ExitDungeon())
             {
@@ -5903,13 +6421,14 @@ namespace UiClient
             return false;
         }
 
-        if (EntityHasService(entity, "auction"))
+        if (EntityHasService(entity, AuctionServiceType))
         {
             if (gameCore->BrowseAuctions(m_auctionSearchBuffer, {}, "buyout_asc"))
             {
                 m_auctionOpen = true;
                 m_questGossipOpen = false;
                 m_trainerOpen = false;
+                m_professionsOpen = false;
                 m_activeInteractionEntityId = entity.m_id;
                 m_activeInteractionKind = "auction";
                 AZ_Printf(
@@ -5930,11 +6449,34 @@ namespace UiClient
             return false;
         }
 
+        if (IsProfessionTrainerNpc(entity))
+        {
+            m_professionsOpen = true;
+            m_questGossipOpen = false;
+            m_trainerOpen = false;
+            m_auctionOpen = false;
+            m_activeInteractionEntityId = entity.m_id;
+            m_activeInteractionKind = "profession_trainer";
+            AZ_Printf(
+                "amandacore",
+                "client.npc_interaction_opened source=%s targetId=%s kind=profession_trainer",
+                source,
+                entity.m_id.c_str());
+            AZ_Printf(
+                "amandacore",
+                "client.professions_visible open=true source=%s targetId=%s",
+                source,
+                entity.m_id.c_str());
+            AddHudEvent(AZStd::string::format("Viewing professions with %s", entity.m_displayName.c_str()));
+            return true;
+        }
+
         if (ShouldOpenQuestForEntity(worldState, entity))
         {
             m_questGossipOpen = true;
             m_trainerOpen = false;
             m_auctionOpen = false;
+            m_professionsOpen = false;
             m_activeInteractionEntityId = entity.m_id;
             m_activeInteractionKind = "quest";
             AZ_Printf(
@@ -5956,6 +6498,7 @@ namespace UiClient
             m_trainerOpen = true;
             m_questGossipOpen = false;
             m_auctionOpen = false;
+            m_professionsOpen = false;
             m_activeInteractionEntityId = entity.m_id;
             m_activeInteractionKind = "trainer";
             AZ_Printf(
@@ -5977,6 +6520,7 @@ namespace UiClient
             m_questGossipOpen = true;
             m_trainerOpen = false;
             m_auctionOpen = false;
+            m_professionsOpen = false;
             m_activeInteractionEntityId = entity.m_id;
             m_activeInteractionKind = "quest";
             AZ_Printf(
@@ -6451,7 +6995,7 @@ namespace UiClient
                 {
                     const auto& character = frontend.m_characters[frontend.m_selectedCharacterIndex];
                     ImGui::Text("%s", character.m_displayName.c_str());
-                    ImGui::Text("Archetype: %s", character.m_archetypeId.empty() ? "wayfarer_warden" : character.m_archetypeId.c_str());
+                    ImGui::Text("Class: %s", DisplayPlayableClassName(character.m_classId, character.m_archetypeId).c_str());
                     ImGui::Text("Level: %d", character.m_level <= 0 ? 1 : character.m_level);
                     ImGui::Text("Zone: %s", character.m_zoneId.empty() ? "starting zone" : character.m_zoneId.c_str());
                     ImGui::Separator();
@@ -6499,7 +7043,7 @@ namespace UiClient
 
                 ImGui::BeginChild("##creation_controls", ImVec2(330.0f, 455.0f), true);
                 ImGui::Combo("Lineage", &m_createLineageIndex, lineages, AZ_ARRAY_SIZE(lineages));
-                ImGui::Text("Archetype: Wayfarer Warden");
+                ImGui::Text("Class: Warrior");
                 ImGui::Combo("Body", &m_createBodyIndex, bodyTypes, AZ_ARRAY_SIZE(bodyTypes));
                 ImGui::Combo("Skin", &m_createSkinIndex, skinTones, AZ_ARRAY_SIZE(skinTones));
                 ImGui::Combo("Face", &m_createFaceIndex, faces, AZ_ARRAY_SIZE(faces));
@@ -6723,6 +7267,7 @@ namespace UiClient
         {
             CloseNpcInteraction("pre_world");
             m_talentsOpen = false;
+            m_professionsOpen = false;
             DrawPreWorldFrontend(gameCore, displaySize);
             m_lastWorldConnected = false;
             m_loggedActionBarVisible = false;
@@ -6748,6 +7293,7 @@ namespace UiClient
         {
             CloseNpcInteraction("disconnect");
             m_talentsOpen = false;
+            m_professionsOpen = false;
             if (BeginHudPanel(
                     "##world_connect_panel",
                     "World Link",
@@ -6999,7 +7545,7 @@ namespace UiClient
         const ImVec2 actionBarPos = ApplyHudOffset(actionBarDefaultPos, m_actionBarOffsetX, m_actionBarOffsetY, actionBarSize, displaySize);
         const ImVec2 upperActionBarSize(744.0f, 72.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
-        const ImVec2 microMenuSize(472.0f, 44.0f);
+        const ImVec2 microMenuSize(642.0f, 44.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
         const bool microMenuFitsRight = microMenuRightX + microMenuSize.x < rightActionBarTwoPos.x - 12.0f;
         const ImVec2 microMenuPos(
@@ -7026,6 +7572,10 @@ namespace UiClient
         const ImVec2 talentsPos(
             AZ::GetMin(characterPos.x + characterSize.x + 18.0f, displaySize.x - talentsSize.x - 18.0f),
             AZ::GetMax(18.0f, displaySize.y - talentsSize.y - 176.0f));
+        const ImVec2 professionsSize(520.0f, 430.0f);
+        const ImVec2 professionsPos(
+            AZ::GetMin(characterPos.x + characterSize.x + 18.0f, displaySize.x - professionsSize.x - 18.0f),
+            AZ::GetMax(18.0f, talentsPos.y - professionsSize.y - 18.0f));
         const ImVec2 questLogSize(460.0f, 360.0f);
         const ImVec2 questLogPos(280.0f, AZ::GetMax(18.0f, displaySize.y - questLogSize.y - 176.0f));
         const ImVec2 mapSize(700.0f, 510.0f);
@@ -7097,11 +7647,22 @@ namespace UiClient
         {
             CloseNpcInteraction("out_of_range");
         }
+        if (m_professionsOpen && m_activeInteractionKind == "profession_trainer" &&
+            !worldState.m_session.m_professionTrainer.m_id.empty() &&
+            (!worldState.m_session.m_professionTrainer.m_inRange ||
+                worldState.m_session.m_currentTargetId != worldState.m_session.m_professionTrainer.m_npcId))
+        {
+            CloseNpcInteraction("out_of_range");
+        }
         if (m_questGossipOpen && (!targetEntity || !IsQuestGiverNpc(*targetEntity)))
         {
             CloseNpcInteraction("target_changed");
         }
-        if (m_auctionOpen && (!targetEntity || !EntityHasService(*targetEntity, "auction")))
+        if (m_auctionOpen && (!targetEntity || !EntityHasService(*targetEntity, AuctionServiceType)))
+        {
+            CloseNpcInteraction("target_changed");
+        }
+        if (m_professionsOpen && m_activeInteractionKind == "profession_trainer" && (!targetEntity || !IsProfessionTrainerNpc(*targetEntity)))
         {
             CloseNpcInteraction("target_changed");
         }
@@ -7271,6 +7832,7 @@ namespace UiClient
             if (const char* toggledPanel = DrawMicroMenuBar(
                 m_characterSheetOpen,
                 m_talentsOpen,
+                m_professionsOpen,
                 m_questLogOpen,
                 m_mapOpen,
                 m_spellbookOpen,
@@ -7473,6 +8035,30 @@ namespace UiClient
             }
         }
         if (talentsPanelWasOpen)
+        {
+            ImGui::End();
+        }
+
+        const bool professionsPanelWasOpen = m_professionsOpen;
+        if (professionsPanelWasOpen && BeginHudPanel("##professions", "Professions", professionsPos, professionsSize, false, true))
+        {
+            if (DrawHudPanelCloseButton())
+            {
+                if (m_activeInteractionKind == "profession_trainer")
+                {
+                    CloseNpcInteraction("close_button");
+                }
+                else
+                {
+                    CloseGameplayPanelById(PanelProfessions, "close_button");
+                }
+            }
+            else
+            {
+                DrawProfessionsWindow(gameCore, worldState);
+            }
+        }
+        if (professionsPanelWasOpen)
         {
             ImGui::End();
         }

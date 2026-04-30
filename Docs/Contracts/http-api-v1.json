@@ -54,6 +54,140 @@
         "stamina",
         "armor"
       ]
+    },
+    {
+      "name": "worldSession.spellbook[]",
+      "surface": "world-progression",
+      "fields": [
+        "id",
+        "displayName",
+        "classId",
+        "category",
+        "abilityType",
+        "description",
+        "tooltipText",
+        "requirementText",
+        "resourceName",
+        "iconKind",
+        "requiredLevel",
+        "resourceCost",
+        "resourceGeneration",
+        "cooldownMs",
+        "rangeMeters",
+        "requiresTarget",
+        "triggersGCD",
+        "learned",
+        "passive",
+        "actionBarAssignable",
+        "trainable"
+      ]
+    },
+    {
+      "name": "worldSession.actionBar[]",
+      "surface": "world-progression",
+      "fields": [
+        "slotIndex",
+        "hotkey",
+        "abilityId",
+        "displayName",
+        "buttonLabel",
+        "category",
+        "abilityType",
+        "resourceName",
+        "tooltipText",
+        "iconKind",
+        "resourceCost",
+        "resourceGeneration",
+        "cooldownMs",
+        "cooldownEndsAt",
+        "cooldownRemainingMs",
+        "rangeMeters",
+        "requiresTarget",
+        "triggersGCD",
+        "learned",
+        "passive",
+        "actionBarAssignable"
+      ]
+    },
+    {
+      "name": "worldSession.trainer.offers[]",
+      "surface": "world-progression",
+      "fields": [
+        "abilityId",
+        "displayName",
+        "description",
+        "tooltipText",
+        "category",
+        "abilityType",
+        "requiredLevel",
+        "costCopper",
+        "learned",
+        "canLearn",
+        "requirementText",
+        "iconKind",
+        "passive",
+        "actionBarAssignable",
+        "trainable",
+        "actionBarSlot",
+        "actionBarHotkey",
+        "actionBarLabel",
+        "requiresTarget",
+        "resourceName",
+        "resourceCost",
+        "resourceGeneration",
+        "cooldownMs",
+        "rangeMeters"
+      ]
+    },
+    {
+      "name": "worldSession.professions.catalog[]",
+      "surface": "world-profession",
+      "fields": [
+        "professionId",
+        "displayName",
+        "category",
+        "rankId",
+        "unavailableReason",
+        "maxStarterSkill",
+        "skillValue",
+        "implemented",
+        "knownRecipeIds",
+        "knownRecipes"
+      ]
+    },
+    {
+      "name": "worldSession.professions.learned[]",
+      "surface": "world-profession",
+      "fields": [
+        "professionId",
+        "displayName",
+        "category",
+        "rankId",
+        "unavailableReason",
+        "maxStarterSkill",
+        "skillValue",
+        "implemented",
+        "learnedAt",
+        "updatedAt",
+        "knownRecipeIds",
+        "knownRecipes"
+      ]
+    },
+    {
+      "name": "worldSession.professionTrainer.offers[]",
+      "surface": "world-profession",
+      "fields": [
+        "professionId",
+        "displayName",
+        "category",
+        "requirementText",
+        "unavailableReason",
+        "maxStarterSkill",
+        "costCopper",
+        "learned",
+        "implemented",
+        "canLearn"
+      ]
     }
   ],
   "routes": [

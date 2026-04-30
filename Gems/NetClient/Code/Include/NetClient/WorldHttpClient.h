@@ -375,6 +375,8 @@ namespace NetClient
         AZStd::string m_id;
         AZStd::string m_displayName;
         AZStd::string m_classId;
+        AZStd::string m_category;
+        AZStd::string m_abilityType;
         AZStd::string m_description;
         AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
@@ -388,6 +390,9 @@ namespace NetClient
         bool m_requiresTarget = false;
         bool m_triggersGlobalCooldown = false;
         bool m_learned = false;
+        bool m_passive = false;
+        bool m_actionBarAssignable = false;
+        bool m_trainable = false;
     };
 
     struct ActionBarSlotState
@@ -397,6 +402,8 @@ namespace NetClient
         AZStd::string m_abilityId;
         AZStd::string m_displayName;
         AZStd::string m_buttonLabel;
+        AZStd::string m_category;
+        AZStd::string m_abilityType;
         AZStd::string m_resourceName;
         AZStd::string m_tooltipText;
         AZStd::string m_iconKind;
@@ -409,12 +416,16 @@ namespace NetClient
         bool m_requiresTarget = false;
         bool m_triggersGlobalCooldown = false;
         bool m_learned = false;
+        bool m_passive = false;
+        bool m_actionBarAssignable = false;
     };
 
     struct TrainerOfferState
     {
         AZStd::string m_abilityId;
         AZStd::string m_displayName;
+        AZStd::string m_category;
+        AZStd::string m_abilityType;
         AZStd::string m_description;
         AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
@@ -428,6 +439,9 @@ namespace NetClient
         double m_rangeMeters = 0.0;
         bool m_learned = false;
         bool m_canLearn = false;
+        bool m_passive = false;
+        bool m_actionBarAssignable = false;
+        bool m_trainable = false;
     };
 
     struct TrainerState
@@ -472,6 +486,77 @@ namespace NetClient
         int m_pointsAvailable = 0;
         AZStd::vector<AZStd::string> m_categories;
         AZStd::vector<TalentEntryState> m_talents;
+    };
+
+    struct ProfessionRecipeMaterialState
+    {
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        int m_quantity = 0;
+    };
+
+    struct ProfessionRecipeState
+    {
+        AZStd::string m_recipeId;
+        AZStd::string m_professionId;
+        AZStd::string m_displayName;
+        AZStd::string m_outputItemId;
+        AZStd::string m_outputDisplayName;
+        AZStd::string m_category;
+        int m_requiredSkill = 0;
+        int m_outputQuantity = 0;
+        AZ::s64 m_craftTimeMs = 0;
+        bool m_learnedByDefault = false;
+        bool m_trainerTaught = false;
+        bool m_implemented = false;
+        AZStd::vector<ProfessionRecipeMaterialState> m_requiredMaterials;
+    };
+
+    struct ProfessionEntryState
+    {
+        AZStd::string m_professionId;
+        AZStd::string m_displayName;
+        AZStd::string m_category;
+        AZStd::string m_rankId;
+        AZStd::string m_unavailableReason;
+        int m_maxStarterSkill = 0;
+        int m_skillValue = 0;
+        bool m_implemented = false;
+        AZ::s64 m_learnedAt = 0;
+        AZ::s64 m_updatedAt = 0;
+        AZStd::vector<AZStd::string> m_knownRecipeIds;
+        AZStd::vector<ProfessionRecipeState> m_knownRecipes;
+    };
+
+    struct ProfessionSummaryState
+    {
+        int m_primaryLimit = 0;
+        AZStd::vector<ProfessionEntryState> m_learned;
+        AZStd::vector<ProfessionEntryState> m_catalog;
+    };
+
+    struct ProfessionTrainerOfferState
+    {
+        AZStd::string m_professionId;
+        AZStd::string m_displayName;
+        AZStd::string m_category;
+        AZStd::string m_requirementText;
+        AZStd::string m_unavailableReason;
+        int m_maxStarterSkill = 0;
+        int m_costCopper = 0;
+        bool m_learned = false;
+        bool m_implemented = false;
+        bool m_canLearn = false;
+    };
+
+    struct ProfessionTrainerState
+    {
+        AZStd::string m_id;
+        AZStd::string m_npcId;
+        AZStd::string m_displayName;
+        AZStd::string m_interactionHint;
+        bool m_inRange = false;
+        AZStd::vector<ProfessionTrainerOfferState> m_offers;
     };
 
     struct PvPStatsState
@@ -543,6 +628,8 @@ namespace NetClient
         EquipmentState m_equipment;
         StatBlockState m_stats;
         TalentState m_talents;
+        ProfessionSummaryState m_professions;
+        ProfessionTrainerState m_professionTrainer;
         AZStd::vector<AZStd::string> m_learnedAbilityIds;
         AZStd::vector<SpellbookEntryState> m_spellbookEntries;
         AZStd::vector<ActionBarSlotState> m_actionBarSlots;
@@ -1019,6 +1106,14 @@ namespace NetClient
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
             const AZStd::string& talentId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool LearnProfession(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& trainerId,
+            const AZStd::string& professionId,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 

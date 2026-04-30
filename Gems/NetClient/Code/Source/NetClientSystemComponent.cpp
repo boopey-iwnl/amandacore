@@ -236,6 +236,14 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool LearnProfessionRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& trainerId,
+        const AZStd::string& professionId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool AssignActionBarSlotRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -796,6 +804,17 @@ namespace NetClient
         AZStd::string& outError)
     {
         return SelectTalentRequest(worldEndpoint, worldSessionToken, talentId, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::LearnProfession(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& trainerId,
+        const AZStd::string& professionId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return LearnProfessionRequest(worldEndpoint, worldSessionToken, trainerId, professionId, outResponse, outError);
     }
 
     bool NetClientSystemComponent::AssignActionBarSlot(
