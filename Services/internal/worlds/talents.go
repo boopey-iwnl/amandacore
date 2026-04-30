@@ -139,7 +139,7 @@ func (s *worldServer) selectTalentLocked(session *worldSessionState, talentID st
 		return fmt.Errorf("world session token was not found")
 	}
 	if session.ClassID != platform.DefaultClassID {
-		return fmt.Errorf("talents are only available to Warriors")
+		return fmt.Errorf("disciplines are only available to Warriors")
 	}
 
 	talent, found := findTalentDefinition(talentID)

@@ -88,40 +88,45 @@ func (s *worldServer) buildTrainerResponse(session *worldSessionState) map[strin
 		if learned {
 			requirementText = "Already learned."
 		} else if session.ClassID != trainer.ClassID {
-			requirementText = "Requires Warrior class."
+			requirementText = "Requires the Warrior class."
 		} else if session.Level < ability.RequiredLevel {
 			requirementText = fmt.Sprintf("Requires level %d.", ability.RequiredLevel)
 		} else if session.CurrencyCopper < ability.TrainerCostCopper {
 			requirementText = fmt.Sprintf("Requires %d copper.", ability.TrainerCostCopper)
 		} else if session.CurrentTargetID != trainer.ID {
-			requirementText = "Right-click the Warrior trainer NPC to train."
+			requirementText = "Right-click the trainer NPC to train."
 		} else if !inRange {
-			requirementText = "Move closer to the Warrior trainer."
+			requirementText = "Move closer to the trainer."
 		} else {
 			canLearn = true
 			requirementText = "Ready to learn."
 		}
 
 		offers = append(offers, map[string]any{
-			"abilityId":          ability.ID,
-			"displayName":        ability.DisplayName,
-			"description":        ability.Description,
-			"tooltipText":        abilityTooltip(ability),
-			"requiredLevel":      ability.RequiredLevel,
-			"costCopper":         ability.TrainerCostCopper,
-			"learned":            learned,
-			"canLearn":           canLearn,
-			"requirementText":    requirementText,
-			"iconKind":           abilityIconKind(ability),
-			"actionBarSlot":      ability.ActionBarSlot,
-			"actionBarHotkey":    ability.ActionBarHotkey,
-			"actionBarLabel":     ability.ActionBarLabel,
-			"requiresTarget":     ability.RequiresTarget,
-			"resourceName":       "Grit",
-			"resourceCost":       ability.ResourceCost,
-			"resourceGeneration": ability.ResourceGeneration,
-			"cooldownMs":         ability.CooldownMs,
-			"rangeMeters":        ability.RangeMeters,
+			"abilityId":           ability.ID,
+			"displayName":         ability.DisplayName,
+			"description":         ability.Description,
+			"tooltipText":         abilityTooltip(ability),
+			"category":            abilityCategory(ability),
+			"abilityType":         abilityType(ability),
+			"requiredLevel":       ability.RequiredLevel,
+			"costCopper":          ability.TrainerCostCopper,
+			"learned":             learned,
+			"canLearn":            canLearn,
+			"requirementText":     requirementText,
+			"iconKind":            abilityIconKind(ability),
+			"passive":             ability.Passive,
+			"actionBarAssignable": abilityActionBarAssignable(ability),
+			"trainable":           ability.TrainerLearnable,
+			"actionBarSlot":       ability.ActionBarSlot,
+			"actionBarHotkey":     ability.ActionBarHotkey,
+			"actionBarLabel":      ability.ActionBarLabel,
+			"requiresTarget":      ability.RequiresTarget,
+			"resourceName":        "Grit",
+			"resourceCost":        ability.ResourceCost,
+			"resourceGeneration":  ability.ResourceGeneration,
+			"cooldownMs":          ability.CooldownMs,
+			"rangeMeters":         ability.RangeMeters,
 		})
 	}
 
@@ -130,7 +135,7 @@ func (s *worldServer) buildTrainerResponse(session *worldSessionState) map[strin
 		"displayName":     trainer.DisplayName,
 		"classId":         trainer.ClassID,
 		"inRange":         inRange,
-		"interactionHint": "Right-click the Warrior trainer NPC to train.",
+		"interactionHint": "Right-click the trainer NPC to train.",
 		"offers":          offers,
 	}
 }
@@ -149,10 +154,10 @@ func (s *worldServer) learnTrainerAbilityLocked(session *worldSessionState, trai
 		return fmt.Errorf("wrong class for this trainer")
 	}
 	if session.CurrentTargetID != trainer.ID {
-		return fmt.Errorf("right-click the Warrior trainer NPC before training")
+		return fmt.Errorf("right-click the trainer NPC before training")
 	}
 	if !s.trainerInRangeLocked(session, trainer) {
-		return fmt.Errorf("move closer to the Warrior trainer")
+		return fmt.Errorf("move closer to the trainer")
 	}
 
 	ability, found := findAbilityDefinition(abilityID)

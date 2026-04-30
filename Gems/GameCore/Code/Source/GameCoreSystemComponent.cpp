@@ -1636,6 +1636,34 @@ namespace GameCore
         return true;
     }
 
+    bool GameCoreSystemComponent::LearnProfession(const AZStd::string& trainerId, const AZStd::string& professionId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->LearnProfession(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                trainerId,
+                professionId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "LearnProfession failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "profession_learn");
+        return true;
+    }
+
     bool GameCoreSystemComponent::AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId)
     {
         if (!m_worldState.m_worldConnected)

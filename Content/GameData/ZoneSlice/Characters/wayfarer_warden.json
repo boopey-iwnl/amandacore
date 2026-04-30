@@ -1,7 +1,7 @@
 {
   "$schema": "../../../Schemas/gameplay.schema.json#/$defs/CharacterArchetype",
   "id": "wayfarer_warden",
-  "displayName": "Wayfarer Warden",
+  "displayName": "Warrior",
   "factionTag": "frontier_union",
   "startingLevel": 1,
   "starterSpellIds": [

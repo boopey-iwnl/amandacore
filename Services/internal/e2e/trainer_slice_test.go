@@ -25,11 +25,28 @@ func TestWarriorTrainerSlice(t *testing.T) {
 		assertTrainerEntityVisible(t, state)
 		assertQuestGiverEntityVisible(t, state)
 		offers := requireTrainerOffers(t, trainer)
-		if _, ok := offers["driving_blow"]; !ok {
+		drivingBlow, ok := offers["driving_blow"]
+		if !ok {
 			t.Fatalf("expected driving_blow trainer offer, got %#v", offers)
+		}
+		if drivingBlow["category"].(string) != "Warrior" ||
+			drivingBlow["abilityType"].(string) != "active" ||
+			drivingBlow["passive"].(bool) ||
+			!drivingBlow["actionBarAssignable"].(bool) ||
+			!drivingBlow["trainable"].(bool) {
+			t.Fatalf("expected active trainer metadata for driving_blow, got %#v", drivingBlow)
 		}
 		if _, ok := offers[platform.RallyingCallAbilityID]; !ok {
 			t.Fatalf("expected rallying_call trainer offer, got %#v", offers)
+		}
+		ironResolve, ok := offers[platform.IronResolveAbilityID]
+		if !ok {
+			t.Fatalf("expected iron_resolve trainer offer, got %#v", offers)
+		}
+		if ironResolve["abilityType"].(string) != "passive" ||
+			!ironResolve["passive"].(bool) ||
+			ironResolve["actionBarAssignable"].(bool) {
+			t.Fatalf("expected passive trainer metadata for iron_resolve, got %#v", ironResolve)
 		}
 	})
 
@@ -114,6 +131,28 @@ func TestWarriorTrainerSlice(t *testing.T) {
 			"trainerId":         "trainer_armsmaster_corin_vale",
 			"abilityId":         platform.WarCryAbilityID,
 		}, http.StatusBadRequest, nil)
+	})
+
+	t.Run("passive learned abilities cannot be assigned to action bars", func(t *testing.T) {
+		fixture := newTrainerFixture(t, trainerFixtureOptions{startingExperience: 4900, startingCopper: 200})
+		targetWarriorTrainer(t, fixture)
+
+		var response map[string]any
+		postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/trainer/learn", nil, map[string]any{
+			"worldSessionToken": fixture.worldSessionToken,
+			"trainerId":         "trainer_armsmaster_corin_vale",
+			"abilityId":         platform.IronResolveAbilityID,
+		}, http.StatusOK, &response)
+		assertAbilityLearned(t, response, platform.IronResolveAbilityID)
+
+		postJSON(t, fixture.server.Client(), fixture.server.URL+"/v1/world/action-bar/assign", nil, map[string]any{
+			"worldSessionToken": fixture.worldSessionToken,
+			"slotIndex":         9,
+			"abilityId":         platform.IronResolveAbilityID,
+		}, http.StatusBadRequest, nil)
+
+		response = fixture.getWorldState(t)
+		assertActionBarSlotEmpty(t, response, 9)
 	})
 
 	t.Run("learned trainer abilities persist across reconnect and restart", func(t *testing.T) {

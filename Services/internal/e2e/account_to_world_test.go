@@ -287,6 +287,12 @@ func assertAbilityPayload(t *testing.T, response map[string]any) {
 	if slot1["buttonLabel"].(string) != "Strike" {
 		t.Fatalf("expected action bar slot 1 label Strike, got %#v", slot1)
 	}
+	if slot1["category"].(string) != "Warrior" ||
+		slot1["abilityType"].(string) != "active" ||
+		slot1["passive"].(bool) ||
+		!slot1["actionBarAssignable"].(bool) {
+		t.Fatalf("expected action bar slot 1 ability metadata, got %#v", slot1)
+	}
 	slot2 := actionBar[2].(map[string]any)
 	if slot2["abilityId"].(string) != "brace" {
 		t.Fatalf("expected action bar slot 2 to be brace, got %#v", slot2)
@@ -317,6 +323,13 @@ func assertAbilityPayloadWithoutDefaultBarLayout(t *testing.T, response map[stri
 	spellbook0 := spellbook[0].(map[string]any)
 	if spellbook0["displayName"].(string) != "Auto Attack" {
 		t.Fatalf("expected first spellbook entry to be Auto Attack, got %#v", spellbook0)
+	}
+	if spellbook0["category"].(string) != "Warrior" ||
+		spellbook0["abilityType"].(string) != "active" ||
+		spellbook0["passive"].(bool) ||
+		!spellbook0["actionBarAssignable"].(bool) ||
+		spellbook0["trainable"].(bool) {
+		t.Fatalf("expected spellbook metadata on auto attack, got %#v", spellbook0)
 	}
 	spellbook1 := spellbook[1].(map[string]any)
 	if spellbook1["displayName"].(string) != "Steady Strike" {

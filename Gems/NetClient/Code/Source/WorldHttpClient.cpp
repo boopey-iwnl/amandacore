@@ -617,6 +617,78 @@ namespace NetClient
             }
         }
 
+        void ParseProfessionRecipe(const rapidjson::Value& recipeValue, ProfessionRecipeState& outRecipe)
+        {
+            ReadString(recipeValue, "recipeId", outRecipe.m_recipeId);
+            ReadString(recipeValue, "professionId", outRecipe.m_professionId);
+            ReadString(recipeValue, "displayName", outRecipe.m_displayName);
+            ReadInt(recipeValue, "requiredSkill", outRecipe.m_requiredSkill);
+            ReadString(recipeValue, "outputItemId", outRecipe.m_outputItemId);
+            ReadString(recipeValue, "outputDisplayName", outRecipe.m_outputDisplayName);
+            ReadInt(recipeValue, "outputQuantity", outRecipe.m_outputQuantity);
+            ReadBool(recipeValue, "learnedByDefault", outRecipe.m_learnedByDefault);
+            ReadBool(recipeValue, "trainerTaught", outRecipe.m_trainerTaught);
+            ReadInt64(recipeValue, "craftTimeMs", outRecipe.m_craftTimeMs);
+            ReadString(recipeValue, "category", outRecipe.m_category);
+            ReadBool(recipeValue, "implemented", outRecipe.m_implemented);
+
+            if (recipeValue.HasMember("requiredMaterials") && recipeValue["requiredMaterials"].IsArray())
+            {
+                for (const rapidjson::Value& materialValue : recipeValue["requiredMaterials"].GetArray())
+                {
+                    if (!materialValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    ProfessionRecipeMaterialState material;
+                    ReadString(materialValue, "itemId", material.m_itemId);
+                    ReadString(materialValue, "displayName", material.m_displayName);
+                    ReadInt(materialValue, "quantity", material.m_quantity);
+                    outRecipe.m_requiredMaterials.push_back(AZStd::move(material));
+                }
+            }
+        }
+
+        void ParseProfessionEntry(const rapidjson::Value& professionValue, ProfessionEntryState& outProfession)
+        {
+            ReadString(professionValue, "professionId", outProfession.m_professionId);
+            ReadString(professionValue, "displayName", outProfession.m_displayName);
+            ReadString(professionValue, "category", outProfession.m_category);
+            ReadString(professionValue, "rankId", outProfession.m_rankId);
+            ReadString(professionValue, "unavailableReason", outProfession.m_unavailableReason);
+            ReadInt(professionValue, "maxStarterSkill", outProfession.m_maxStarterSkill);
+            ReadInt(professionValue, "skillValue", outProfession.m_skillValue);
+            ReadBool(professionValue, "implemented", outProfession.m_implemented);
+            ReadInt64(professionValue, "learnedAt", outProfession.m_learnedAt);
+            ReadInt64(professionValue, "updatedAt", outProfession.m_updatedAt);
+
+            if (professionValue.HasMember("knownRecipeIds") && professionValue["knownRecipeIds"].IsArray())
+            {
+                for (const rapidjson::Value& recipeIdValue : professionValue["knownRecipeIds"].GetArray())
+                {
+                    if (recipeIdValue.IsString())
+                    {
+                        outProfession.m_knownRecipeIds.push_back(recipeIdValue.GetString());
+                    }
+                }
+            }
+            if (professionValue.HasMember("knownRecipes") && professionValue["knownRecipes"].IsArray())
+            {
+                for (const rapidjson::Value& recipeValue : professionValue["knownRecipes"].GetArray())
+                {
+                    if (!recipeValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    ProfessionRecipeState recipe;
+                    ParseProfessionRecipe(recipeValue, recipe);
+                    outProfession.m_knownRecipes.push_back(AZStd::move(recipe));
+                }
+            }
+        }
+
         bool ParseWorldSessionJson(const AZStd::string& payload, WorldSessionResponse& outResponse, AZStd::string& outError)
         {
             outResponse = WorldSessionResponse{};
@@ -833,6 +905,8 @@ namespace NetClient
                     ReadString(spellValue, "id", entry.m_id);
                     ReadString(spellValue, "displayName", entry.m_displayName);
                     ReadString(spellValue, "classId", entry.m_classId);
+                    ReadString(spellValue, "category", entry.m_category);
+                    ReadString(spellValue, "abilityType", entry.m_abilityType);
                     ReadString(spellValue, "description", entry.m_description);
                     ReadString(spellValue, "tooltipText", entry.m_tooltipText);
                     ReadString(spellValue, "requirementText", entry.m_requirementText);
@@ -846,6 +920,9 @@ namespace NetClient
                     ReadBool(spellValue, "requiresTarget", entry.m_requiresTarget);
                     ReadBool(spellValue, "triggersGCD", entry.m_triggersGlobalCooldown);
                     ReadBool(spellValue, "learned", entry.m_learned);
+                    ReadBool(spellValue, "passive", entry.m_passive);
+                    ReadBool(spellValue, "actionBarAssignable", entry.m_actionBarAssignable);
+                    ReadBool(spellValue, "trainable", entry.m_trainable);
                     outResponse.m_spellbookEntries.push_back(AZStd::move(entry));
                 }
             }
@@ -865,6 +942,8 @@ namespace NetClient
                     ReadString(actionValue, "abilityId", slot.m_abilityId);
                     ReadString(actionValue, "displayName", slot.m_displayName);
                     ReadString(actionValue, "buttonLabel", slot.m_buttonLabel);
+                    ReadString(actionValue, "category", slot.m_category);
+                    ReadString(actionValue, "abilityType", slot.m_abilityType);
                     ReadString(actionValue, "resourceName", slot.m_resourceName);
                     ReadString(actionValue, "tooltipText", slot.m_tooltipText);
                     ReadString(actionValue, "iconKind", slot.m_iconKind);
@@ -877,6 +956,8 @@ namespace NetClient
                     ReadBool(actionValue, "requiresTarget", slot.m_requiresTarget);
                     ReadBool(actionValue, "triggersGCD", slot.m_triggersGlobalCooldown);
                     ReadBool(actionValue, "learned", slot.m_learned);
+                    ReadBool(actionValue, "passive", slot.m_passive);
+                    ReadBool(actionValue, "actionBarAssignable", slot.m_actionBarAssignable);
                     outResponse.m_actionBarSlots.push_back(AZStd::move(slot));
                 }
             }
@@ -902,6 +983,8 @@ namespace NetClient
                         TrainerOfferState offer;
                         ReadString(offerValue, "abilityId", offer.m_abilityId);
                         ReadString(offerValue, "displayName", offer.m_displayName);
+                        ReadString(offerValue, "category", offer.m_category);
+                        ReadString(offerValue, "abilityType", offer.m_abilityType);
                         ReadString(offerValue, "description", offer.m_description);
                         ReadString(offerValue, "tooltipText", offer.m_tooltipText);
                         ReadString(offerValue, "requirementText", offer.m_requirementText);
@@ -915,7 +998,77 @@ namespace NetClient
                         ReadDouble(offerValue, "rangeMeters", offer.m_rangeMeters);
                         ReadBool(offerValue, "learned", offer.m_learned);
                         ReadBool(offerValue, "canLearn", offer.m_canLearn);
+                        ReadBool(offerValue, "passive", offer.m_passive);
+                        ReadBool(offerValue, "actionBarAssignable", offer.m_actionBarAssignable);
+                        ReadBool(offerValue, "trainable", offer.m_trainable);
                         outResponse.m_trainer.m_offers.push_back(AZStd::move(offer));
+                    }
+                }
+            }
+            outResponse.m_professions = ProfessionSummaryState{};
+            if (document.HasMember("professions") && document["professions"].IsObject())
+            {
+                const rapidjson::Value& professions = document["professions"];
+                ReadInt(professions, "primaryLimit", outResponse.m_professions.m_primaryLimit);
+                if (professions.HasMember("learned") && professions["learned"].IsArray())
+                {
+                    for (const rapidjson::Value& professionValue : professions["learned"].GetArray())
+                    {
+                        if (!professionValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        ProfessionEntryState profession;
+                        ParseProfessionEntry(professionValue, profession);
+                        outResponse.m_professions.m_learned.push_back(AZStd::move(profession));
+                    }
+                }
+                if (professions.HasMember("catalog") && professions["catalog"].IsArray())
+                {
+                    for (const rapidjson::Value& professionValue : professions["catalog"].GetArray())
+                    {
+                        if (!professionValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        ProfessionEntryState profession;
+                        ParseProfessionEntry(professionValue, profession);
+                        outResponse.m_professions.m_catalog.push_back(AZStd::move(profession));
+                    }
+                }
+            }
+            outResponse.m_professionTrainer = ProfessionTrainerState{};
+            if (document.HasMember("professionTrainer") && document["professionTrainer"].IsObject())
+            {
+                const rapidjson::Value& trainer = document["professionTrainer"];
+                ReadString(trainer, "id", outResponse.m_professionTrainer.m_id);
+                ReadString(trainer, "npcId", outResponse.m_professionTrainer.m_npcId);
+                ReadString(trainer, "displayName", outResponse.m_professionTrainer.m_displayName);
+                ReadString(trainer, "interactionHint", outResponse.m_professionTrainer.m_interactionHint);
+                ReadBool(trainer, "inRange", outResponse.m_professionTrainer.m_inRange);
+                if (trainer.HasMember("offers") && trainer["offers"].IsArray())
+                {
+                    for (const rapidjson::Value& offerValue : trainer["offers"].GetArray())
+                    {
+                        if (!offerValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        ProfessionTrainerOfferState offer;
+                        ReadString(offerValue, "professionId", offer.m_professionId);
+                        ReadString(offerValue, "displayName", offer.m_displayName);
+                        ReadString(offerValue, "category", offer.m_category);
+                        ReadString(offerValue, "requirementText", offer.m_requirementText);
+                        ReadString(offerValue, "unavailableReason", offer.m_unavailableReason);
+                        ReadInt(offerValue, "maxStarterSkill", offer.m_maxStarterSkill);
+                        ReadInt(offerValue, "costCopper", offer.m_costCopper);
+                        ReadBool(offerValue, "learned", offer.m_learned);
+                        ReadBool(offerValue, "implemented", offer.m_implemented);
+                        ReadBool(offerValue, "canLearn", offer.m_canLearn);
+                        outResponse.m_professionTrainer.m_offers.push_back(AZStd::move(offer));
                     }
                 }
             }
@@ -2626,6 +2779,35 @@ namespace NetClient
             worldSessionToken.c_str(),
             talentId.c_str());
         if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/talent/select", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool LearnProfessionRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& trainerId,
+        const AZStd::string& professionId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"trainerId\":\"%s\",\"professionId\":\"%s\"}",
+            worldSessionToken.c_str(),
+            trainerId.c_str(),
+            professionId.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/profession/learn", requestBody, responseBody, statusCode, outError))
         {
             return false;
         }

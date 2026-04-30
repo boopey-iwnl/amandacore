@@ -98,6 +98,7 @@ namespace UiClient
         bool m_questLogOpen = false;
         bool m_mapOpen = false;
         bool m_talentsOpen = false;
+        bool m_professionsOpen = false;
         bool m_uiEditMode = false;
         bool m_uiLayoutDirty = false;
         int m_settingsTab = 0;

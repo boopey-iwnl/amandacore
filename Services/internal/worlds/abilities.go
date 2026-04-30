@@ -12,12 +12,18 @@ import (
 const (
 	emberBoltAbilityAlias   = "ember_bolt"
 	steadyBlastAbilityAlias = "steady_blast"
+
+	abilityCategoryWarrior = "Warrior"
+	abilityCategoryUtility = "Utility"
+	abilityTypeActive      = "active"
+	abilityTypePassive     = "passive"
 )
 
 type abilityDefinition struct {
 	ID                 string
 	DisplayName        string
 	ClassID            string
+	Category           string
 	Description        string
 	RequirementText    string
 	TooltipText        string
@@ -37,6 +43,7 @@ type abilityDefinition struct {
 	CooldownMs         int64
 	CooldownCategory   string
 	TriggersGCD        bool
+	Passive            bool
 	TargetDisposition  string
 	Damage             float64
 	AttackPowerScale   float64
@@ -49,9 +56,10 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                 platform.AutoAttackAbilityID,
 		DisplayName:        "Auto Attack",
 		ClassID:            platform.DefaultClassID,
+		Category:           abilityCategoryWarrior,
 		Description:        "Maintain pressure with your weapon while a target stays in melee range.",
 		TooltipText:        "Automatic melee swings generate Grit.",
-		RequirementText:    "Known by all Warriors.",
+		RequirementText:    "Known by Warriors.",
 		RequiredLevel:      1,
 		LearnedByDefault:   true,
 		ActionBarSlot:      0,
@@ -65,6 +73,7 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                 platform.SteadyStrikeAbilityID,
 		DisplayName:        "Steady Strike",
 		ClassID:            platform.DefaultClassID,
+		Category:           abilityCategoryWarrior,
 		Description:        "A measured weapon strike that builds Grit with reliable melee damage.",
 		TooltipText:        "Strike your target and gain 10 Grit.",
 		RequirementText:    "Known by default.",
@@ -84,6 +93,7 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:               platform.BraceAbilityID,
 		DisplayName:      "Brace",
 		ClassID:          platform.DefaultClassID,
+		Category:         abilityCategoryUtility,
 		Description:      "Set your stance and recover a small amount of health without needing a target.",
 		TooltipText:      "Recover health and prepare for the next exchange.",
 		RequirementText:  "Known by default.",
@@ -102,6 +112,7 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                platform.DevBasicStrikeAbilityID,
 		DisplayName:       "Basic Strike",
 		ClassID:           platform.DefaultClassID,
+		Category:          abilityCategoryWarrior,
 		Description:       "A deterministic server-authoritative test strike against hostile NPCs.",
 		TooltipText:       "Strike a hostile target for fixed damage.",
 		RequirementText:   "Known by default for dev combat validation.",
@@ -117,9 +128,10 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                platform.DrivingBlowAbilityID,
 		DisplayName:       "Driving Blow",
 		ClassID:           platform.DefaultClassID,
-		Description:       "A heavy follow-through strike taught by the Warrior trainer.",
+		Category:          abilityCategoryWarrior,
+		Description:       "A heavy follow-through strike taught by an armsmaster trainer.",
 		TooltipText:       "Spend 25 Grit for a heavier melee hit.",
-		RequirementText:   "Requires a Warrior trainer and 10 copper.",
+		RequirementText:   "Requires a trainer and 10 copper.",
 		RequiredLevel:     2,
 		TrainerLearnable:  true,
 		TrainerCostCopper: 10,
@@ -137,9 +149,10 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                 platform.RallyingCallAbilityID,
 		DisplayName:        "Rallying Call",
 		ClassID:            platform.DefaultClassID,
-		Description:        "A focused call that restores Grit and steadies the Warrior.",
+		Category:           abilityCategoryUtility,
+		Description:        "A focused call that restores Grit and steadies the next exchange.",
 		TooltipText:        "Generate 18 Grit. Does not require a target.",
-		RequirementText:    "Requires level 4 and a Warrior trainer.",
+		RequirementText:    "Requires level 4 and a trainer.",
 		RequiredLevel:      4,
 		TrainerLearnable:   true,
 		TrainerCostCopper:  25,
@@ -155,9 +168,10 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                platform.HamperingStrikeAbilityID,
 		DisplayName:       "Hampering Strike",
 		ClassID:           platform.DefaultClassID,
+		Category:          abilityCategoryWarrior,
 		Description:       "A controlling strike that deals modest damage while keeping pressure on a target.",
 		TooltipText:       "Spend 15 Grit for a quick controlling strike.",
-		RequirementText:   "Requires level 6 and a Warrior trainer.",
+		RequirementText:   "Requires level 6 and a trainer.",
 		RequiredLevel:     6,
 		TrainerLearnable:  true,
 		TrainerCostCopper: 40,
@@ -176,9 +190,10 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                platform.GuardedFormAbilityID,
 		DisplayName:       "Guarded Form",
 		ClassID:           platform.DefaultClassID,
+		Category:          abilityCategoryUtility,
 		Description:       "A defensive form that gives the early rotation a survival button.",
 		TooltipText:       "Spend 20 Grit to recover health.",
-		RequirementText:   "Requires level 8 and a Warrior trainer.",
+		RequirementText:   "Requires level 8 and a trainer.",
 		RequiredLevel:     8,
 		TrainerLearnable:  true,
 		TrainerCostCopper: 65,
@@ -195,9 +210,10 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                platform.OverhandCutAbilityID,
 		DisplayName:       "Overhand Cut",
 		ClassID:           platform.DefaultClassID,
-		Description:       "A committed weapon attack for Warriors who have learned to manage Grit.",
+		Category:          abilityCategoryWarrior,
+		Description:       "A committed weapon attack for combatants who have learned to manage Grit.",
 		TooltipText:       "Spend 40 Grit for a strong melee attack.",
-		RequirementText:   "Requires level 10 and a Warrior trainer.",
+		RequirementText:   "Requires level 10 and a trainer.",
 		RequiredLevel:     10,
 		TrainerLearnable:  true,
 		TrainerCostCopper: 90,
@@ -216,14 +232,16 @@ var warriorAbilityCatalog = []abilityDefinition{
 		ID:                platform.IronResolveAbilityID,
 		DisplayName:       "Iron Resolve",
 		ClassID:           platform.DefaultClassID,
-		Description:       "A durable Warrior passive granted through advanced starter training.",
+		Category:          abilityCategoryWarrior,
+		Description:       "A durable passive granted through advanced starter training.",
 		TooltipText:       "A passive foundation for later defensive class work.",
-		RequirementText:   "Requires level 12 and a Warrior trainer.",
+		RequirementText:   "Requires level 12 and a trainer.",
 		RequiredLevel:     12,
 		TrainerLearnable:  true,
 		TrainerCostCopper: 120,
 		ActionBarLabel:    "Resolve",
 		RequiresTarget:    false,
+		Passive:           true,
 	},
 }
 
@@ -262,6 +280,27 @@ func abilityIconKind(ability abilityDefinition) string {
 	default:
 		return "icon_missing"
 	}
+}
+
+func abilityCategory(ability abilityDefinition) string {
+	if ability.Category != "" {
+		return ability.Category
+	}
+	if !ability.RequiresTarget {
+		return abilityCategoryUtility
+	}
+	return abilityCategoryWarrior
+}
+
+func abilityType(ability abilityDefinition) string {
+	if ability.Passive {
+		return abilityTypePassive
+	}
+	return abilityTypeActive
+}
+
+func abilityActionBarAssignable(ability abilityDefinition) bool {
+	return !ability.Passive
 }
 
 func findAbilityDefinition(abilityID string) (abilityDefinition, bool) {
@@ -305,22 +344,27 @@ func (s *worldServer) buildSpellbookResponse(session *worldSessionState) []map[s
 	for _, ability := range warriorAbilityCatalog {
 		_, learned := knownAbilities[ability.ID]
 		spellbook = append(spellbook, map[string]any{
-			"id":                 ability.ID,
-			"displayName":        ability.DisplayName,
-			"classId":            ability.ClassID,
-			"description":        ability.Description,
-			"tooltipText":        abilityTooltip(ability),
-			"requiredLevel":      ability.RequiredLevel,
-			"learned":            learned,
-			"requirementText":    ability.RequirementText,
-			"iconKind":           abilityIconKind(ability),
-			"resourceName":       "Grit",
-			"resourceCost":       ability.ResourceCost,
-			"resourceGeneration": ability.ResourceGeneration,
-			"cooldownMs":         ability.CooldownMs,
-			"triggersGCD":        ability.TriggersGCD,
-			"rangeMeters":        ability.RangeMeters,
-			"requiresTarget":     ability.RequiresTarget,
+			"id":                  ability.ID,
+			"displayName":         ability.DisplayName,
+			"classId":             ability.ClassID,
+			"category":            abilityCategory(ability),
+			"abilityType":         abilityType(ability),
+			"description":         ability.Description,
+			"tooltipText":         abilityTooltip(ability),
+			"requiredLevel":       ability.RequiredLevel,
+			"learned":             learned,
+			"requirementText":     ability.RequirementText,
+			"iconKind":            abilityIconKind(ability),
+			"passive":             ability.Passive,
+			"actionBarAssignable": abilityActionBarAssignable(ability),
+			"trainable":           ability.TrainerLearnable,
+			"resourceName":        "Grit",
+			"resourceCost":        ability.ResourceCost,
+			"resourceGeneration":  ability.ResourceGeneration,
+			"cooldownMs":          ability.CooldownMs,
+			"triggersGCD":         ability.TriggersGCD,
+			"rangeMeters":         ability.RangeMeters,
+			"requiresTarget":      ability.RequiresTarget,
 		})
 	}
 
@@ -336,8 +380,12 @@ func (s *worldServer) buildActionBarResponse(session *worldSessionState) []map[s
 			"abilityId":           "",
 			"displayName":         "",
 			"buttonLabel":         "",
+			"category":            "",
+			"abilityType":         "",
 			"requiresTarget":      false,
 			"learned":             false,
+			"passive":             false,
+			"actionBarAssignable": false,
 			"resourceName":        "Grit",
 			"resourceCost":        0.0,
 			"resourceGeneration":  0.0,
@@ -375,8 +423,12 @@ func (s *worldServer) buildActionBarResponse(session *worldSessionState) []map[s
 			"displayName":         ability.DisplayName,
 			"buttonLabel":         ability.ActionBarLabel,
 			"iconKind":            abilityIconKind(ability),
+			"category":            abilityCategory(ability),
+			"abilityType":         abilityType(ability),
 			"requiresTarget":      ability.RequiresTarget,
 			"learned":             true,
+			"passive":             ability.Passive,
+			"actionBarAssignable": abilityActionBarAssignable(ability),
 			"resourceName":        "Grit",
 			"resourceCost":        ability.ResourceCost,
 			"resourceGeneration":  ability.ResourceGeneration,
@@ -406,6 +458,9 @@ func (s *worldServer) assignActionBarSlotLocked(session *worldSessionState, slot
 	}
 	if !s.sessionKnowsAbilityLocked(session, ability.ID) {
 		return fmt.Errorf("ability is not learned")
+	}
+	if !abilityActionBarAssignable(ability) {
+		return fmt.Errorf("passive abilities cannot be assigned to the action bar")
 	}
 
 	actionBarSlots := platform.NormalizeActionBarSlots(session.ActionBarSlots, session.LearnedAbilityIDs)
