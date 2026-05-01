@@ -1736,12 +1736,12 @@ namespace MovementPhysics
             AZ::Vector3(232.0f, 118.0f, 0.9f),
             AZ::Vector3(220.0f, 142.0f, 0.85f),
             AZ::Vector3(244.0f, 142.0f, 0.85f),
-            AZ::Vector3(268.0f, 145.0f, 0.65f),
-            AZ::Vector3(197.0f, 74.0f, 1.1f),
-            AZ::Vector3(313.0f, 81.0f, 1.2f),
-            AZ::Vector3(380.0f, 231.0f, 2.6f),
+            AZ::Vector3(270.0f, 143.0f, 0.65f),
+            AZ::Vector3(198.0f, 68.0f, 1.1f),
+            AZ::Vector3(320.0f, 76.0f, 1.2f),
+            AZ::Vector3(386.0f, 233.0f, 2.6f),
             AZ::Vector3(358.0f, 39.0f, 1.0f),
-            AZ::Vector3(375.0f, 77.0f, 1.7f),
+            AZ::Vector3(381.0f, 76.0f, 1.7f),
         };
         const AZ::Vector3 buildingExtents[] = {
             AZ::Vector3(2.8f, 2.0f, 1.0f),

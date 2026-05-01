@@ -25,8 +25,10 @@ Use this runbook to manually verify UI Milestone 5 after automated validation pa
 - Open and close World Map.
 - Confirm the World tab shows the repo-local Dawnwake world map art.
 - Confirm the Zone tab shows the repo-local Stonewake Vale map art.
+- Confirm the World and Zone maps are readable at normal gameplay resolution, then use Fit, zoom, and pan to inspect labels without marker drift.
 - Click quest/map markers and confirm supported selection or tracking behavior on calibrated views.
 - Open Reference Maps and confirm non-Stonewake zone art is display-only without marker precision claims.
+- Visit Armsmaster Corin Vale, Scout Rowan Bell, Roadwarden Ilya Brant, the Watch Lantern, and Quartermaster Lyra. Confirm each is visible, reachable, and right-clickable without being hidden by building, ramp, floor, prop, or terrain geometry.
 - Verify action bars, inventory, character panel, spellbook, chat, movement, camera, trainer, and vendor flows still work.
 
 ## Safety Checks

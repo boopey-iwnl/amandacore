@@ -128,6 +128,53 @@ func TestStonewakeSpawnsAreGrounded(t *testing.T) {
 	}
 }
 
+func TestStonewakeInteractableNPCsAvoidVisualBlockouts(t *testing.T) {
+	server := newWorldServer(nil)
+
+	type visualBlockout struct {
+		name             string
+		centerX, centerY float64
+		halfX, halfY     float64
+	}
+
+	solidBlockouts := []visualBlockout{
+		{name: "training rail", centerX: 270.0, centerY: 143.0, halfX: 7.0, halfY: 0.35},
+		{name: "ValeFurrow shed", centerX: 198.0, centerY: 68.0, halfX: 6.0, halfY: 0.9},
+		{name: "Brookside crossing marker", centerX: 320.0, centerY: 76.0, halfX: 2.4, halfY: 2.4},
+		{name: "Lightkeeper tower", centerX: 386.0, centerY: 233.0, halfX: 4.4, halfY: 4.4},
+		{name: "Whispering Cave frontage", centerX: 381.0, centerY: 76.0, halfX: 6.5, halfY: 1.2},
+	}
+	keyInteractables := []string{
+		warriorTrainerID,
+		npcScoutRowanID,
+		npcRoadwardenIlyaID,
+		objWatchLanternID,
+		npcQuartermasterLyraID,
+	}
+	const interactionClearance = 1.0
+	for _, npcID := range keyInteractables {
+		npc := server.friendlyNPCs[npcID]
+		if npc.ID == "" {
+			t.Fatalf("expected Stonewake interactable %s to be loaded", npcID)
+		}
+		for _, blockout := range solidBlockouts {
+			insideX := npc.X >= blockout.centerX-blockout.halfX-interactionClearance &&
+				npc.X <= blockout.centerX+blockout.halfX+interactionClearance
+			insideY := npc.Y >= blockout.centerY-blockout.halfY-interactionClearance &&
+				npc.Y <= blockout.centerY+blockout.halfY+interactionClearance
+			if insideX && insideY {
+				t.Fatalf("expected %s at %.1f,%.1f to stay clear of %s visual blockout", npc.ID, npc.X, npc.Y, blockout.name)
+			}
+		}
+	}
+
+	roadwarden := server.friendlyNPCs[npcRoadwardenIlyaID]
+	roadsideQuest := server.quests["sv_roadside_marks"]
+	if math.Hypot(roadsideQuest.MarkerX-roadwarden.X, roadsideQuest.MarkerY-roadwarden.Y) > 0.1 {
+		t.Fatalf("expected Roadside Marks marker to follow Roadwarden Ilya, marker %.1f,%.1f npc %.1f,%.1f", roadsideQuest.MarkerX, roadsideQuest.MarkerY, roadwarden.X, roadwarden.Y)
+	}
+}
+
 func assertMobAreaCenter(t *testing.T, server *worldServer, mobTypeID string, centerX float64, centerY float64, maxRadius float64) {
 	t.Helper()
 

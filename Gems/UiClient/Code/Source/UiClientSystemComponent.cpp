@@ -110,10 +110,14 @@ namespace UiClient
 
         constexpr int PngIconSampleDimension = 32;
         constexpr int PngIconSamplePixelCount = PngIconSampleDimension * PngIconSampleDimension;
-        constexpr int PngMapSampleDimensionX = 128;
-        constexpr int PngMapSampleDimensionY = 96;
-        constexpr int PngMapSamplePixelCount = PngMapSampleDimensionX * PngMapSampleDimensionY;
         constexpr UINT MaxPngIconSourceDimension = 2048;
+        constexpr UINT MaxPngMapSourceDimension = 4096;
+        constexpr float MapZoomMinimum = 1.0f;
+        constexpr float MapZoomMaximum = 4.0f;
+        constexpr int MapRasterMinimumColumns = 256;
+        constexpr int MapRasterMaximumColumns = 440;
+        constexpr int MapRasterMinimumRows = 192;
+        constexpr int MapRasterMaximumRows = 330;
 
         struct PngIconSample
         {
@@ -123,12 +127,21 @@ namespace UiClient
             std::array<ImU32, PngIconSamplePixelCount> m_pixels{};
         };
 
-        struct PngMapSample
+        struct PngMapImage
         {
             bool m_attempted = false;
             bool m_loaded = false;
             AZStd::string m_path;
-            std::array<ImU32, PngMapSamplePixelCount> m_pixels{};
+            int m_width = 0;
+            int m_height = 0;
+            std::vector<ImU32> m_pixels;
+        };
+
+        struct MapViewState
+        {
+            AZStd::string m_mapArtId;
+            float m_zoom = 1.0f;
+            ImVec2 m_pan = ImVec2(0.0f, 0.0f);
         };
 
         struct MapArtDefinition
@@ -682,7 +695,7 @@ namespace UiClient
             return sample.m_loaded ? &sample : nullptr;
         }
 
-        bool LoadPngMapSample(const AZStd::string& path, PngMapSample& outSample)
+        bool LoadPngMapImage(const AZStd::string& path, PngMapImage& outImage)
         {
             std::wstring widePath;
             if (!ToWidePath(path, widePath))
@@ -734,8 +747,8 @@ namespace UiClient
             if (FAILED(converter->GetSize(&width, &height)) ||
                 width == 0 ||
                 height == 0 ||
-                width > MaxPngIconSourceDimension ||
-                height > MaxPngIconSourceDimension)
+                width > MaxPngMapSourceDimension ||
+                height > MaxPngMapSourceDimension)
             {
                 return false;
             }
@@ -748,34 +761,33 @@ namespace UiClient
                 return false;
             }
 
-            outSample.m_path = path;
-            for (int y = 0; y < PngMapSampleDimensionY; ++y)
+            outImage.m_path = path;
+            outImage.m_width = static_cast<int>(width);
+            outImage.m_height = static_cast<int>(height);
+            outImage.m_pixels.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
+            for (UINT y = 0; y < height; ++y)
             {
-                const UINT sampledY = static_cast<UINT>(((y * 2 + 1) * height) / (PngMapSampleDimensionY * 2));
-                const UINT sourceY = sampledY < height ? sampledY : height - 1;
-                for (int x = 0; x < PngMapSampleDimensionX; ++x)
+                for (UINT x = 0; x < width; ++x)
                 {
-                    const UINT sampledX = static_cast<UINT>(((x * 2 + 1) * width) / (PngMapSampleDimensionX * 2));
-                    const UINT sourceX = sampledX < width ? sampledX : width - 1;
-                    const size_t sourceIndex = (static_cast<size_t>(sourceY) * stride) + (static_cast<size_t>(sourceX) * 4);
-                    outSample.m_pixels[(y * PngMapSampleDimensionX) + x] =
+                    const size_t sourceIndex = (static_cast<size_t>(y) * stride) + (static_cast<size_t>(x) * 4);
+                    outImage.m_pixels[(static_cast<size_t>(y) * width) + x] =
                         IM_COL32(rgba[sourceIndex], rgba[sourceIndex + 1], rgba[sourceIndex + 2], rgba[sourceIndex + 3]);
                 }
             }
             return true;
         }
 
-        const PngMapSample* GetPngMapSample(const MapArtDefinition& definition)
+        const PngMapImage* GetPngMapImage(const MapArtDefinition& definition)
         {
-            static AZStd::unordered_map<AZStd::string, PngMapSample> mapCache;
-            PngMapSample& sample = mapCache[definition.m_mapArtId];
-            if (!sample.m_attempted)
+            static AZStd::unordered_map<AZStd::string, PngMapImage> mapCache;
+            PngMapImage& image = mapCache[definition.m_mapArtId];
+            if (!image.m_attempted)
             {
-                sample.m_attempted = true;
+                image.m_attempted = true;
                 const AZStd::string path = ResolveRepoRelativePath(definition.m_imagePath);
-                sample.m_loaded = !path.empty() && LoadPngMapSample(path, sample);
+                image.m_loaded = !path.empty() && LoadPngMapImage(path, image);
             }
-            return sample.m_loaded ? &sample : nullptr;
+            return image.m_loaded ? &image : nullptr;
         }
 
         ImVec2 FitMapArtBounds(const ImVec2& minBounds, const ImVec2& maxBounds, const MapArtDefinition& definition, bool getMax)
@@ -800,33 +812,96 @@ namespace UiClient
             return getMax ? drawMax : drawMin;
         }
 
-        bool DrawPngMapArt(ImDrawList* drawList, const ImVec2& minBounds, const ImVec2& maxBounds, const MapArtDefinition& definition)
+        ImVec2 ClampMapPan(
+            const ImVec2& pan,
+            const ImVec2& canvasMin,
+            const ImVec2& canvasMax,
+            const ImVec2& fitMin,
+            const ImVec2& fitMax,
+            float zoom)
         {
-            const PngMapSample* sample = GetPngMapSample(definition);
-            if (!sample)
+            const float canvasWidth = canvasMax.x - canvasMin.x;
+            const float canvasHeight = canvasMax.y - canvasMin.y;
+            const float drawWidth = (fitMax.x - fitMin.x) * zoom;
+            const float drawHeight = (fitMax.y - fitMin.y) * zoom;
+            const float maxPanX = drawWidth > canvasWidth ? ((drawWidth - canvasWidth) * 0.5f) + 36.0f : 0.0f;
+            const float maxPanY = drawHeight > canvasHeight ? ((drawHeight - canvasHeight) * 0.5f) + 36.0f : 0.0f;
+            return ImVec2(
+                AZ::GetClamp(pan.x, -maxPanX, maxPanX),
+                AZ::GetClamp(pan.y, -maxPanY, maxPanY));
+        }
+
+        bool PointInsideRect(const ImVec2& point, const ImVec2& minBounds, const ImVec2& maxBounds)
+        {
+            return point.x >= minBounds.x && point.x <= maxBounds.x &&
+                point.y >= minBounds.y && point.y <= maxBounds.y;
+        }
+
+        bool DrawPngMapArt(
+            ImDrawList* drawList,
+            const ImVec2& clipMin,
+            const ImVec2& clipMax,
+            const ImVec2& minBounds,
+            const ImVec2& maxBounds,
+            const MapArtDefinition& definition)
+        {
+            const PngMapImage* image = GetPngMapImage(definition);
+            if (!image || image->m_width <= 0 || image->m_height <= 0 || image->m_pixels.empty())
             {
                 return false;
             }
 
             const float width = maxBounds.x - minBounds.x;
             const float height = maxBounds.y - minBounds.y;
-            const float cellWidth = width / static_cast<float>(PngMapSampleDimensionX);
-            const float cellHeight = height / static_cast<float>(PngMapSampleDimensionY);
-            for (int y = 0; y < PngMapSampleDimensionY; ++y)
+            if (width <= 1.0f || height <= 1.0f)
             {
-                for (int x = 0; x < PngMapSampleDimensionX; ++x)
+                return true;
+            }
+
+            const ImVec2 visibleMin(AZ::GetMax(clipMin.x, minBounds.x), AZ::GetMax(clipMin.y, minBounds.y));
+            const ImVec2 visibleMax(AZ::GetMin(clipMax.x, maxBounds.x), AZ::GetMin(clipMax.y, maxBounds.y));
+            const float visibleWidth = visibleMax.x - visibleMin.x;
+            const float visibleHeight = visibleMax.y - visibleMin.y;
+            if (visibleWidth <= 1.0f || visibleHeight <= 1.0f)
+            {
+                return true;
+            }
+
+            const int columns = AZ::GetClamp(
+                static_cast<int>(visibleWidth * 0.52f),
+                MapRasterMinimumColumns,
+                MapRasterMaximumColumns);
+            const int rows = AZ::GetClamp(
+                static_cast<int>(visibleHeight * 0.52f),
+                MapRasterMinimumRows,
+                MapRasterMaximumRows);
+            const float cellWidth = visibleWidth / static_cast<float>(columns);
+            const float cellHeight = visibleHeight / static_cast<float>(rows);
+            for (int y = 0; y < rows; ++y)
+            {
+                const float cellMinY = visibleMin.y + (cellHeight * y);
+                const float cellMaxY = visibleMin.y + (cellHeight * (y + 1)) + 0.55f;
+                const float normalizedY = AZ::GetClamp(((cellMinY + cellMaxY) * 0.5f - minBounds.y) / height, 0.0f, 1.0f);
+                const int sourceY = AZ::GetClamp(
+                    static_cast<int>(normalizedY * static_cast<float>(image->m_height - 1)),
+                    0,
+                    image->m_height - 1);
+                for (int x = 0; x < columns; ++x)
                 {
-                    const ImU32 pixel = sample->m_pixels[(y * PngMapSampleDimensionX) + x];
+                    const float cellMinX = visibleMin.x + (cellWidth * x);
+                    const float cellMaxX = visibleMin.x + (cellWidth * (x + 1)) + 0.55f;
+                    const float normalizedX = AZ::GetClamp(((cellMinX + cellMaxX) * 0.5f - minBounds.x) / width, 0.0f, 1.0f);
+                    const int sourceX = AZ::GetClamp(
+                        static_cast<int>(normalizedX * static_cast<float>(image->m_width - 1)),
+                        0,
+                        image->m_width - 1);
+                    const ImU32 pixel = image->m_pixels[(static_cast<size_t>(sourceY) * image->m_width) + sourceX];
                     const int alpha = (pixel >> IM_COL32_A_SHIFT) & 0xFF;
                     if (alpha < 8)
                     {
                         continue;
                     }
-                    const ImVec2 cellMin(minBounds.x + (cellWidth * x), minBounds.y + (cellHeight * y));
-                    const ImVec2 cellMax(
-                        minBounds.x + (cellWidth * (x + 1)) + 0.5f,
-                        minBounds.y + (cellHeight * (y + 1)) + 0.5f);
-                    drawList->AddRectFilled(cellMin, cellMax, pixel);
+                    drawList->AddRectFilled(ImVec2(cellMinX, cellMinY), ImVec2(cellMaxX, cellMaxY), pixel);
                 }
             }
             return true;
@@ -2679,6 +2754,7 @@ namespace UiClient
             const MapArtDefinition* selectedMapArt = &DawnwakeWorldMapArt;
             bool drawCalibratedOverlays = true;
             static int referenceMapIndex = 0;
+            static MapViewState mapViewState;
 
             if (ImGui::BeginTabBar("##dawnwake_map_tabs"))
             {
@@ -2723,18 +2799,48 @@ namespace UiClient
                 ImGui::EndTabBar();
             }
 
+            if (mapViewState.m_mapArtId != selectedMapArt->m_mapArtId)
+            {
+                mapViewState.m_mapArtId = selectedMapArt->m_mapArtId;
+                mapViewState.m_zoom = 1.0f;
+                mapViewState.m_pan = ImVec2(0.0f, 0.0f);
+            }
+
             ImGui::Text("%s", selectedMapArt->m_displayName);
             ImGui::SameLine();
             ImGui::TextDisabled("%s", selectedMapArt->m_calibrationAccuracy);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Fit##dawnwake_map_fit"))
+            {
+                mapViewState.m_zoom = 1.0f;
+                mapViewState.m_pan = ImVec2(0.0f, 0.0f);
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(132.0f);
+            if (ImGui::SliderFloat("Zoom##dawnwake_map_zoom", &mapViewState.m_zoom, MapZoomMinimum, MapZoomMaximum, "%.1fx"))
+            {
+                mapViewState.m_zoom = AZ::GetClamp(mapViewState.m_zoom, MapZoomMinimum, MapZoomMaximum);
+            }
 
             const ImVec2 availableRegion = ImGui::GetContentRegionAvail();
             const ImVec2 canvasSize(
-                AZ::GetMax(590.0f, availableRegion.x),
-                AZ::GetMax(360.0f, availableRegion.y - 26.0f));
+                AZ::GetMax(660.0f, availableRegion.x),
+                AZ::GetMax(430.0f, availableRegion.y - 18.0f));
             const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
             ImGui::InvisibleButton("##stonewake_zone_map_canvas", canvasSize);
             const bool canvasClicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+            const bool canvasHovered = ImGui::IsItemHovered();
             const ImVec2 clickPoint = ImGui::GetIO().MousePos;
+            const ImGuiIO& io = ImGui::GetIO();
+            if (canvasHovered && io.MouseWheel != 0.0f)
+            {
+                mapViewState.m_zoom = AZ::GetClamp(mapViewState.m_zoom + (io.MouseWheel * 0.18f), MapZoomMinimum, MapZoomMaximum);
+            }
+            if (canvasHovered && ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f))
+            {
+                mapViewState.m_pan.x += io.MouseDelta.x;
+                mapViewState.m_pan.y += io.MouseDelta.y;
+            }
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
             drawList->AddRectFilled(canvasMin, canvasMax, ColorU32(18, 25, 29, 245), 6.0f);
@@ -2742,9 +2848,21 @@ namespace UiClient
 
             const ImVec2 artCanvasMin(canvasMin.x + 10.0f, canvasMin.y + 10.0f);
             const ImVec2 artCanvasMax(canvasMax.x - 10.0f, canvasMax.y - 10.0f);
-            const ImVec2 artMin = FitMapArtBounds(artCanvasMin, artCanvasMax, *selectedMapArt, false);
-            const ImVec2 artMax = FitMapArtBounds(artCanvasMin, artCanvasMax, *selectedMapArt, true);
-            const bool mapArtLoaded = DrawPngMapArt(drawList, artMin, artMax, *selectedMapArt);
+            const ImVec2 fitMin = FitMapArtBounds(artCanvasMin, artCanvasMax, *selectedMapArt, false);
+            const ImVec2 fitMax = FitMapArtBounds(artCanvasMin, artCanvasMax, *selectedMapArt, true);
+            mapViewState.m_zoom = AZ::GetClamp(mapViewState.m_zoom, MapZoomMinimum, MapZoomMaximum);
+            mapViewState.m_pan = ClampMapPan(mapViewState.m_pan, artCanvasMin, artCanvasMax, fitMin, fitMax, mapViewState.m_zoom);
+            const float fitWidth = fitMax.x - fitMin.x;
+            const float fitHeight = fitMax.y - fitMin.y;
+            const ImVec2 fitCenter((fitMin.x + fitMax.x) * 0.5f, (fitMin.y + fitMax.y) * 0.5f);
+            const ImVec2 artMin(
+                fitCenter.x - ((fitWidth * mapViewState.m_zoom) * 0.5f) + mapViewState.m_pan.x,
+                fitCenter.y - ((fitHeight * mapViewState.m_zoom) * 0.5f) + mapViewState.m_pan.y);
+            const ImVec2 artMax(
+                artMin.x + (fitWidth * mapViewState.m_zoom),
+                artMin.y + (fitHeight * mapViewState.m_zoom));
+            drawList->PushClipRect(artCanvasMin, artCanvasMax, true);
+            const bool mapArtLoaded = DrawPngMapArt(drawList, artCanvasMin, artCanvasMax, artMin, artMax, *selectedMapArt);
             if (!mapArtLoaded)
             {
                 drawList->AddRectFilled(artMin, artMax, ColorU32(35, 45, 42, 245), 4.0f);
@@ -2764,14 +2882,16 @@ namespace UiClient
 
             if (drawCalibratedOverlays)
             {
+                const float roadUnderlayWidth = AZ::GetClamp(8.0f * AZStd::sqrt(mapViewState.m_zoom), 8.0f, 14.0f);
+                const float roadLineWidth = AZ::GetClamp(3.0f * AZStd::sqrt(mapViewState.m_zoom), 3.0f, 5.5f);
                 for (const auto& road : zoneMap.m_roads)
                 {
                     for (size_t pointIndex = 1; pointIndex < road.m_points.size(); ++pointIndex)
                     {
                         const ImVec2 previous = mapToScreen(road.m_points[pointIndex - 1].m_x, road.m_points[pointIndex - 1].m_y);
                         const ImVec2 current = mapToScreen(road.m_points[pointIndex].m_x, road.m_points[pointIndex].m_y);
-                        drawList->AddLine(previous, current, ColorU32(58, 39, 21, 180), 8.0f);
-                        drawList->AddLine(previous, current, ColorU32(242, 214, 138, 210), 3.0f);
+                        drawList->AddLine(previous, current, ColorU32(58, 39, 21, 180), roadUnderlayWidth);
+                        drawList->AddLine(previous, current, ColorU32(242, 214, 138, 210), roadLineWidth);
                     }
                 }
             }
@@ -2783,17 +2903,22 @@ namespace UiClient
                 for (const auto& area : worldState.m_session.m_navigationAreas)
                 {
                     const ImVec2 center = mapToScreen(area.m_centerX, area.m_centerY);
+                    if (!PointInsideRect(center, artCanvasMin, artCanvasMax))
+                    {
+                        continue;
+                    }
                     const ImVec2 radiusPoint = mapToScreen(area.m_centerX + area.m_radius, area.m_centerY);
                     const float radius = Distance2D(center.x, center.y, radiusPoint.x, radiusPoint.y);
                     const ImU32 areaColor = area.m_kind == "hostile_objective" ? ColorU32(135, 74, 52, 65) : ColorU32(72, 121, 112, 55);
-                    drawList->AddCircleFilled(center, AZ::GetClamp(radius, 8.0f, 42.0f), areaColor, 32);
-                    drawList->AddCircle(center, AZ::GetClamp(radius, 8.0f, 42.0f), ColorU32(32, 23, 14, 155), 32, 1.0f);
+                    const float visibleRadius = AZ::GetClamp(radius, 8.0f, 72.0f);
+                    drawList->AddCircleFilled(center, visibleRadius, areaColor, 32);
+                    drawList->AddCircle(center, visibleRadius, ColorU32(32, 23, 14, 155), 32, 1.0f);
                     if (canvasClicked && !area.m_questIds.empty())
                     {
                         const float deltaX = clickPoint.x - center.x;
                         const float deltaY = clickPoint.y - center.y;
                         const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
-                        const float clickRadius = AZ::GetClamp(radius, 10.0f, 48.0f);
+                        const float clickRadius = AZ::GetClamp(radius, 10.0f, 76.0f);
                         if (distance <= clickRadius && distance < clickedAreaDistance)
                         {
                             clickedArea = &area;
@@ -2809,6 +2934,10 @@ namespace UiClient
                 for (const auto& landmark : zoneMap.m_landmarks)
                 {
                     const ImVec2 point = mapToScreen(landmark.m_x, landmark.m_y);
+                    if (!PointInsideRect(point, artCanvasMin, artCanvasMax))
+                    {
+                        continue;
+                    }
                     drawList->AddRectFilled(
                         ImVec2(point.x - 5.5f, point.y - 5.5f),
                         ImVec2(point.x + 5.5f, point.y + 5.5f),
@@ -2849,6 +2978,7 @@ namespace UiClient
             float clickedMarkerDistance = 999999.0f;
             if (drawCalibratedOverlays)
             {
+                const float markerRadius = AZ::GetClamp(6.0f * AZStd::sqrt(mapViewState.m_zoom), 6.0f, 10.0f);
                 for (const auto* marker : sortedMarkers)
                 {
                     if (!marker)
@@ -2857,14 +2987,18 @@ namespace UiClient
                     }
 
                     const ImVec2 point = mapToScreen(marker->m_x, marker->m_y);
-                    drawList->AddCircleFilled(point, 6.0f, MapMarkerColor(marker->m_kind), 20);
-                    drawList->AddCircle(point, 7.5f, ColorU32(21, 25, 27), 20, 1.5f);
+                    if (!PointInsideRect(point, artCanvasMin, artCanvasMax))
+                    {
+                        continue;
+                    }
+                    drawList->AddCircleFilled(point, markerRadius, MapMarkerColor(marker->m_kind), 20);
+                    drawList->AddCircle(point, markerRadius + 1.5f, ColorU32(21, 25, 27), 20, 1.5f);
                     if (canvasClicked)
                     {
                         const float deltaX = clickPoint.x - point.x;
                         const float deltaY = clickPoint.y - point.y;
                         const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
-                        if (distance <= 18.0f && distance < clickedMarkerDistance)
+                        if (distance <= markerRadius + 12.0f && distance < clickedMarkerDistance)
                         {
                             clickedMarker = marker;
                             clickedMarkerDistance = distance;
@@ -2887,17 +3021,21 @@ namespace UiClient
             if (drawCalibratedOverlays)
             {
                 const ImVec2 playerPoint = mapToScreen(playerX, playerY);
-                drawList->AddTriangleFilled(
-                    ImVec2(playerPoint.x, playerPoint.y - 9.0f),
-                    ImVec2(playerPoint.x - 7.0f, playerPoint.y + 7.0f),
-                    ImVec2(playerPoint.x + 7.0f, playerPoint.y + 7.0f),
-                    ColorU32(226, 240, 243));
-                drawList->AddTriangle(
-                    ImVec2(playerPoint.x, playerPoint.y - 9.0f),
-                    ImVec2(playerPoint.x - 7.0f, playerPoint.y + 7.0f),
-                    ImVec2(playerPoint.x + 7.0f, playerPoint.y + 7.0f),
-                    ColorU32(24, 31, 32),
-                    1.5f);
+                if (PointInsideRect(playerPoint, artCanvasMin, artCanvasMax))
+                {
+                    const float playerMarkerScale = AZ::GetClamp(AZStd::sqrt(mapViewState.m_zoom), 1.0f, 1.35f);
+                    drawList->AddTriangleFilled(
+                        ImVec2(playerPoint.x, playerPoint.y - (9.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x - (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x + (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ColorU32(226, 240, 243));
+                    drawList->AddTriangle(
+                        ImVec2(playerPoint.x, playerPoint.y - (9.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x - (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x + (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ColorU32(24, 31, 32),
+                        1.5f);
+                }
             }
             else
             {
@@ -2906,6 +3044,7 @@ namespace UiClient
                     ColorU32(245, 238, 206),
                     "Display reference - runtime markers hidden until this zone is calibrated.");
             }
+            drawList->PopClipRect();
 
             if (drawCalibratedOverlays && canvasClicked && gameCore)
             {
@@ -8194,7 +8333,9 @@ namespace UiClient
             AZ::GetMax(18.0f, talentsPos.y - professionsSize.y - 18.0f));
         const ImVec2 questLogSize(AZ::GetClamp(displaySize.x - 420.0f, 620.0f, 780.0f), AZ::GetClamp(displaySize.y - 220.0f, 410.0f, 520.0f));
         const ImVec2 questLogPos(250.0f, AZ::GetMax(18.0f, displaySize.y - questLogSize.y - 156.0f));
-        const ImVec2 mapSize(AZ::GetClamp(displaySize.x - 360.0f, 680.0f, 820.0f), AZ::GetClamp(displaySize.y - 180.0f, 470.0f, 560.0f));
+        const ImVec2 mapSize(
+            AZ::GetMin(AZ::GetClamp(displaySize.x - 280.0f, 760.0f, 1040.0f), displaySize.x - 36.0f),
+            AZ::GetMin(AZ::GetClamp(displaySize.y - 160.0f, 540.0f, 720.0f), displaySize.y - 36.0f));
         const ImVec2 mapPos((displaySize.x - mapSize.x) * 0.5f, (displaySize.y - mapSize.y) * 0.5f);
         const ImVec2 partyFramesSize(250.0f, 250.0f);
         const ImVec2 partyFramesPos(18.0f, 158.0f);

@@ -19,6 +19,8 @@ Milestone 5 polishes AmandaCore's first-party questing shell without adding addo
 - Quest gossip selects the relevant quest for the targeted NPC, shows available/active/ready states, previews real rewards, accepts through the authoritative accept route, and completes/turns in through the authoritative complete route.
 - Zone Map clicks on quest markers or quest areas select the quest and open the Quest Log. Track requests are sent only for supported quest states.
 - The authored Dawnwake follow-up adds repo-local map art for the Dawnwake world map and copied zone maps. Stonewake Vale is calibrated for v1 runtime overlays; other zone art is display-reference until those zones are authored.
+- The authored map readability fix keeps repo-local PNG map art cached at source resolution in the client and renders a zoomable, pannable visible crop instead of the earlier coarse preview sample. World and Stonewake zone maps should be legible at normal gameplay resolution.
+- Stonewake quest and service interactables near blockout buildings are placed on reachable porch, road, or yard positions so nameplates and right-click interaction are not hidden by the visible settlement geometry.
 - Map and minimap markers remain procedural first-party shapes and colors. No external marker art or copied MMO UI assets are introduced.
 - The playable Stonewake Vale layout now uses the same v1 anchors as the map overlay: Hearthwatch Yard, ValeFurrow Farms, Brookside Crossing, Stonehewn Quarry, Tiderown Ruins, Lightkeeper's Point, Whispering Cave, and the main road loop.
 

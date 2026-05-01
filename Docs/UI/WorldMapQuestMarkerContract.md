@@ -16,7 +16,9 @@ The World Map is a built-in map shell backed by repo-local AmandaCore map art pl
 - The World tab displays `Content/Art/UI/Maps/World/dawnwake_isles_world.png`.
 - The Zone tab displays `Content/Art/UI/Maps/Zones/stonewake_vale.png` for Stonewake Vale.
 - The Reference Maps tab can display other copied Dawnwake zone art as display references until those runtime zones are calibrated.
+- Authored map PNGs are cached after first load and rendered from the repo-local source-resolution pixels. The map window provides fit, zoom, and pan behavior so authored labels remain readable without reloading image files per frame.
 - Calibrated map views display current zone name, authored roads, landmarks, navigation areas, player marker, and server-provided markers.
+- Marker, road, area, and label overlays are transformed through the same calibrated map bounds as the player marker and scale or clip with the current map zoom/pan view.
 - Quest marker clicks select the related quest and open the Quest Log. Track calls are sent only when the quest state supports tracking.
 - Entity markers may target the related NPC where the payload provides an entity ID.
 - Missing image or missing calibration must fall back visibly without crashing.
