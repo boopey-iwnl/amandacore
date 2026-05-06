@@ -389,6 +389,24 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool BuyVendorItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& vendorId,
+            const AZStd::string& itemId,
+            int stackCount,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
+        bool SellVendorItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& vendorId,
+            int slotIndex,
+            int stackCount,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool BrowseAuctions(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,

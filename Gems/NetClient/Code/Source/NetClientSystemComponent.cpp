@@ -296,6 +296,24 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool BuyVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        const AZStd::string& itemId,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool SellVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        int slotIndex,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool AuctionStateRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -915,6 +933,44 @@ namespace NetClient
             worldEndpoint,
             worldSessionToken,
             equipmentSlot,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::BuyVendorItem(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        const AZStd::string& itemId,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return BuyVendorItemRequest(
+            worldEndpoint,
+            worldSessionToken,
+            vendorId,
+            itemId,
+            stackCount,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::SellVendorItem(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        int slotIndex,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SellVendorItemRequest(
+            worldEndpoint,
+            worldSessionToken,
+            vendorId,
+            slotIndex,
+            stackCount,
             outResponse,
             outError);
     }

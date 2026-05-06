@@ -1856,6 +1856,70 @@ namespace GameCore
         return true;
     }
 
+    bool GameCoreSystemComponent::BuyVendorItem(
+        const AZStd::string& vendorId,
+        const AZStd::string& itemId,
+        int stackCount)
+    {
+        if (!m_worldState.m_worldConnected || vendorId.empty() || itemId.empty() || stackCount <= 0)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->BuyVendorItem(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                vendorId,
+                itemId,
+                stackCount,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "BuyVendorItem failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "vendor_buy");
+        return true;
+    }
+
+    bool GameCoreSystemComponent::SellVendorItem(
+        const AZStd::string& vendorId,
+        int slotIndex,
+        int stackCount)
+    {
+        if (!m_worldState.m_worldConnected || vendorId.empty() || slotIndex < 0 || stackCount <= 0)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->SellVendorItem(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                vendorId,
+                slotIndex,
+                stackCount,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "SellVendorItem failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "vendor_sell");
+        return true;
+    }
+
     bool GameCoreSystemComponent::BrowseAuctions(
         const AZStd::string& search,
         const AZStd::string& itemType,

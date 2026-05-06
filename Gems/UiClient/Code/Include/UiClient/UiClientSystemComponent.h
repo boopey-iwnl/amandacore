@@ -100,6 +100,7 @@ namespace UiClient
         bool m_settingsOpen = false;
         bool m_socialOpen = false;
         bool m_auctionOpen = false;
+        bool m_vendorOpen = false;
         bool m_characterSheetOpen = false;
         bool m_questLogOpen = false;
         bool m_mapOpen = false;
@@ -131,6 +132,7 @@ namespace UiClient
         AZStd::string m_interactBinding;
         AZStd::string m_targetHostileBinding;
         AZStd::string m_chatChannel = "say";
+        AZStd::string m_chatFilterChannel = "all";
         bool m_chatFocusRequested = false;
         bool m_chatInputActive = false;
         bool m_preWorldDiscreteInputEnabled = false;
@@ -149,6 +151,9 @@ namespace UiClient
         int m_pendingAuctionSellSlot = -1;
         int m_pendingAuctionBuyoutIndex = -1;
         int m_auctionStackCount = 1;
+        int m_selectedMailIndex = -1;
+        int m_pendingVendorSellSlot = -1;
+        int m_vendorStackCount = 1;
         int m_createLineageIndex = 0;
         int m_createBodyIndex = 0;
         int m_createSkinIndex = 0;
