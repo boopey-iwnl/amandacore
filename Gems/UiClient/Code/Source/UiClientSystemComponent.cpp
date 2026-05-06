@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -48,7 +49,10 @@ namespace UiClient
         constexpr float MeleeRange = 5.5f;
         constexpr float SpellRange = 24.0f;
         constexpr size_t MaxEventLogEntries = 9;
+        constexpr size_t MaxNotificationEntries = 8;
+        constexpr size_t MaxVisibleNotifications = 3;
         constexpr size_t MaxCombatPulseEntries = 5;
+        constexpr size_t TutorialHintCount = 10;
         constexpr int MaxWorldNameplates = 12;
         constexpr AZ::s64 CombatPulseLifetimeMs = 2200;
         constexpr AZ::s64 CombatPulseMinIntervalMs = 220;
@@ -84,6 +88,7 @@ namespace UiClient
         constexpr const char* PanelBag = "bag";
         constexpr const char* PanelGameMenu = "gameMenu";
         constexpr const char* PanelSettings = "settings";
+        constexpr const char* PanelHelp = "help";
         constexpr const char* PanelSocial = "social";
         constexpr const char* PanelTalents = "talents";
         constexpr const char* PanelProfessions = "professions";
@@ -101,6 +106,83 @@ namespace UiClient
             SettingsTabCombat,
             SettingsTabNameplates,
             SettingsTabObjectives,
+            SettingsTabHelp,
+        };
+
+        bool g_tooltipsVisible = true;
+
+        enum TutorialHintIndex
+        {
+            TutorialIntro = 0,
+            TutorialMovement,
+            TutorialInteract,
+            TutorialQuest,
+            TutorialCombat,
+            TutorialInventory,
+            TutorialSpellbook,
+            TutorialActionBar,
+            TutorialSettings,
+            TutorialChat,
+        };
+
+        struct HelpTopicDefinition
+        {
+            const char* m_category;
+            const char* m_title;
+            const char* m_body;
+        };
+
+        struct TutorialHintDefinition
+        {
+            const char* m_id;
+            const char* m_title;
+            const char* m_body;
+        };
+
+        const TutorialHintDefinition TutorialHints[TutorialHintCount] = {
+            {"intro", "Welcome to Stonewake Vale", "Use the HUD anchors to move, target, open your pack, review quests, and adjust settings. Hints are local and can be reset from Settings."},
+            {"movement", "Movement and Camera", "Move with WASD and steer the camera with the mouse. Use the navigator and objective tracker to stay oriented."},
+            {"interact", "NPC Services", "Move close to friendly NPCs and use Interact to open quests, training, vendors, professions, or market services when available."},
+            {"quest", "Quest Guidance", "Accepted field orders appear in Objectives. Open the Quest Log for detail, progress, and map context."},
+            {"combat", "Combat Basics", "Target a hostile, check range and resources, then use action-bar slots. Server state decides hits, cooldowns, and rewards."},
+            {"inventory", "Inventory and Equipment", "Open your pack to inspect items. Drag items between slots or equip compatible gear through the server-authoritative inventory path."},
+            {"spellbook", "Spellbook and Actions", "The Spellbook lists learned and trainable abilities. Drag assignable abilities to action slots while edit mode or Shift-edit is active."},
+            {"actionbar", "Action Bar Editing", "Hold Shift or enable HUD edit mode to place, move, or clear action slots without changing the learned spellbook list."},
+            {"settings", "Settings and Keybinds", "Settings are local first-party options. Keybind changes update supported hint text and never expose addon or script surfaces."},
+            {"chat", "Chat and Commands", "Press Enter for chat. Slash commands are limited to safe first-party commands such as /help and /tutorials."},
+        };
+
+        const char* HelpCategories[] = {
+            "Getting Started",
+            "Movement and Camera",
+            "Combat",
+            "Quests",
+            "Inventory and Equipment",
+            "Spellbook and Action Bars",
+            "Map and Objectives",
+            "Chat and Social",
+            "Settings and Keybinds",
+            "Known Alpha Limitations",
+        };
+
+        const HelpTopicDefinition HelpTopics[] = {
+            {"Getting Started", "Your First Session", "Log in, choose a realm, select or create a character, and enter Stonewake Vale. The world remains server-authoritative after join."},
+            {"Getting Started", "Default Screen", "Player and target frames sit top-left, navigator and objectives sit right, chat sits lower-left, and action bars sit lower-center."},
+            {"Movement and Camera", "Movement", "Use WASD movement and mouse camera control. UI panels should not capture movement unless chat, text entry, or a modal confirmation is active."},
+            {"Movement and Camera", "Interaction", "Move close to a service NPC and use the Interact binding. Unavailable services explain what is missing instead of silently failing."},
+            {"Combat", "Targeting", "Use the target hostile binding or click supported world targets. The target frame shows health, range, and combat state."},
+            {"Combat", "Abilities", "Action-bar slots activate learned abilities only when target, range, cooldown, and resource checks pass on the server."},
+            {"Quests", "Objectives", "The objective tracker summarizes active field orders. The Quest Log provides detail and map context when available."},
+            {"Inventory and Equipment", "Pack", "Open the pack to inspect items, drag inventory slots, or equip compatible gear. Item truth remains server-owned."},
+            {"Spellbook and Action Bars", "Spellbook", "Learned abilities can be inspected and assigned. Passive abilities remain informational and cannot be placed on action slots."},
+            {"Spellbook and Action Bars", "Editing Bars", "Hold Shift or enable edit mode to move, clear, or assign action slots. Clearing a slot does not remove the ability from the Spellbook."},
+            {"Map and Objectives", "Navigator", "The navigator shows the current zone and service markers when the runtime provides them. Map markers are AmandaCore-authored."},
+            {"Chat and Social", "Chat", "Press Enter to focus chat and Escape to cancel focus. Party, guild, and whisper channels only send when the runtime state supports them."},
+            {"Chat and Social", "Safe Slash Commands", "Supported commands are first-party only. There is no macro system, addon command bus, script execution, or external command module loading."},
+            {"Settings and Keybinds", "Local Settings", "Settings are stored locally under the approved AmandaCore UI settings path. They never store passwords, tokens, tickets, or machine-local asset paths."},
+            {"Settings and Keybinds", "Tutorial Reset", "Tutorial hints can be dismissed, disabled, or reset from Settings. Completion is local-only for this milestone."},
+            {"Known Alpha Limitations", "Unsupported Features", "Some controls stay disabled until a real runtime path exists. AmandaCore prefers clear unavailable states over fake controls."},
+            {"Known Alpha Limitations", "No AddOns", "AmandaCore does not load AddOns, Lua, plugins, external help packs, user-installed UI modules, or arbitrary UI scripts."},
         };
 
         struct SpellbookAbilityDragPayload
@@ -1056,6 +1138,122 @@ namespace UiClient
                 .count();
         }
 
+        AZStd::string LowerAscii(AZStd::string value)
+        {
+            for (char& character : value)
+            {
+                character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+            }
+            return value;
+        }
+
+        bool ContainsAsciiInsensitive(const AZStd::string& haystack, const AZStd::string& needle)
+        {
+            if (needle.empty())
+            {
+                return true;
+            }
+            return LowerAscii(haystack).find(LowerAscii(needle)) != AZStd::string::npos;
+        }
+
+        int TutorialIndexById(const AZStd::string& tutorialId)
+        {
+            for (int index = 0; index < static_cast<int>(TutorialHintCount); ++index)
+            {
+                if (tutorialId == TutorialHints[index].m_id)
+                {
+                    return index;
+                }
+            }
+            return -1;
+        }
+
+        void ApplyTutorialDismissalString(
+            const AZStd::string& serialized,
+            AZStd::array<bool, TutorialHintCount>& dismissed)
+        {
+            for (bool& value : dismissed)
+            {
+                value = false;
+            }
+
+            size_t start = 0;
+            while (start < serialized.size())
+            {
+                const size_t separator = serialized.find(',', start);
+                const size_t end = separator == AZStd::string::npos ? serialized.size() : separator;
+                const AZStd::string tutorialId = serialized.substr(start, end - start);
+                const int index = TutorialIndexById(tutorialId);
+                if (index >= 0)
+                {
+                    dismissed[index] = true;
+                }
+                if (separator == AZStd::string::npos)
+                {
+                    break;
+                }
+                start = separator + 1;
+            }
+        }
+
+        AZStd::string SerializeTutorialDismissals(const AZStd::array<bool, TutorialHintCount>& dismissed)
+        {
+            AZStd::string serialized;
+            for (int index = 0; index < static_cast<int>(TutorialHintCount); ++index)
+            {
+                if (!dismissed[index])
+                {
+                    continue;
+                }
+                if (!serialized.empty())
+                {
+                    serialized += ",";
+                }
+                serialized += TutorialHints[index].m_id;
+            }
+            return serialized;
+        }
+
+        void ShowControlTooltip(const char* tooltip)
+        {
+            if (g_tooltipsVisible && tooltip && tooltip[0] != '\0')
+            {
+                ImGui::SetTooltip("%s", tooltip);
+            }
+        }
+
+        AZStd::string BuildUserFacingError(const AZStd::string& rawError, const char* context)
+        {
+            if (rawError.empty())
+            {
+                return {};
+            }
+
+            const AZStd::string lower = LowerAscii(rawError);
+            if (lower.find("token") != AZStd::string::npos ||
+                lower.find("session") != AZStd::string::npos ||
+                lower.find("unauthorized") != AZStd::string::npos)
+            {
+                return "Your session could not be verified. Sign in again from the launcher or login screen.";
+            }
+            if (lower.find("connect") != AZStd::string::npos ||
+                lower.find("winhttp") != AZStd::string::npos ||
+                lower.find("service unavailable") != AZStd::string::npos)
+            {
+                return AZStd::string::format("%s is not reachable right now. Check the local stack, then retry.", context ? context : "The service");
+            }
+            if (lower.find("rate") != AZStd::string::npos ||
+                lower.find("duplicate") != AZStd::string::npos)
+            {
+                return "That action was already submitted or is happening too quickly. Wait a moment and try again.";
+            }
+            if (lower.find("invalid") != AZStd::string::npos)
+            {
+                return "That action is not available in the current state. Check target, range, quest, inventory, or session state.";
+            }
+            return rawError;
+        }
+
         AZStd::string GetMobDebugSuffix(const AZStd::string& entityId)
         {
             const size_t separatorIndex = entityId.find_last_of('_');
@@ -1797,7 +1995,7 @@ namespace UiClient
 
         void ShowTooltipText(const AZStd::string& tooltip)
         {
-            if (tooltip.empty())
+            if (!g_tooltipsVisible || tooltip.empty())
             {
                 return;
             }
@@ -4031,7 +4229,7 @@ namespace UiClient
                 }
                 else if (ImGui::IsItemHovered())
                 {
-                    ImGui::SetTooltip("Drop a learned spellbook ability here, or drag another action slot here.");
+                    ShowControlTooltip("Drop a learned spellbook ability here, or drag another action slot here.");
                 }
                 ImGui::PopID();
             }
@@ -4048,6 +4246,7 @@ namespace UiClient
             const AZStd::string& settingsBinding,
             const AZStd::string& interactBinding,
             const AZStd::string& targetHostileBinding,
+            bool showKeybindHints,
             bool editMode,
             AZStd::string& pendingActionAssignmentAbilityId,
             int& pendingActionMoveSlot)
@@ -4110,18 +4309,21 @@ namespace UiClient
             }
             if (ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("Drop an action slot here, or SHIFT-click a slot and press this, to clear it.");
+                ShowControlTooltip("Drop an action slot here, or SHIFT-click a slot and press this, to clear it.");
             }
             ImGui::SameLine();
             ImGui::TextDisabled("Drag spells onto slots. Drag an action here to remove it.");
 
-            ImGui::Text(
-                "%s interact  |  %s target  |  %s bag  |  %s spells  |  %s menu  |  Hold SHIFT to edit",
-                DisplayKeyName(interactBinding).c_str(),
-                DisplayKeyName(targetHostileBinding).c_str(),
-                DisplayKeyName(bagBinding).c_str(),
-                DisplayKeyName(spellbookBinding).c_str(),
-                DisplayKeyName(settingsBinding).c_str());
+            if (showKeybindHints)
+            {
+                ImGui::Text(
+                    "%s interact  |  %s target  |  %s bag  |  %s spells  |  %s menu  |  Hold SHIFT to edit",
+                    DisplayKeyName(interactBinding).c_str(),
+                    DisplayKeyName(targetHostileBinding).c_str(),
+                    DisplayKeyName(bagBinding).c_str(),
+                    DisplayKeyName(spellbookBinding).c_str(),
+                    DisplayKeyName(settingsBinding).c_str());
+            }
             if (editMode)
             {
                 if (!pendingActionAssignmentAbilityId.empty())
@@ -5021,6 +5223,11 @@ namespace UiClient
             bool includeMoveHelp,
             bool comparisonEnabled)
         {
+            if (!g_tooltipsVisible)
+            {
+                return;
+            }
+
             ImGui::BeginTooltip();
             ImGui::TextColored(QualityTextColor(slot.m_quality), "%s x%d", slot.m_displayName.c_str(), slot.m_stackCount);
             DrawItemMetadataLines(
@@ -5074,6 +5281,11 @@ namespace UiClient
 
         void DrawEquipmentItemTooltip(const NetClient::EquipmentSlotState& slot)
         {
+            if (!g_tooltipsVisible)
+            {
+                return;
+            }
+
             ImGui::BeginTooltip();
             ImGui::TextColored(QualityTextColor(slot.m_quality), "%s", slot.m_displayName.c_str());
             DrawItemMetadataLines(
@@ -5257,13 +5469,13 @@ namespace UiClient
             ImGui::Button("Claim", HudButtonSize(86.0f));
             if (ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("Mail claim has no live runtime endpoint in this build.");
+                ShowControlTooltip("Mail claim has no live runtime endpoint in this build.");
             }
             ImGui::SameLine();
             ImGui::Button("Compose", HudButtonSize(104.0f));
             if (ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("Mail send has no live runtime endpoint in this build.");
+                ShowControlTooltip("Mail send has no live runtime endpoint in this build.");
             }
             ImGui::EndGroup();
         }
@@ -5296,7 +5508,8 @@ namespace UiClient
             {
                 ImGui::TextColored(ImVec4(0.95f, 0.34f, 0.28f, 1.0f), "Status");
                 ImGui::SameLine();
-                ImGui::TextWrapped("%s", worldState.m_errorMessage.c_str());
+                const AZStd::string friendlyError = BuildUserFacingError(worldState.m_errorMessage, "Market service");
+                ImGui::TextWrapped("%s", friendlyError.c_str());
             }
             ImGui::Separator();
 
@@ -5433,7 +5646,7 @@ namespace UiClient
                         {
                             if (ImGui::IsItemHovered())
                             {
-                                ImGui::SetTooltip("%s", sellSlot->m_blockedReason.empty() ? "This item cannot be auctioned." : sellSlot->m_blockedReason.c_str());
+                                ShowControlTooltip(sellSlot->m_blockedReason.empty() ? "This item cannot be auctioned." : sellSlot->m_blockedReason.c_str());
                             }
                         }
                         ImGui::PopID();
@@ -5510,6 +5723,11 @@ namespace UiClient
 
         void DrawVendorOfferTooltip(const NetClient::VendorOfferState& offer)
         {
+            if (!g_tooltipsVisible)
+            {
+                return;
+            }
+
             ImGui::BeginTooltip();
             ImGui::TextColored(QualityTextColor(offer.m_quality), "%s", offer.m_displayName.c_str());
             DrawItemMetadataLines(
@@ -5559,7 +5777,8 @@ namespace UiClient
             {
                 ImGui::TextColored(ImVec4(0.95f, 0.34f, 0.28f, 1.0f), "Status");
                 ImGui::SameLine();
-                ImGui::TextWrapped("%s", worldState.m_errorMessage.c_str());
+                const AZStd::string friendlyError = BuildUserFacingError(worldState.m_errorMessage, "Vendor service");
+                ImGui::TextWrapped("%s", friendlyError.c_str());
             }
             ImGui::Separator();
 
@@ -5621,7 +5840,7 @@ namespace UiClient
                             const char* reason = !vendor.m_inRange
                                 ? "Move closer to buy from this vendor."
                                 : (offer.m_buyPriceCopper <= 0 ? "This item has no buy price." : "Not enough currency.");
-                            ImGui::SetTooltip("%s", reason);
+                            ShowControlTooltip(reason);
                         }
                         if (!canBuy)
                         {
@@ -5719,7 +5938,7 @@ namespace UiClient
                     }
                     if (!canSell && ImGui::IsItemHovered())
                     {
-                        ImGui::SetTooltip("%s", vendor.m_inRange ? "Select a sellable inventory item." : "Move closer to sell to this vendor.");
+                        ShowControlTooltip(vendor.m_inRange ? "Select a sellable inventory item." : "Move closer to sell to this vendor.");
                     }
                     if (!canSell)
                     {
@@ -5799,7 +6018,7 @@ namespace UiClient
             ImGui::PopStyleVar();
             if (ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("%s", reason);
+                ShowControlTooltip(reason);
             }
             ImGui::SameLine();
             ImGui::TextDisabled("%s", reason);
@@ -5812,7 +6031,7 @@ namespace UiClient
             gameMenuOpen = false;
         }
 
-        bool DrawGameMenuWindow(bool& gameMenuOpen, bool& settingsOpen, int& selectedTab)
+        bool DrawGameMenuWindow(bool& gameMenuOpen, bool& settingsOpen, bool& helpOpen, int& selectedTab)
         {
             bool changed = false;
             ImGui::TextUnformatted("Game Menu");
@@ -5830,6 +6049,12 @@ namespace UiClient
             if (ImGui::Button("Keybinds", ImVec2(240.0f, 32.0f)))
             {
                 OpenSettingsTabFromMenu(gameMenuOpen, settingsOpen, selectedTab, SettingsTabKeybinds);
+                changed = true;
+            }
+            if (ImGui::Button("Help / Guide", ImVec2(240.0f, 32.0f)))
+            {
+                helpOpen = true;
+                gameMenuOpen = false;
                 changed = true;
             }
             if (ImGui::Button("UI Layout / Edit Mode", ImVec2(240.0f, 32.0f)))
@@ -5907,6 +6132,11 @@ namespace UiClient
             bool& actionBarsVisible,
             bool& combatTextVisible,
             bool& nameplatesVisible,
+            bool& tutorialsEnabled,
+            bool& keybindHintsVisible,
+            bool& tooltipsVisible,
+            bool& notificationsVisible,
+            float& notificationDurationSeconds,
             bool& tooltipComparisonEnabled,
             bool& reduceUiMotion,
             AZStd::string& layoutProfileName,
@@ -5922,6 +6152,7 @@ namespace UiClient
             AZStd::string& targetHostileBinding,
             AZStd::string& pendingKeybindActionId,
             AZStd::string& keybindNotice,
+            bool& resetTutorialsRequested,
             bool& resetHudLayoutRequested,
             bool& resetOptionsRequested,
             bool& closeSettingsRequested)
@@ -5941,6 +6172,7 @@ namespace UiClient
             DrawSettingsCategoryButton("Combat", SettingsTabCombat, selectedTab);
             DrawSettingsCategoryButton("Nameplates", SettingsTabNameplates, selectedTab);
             DrawSettingsCategoryButton("Objectives / Map", SettingsTabObjectives, selectedTab);
+            DrawSettingsCategoryButton("Help / Tutorials", SettingsTabHelp, selectedTab);
             ImGui::Separator();
             ImGui::TextWrapped("Local first-party settings only.");
             ImGui::TextDisabled("No AddOns tab.");
@@ -6189,6 +6421,26 @@ namespace UiClient
                 DrawUnavailableOption("Auto-track new quests", "Quest tracking is driven by the current server-authored quest payload.");
                 DrawUnavailableOption("Tracker category filters", "Additional tracker filters are deferred until authored objective metadata exists.");
             }
+            else if (selectedTab == SettingsTabHelp)
+            {
+                ImGui::TextUnformatted("Help, Tutorials, and Notifications");
+                ImGui::Separator();
+                changed |= ImGui::Checkbox("Enable tutorials", &tutorialsEnabled);
+                changed |= ImGui::Checkbox("Show keybind hints", &keybindHintsVisible);
+                changed |= ImGui::Checkbox("Show tooltips", &tooltipsVisible);
+                changed |= ImGui::Checkbox("Show notifications", &notificationsVisible);
+                changed |= ImGui::SliderFloat("Notification duration", &notificationDurationSeconds, 2.0f, 8.0f, "%.1fs");
+                changed |= ImGui::Checkbox("Reduce notification motion", &reduceUiMotion);
+                if (ImGui::Button("Reset Tutorials", HudButtonSize(160.0f)))
+                {
+                    resetTutorialsRequested = true;
+                    changed = true;
+                }
+                ImGui::Spacing();
+                ImGui::TextWrapped("Guide content and tutorial hints are first-party AmandaCore UI. No AddOns, Lua, plugins, external help packs, or runtime-loaded tutorial modules are available.");
+                DrawUnavailableOption("External tutorial packs", "Unsupported. Help content is built into the reviewed AmandaCore client.");
+                DrawUnavailableOption("AddOns", "AmandaCore does not load user-installed UI modules, Lua, plugins, or addon commands.");
+            }
             ImGui::EndChild();
 
             ImGui::Separator();
@@ -6204,7 +6456,7 @@ namespace UiClient
             }
             if (ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("Settings apply immediately; use Defaults to restore baseline values.");
+                ShowControlTooltip("Settings apply immediately; use Defaults to restore baseline values.");
             }
             ImGui::SameLine();
             if (ImGui::Button("Defaults", ImVec2(110.0f, 30.0f)))
@@ -6337,7 +6589,8 @@ namespace UiClient
             }
             else if (!hasItem && ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("Empty %s slot.", EquipmentSlotLabel(slotId).c_str());
+                const AZStd::string tooltip = AZStd::string::format("Empty %s slot.", EquipmentSlotLabel(slotId).c_str());
+                ShowControlTooltip(tooltip.c_str());
             }
             if (pressed && hasItem)
             {
@@ -6907,7 +7160,7 @@ namespace UiClient
             const bool clicked = ImGui::Button(label, ImVec2(width, 24.0f)) && enabled;
             if (!enabled && ImGui::IsItemHovered() && unavailableReason && unavailableReason[0] != '\0')
             {
-                ImGui::SetTooltip("%s", unavailableReason);
+                ShowControlTooltip(unavailableReason);
             }
             if (!enabled)
             {
@@ -7268,13 +7521,13 @@ namespace UiClient
                     ImGui::Button("Add Block", HudButtonSize(104.0f));
                     if (ImGui::IsItemHovered())
                     {
-                        ImGui::SetTooltip("Blocked-list mutation is unavailable in this build.");
+                        ShowControlTooltip("Blocked-list mutation is unavailable in this build.");
                     }
                     ImGui::SameLine();
                     ImGui::Button("Remove", HudButtonSize(86.0f));
                     if (ImGui::IsItemHovered())
                     {
-                        ImGui::SetTooltip("Blocked-list mutation is unavailable in this build.");
+                        ShowControlTooltip("Blocked-list mutation is unavailable in this build.");
                     }
                     ImGui::EndTabItem();
                 }
@@ -7432,6 +7685,68 @@ namespace UiClient
             }
         }
 
+        void DrawHelpGuideWindow(int& selectedCategoryIndex, char* filterBuffer, size_t filterBufferSize)
+        {
+            selectedCategoryIndex = AZ::GetClamp(
+                selectedCategoryIndex,
+                0,
+                static_cast<int>(AZ_ARRAY_SIZE(HelpCategories)) - 1);
+            const AZStd::string selectedCategory = HelpCategories[selectedCategoryIndex];
+            const AZStd::string filterText(filterBuffer ? filterBuffer : "");
+
+            ImGui::BeginChild("##help_categories", ImVec2(210.0f, -4.0f), true);
+            for (int index = 0; index < static_cast<int>(AZ_ARRAY_SIZE(HelpCategories)); ++index)
+            {
+                if (ImGui::Selectable(HelpCategories[index], selectedCategoryIndex == index))
+                {
+                    selectedCategoryIndex = index;
+                }
+            }
+            ImGui::Separator();
+            ImGui::TextWrapped("First-party AmandaCore guide content only.");
+            ImGui::TextDisabled("No AddOns or external packs.");
+            ImGui::EndChild();
+
+            ImGui::SameLine();
+            ImGui::BeginChild("##help_topics", ImVec2(0.0f, -4.0f), true);
+            ImGui::Text("%s", selectedCategory.c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("Guide");
+            ImGui::Separator();
+            ImGui::SetNextItemWidth(260.0f);
+            ImGui::InputText("Filter", filterBuffer, filterBufferSize);
+            if (filterText.empty())
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("Search filters this built-in guide.");
+            }
+            ImGui::Spacing();
+
+            bool anyTopic = false;
+            for (const auto& topic : HelpTopics)
+            {
+                if (selectedCategory != topic.m_category)
+                {
+                    continue;
+                }
+                const AZStd::string combined = AZStd::string(topic.m_title) + " " + topic.m_body;
+                if (!ContainsAsciiInsensitive(combined, filterText))
+                {
+                    continue;
+                }
+                anyTopic = true;
+                ImGui::TextUnformatted(topic.m_title);
+                ImGui::TextWrapped("%s", topic.m_body);
+                ImGui::Spacing();
+                ImGui::Separator();
+            }
+            if (!anyTopic)
+            {
+                ImGui::TextWrapped("No guide entries match the current filter.");
+            }
+            ImGui::EndChild();
+        }
+
         const char* DrawMicroMenuBar(
             bool& characterSheetOpen,
             bool& talentsOpen,
@@ -7441,6 +7756,7 @@ namespace UiClient
             bool& spellbookOpen,
             bool& bagOpen,
             bool& settingsOpen,
+            bool& helpOpen,
             bool& socialOpen)
         {
             struct MenuButtonState
@@ -7460,6 +7776,7 @@ namespace UiClient
                 {"Map", PanelMap, &mapOpen},
                 {"Social", PanelSocial, &socialOpen},
                 {"Bag", PanelBag, &bagOpen},
+                {"Help", PanelHelp, &helpOpen},
                 {"Settings", PanelSettings, &settingsOpen},
             };
 
@@ -7606,6 +7923,7 @@ namespace UiClient
         }
 
         char line[256] = {};
+        AZStd::string dismissedTutorials;
         while (fgets(line, sizeof(line), settingsFile))
         {
             auto readBool = [&line](const char* key, bool& value)
@@ -7653,6 +7971,11 @@ namespace UiClient
             readBool("ui.actionBars.visible", m_actionBarsVisible);
             readBool("ui.combatText.visible", m_combatTextVisible);
             readBool("ui.nameplates.visible", m_nameplatesVisible);
+            readBool("ui.tutorials.enabled", m_tutorialsEnabled);
+            readBool("ui.keybindHints.visible", m_keybindHintsVisible);
+            readBool("ui.tooltips.visible", m_tooltipsVisible);
+            readBool("ui.notifications.visible", m_notificationsVisible);
+            readFloat("ui.notifications.duration", m_notificationDurationSeconds);
             readBool("ui.tooltipComparison", m_tooltipComparisonEnabled);
             readBool("ui.reduceMotion", m_reduceUiMotion);
             readFloat("layout.chat.x", m_chatOffsetX);
@@ -7667,6 +7990,7 @@ namespace UiClient
             readFloat("layout.minimap.y", m_minimapOffsetY);
             readString("layout.profile", m_layoutProfileName);
             readString("chat.filter", m_chatFilterChannel);
+            readString("tutorial.dismissed", dismissedTutorials);
             readString("bind.spellbook", m_spellbookBinding);
             readString("bind.bag", m_bagBinding);
             readString("bind.character", m_characterBinding);
@@ -7685,6 +8009,9 @@ namespace UiClient
 
         m_uiScale = AZ::GetClamp(m_uiScale, 0.85f, 1.25f);
         m_readabilityScale = AZ::GetClamp(m_readabilityScale, 0.90f, 1.20f);
+        m_notificationDurationSeconds = AZ::GetClamp(m_notificationDurationSeconds, 2.0f, 8.0f);
+        ApplyTutorialDismissalString(dismissedTutorials, m_tutorialDismissed);
+        g_tooltipsVisible = m_tooltipsVisible;
         if (m_layoutProfileName != "Custom")
         {
             m_layoutProfileName = "Default";
@@ -7722,7 +8049,7 @@ namespace UiClient
             return;
         }
 
-        fprintf(settingsFile, "settings.version=2\n");
+        fprintf(settingsFile, "settings.version=3\n");
         fprintf(settingsFile, "upperActionBar=%d\n", m_extraUpperActionBarVisible ? 1 : 0);
         fprintf(settingsFile, "rightActionBarOne=%d\n", m_rightActionBarOneVisible ? 1 : 0);
         fprintf(settingsFile, "rightActionBarTwo=%d\n", m_rightActionBarTwoVisible ? 1 : 0);
@@ -7737,6 +8064,11 @@ namespace UiClient
         fprintf(settingsFile, "ui.actionBars.visible=%d\n", m_actionBarsVisible ? 1 : 0);
         fprintf(settingsFile, "ui.combatText.visible=%d\n", m_combatTextVisible ? 1 : 0);
         fprintf(settingsFile, "ui.nameplates.visible=%d\n", m_nameplatesVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.tutorials.enabled=%d\n", m_tutorialsEnabled ? 1 : 0);
+        fprintf(settingsFile, "ui.keybindHints.visible=%d\n", m_keybindHintsVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.tooltips.visible=%d\n", m_tooltipsVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.notifications.visible=%d\n", m_notificationsVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.notifications.duration=%.1f\n", static_cast<double>(AZ::GetClamp(m_notificationDurationSeconds, 2.0f, 8.0f)));
         fprintf(settingsFile, "ui.tooltipComparison=%d\n", m_tooltipComparisonEnabled ? 1 : 0);
         fprintf(settingsFile, "ui.reduceMotion=%d\n", m_reduceUiMotion ? 1 : 0);
         fprintf(settingsFile, "layout.chat.x=%.1f\n", static_cast<double>(m_chatOffsetX));
@@ -7751,6 +8083,7 @@ namespace UiClient
         fprintf(settingsFile, "layout.minimap.y=%.1f\n", static_cast<double>(m_minimapOffsetY));
         fprintf(settingsFile, "layout.profile=%s\n", m_layoutProfileName.c_str());
         fprintf(settingsFile, "chat.filter=%s\n", m_chatFilterChannel.c_str());
+        fprintf(settingsFile, "tutorial.dismissed=%s\n", SerializeTutorialDismissals(m_tutorialDismissed).c_str());
         fprintf(settingsFile, "bind.spellbook=%s\n", m_spellbookBinding.c_str());
         fprintf(settingsFile, "bind.bag=%s\n", m_bagBinding.c_str());
         fprintf(settingsFile, "bind.character=%s\n", m_characterBinding.c_str());
@@ -8118,6 +8451,10 @@ namespace UiClient
         {
             return m_settingsOpen;
         }
+        if (strcmp(panelId, PanelHelp) == 0)
+        {
+            return m_helpOpen;
+        }
         return false;
     }
 
@@ -8173,6 +8510,10 @@ namespace UiClient
             m_settingsOpen = false;
             m_pendingKeybindActionId.clear();
         }
+        else if (strcmp(panelName, PanelHelp) == 0)
+        {
+            m_helpOpen = false;
+        }
         if (!m_topGameplayPanel.empty() && strcmp(m_topGameplayPanel.c_str(), panelName) == 0)
         {
             m_topGameplayPanel.clear();
@@ -8215,6 +8556,11 @@ namespace UiClient
         m_actionBarsVisible = true;
         m_combatTextVisible = true;
         m_nameplatesVisible = true;
+        m_tutorialsEnabled = true;
+        m_keybindHintsVisible = true;
+        m_tooltipsVisible = true;
+        m_notificationsVisible = true;
+        m_notificationDurationSeconds = 4.5f;
         m_tooltipComparisonEnabled = true;
         m_reduceUiMotion = false;
         m_layoutProfileName = "Default";
@@ -8226,8 +8572,38 @@ namespace UiClient
         m_keybindNotice = "All local UI options reset to defaults.";
         LoadDefaultKeybindings();
         ResetHudLayout();
+        AddNotification("Settings", "Local UI options restored to default values.");
         m_loggedActionBarVisible = false;
         AZ_Printf("amandacore", "client.ui_options_reset_defaults");
+    }
+
+    void UiClientSystemComponent::ResetTutorialState()
+    {
+        for (bool& dismissed : m_tutorialDismissed)
+        {
+            dismissed = false;
+        }
+        AddNotification("Tutorials", "Tutorial hints reset. They will appear again when relevant.");
+        AddHudEvent("Tutorial hints reset.");
+        AZ_Printf("amandacore", "client.tutorials_reset");
+    }
+
+    void UiClientSystemComponent::MarkTutorialDismissed(int tutorialIndex)
+    {
+        if (tutorialIndex < 0 || tutorialIndex >= static_cast<int>(TutorialHintCount))
+        {
+            return;
+        }
+        m_tutorialDismissed[tutorialIndex] = true;
+        SaveUiSettings();
+        AZ_Printf("amandacore", "client.tutorial_dismissed id=%s", TutorialHints[tutorialIndex].m_id);
+    }
+
+    void UiClientSystemComponent::OpenHelpPanel(const char* source)
+    {
+        m_helpOpen = true;
+        MarkGameplayPanelOpened(PanelHelp);
+        AZ_Printf("amandacore", "client.help_panel_opened source=%s", source && source[0] != '\0' ? source : "unknown");
     }
 
     bool UiClientSystemComponent::CloseOpenGameplayPanel(const char* reason)
@@ -8239,6 +8615,7 @@ namespace UiClient
         const char* fallbackOrder[] = {
             PanelGameMenu,
             PanelSettings,
+            PanelHelp,
             PanelMap,
             PanelQuestLog,
             PanelCharacter,
@@ -8549,6 +8926,38 @@ namespace UiClient
         const auto commandAndRest = splitFirst(text.substr(1));
         const AZStd::string command = commandAndRest.first;
         const AZStd::string rest = commandAndRest.second;
+        if (command == "help")
+        {
+            OpenHelpPanel("slash");
+            AddHudEvent("Opened Help / Guide.");
+            return true;
+        }
+        if (command == "tutorials")
+        {
+            if (rest == "reset")
+            {
+                ResetTutorialState();
+                SaveUiSettings();
+                return true;
+            }
+            m_tutorialsEnabled = true;
+            AddHudEvent("Tutorial hints are enabled. Use /tutorials reset to show dismissed hints again.");
+            AddNotification("Tutorials", "Tutorial hints enabled. Use Settings to disable or reset them.");
+            SaveUiSettings();
+            return true;
+        }
+        if (command == "resetui")
+        {
+            ResetHudLayout();
+            SaveUiSettings();
+            AddNotification("UI Reset", "HUD anchors returned to their default layout.");
+            return true;
+        }
+        if (command == "reloadui" || command == "who" || command == "played")
+        {
+            AddHudEvent(AZStd::string::format("/%s is not available in this alpha build.", command.c_str()));
+            return false;
+        }
         if (command == "say" || command == "s")
         {
             return gameCore->SubmitChatMessage("say", {}, rest);
@@ -8675,7 +9084,8 @@ namespace UiClient
             if (!frontend.m_errorMessage.empty())
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.58f, 0.44f, 1.0f));
-                ImGui::TextWrapped("%s", frontend.m_errorMessage.c_str());
+                const AZStd::string friendlyError = BuildUserFacingError(frontend.m_errorMessage, "Login service");
+                ImGui::TextWrapped("%s", friendlyError.c_str());
                 ImGui::PopStyleColor();
             }
             else if (!frontend.m_statusMessage.empty())
@@ -8720,6 +9130,7 @@ namespace UiClient
                 {
                     bool resetHudLayoutRequested = false;
                     bool resetOptionsRequested = false;
+                    bool resetTutorialsRequested = false;
                     bool closeSettingsRequested = false;
                     if (DrawSettingsWindow(
                             m_settingsTab,
@@ -8737,6 +9148,11 @@ namespace UiClient
                             m_actionBarsVisible,
                             m_combatTextVisible,
                             m_nameplatesVisible,
+                            m_tutorialsEnabled,
+                            m_keybindHintsVisible,
+                            m_tooltipsVisible,
+                            m_notificationsVisible,
+                            m_notificationDurationSeconds,
                             m_tooltipComparisonEnabled,
                             m_reduceUiMotion,
                             m_layoutProfileName,
@@ -8752,6 +9168,7 @@ namespace UiClient
                             m_targetHostileBinding,
                             m_pendingKeybindActionId,
                             m_keybindNotice,
+                            resetTutorialsRequested,
                             resetHudLayoutRequested,
                             resetOptionsRequested,
                             closeSettingsRequested))
@@ -8763,6 +9180,11 @@ namespace UiClient
                         ResetUiOptionsToDefaults();
                         SaveUiSettings();
                     }
+                    if (resetTutorialsRequested)
+                    {
+                        ResetTutorialState();
+                        SaveUiSettings();
+                    }
                     if (resetHudLayoutRequested)
                     {
                         ResetHudLayout();
@@ -8772,6 +9194,30 @@ namespace UiClient
                     {
                         m_preWorldSettingsOpen = false;
                     }
+                }
+            }
+            ImGui::End();
+        };
+
+        auto drawHelp = [&]()
+        {
+            if (!m_helpOpen)
+            {
+                return;
+            }
+            const ImVec2 helpSize(760.0f, 520.0f);
+            const ImVec2 helpPos(
+                AZ::GetMax(18.0f, (displaySize.x - helpSize.x) * 0.5f),
+                AZ::GetMax(18.0f, (displaySize.y - helpSize.y) * 0.5f));
+            if (BeginHudPanel("##preworld_help", "Help / Guide", helpPos, helpSize, false, true))
+            {
+                if (DrawHudPanelCloseButton())
+                {
+                    m_helpOpen = false;
+                }
+                else
+                {
+                    DrawHelpGuideWindow(m_helpCategoryIndex, m_helpFilterBuffer, AZ_ARRAY_SIZE(m_helpFilterBuffer));
                 }
             }
             ImGui::End();
@@ -8900,6 +9346,11 @@ namespace UiClient
                 {
                     m_preWorldSettingsOpen = true;
                 }
+                ImGui::SameLine();
+                if (ImGui::Button("Help", ImVec2(90.0f, 30.0f)))
+                {
+                    OpenHelpPanel("preworld_login");
+                }
                 if (frontend.m_rememberedSessionAvailable)
                 {
                     ImGui::SameLine();
@@ -8948,6 +9399,11 @@ namespace UiClient
                 if (ImGui::Button("Settings", ImVec2(120.0f, 30.0f)))
                 {
                     m_preWorldSettingsOpen = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Help", ImVec2(90.0f, 30.0f)))
+                {
+                    OpenHelpPanel("preworld_realm");
                 }
                 drawStatus();
             }
@@ -9009,6 +9465,11 @@ namespace UiClient
                 if (ImGui::Button("Logout", ImVec2(100.0f, 30.0f)))
                 {
                     gameCore->ForgetFrontendRememberedSession();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Help", ImVec2(90.0f, 30.0f)))
+                {
+                    OpenHelpPanel("preworld_character");
                 }
                 drawStatus();
             }
@@ -9116,6 +9577,11 @@ namespace UiClient
                 {
                     gameCore->NavigateFrontendBack();
                 }
+                ImGui::SameLine();
+                if (ImGui::Button("Help", ImVec2(90.0f, 30.0f)))
+                {
+                    OpenHelpPanel("preworld_create");
+                }
                 drawStatus();
             }
             else if (connectingScreen)
@@ -9126,6 +9592,8 @@ namespace UiClient
         }
         ImGui::End();
         drawSettings();
+        drawHelp();
+        DrawNotifications(NowMs(), displaySize);
     }
 
     bool UiClientSystemComponent::OnInputChannelEventFiltered(const AzFramework::InputChannel& inputChannel)
@@ -9170,6 +9638,7 @@ namespace UiClient
                 m_pendingKeybindActionId.clear();
                 SaveUiSettings();
                 AddHudEvent(AZStd::string::format("Keybinding updated: %s", DisplayKeyName(keyName).c_str()));
+                AddNotification("Keybind Updated", AZStd::string::format("Assigned %s.", DisplayKeyName(keyName).c_str()));
             }
             return true;
         }
@@ -9178,7 +9647,11 @@ namespace UiClient
         {
             if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape)
             {
-                if (m_preWorldSettingsOpen)
+                if (m_helpOpen)
+                {
+                    m_helpOpen = false;
+                }
+                else if (m_preWorldSettingsOpen)
                 {
                     m_preWorldSettingsOpen = false;
                 }
@@ -9245,6 +9718,7 @@ namespace UiClient
 
         ImGuiIO& io = ImGui::GetIO();
         io.FontGlobalScale = AZ::GetClamp(m_uiScale * m_readabilityScale, 0.75f, 1.40f);
+        g_tooltipsVisible = m_tooltipsVisible;
         const ImVec2 displaySize = io.DisplaySize;
         if (displaySize.x <= 1.0f || displaySize.y <= 1.0f)
         {
@@ -9300,7 +9774,8 @@ namespace UiClient
                 if (!worldState.m_errorMessage.empty())
                 {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.94f, 0.66f, 0.40f, 1.0f));
-                    ImGui::TextWrapped("%s", worldState.m_errorMessage.c_str());
+                    const AZStd::string friendlyError = BuildUserFacingError(worldState.m_errorMessage, "World service");
+                    ImGui::TextWrapped("%s", friendlyError.c_str());
                     ImGui::PopStyleColor();
                 }
             }
@@ -9372,6 +9847,7 @@ namespace UiClient
         if (!m_lastWorldConnected)
         {
             AddHudEvent("Entered Stonewake Vale");
+            AddNotification("World Ready", "Stonewake Vale loaded. Open Help or follow tutorial hints for first steps.");
         }
         if (worldState.m_session.m_worldSessionToken != m_lastWorldSessionToken)
         {
@@ -9379,7 +9855,9 @@ namespace UiClient
             {
                 CloseNpcInteraction("disconnect");
             }
-            AddHudEvent(m_lastWorldSessionToken.empty() ? "World session linked" : "World session refreshed");
+            const AZStd::string sessionNotice = m_lastWorldSessionToken.empty() ? "World session linked" : "World session refreshed";
+            AddHudEvent(sessionNotice);
+            AddNotification("Session", sessionNotice);
             m_lastWorldSessionToken = worldState.m_session.m_worldSessionToken;
             m_lastTargetFrameSummary.clear();
             m_lastKillCreditSummary.clear();
@@ -9515,7 +9993,9 @@ namespace UiClient
 
         if (!worldState.m_errorMessage.empty() && worldState.m_errorMessage != m_lastErrorMessage)
         {
-            AddHudEvent(AZStd::string::format("Notice: %s", worldState.m_errorMessage.c_str()));
+            const AZStd::string friendlyError = BuildUserFacingError(worldState.m_errorMessage, "World service");
+            AddHudEvent(AZStd::string::format("Notice: %s", friendlyError.c_str()));
+            AddNotification("Notice", friendlyError);
         }
         m_lastErrorMessage = worldState.m_errorMessage;
         m_lastWorldConnected = true;
@@ -9564,7 +10044,7 @@ namespace UiClient
         const ImVec2 actionBarPos = ApplyHudOffset(actionBarDefaultPos, m_actionBarOffsetX, m_actionBarOffsetY, actionBarSize, displaySize);
         const ImVec2 upperActionBarSize(744.0f, 72.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
-        const ImVec2 microMenuSize(720.0f, 44.0f);
+        const ImVec2 microMenuSize(790.0f, 44.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
         const bool microMenuFitsRight = microMenuRightX + microMenuSize.x < rightActionBarTwoPos.x - 12.0f;
         const ImVec2 microMenuPos(
@@ -9587,6 +10067,8 @@ namespace UiClient
         const ImVec2 gameMenuPos((displaySize.x - gameMenuSize.x) * 0.5f, (displaySize.y - gameMenuSize.y) * 0.5f);
         const ImVec2 settingsSize(760.0f, 560.0f);
         const ImVec2 settingsPos((displaySize.x - settingsSize.x) * 0.5f, (displaySize.y - settingsSize.y) * 0.5f);
+        const ImVec2 helpSize(780.0f, 540.0f);
+        const ImVec2 helpPos((displaySize.x - helpSize.x) * 0.5f, (displaySize.y - helpSize.y) * 0.5f);
         const ImVec2 characterSize(690.0f, 540.0f);
         const ImVec2 characterPos(80.0f, AZ::GetMax(18.0f, displaySize.y - characterSize.y - 176.0f));
         const ImVec2 talentsSize(440.0f, 430.0f);
@@ -9868,6 +10350,7 @@ namespace UiClient
                 m_settingsBinding,
                 m_interactBinding,
                 m_targetHostileBinding,
+                m_keybindHintsVisible,
                 actionEditMode,
                 m_pendingActionAssignmentAbilityId,
                 m_pendingActionMoveSlot);
@@ -9901,6 +10384,7 @@ namespace UiClient
                 m_spellbookOpen,
                 m_bagOpen,
                 m_settingsOpen,
+                m_helpOpen,
                 m_socialOpen))
             {
                 MarkGameplayPanelOpened(toggledPanel);
@@ -10018,11 +10502,15 @@ namespace UiClient
             {
                 CloseGameplayPanelById(PanelGameMenu, "close_button");
             }
-            else if (DrawGameMenuWindow(m_gameMenuOpen, m_settingsOpen, m_settingsTab))
+            else if (DrawGameMenuWindow(m_gameMenuOpen, m_settingsOpen, m_helpOpen, m_settingsTab))
             {
                 if (m_settingsOpen)
                 {
                     MarkGameplayPanelOpened(PanelSettings);
+                }
+                else if (m_helpOpen)
+                {
+                    MarkGameplayPanelOpened(PanelHelp);
                 }
                 else if (!m_gameMenuOpen && m_topGameplayPanel == PanelGameMenu)
                 {
@@ -10031,6 +10519,23 @@ namespace UiClient
             }
         }
         if (gameMenuWasOpen)
+        {
+            ImGui::End();
+        }
+
+        const bool helpPanelWasOpen = m_helpOpen;
+        if (helpPanelWasOpen && BeginHudPanel("##help_guide", "Help / Guide", helpPos, helpSize, false, true))
+        {
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelHelp, "close_button");
+            }
+            else
+            {
+                DrawHelpGuideWindow(m_helpCategoryIndex, m_helpFilterBuffer, AZ_ARRAY_SIZE(m_helpFilterBuffer));
+            }
+        }
+        if (helpPanelWasOpen)
         {
             ImGui::End();
         }
@@ -10046,6 +10551,7 @@ namespace UiClient
             {
                 bool resetHudLayoutRequested = false;
                 bool resetOptionsRequested = false;
+                bool resetTutorialsRequested = false;
                 bool closeSettingsRequested = false;
                 if (DrawSettingsWindow(
                         m_settingsTab,
@@ -10063,6 +10569,11 @@ namespace UiClient
                         m_actionBarsVisible,
                         m_combatTextVisible,
                         m_nameplatesVisible,
+                        m_tutorialsEnabled,
+                        m_keybindHintsVisible,
+                        m_tooltipsVisible,
+                        m_notificationsVisible,
+                        m_notificationDurationSeconds,
                         m_tooltipComparisonEnabled,
                         m_reduceUiMotion,
                         m_layoutProfileName,
@@ -10078,6 +10589,7 @@ namespace UiClient
                         m_targetHostileBinding,
                         m_pendingKeybindActionId,
                         m_keybindNotice,
+                        resetTutorialsRequested,
                         resetHudLayoutRequested,
                         resetOptionsRequested,
                         closeSettingsRequested))
@@ -10088,6 +10600,11 @@ namespace UiClient
                 if (resetOptionsRequested)
                 {
                     ResetUiOptionsToDefaults();
+                    SaveUiSettings();
+                }
+                if (resetTutorialsRequested)
+                {
+                    ResetTutorialState();
                     SaveUiSettings();
                 }
                 if (resetHudLayoutRequested)
@@ -10313,18 +10830,8 @@ namespace UiClient
             DrawCombatFeedbackPulses(nowMs, displaySize);
         }
 
-        if (!m_questToast.empty() && nowMs < m_questToastExpiresAt)
-        {
-            if (BeginHudPanel(
-                    "##quest_toast",
-                    "Update",
-                    ImVec2((displaySize.x * 0.5f) - 220.0f, actionBarPos.y - 92.0f),
-                    ImVec2(440.0f, 78.0f)))
-            {
-                ImGui::TextWrapped("%s", m_questToast.c_str());
-            }
-            ImGui::End();
-        }
+        DrawTutorialHints(worldState, displaySize);
+        DrawNotifications(nowMs, displaySize);
 
         if (m_uiLayoutDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
         {
@@ -10357,34 +10864,34 @@ namespace UiClient
         {
             if (questState == "active")
             {
-                m_questToast = "Field orders accepted";
-                m_questToastExpiresAt = NowMs() + 4000;
+                AddNotification("Quest", "Field orders accepted.");
             }
             else if (questState == "reward_granted")
             {
-                m_questToast = AZStd::string::format(
-                    "Quest complete: +%d XP, +%dg %ds %dc",
-                    rewardXp,
-                    rewardGold,
-                    rewardSilver,
-                    rewardCopper);
-                m_questToastExpiresAt = NowMs() + 5000;
+                AddNotification(
+                    "Quest Complete",
+                    AZStd::string::format(
+                        "+%d XP, +%dg %ds %dc",
+                        rewardXp,
+                        rewardGold,
+                        rewardSilver,
+                        rewardCopper));
             }
         }
         else if (currentCount != m_lastQuestCount && questState == "active")
         {
-            m_questToast = AZStd::string::format("Quest progress: %d / %d", currentCount, targetCount);
-            m_questToastExpiresAt = NowMs() + 3500;
+            AddNotification("Quest Progress", AZStd::string::format("%d / %d", currentCount, targetCount));
         }
         else if ((experience != m_lastExperience || totalCopper != m_lastCurrencyCopper) && rewardXp > 0)
         {
-            m_questToast = AZStd::string::format(
-                "Totals updated: %d XP, %dg %ds %dc",
-                experience,
-                totalCopper / 10000,
-                (totalCopper % 10000) / 100,
-                totalCopper % 100);
-            m_questToastExpiresAt = NowMs() + 3000;
+            AddNotification(
+                "Totals Updated",
+                AZStd::string::format(
+                    "%d XP, %dg %ds %dc",
+                    experience,
+                    totalCopper / 10000,
+                    (totalCopper % 10000) / 100,
+                    totalCopper % 100));
         }
 
         m_lastQuestState = questState;
@@ -10410,6 +10917,211 @@ namespace UiClient
             m_eventLog.pop_front();
         }
         m_eventLog.push_back(message);
+    }
+
+    void UiClientSystemComponent::AddNotification(const AZStd::string& title, const AZStd::string& message)
+    {
+        if (!m_notificationsVisible || message.empty())
+        {
+            return;
+        }
+
+        const AZ::s64 nowMs = NowMs();
+        while (!m_notifications.empty() && m_notifications.front().m_expiresAt <= nowMs)
+        {
+            m_notifications.pop_front();
+        }
+        for (const auto& notification : m_notifications)
+        {
+            if (notification.m_title == title && notification.m_message == message)
+            {
+                return;
+            }
+        }
+        while (m_notifications.size() >= MaxNotificationEntries)
+        {
+            m_notifications.pop_front();
+        }
+        NotificationToast toast;
+        toast.m_title = title.empty() ? "Notice" : title;
+        toast.m_message = message;
+        const float durationSeconds = AZ::GetClamp(m_notificationDurationSeconds, 2.0f, 8.0f);
+        toast.m_expiresAt = nowMs + static_cast<AZ::s64>(durationSeconds * 1000.0f);
+        m_notifications.push_back(toast);
+    }
+
+    void UiClientSystemComponent::DrawNotifications(AZ::s64 nowMs, const ImVec2& displaySize)
+    {
+        if (!m_notificationsVisible)
+        {
+            return;
+        }
+        while (!m_notifications.empty() && m_notifications.front().m_expiresAt <= nowMs)
+        {
+            m_notifications.pop_front();
+        }
+        if (m_notifications.empty())
+        {
+            return;
+        }
+
+        const float width = displaySize.x > 404.0f ? 360.0f : AZ::GetMax(120.0f, displaySize.x - 36.0f);
+        const float height = 76.0f;
+        const float startX = AZ::GetMax(18.0f, displaySize.x - width - 22.0f);
+        float y = 286.0f;
+        const size_t visibleCount = m_notifications.size() < MaxVisibleNotifications
+            ? m_notifications.size()
+            : MaxVisibleNotifications;
+        for (size_t index = 0; index < visibleCount; ++index)
+        {
+            const auto& notification = m_notifications[m_notifications.size() - 1 - index];
+            const AZ::s64 remainingMs = notification.m_expiresAt > nowMs ? notification.m_expiresAt - nowMs : 0;
+            const float fade = m_reduceUiMotion ? 1.0f : AZ::GetClamp(static_cast<float>(remainingMs) / 650.0f, 0.0f, 1.0f);
+            ImGui::SetNextWindowPos(ImVec2(startX, y), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Always);
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.04f, 0.06f, 0.08f, 0.82f * fade));
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.55f, 0.43f, 0.22f, 0.85f * fade));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 9.0f));
+            const AZStd::string windowName = AZStd::string::format("##notification_%zu", index);
+            if (ImGui::Begin(
+                    windowName.c_str(),
+                    nullptr,
+                    ImGuiWindowFlags_NoTitleBar |
+                        ImGuiWindowFlags_NoResize |
+                        ImGuiWindowFlags_NoMove |
+                        ImGuiWindowFlags_NoSavedSettings |
+                        ImGuiWindowFlags_NoInputs))
+            {
+                ImGui::TextColored(ImVec4(0.91f, 0.80f, 0.50f, fade), "%s", notification.m_title.c_str());
+                ImGui::TextWrapped("%s", notification.m_message.c_str());
+            }
+            ImGui::End();
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor(2);
+            y += height + 8.0f;
+        }
+    }
+
+    void UiClientSystemComponent::DrawTutorialHints(const GameCore::ClientWorldState& worldState, const ImVec2& displaySize)
+    {
+        if (!m_tutorialsEnabled)
+        {
+            return;
+        }
+
+        int candidateIndex = -1;
+        auto chooseIfAvailable = [&](int index)
+        {
+            if (candidateIndex < 0 && index >= 0 && index < static_cast<int>(TutorialHintCount) && !m_tutorialDismissed[index])
+            {
+                candidateIndex = index;
+            }
+        };
+
+        chooseIfAvailable(TutorialIntro);
+        if (m_chatInputActive)
+        {
+            chooseIfAvailable(TutorialChat);
+        }
+        if (m_settingsOpen || m_preWorldSettingsOpen)
+        {
+            chooseIfAvailable(TutorialSettings);
+        }
+        if (m_bagOpen)
+        {
+            chooseIfAvailable(TutorialInventory);
+        }
+        if (m_spellbookOpen)
+        {
+            chooseIfAvailable(TutorialSpellbook);
+            chooseIfAvailable(TutorialActionBar);
+        }
+        if (worldState.m_session.m_quest.m_state == "active")
+        {
+            chooseIfAvailable(TutorialQuest);
+        }
+        if (FindTargetEntity(worldState))
+        {
+            chooseIfAvailable(TutorialCombat);
+        }
+        if (const auto* trainerEntity = FindTrainerEntity(worldState))
+        {
+            const float playerX = static_cast<float>(worldState.m_session.m_position.m_x);
+            const float playerY = static_cast<float>(worldState.m_session.m_position.m_y);
+            const float distance = Distance2D(playerX, playerY, static_cast<float>(trainerEntity->m_x), static_cast<float>(trainerEntity->m_y));
+            if (distance <= CommandPointRadius)
+            {
+                chooseIfAvailable(TutorialInteract);
+            }
+        }
+        chooseIfAvailable(TutorialMovement);
+        if (candidateIndex < 0)
+        {
+            return;
+        }
+
+        const auto& hint = TutorialHints[candidateIndex];
+        AZStd::string hintBody = hint.m_body;
+        if (candidateIndex == TutorialMovement)
+        {
+            hintBody = AZStd::string::format(
+                "Move with WASD and steer the camera with the mouse. Current helper binds: %s target, %s interact.",
+                DisplayKeyName(m_targetHostileBinding).c_str(),
+                DisplayKeyName(m_interactBinding).c_str());
+        }
+        else if (candidateIndex == TutorialInteract)
+        {
+            hintBody = AZStd::string::format(
+                "Move close to friendly NPCs and press %s to open quests, training, vendors, professions, or market services when available.",
+                DisplayKeyName(m_interactBinding).c_str());
+        }
+        else if (candidateIndex == TutorialCombat)
+        {
+            hintBody = AZStd::string::format(
+                "Target a hostile with %s, check range and resources, then use action-bar slots. Server state decides hits, cooldowns, and rewards.",
+                DisplayKeyName(m_targetHostileBinding).c_str());
+        }
+        else if (candidateIndex == TutorialInventory)
+        {
+            hintBody = AZStd::string::format(
+                "Press %s to open your pack. Drag items between slots or equip compatible gear through the server-authoritative inventory path.",
+                DisplayKeyName(m_bagBinding).c_str());
+        }
+        else if (candidateIndex == TutorialSpellbook)
+        {
+            hintBody = AZStd::string::format(
+                "Press %s for learned and trainable abilities. Drag assignable abilities to action slots while edit mode or Shift-edit is active.",
+                DisplayKeyName(m_spellbookBinding).c_str());
+        }
+        else if (candidateIndex == TutorialSettings)
+        {
+            hintBody = AZStd::string::format(
+                "Press %s for local first-party settings. Keybind changes update supported hint text and never expose addon or script surfaces.",
+                DisplayKeyName(m_settingsBinding).c_str());
+        }
+        const float hintWidth = displaySize.x > 556.0f ? 520.0f : AZ::GetMax(220.0f, displaySize.x - 36.0f);
+        const float hintHeight = hintWidth < 360.0f ? 164.0f : 132.0f;
+        const ImVec2 hintSize(hintWidth, hintHeight);
+        const ImVec2 hintPos(
+            AZ::GetMax(18.0f, (displaySize.x - hintSize.x) * 0.5f),
+            AZ::GetMax(18.0f, displaySize.y - hintSize.y - 196.0f));
+        if (BeginHudPanel("##tutorial_hint", "Tutorial", hintPos, hintSize, false, false))
+        {
+            ImGui::Text("%s", hint.m_title);
+            ImGui::TextWrapped("%s", hintBody.c_str());
+            ImGui::Spacing();
+            if (ImGui::Button("Dismiss", HudButtonSize(96.0f)))
+            {
+                MarkTutorialDismissed(candidateIndex);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Open Help", HudButtonSize(110.0f)))
+            {
+                OpenHelpPanel("tutorial");
+            }
+        }
+        ImGui::End();
     }
 
     void UiClientSystemComponent::AddCombatFeedbackPulse(const AZStd::string& message, AZ::s64 nowMs)
