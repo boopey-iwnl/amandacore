@@ -83,13 +83,13 @@ const (
 
 	starterQuestID        = "sv_first_muster"
 	legacyEmberQuestID    = "defeat_ember_hounds_01"
-	starterSpawnX         = 10.0
-	starterSpawnY         = 10.0
+	starterSpawnX         = 232.0
+	starterSpawnY         = 130.0
 	starterSpawnZ         = 0.0
 	playableGroundZ       = 0.05
 	starterInteractRadius = 5.0
-	starterZoneMaxX       = 480.0
-	starterZoneMaxY       = 300.0
+	starterZoneMaxX       = 460.0
+	starterZoneMaxY       = 270.0
 	secondZoneEntryX      = 34.0
 	secondZoneEntryY      = 148.0
 	secondZoneMaxX        = 720.0

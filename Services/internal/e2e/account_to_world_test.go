@@ -152,11 +152,11 @@ func TestAccountToWorldGoldenPath(t *testing.T) {
 	assertInventorySlotItem(t, connectResponse, 5, "camp_ration", 3)
 
 	position := connectResponse["position"].(map[string]any)
-	if position["x"].(float64) != 14 {
-		t.Fatalf("expected persisted x position 14, got %v", position["x"])
+	if position["x"].(float64) != 236 {
+		t.Fatalf("expected persisted x position 236, got %v", position["x"])
 	}
-	if position["y"].(float64) != 12 {
-		t.Fatalf("expected persisted y position 12, got %v", position["y"])
+	if position["y"].(float64) != 132 {
+		t.Fatalf("expected persisted y position 132, got %v", position["y"])
 	}
 
 	fileStoreAfterRestart, err := store.NewFileStore(storePath, "test-build", "http://world.local")
@@ -202,11 +202,11 @@ func TestAccountToWorldGoldenPath(t *testing.T) {
 	assertInventorySlotItem(t, reconnectAfterRestart, 5, "camp_ration", 3)
 
 	restartedPosition := reconnectAfterRestart["position"].(map[string]any)
-	if restartedPosition["x"].(float64) != 14 {
-		t.Fatalf("expected restarted x position 14, got %v", restartedPosition["x"])
+	if restartedPosition["x"].(float64) != 236 {
+		t.Fatalf("expected restarted x position 236, got %v", restartedPosition["x"])
 	}
-	if restartedPosition["y"].(float64) != 12 {
-		t.Fatalf("expected restarted y position 12, got %v", restartedPosition["y"])
+	if restartedPosition["y"].(float64) != 132 {
+		t.Fatalf("expected restarted y position 132, got %v", restartedPosition["y"])
 	}
 }
 

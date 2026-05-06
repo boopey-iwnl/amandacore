@@ -151,6 +151,7 @@ namespace NetClient
         AZStd::string m_title;
         AZStd::string m_category;
         AZStd::string m_statusBucket;
+        AZStd::string m_levelBand;
         AZStd::string m_objectiveType;
         AZStd::string m_objectiveText;
         AZStd::string m_state;
@@ -178,6 +179,28 @@ namespace NetClient
         int m_rewardCurrencySilver = 0;
         int m_rewardCurrencyGold = 0;
         int m_rewardCurrencyCopper = 0;
+        struct ObjectiveNode
+        {
+            AZStd::string m_nodeId;
+            AZStd::string m_kind;
+            AZStd::string m_targetNpcArchetype;
+            AZStd::string m_targetEntityId;
+            AZStd::string m_targetItemId;
+            AZStd::vector<AZStd::string> m_dependsOn;
+            int m_currentCount = 0;
+            int m_targetCount = 0;
+            bool m_completed = false;
+            bool m_active = false;
+            bool m_terminal = false;
+        };
+        struct RewardItem
+        {
+            AZStd::string m_itemId;
+            AZStd::string m_displayName;
+            int m_stackCount = 0;
+        };
+        AZStd::vector<ObjectiveNode> m_objectiveGraph;
+        AZStd::vector<RewardItem> m_rewardItems;
     };
 
     struct MapPointState
@@ -1017,6 +1040,13 @@ namespace NetClient
             AZStd::string& outError) = 0;
 
         virtual bool AcceptQuest(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& questId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool CompleteQuest(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
             const AZStd::string& questId,

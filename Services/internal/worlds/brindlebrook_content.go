@@ -51,22 +51,22 @@ var zoneDefinitions = []zoneDefinition{
 		Roads: []zoneRoadDefinition{
 			{
 				ID:          "stonewake_west_road",
-				DisplayName: "Westward Road",
+				DisplayName: "Main Road Loop",
 				Points: []zonePointDefinition{
-					{ID: "stonewake_hearthwatch", DisplayName: "Hearthwatch Yard", Type: "hub", X: 13, Y: 10},
-					{ID: "stonewake_oatfield", DisplayName: "Oatfield Post", Type: "road", X: 134, Y: 64},
-					{ID: "stonewake_old_mill", DisplayName: "Old Mill Road", Type: "landmark", X: 322, Y: 174},
-					{ID: "stonewake_west_gate", DisplayName: "Westward Gate", Type: "transition", X: 438, Y: 246},
+					{ID: "stonewake_hearthwatch", DisplayName: "Hearthwatch Yard", Type: "hub", X: 232, Y: 130},
+					{ID: "stonewake_valefurrow", DisplayName: "ValeFurrow Farms", Type: "road", X: 197, Y: 74},
+					{ID: "stonewake_brookside", DisplayName: "Brookside Crossing", Type: "route", X: 313, Y: 81},
+					{ID: "stonewake_whispering_cave", DisplayName: "Whispering Cave Road", Type: "transition", X: 430, Y: 77},
 				},
 			},
 		},
 		Landmarks: []zonePointDefinition{
-			{ID: "stonewake_hearthwatch_yard", DisplayName: "Hearthwatch Yard", Type: "hub", X: 13, Y: 10},
-			{ID: "stonewake_training_ring", DisplayName: "Training Ring", Type: "service", X: 34, Y: 18},
-			{ID: "stonewake_old_mill", DisplayName: "Old Mill", Type: "objective", X: 322, Y: 174},
+			{ID: "stonewake_hearthwatch_yard", DisplayName: "Hearthwatch Yard", Type: "hub", X: 232, Y: 130},
+			{ID: "stonewake_training_ring", DisplayName: "Training Ring", Type: "service", X: 268, Y: 145},
+			{ID: "stonewake_stonehewn_quarry", DisplayName: "Stonehewn Quarry", Type: "objective", X: 361, Y: 157},
 		},
 		Transitions: []zonePointDefinition{
-			{ID: "to_brindlebrook", DisplayName: "Road to Brindlebrook", Type: "zone_exit", X: 470, Y: 260},
+			{ID: "to_brindlebrook", DisplayName: "Road to Brindlebrook", Type: "zone_exit", X: 430, Y: 77},
 		},
 	},
 	{

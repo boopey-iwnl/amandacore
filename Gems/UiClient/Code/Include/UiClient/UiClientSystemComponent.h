@@ -81,6 +81,7 @@ namespace UiClient
         AZStd::string m_activeInteractionEntityId;
         AZStd::string m_activeInteractionKind;
         AZStd::string m_topGameplayPanel;
+        AZStd::string m_selectedQuestId;
         AZStd::string m_questToast;
         AZStd::deque<AZStd::string> m_eventLog;
         AZ::u64 m_lastHandledInteractionSequence = 0;
@@ -101,6 +102,7 @@ namespace UiClient
         bool m_professionsOpen = false;
         bool m_uiEditMode = false;
         bool m_uiLayoutDirty = false;
+        bool m_objectiveTrackerCollapsed = false;
         int m_settingsTab = 0;
         bool m_extraUpperActionBarVisible = true;
         bool m_rightActionBarOneVisible = true;

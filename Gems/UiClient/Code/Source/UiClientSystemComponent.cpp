@@ -37,11 +37,11 @@ namespace UiClient
 {
     namespace
     {
-        constexpr float CommandPointX = 13.0f;
-        constexpr float CommandPointY = 10.0f;
+        constexpr float CommandPointX = 232.0f;
+        constexpr float CommandPointY = 130.0f;
         constexpr float CommandPointRadius = 5.0f;
-        constexpr float EncounterAnchorX = 232.0f;
-        constexpr float EncounterAnchorY = 118.0f;
+        constexpr float EncounterAnchorX = 380.0f;
+        constexpr float EncounterAnchorY = 231.0f;
         constexpr float FriendlyNameplateDrawDistance = 36.0f;
         constexpr float MeleeRange = 5.5f;
         constexpr float SpellRange = 24.0f;
@@ -111,6 +111,13 @@ namespace UiClient
         constexpr int PngIconSampleDimension = 32;
         constexpr int PngIconSamplePixelCount = PngIconSampleDimension * PngIconSampleDimension;
         constexpr UINT MaxPngIconSourceDimension = 2048;
+        constexpr UINT MaxPngMapSourceDimension = 4096;
+        constexpr float MapZoomMinimum = 1.0f;
+        constexpr float MapZoomMaximum = 4.0f;
+        constexpr int MapRasterMinimumColumns = 256;
+        constexpr int MapRasterMaximumColumns = 440;
+        constexpr int MapRasterMinimumRows = 192;
+        constexpr int MapRasterMaximumRows = 330;
 
         struct PngIconSample
         {
@@ -118,6 +125,90 @@ namespace UiClient
             bool m_loaded = false;
             AZStd::string m_path;
             std::array<ImU32, PngIconSamplePixelCount> m_pixels{};
+        };
+
+        struct PngMapImage
+        {
+            bool m_attempted = false;
+            bool m_loaded = false;
+            AZStd::string m_path;
+            int m_width = 0;
+            int m_height = 0;
+            std::vector<ImU32> m_pixels;
+        };
+
+        struct MapViewState
+        {
+            AZStd::string m_mapArtId;
+            float m_zoom = 1.0f;
+            ImVec2 m_pan = ImVec2(0.0f, 0.0f);
+        };
+
+        struct MapArtDefinition
+        {
+            const char* m_mapArtId;
+            const char* m_zoneId;
+            const char* m_displayName;
+            const char* m_imagePath;
+            int m_imageWidth;
+            int m_imageHeight;
+            double m_minX;
+            double m_minY;
+            double m_maxX;
+            double m_maxY;
+            double m_pixelMinX;
+            double m_pixelMinY;
+            double m_pixelMaxX;
+            double m_pixelMaxY;
+            const char* m_calibrationAccuracy;
+            bool m_displayOnly;
+        };
+
+        constexpr MapArtDefinition DawnwakeWorldMapArt = {
+            "dawnwake_isles_world",
+            "stonewake_vale",
+            "Dawnwake Isles",
+            "Content\\Art\\UI\\Maps\\World\\dawnwake_isles_world.png",
+            1448,
+            1086,
+            0.0,
+            0.0,
+            460.0,
+            270.0,
+            65.0,
+            205.0,
+            535.0,
+            505.0,
+            "calibrated_v1",
+            false,
+        };
+
+        constexpr MapArtDefinition DawnwakeZoneMapArtDefinitions[] = {
+            {
+                "stonewake_vale",
+                "stonewake_vale",
+                "Stonewake Vale",
+                "Content\\Art\\UI\\Maps\\Zones\\stonewake_vale.png",
+                1448,
+                1086,
+                0.0,
+                0.0,
+                460.0,
+                270.0,
+                0.0,
+                0.0,
+                1448.0,
+                1086.0,
+                "calibrated_v1",
+                false,
+            },
+            {"hearthmere_coast", "hearthmere_coast", "Hearthmere Coast", "Content\\Art\\UI\\Maps\\Zones\\hearthmere_coast.png", 1448, 1086, 0.0, 0.0, 460.0, 270.0, 0.0, 0.0, 1448.0, 1086.0, "display_reference", true},
+            {"tempest_hollow", "tempest_hollow", "Tempest Hollow", "Content\\Art\\UI\\Maps\\Zones\\tempest_hollow.png", 1055, 1491, 0.0, 0.0, 460.0, 270.0, 0.0, 0.0, 1055.0, 1491.0, "display_reference", true},
+            {"ironroot_wilds", "ironroot_wilds", "Ironroot Wilds", "Content\\Art\\UI\\Maps\\Zones\\ironroot_wilds.png", 1448, 1086, 0.0, 0.0, 460.0, 270.0, 0.0, 0.0, 1448.0, 1086.0, "display_reference", true},
+            {"ashenridge_highlands", "ashenridge_highlands", "Ashenridge Highlands", "Content\\Art\\UI\\Maps\\Zones\\ashenridge_highlands.png", 1448, 1086, 0.0, 0.0, 460.0, 270.0, 0.0, 0.0, 1448.0, 1086.0, "display_reference", true},
+            {"goldmere_plains", "goldmere_plains", "Goldmere Plains", "Content\\Art\\UI\\Maps\\Zones\\goldmere_plains.png", 1448, 1086, 0.0, 0.0, 460.0, 270.0, 0.0, 0.0, 1448.0, 1086.0, "display_reference", true},
+            {"kingsfall_reach", "kingsfall_reach", "Kingsfall Reach", "Content\\Art\\UI\\Maps\\Zones\\kingsfall_reach.png", 1448, 1086, 0.0, 0.0, 460.0, 270.0, 0.0, 0.0, 1448.0, 1086.0, "display_reference", true},
+            {"kingsfall_harbor", "kingsfall_harbor", "Kingsfall Harbor", "Content\\Art\\UI\\Maps\\Zones\\kingsfall_harbor.png", 1448, 1086, 0.0, 0.0, 460.0, 270.0, 0.0, 0.0, 1448.0, 1086.0, "display_reference", true},
         };
 
         AZStd::string SlotActionId(int slotIndex)
@@ -353,6 +444,30 @@ namespace UiClient
             return {};
         }
 
+        AZStd::string ResolveRepoRelativePath(const char* repoRelativePath)
+        {
+            static const AZStd::string repoRoot = FindRepoRootForIcons();
+            if (repoRoot.empty() || !repoRelativePath || repoRelativePath[0] == '\0')
+            {
+                return {};
+            }
+
+            const AZStd::string requested = JoinPath(repoRoot, repoRelativePath);
+            return FileExists(requested) ? requested : AZStd::string{};
+        }
+
+        const MapArtDefinition* FindZoneMapArt(const AZStd::string& zoneId)
+        {
+            for (const MapArtDefinition& definition : DawnwakeZoneMapArtDefinitions)
+            {
+                if (zoneId == definition.m_zoneId)
+                {
+                    return &definition;
+                }
+            }
+            return nullptr;
+        }
+
         AZStd::string IconPathForKind(const AZStd::string& kind)
         {
             if (kind == "ability_auto_attack")
@@ -432,19 +547,13 @@ namespace UiClient
 
         AZStd::string ResolveIconPath(const AZStd::string& kind)
         {
-            static const AZStd::string repoRoot = FindRepoRootForIcons();
-            if (repoRoot.empty())
-            {
-                return {};
-            }
-
-            const AZStd::string requested = JoinPath(repoRoot, IconPathForKind(kind).c_str());
+            const AZStd::string requested = ResolveRepoRelativePath(IconPathForKind(kind).c_str());
             if (FileExists(requested))
             {
                 return requested;
             }
 
-            const AZStd::string fallback = JoinPath(repoRoot, "Content\\Art\\Icons\\UI\\icon_missing.png");
+            const AZStd::string fallback = ResolveRepoRelativePath("Content\\Art\\Icons\\UI\\icon_missing.png");
             return FileExists(fallback) ? fallback : AZStd::string{};
         }
 
@@ -584,6 +693,233 @@ namespace UiClient
                 sample.m_loaded = !path.empty() && LoadPngIconSample(path, sample);
             }
             return sample.m_loaded ? &sample : nullptr;
+        }
+
+        bool LoadPngMapImage(const AZStd::string& path, PngMapImage& outImage)
+        {
+            std::wstring widePath;
+            if (!ToWidePath(path, widePath))
+            {
+                return false;
+            }
+
+            static Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
+            if (!factory)
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+            if (FAILED(factory->CreateDecoderFromFilename(
+                    widePath.c_str(),
+                    nullptr,
+                    GENERIC_READ,
+                    WICDecodeMetadataCacheOnLoad,
+                    decoder.GetAddressOf())))
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+            if (FAILED(decoder->GetFrame(0, frame.GetAddressOf())))
+            {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+            if (FAILED(factory->CreateFormatConverter(converter.GetAddressOf())))
+            {
+                return false;
+            }
+            if (FAILED(converter->Initialize(
+                    frame.Get(),
+                    GUID_WICPixelFormat32bppRGBA,
+                    WICBitmapDitherTypeNone,
+                    nullptr,
+                    0.0,
+                    WICBitmapPaletteTypeCustom)))
+            {
+                return false;
+            }
+
+            UINT width = 0;
+            UINT height = 0;
+            if (FAILED(converter->GetSize(&width, &height)) ||
+                width == 0 ||
+                height == 0 ||
+                width > MaxPngMapSourceDimension ||
+                height > MaxPngMapSourceDimension)
+            {
+                return false;
+            }
+
+            const UINT stride = width * 4;
+            const UINT byteCount = stride * height;
+            std::vector<unsigned char> rgba(byteCount);
+            if (FAILED(converter->CopyPixels(nullptr, stride, byteCount, rgba.data())))
+            {
+                return false;
+            }
+
+            outImage.m_path = path;
+            outImage.m_width = static_cast<int>(width);
+            outImage.m_height = static_cast<int>(height);
+            outImage.m_pixels.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
+            for (UINT y = 0; y < height; ++y)
+            {
+                for (UINT x = 0; x < width; ++x)
+                {
+                    const size_t sourceIndex = (static_cast<size_t>(y) * stride) + (static_cast<size_t>(x) * 4);
+                    outImage.m_pixels[(static_cast<size_t>(y) * width) + x] =
+                        IM_COL32(rgba[sourceIndex], rgba[sourceIndex + 1], rgba[sourceIndex + 2], rgba[sourceIndex + 3]);
+                }
+            }
+            return true;
+        }
+
+        const PngMapImage* GetPngMapImage(const MapArtDefinition& definition)
+        {
+            static AZStd::unordered_map<AZStd::string, PngMapImage> mapCache;
+            PngMapImage& image = mapCache[definition.m_mapArtId];
+            if (!image.m_attempted)
+            {
+                image.m_attempted = true;
+                const AZStd::string path = ResolveRepoRelativePath(definition.m_imagePath);
+                image.m_loaded = !path.empty() && LoadPngMapImage(path, image);
+            }
+            return image.m_loaded ? &image : nullptr;
+        }
+
+        ImVec2 FitMapArtBounds(const ImVec2& minBounds, const ImVec2& maxBounds, const MapArtDefinition& definition, bool getMax)
+        {
+            const float width = maxBounds.x - minBounds.x;
+            const float height = maxBounds.y - minBounds.y;
+            const float imageAspect = definition.m_imageHeight > 0
+                ? static_cast<float>(definition.m_imageWidth) / static_cast<float>(definition.m_imageHeight)
+                : 1.0f;
+            float drawWidth = width;
+            float drawHeight = width / imageAspect;
+            if (drawHeight > height)
+            {
+                drawHeight = height;
+                drawWidth = height * imageAspect;
+            }
+
+            const ImVec2 drawMin(
+                minBounds.x + ((width - drawWidth) * 0.5f),
+                minBounds.y + ((height - drawHeight) * 0.5f));
+            const ImVec2 drawMax(drawMin.x + drawWidth, drawMin.y + drawHeight);
+            return getMax ? drawMax : drawMin;
+        }
+
+        ImVec2 ClampMapPan(
+            const ImVec2& pan,
+            const ImVec2& canvasMin,
+            const ImVec2& canvasMax,
+            const ImVec2& fitMin,
+            const ImVec2& fitMax,
+            float zoom)
+        {
+            const float canvasWidth = canvasMax.x - canvasMin.x;
+            const float canvasHeight = canvasMax.y - canvasMin.y;
+            const float drawWidth = (fitMax.x - fitMin.x) * zoom;
+            const float drawHeight = (fitMax.y - fitMin.y) * zoom;
+            const float maxPanX = drawWidth > canvasWidth ? ((drawWidth - canvasWidth) * 0.5f) + 36.0f : 0.0f;
+            const float maxPanY = drawHeight > canvasHeight ? ((drawHeight - canvasHeight) * 0.5f) + 36.0f : 0.0f;
+            return ImVec2(
+                AZ::GetClamp(pan.x, -maxPanX, maxPanX),
+                AZ::GetClamp(pan.y, -maxPanY, maxPanY));
+        }
+
+        bool PointInsideRect(const ImVec2& point, const ImVec2& minBounds, const ImVec2& maxBounds)
+        {
+            return point.x >= minBounds.x && point.x <= maxBounds.x &&
+                point.y >= minBounds.y && point.y <= maxBounds.y;
+        }
+
+        bool DrawPngMapArt(
+            ImDrawList* drawList,
+            const ImVec2& clipMin,
+            const ImVec2& clipMax,
+            const ImVec2& minBounds,
+            const ImVec2& maxBounds,
+            const MapArtDefinition& definition)
+        {
+            const PngMapImage* image = GetPngMapImage(definition);
+            if (!image || image->m_width <= 0 || image->m_height <= 0 || image->m_pixels.empty())
+            {
+                return false;
+            }
+
+            const float width = maxBounds.x - minBounds.x;
+            const float height = maxBounds.y - minBounds.y;
+            if (width <= 1.0f || height <= 1.0f)
+            {
+                return true;
+            }
+
+            const ImVec2 visibleMin(AZ::GetMax(clipMin.x, minBounds.x), AZ::GetMax(clipMin.y, minBounds.y));
+            const ImVec2 visibleMax(AZ::GetMin(clipMax.x, maxBounds.x), AZ::GetMin(clipMax.y, maxBounds.y));
+            const float visibleWidth = visibleMax.x - visibleMin.x;
+            const float visibleHeight = visibleMax.y - visibleMin.y;
+            if (visibleWidth <= 1.0f || visibleHeight <= 1.0f)
+            {
+                return true;
+            }
+
+            const int columns = AZ::GetClamp(
+                static_cast<int>(visibleWidth * 0.52f),
+                MapRasterMinimumColumns,
+                MapRasterMaximumColumns);
+            const int rows = AZ::GetClamp(
+                static_cast<int>(visibleHeight * 0.52f),
+                MapRasterMinimumRows,
+                MapRasterMaximumRows);
+            const float cellWidth = visibleWidth / static_cast<float>(columns);
+            const float cellHeight = visibleHeight / static_cast<float>(rows);
+            for (int y = 0; y < rows; ++y)
+            {
+                const float cellMinY = visibleMin.y + (cellHeight * y);
+                const float cellMaxY = visibleMin.y + (cellHeight * (y + 1)) + 0.55f;
+                const float normalizedY = AZ::GetClamp(((cellMinY + cellMaxY) * 0.5f - minBounds.y) / height, 0.0f, 1.0f);
+                const int sourceY = AZ::GetClamp(
+                    static_cast<int>(normalizedY * static_cast<float>(image->m_height - 1)),
+                    0,
+                    image->m_height - 1);
+                for (int x = 0; x < columns; ++x)
+                {
+                    const float cellMinX = visibleMin.x + (cellWidth * x);
+                    const float cellMaxX = visibleMin.x + (cellWidth * (x + 1)) + 0.55f;
+                    const float normalizedX = AZ::GetClamp(((cellMinX + cellMaxX) * 0.5f - minBounds.x) / width, 0.0f, 1.0f);
+                    const int sourceX = AZ::GetClamp(
+                        static_cast<int>(normalizedX * static_cast<float>(image->m_width - 1)),
+                        0,
+                        image->m_width - 1);
+                    const ImU32 pixel = image->m_pixels[(static_cast<size_t>(sourceY) * image->m_width) + sourceX];
+                    const int alpha = (pixel >> IM_COL32_A_SHIFT) & 0xFF;
+                    if (alpha < 8)
+                    {
+                        continue;
+                    }
+                    drawList->AddRectFilled(ImVec2(cellMinX, cellMinY), ImVec2(cellMaxX, cellMaxY), pixel);
+                }
+            }
+            return true;
+        }
+
+        ImVec2 CalibratedMapToScreen(const MapArtDefinition& definition, const ImVec2& drawMin, const ImVec2& drawMax, double x, double y)
+        {
+            const double width = (definition.m_maxX - definition.m_minX) > 1.0 ? (definition.m_maxX - definition.m_minX) : 1.0;
+            const double height = (definition.m_maxY - definition.m_minY) > 1.0 ? (definition.m_maxY - definition.m_minY) : 1.0;
+            const double normalizedX = AZ::GetClamp((x - definition.m_minX) / width, 0.0, 1.0);
+            const double normalizedY = AZ::GetClamp((y - definition.m_minY) / height, 0.0, 1.0);
+            const double pixelX = definition.m_pixelMinX + (normalizedX * (definition.m_pixelMaxX - definition.m_pixelMinX));
+            const double pixelY = definition.m_pixelMaxY - (normalizedY * (definition.m_pixelMaxY - definition.m_pixelMinY));
+            const float imageX = definition.m_imageWidth > 0 ? static_cast<float>(pixelX / definition.m_imageWidth) : 0.0f;
+            const float imageY = definition.m_imageHeight > 0 ? static_cast<float>(pixelY / definition.m_imageHeight) : 0.0f;
+            return ImVec2(
+                drawMin.x + (imageX * (drawMax.x - drawMin.x)),
+                drawMin.y + (imageY * (drawMax.y - drawMin.y)));
         }
 
         ImU32 MutedIconColor(ImU32 color)
@@ -1051,14 +1387,8 @@ namespace UiClient
             return "Service";
         }
 
-        bool ShouldOpenQuestForEntity(const GameCore::ClientWorldState& worldState, const NetClient::VisibleEntity& entity)
+        bool QuestMatchesEntityForInteraction(const NetClient::QuestState& quest, const NetClient::VisibleEntity& entity)
         {
-            if (!IsQuestGiverNpc(entity))
-            {
-                return false;
-            }
-
-            const auto& quest = worldState.m_session.m_quest;
             if (quest.m_id.empty())
             {
                 return false;
@@ -1066,22 +1396,22 @@ namespace UiClient
 
             const bool isQuestGiver = quest.m_giverNpcId == entity.m_id;
             const bool isQuestTurnIn = quest.m_turnInNpcId == entity.m_id;
-            if (quest.m_state == "not_started")
+            if (quest.m_state == "not_started" || quest.m_statusBucket == "available")
             {
                 return isQuestGiver;
             }
-            if (quest.m_state == "completed")
+            if (quest.m_state == "completed" || quest.m_state == "ready" ||
+                quest.m_statusBucket == "ready_to_turn_in" || quest.m_statusBucket == "ready_to_complete")
             {
                 return isQuestTurnIn;
             }
             if (quest.m_state == "active")
             {
-                if (quest.m_currentCount >= quest.m_targetCount)
+                if (quest.m_currentCount >= quest.m_targetCount && quest.m_targetCount > 0)
                 {
                     return isQuestTurnIn;
                 }
 
-                // Talk/trainer/explore/use quests can complete from their destination service NPC.
                 return isQuestTurnIn &&
                     (quest.m_objectiveType == "talk" ||
                      quest.m_objectiveType == "trainer" ||
@@ -1090,6 +1420,51 @@ namespace UiClient
             }
 
             return false;
+        }
+
+        const NetClient::QuestState* FindQuestForEntityInteraction(
+            const GameCore::ClientWorldState& worldState,
+            const NetClient::VisibleEntity& entity)
+        {
+            for (const auto& quest : worldState.m_session.m_quests)
+            {
+                if ((quest.m_state == "completed" || quest.m_state == "ready" ||
+                        quest.m_statusBucket == "ready_to_turn_in" || quest.m_statusBucket == "ready_to_complete") &&
+                    QuestMatchesEntityForInteraction(quest, entity))
+                {
+                    return &quest;
+                }
+            }
+            for (const auto& quest : worldState.m_session.m_quests)
+            {
+                if ((quest.m_state == "not_started" || quest.m_statusBucket == "available") &&
+                    QuestMatchesEntityForInteraction(quest, entity))
+                {
+                    return &quest;
+                }
+            }
+            for (const auto& quest : worldState.m_session.m_quests)
+            {
+                if (QuestMatchesEntityForInteraction(quest, entity))
+                {
+                    return &quest;
+                }
+            }
+            if (QuestMatchesEntityForInteraction(worldState.m_session.m_quest, entity))
+            {
+                return &worldState.m_session.m_quest;
+            }
+            return nullptr;
+        }
+
+        bool ShouldOpenQuestForEntity(const GameCore::ClientWorldState& worldState, const NetClient::VisibleEntity& entity)
+        {
+            if (!IsQuestGiverNpc(entity))
+            {
+                return false;
+            }
+
+            return FindQuestForEntityInteraction(worldState, entity) != nullptr;
         }
 
         AZStd::string GetInventorySlotLabel(const NetClient::InventorySlotState& slot)
@@ -2236,7 +2611,7 @@ namespace UiClient
                 ImVec2(center.x - 7.0f, center.y + 8.0f),
                 ImVec2(center.x + 7.0f, center.y + 8.0f),
                 ColorU32(226, 240, 243));
-            ImGui::TextUnformatted("Markers: quests, trainer, services, current target");
+            ImGui::TextUnformatted("Markers: quests, objectives, services, travel, current target");
         }
 
         ImU32 MapMarkerColor(const AZStd::string& kind)
@@ -2260,6 +2635,14 @@ namespace UiClient
             if (kind == "vendor")
             {
                 return ColorU32(183, 135, 223);
+            }
+            if (kind == "travel_point")
+            {
+                return ColorU32(78, 196, 191);
+            }
+            if (kind == "bind_point")
+            {
+                return ColorU32(148, 162, 176);
             }
             return ColorU32(210, 210, 198);
         }
@@ -2355,99 +2738,226 @@ namespace UiClient
             return false;
         }
 
+        const char* QuestStateLabel(const NetClient::QuestState& quest);
+        bool QuestCanBeTracked(const NetClient::QuestState& quest);
+        void DrawQuestRewardPreview(const NetClient::QuestState& quest);
+
         void DrawZoneMapWindow(
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
             float playerX,
-            float playerY)
+            float playerY,
+            AZStd::string& selectedQuestId,
+            bool& openQuestLogRequested)
         {
             const auto& zoneMap = worldState.m_session.m_zoneMap;
-            ImGui::Text("%s", zoneMap.m_displayName.empty() ? "Stonewake Vale" : zoneMap.m_displayName.c_str());
-            ImGui::TextUnformatted("Authored navigation blockout");
+            const MapArtDefinition* selectedMapArt = &DawnwakeWorldMapArt;
+            bool drawCalibratedOverlays = true;
+            static int referenceMapIndex = 0;
+            static MapViewState mapViewState;
+
+            if (ImGui::BeginTabBar("##dawnwake_map_tabs"))
+            {
+                if (ImGui::BeginTabItem("World"))
+                {
+                    selectedMapArt = &DawnwakeWorldMapArt;
+                    drawCalibratedOverlays = true;
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Zone"))
+                {
+                    const MapArtDefinition* zoneArt = FindZoneMapArt(zoneMap.m_zoneId);
+                    selectedMapArt = zoneArt ? zoneArt : &DawnwakeZoneMapArtDefinitions[0];
+                    drawCalibratedOverlays = !selectedMapArt->m_displayOnly;
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Reference Maps"))
+                {
+                    referenceMapIndex = AZ::GetClamp(referenceMapIndex, 0, static_cast<int>(AZ_ARRAY_SIZE(DawnwakeZoneMapArtDefinitions)) - 1);
+                    if (ImGui::BeginCombo("Map Art", DawnwakeZoneMapArtDefinitions[referenceMapIndex].m_displayName))
+                    {
+                        for (int index = 0; index < static_cast<int>(AZ_ARRAY_SIZE(DawnwakeZoneMapArtDefinitions)); ++index)
+                        {
+                            const bool selected = index == referenceMapIndex;
+                            if (ImGui::Selectable(DawnwakeZoneMapArtDefinitions[index].m_displayName, selected))
+                            {
+                                referenceMapIndex = index;
+                            }
+                            if (selected)
+                            {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    selectedMapArt = &DawnwakeZoneMapArtDefinitions[referenceMapIndex];
+                    drawCalibratedOverlays = !selectedMapArt->m_displayOnly && zoneMap.m_zoneId == selectedMapArt->m_zoneId;
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+
+            if (mapViewState.m_mapArtId != selectedMapArt->m_mapArtId)
+            {
+                mapViewState.m_mapArtId = selectedMapArt->m_mapArtId;
+                mapViewState.m_zoom = 1.0f;
+                mapViewState.m_pan = ImVec2(0.0f, 0.0f);
+            }
+
+            ImGui::Text("%s", selectedMapArt->m_displayName);
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", selectedMapArt->m_calibrationAccuracy);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Fit##dawnwake_map_fit"))
+            {
+                mapViewState.m_zoom = 1.0f;
+                mapViewState.m_pan = ImVec2(0.0f, 0.0f);
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(132.0f);
+            if (ImGui::SliderFloat("Zoom##dawnwake_map_zoom", &mapViewState.m_zoom, MapZoomMinimum, MapZoomMaximum, "%.1fx"))
+            {
+                mapViewState.m_zoom = AZ::GetClamp(mapViewState.m_zoom, MapZoomMinimum, MapZoomMaximum);
+            }
 
             const ImVec2 availableRegion = ImGui::GetContentRegionAvail();
             const ImVec2 canvasSize(
-                AZ::GetMax(590.0f, availableRegion.x),
-                AZ::GetMax(360.0f, availableRegion.y - 26.0f));
+                AZ::GetMax(660.0f, availableRegion.x),
+                AZ::GetMax(430.0f, availableRegion.y - 18.0f));
             const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
             ImGui::InvisibleButton("##stonewake_zone_map_canvas", canvasSize);
             const bool canvasClicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+            const bool canvasHovered = ImGui::IsItemHovered();
             const ImVec2 clickPoint = ImGui::GetIO().MousePos;
+            const ImGuiIO& io = ImGui::GetIO();
+            if (canvasHovered && io.MouseWheel != 0.0f)
+            {
+                mapViewState.m_zoom = AZ::GetClamp(mapViewState.m_zoom + (io.MouseWheel * 0.18f), MapZoomMinimum, MapZoomMaximum);
+            }
+            if (canvasHovered && ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f))
+            {
+                mapViewState.m_pan.x += io.MouseDelta.x;
+                mapViewState.m_pan.y += io.MouseDelta.y;
+            }
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
             drawList->AddRectFilled(canvasMin, canvasMax, ColorU32(18, 25, 29, 245), 6.0f);
             drawList->AddRect(canvasMin, canvasMax, ColorU32(126, 132, 117), 6.0f, 0, 1.5f);
 
-            const double minX = zoneMap.m_minX;
-            const double minY = zoneMap.m_minY;
-            const double width = (zoneMap.m_maxX - zoneMap.m_minX) > 1.0 ? (zoneMap.m_maxX - zoneMap.m_minX) : 1.0;
-            const double height = (zoneMap.m_maxY - zoneMap.m_minY) > 1.0 ? (zoneMap.m_maxY - zoneMap.m_minY) : 1.0;
+            const ImVec2 artCanvasMin(canvasMin.x + 10.0f, canvasMin.y + 10.0f);
+            const ImVec2 artCanvasMax(canvasMax.x - 10.0f, canvasMax.y - 10.0f);
+            const ImVec2 fitMin = FitMapArtBounds(artCanvasMin, artCanvasMax, *selectedMapArt, false);
+            const ImVec2 fitMax = FitMapArtBounds(artCanvasMin, artCanvasMax, *selectedMapArt, true);
+            mapViewState.m_zoom = AZ::GetClamp(mapViewState.m_zoom, MapZoomMinimum, MapZoomMaximum);
+            mapViewState.m_pan = ClampMapPan(mapViewState.m_pan, artCanvasMin, artCanvasMax, fitMin, fitMax, mapViewState.m_zoom);
+            const float fitWidth = fitMax.x - fitMin.x;
+            const float fitHeight = fitMax.y - fitMin.y;
+            const ImVec2 fitCenter((fitMin.x + fitMax.x) * 0.5f, (fitMin.y + fitMax.y) * 0.5f);
+            const ImVec2 artMin(
+                fitCenter.x - ((fitWidth * mapViewState.m_zoom) * 0.5f) + mapViewState.m_pan.x,
+                fitCenter.y - ((fitHeight * mapViewState.m_zoom) * 0.5f) + mapViewState.m_pan.y);
+            const ImVec2 artMax(
+                artMin.x + (fitWidth * mapViewState.m_zoom),
+                artMin.y + (fitHeight * mapViewState.m_zoom));
+            drawList->PushClipRect(artCanvasMin, artCanvasMax, true);
+            const bool mapArtLoaded = DrawPngMapArt(drawList, artCanvasMin, artCanvasMax, artMin, artMax, *selectedMapArt);
+            if (!mapArtLoaded)
+            {
+                drawList->AddRectFilled(artMin, artMax, ColorU32(35, 45, 42, 245), 4.0f);
+                const char* fallbackLabel = "Map art unavailable - schematic fallback";
+                const ImVec2 labelSize = ImGui::CalcTextSize(fallbackLabel);
+                drawList->AddText(
+                    ImVec2(artMin.x + ((artMax.x - artMin.x - labelSize.x) * 0.5f), artMin.y + 18.0f),
+                    ColorU32(230, 224, 198),
+                    fallbackLabel);
+            }
+            drawList->AddRect(artMin, artMax, ColorU32(230, 214, 166, mapArtLoaded ? 170 : 210), 4.0f, 0, 1.5f);
+
             auto mapToScreen = [&](double x, double y) -> ImVec2
             {
-                const float normalizedX = static_cast<float>((x - minX) / width);
-                const float normalizedY = static_cast<float>((y - minY) / height);
-                return ImVec2(
-                    canvasMin.x + 18.0f + (normalizedX * (canvasSize.x - 36.0f)),
-                    canvasMax.y - 18.0f - (normalizedY * (canvasSize.y - 36.0f)));
+                return CalibratedMapToScreen(*selectedMapArt, artMin, artMax, x, y);
             };
 
-            for (const auto& road : zoneMap.m_roads)
+            if (drawCalibratedOverlays)
             {
-                for (size_t pointIndex = 1; pointIndex < road.m_points.size(); ++pointIndex)
+                const float roadUnderlayWidth = AZ::GetClamp(8.0f * AZStd::sqrt(mapViewState.m_zoom), 8.0f, 14.0f);
+                const float roadLineWidth = AZ::GetClamp(3.0f * AZStd::sqrt(mapViewState.m_zoom), 3.0f, 5.5f);
+                for (const auto& road : zoneMap.m_roads)
                 {
-                    const ImVec2 previous = mapToScreen(road.m_points[pointIndex - 1].m_x, road.m_points[pointIndex - 1].m_y);
-                    const ImVec2 current = mapToScreen(road.m_points[pointIndex].m_x, road.m_points[pointIndex].m_y);
-                    drawList->AddLine(previous, current, ColorU32(88, 65, 36), 7.0f);
-                    drawList->AddLine(previous, current, ColorU32(226, 184, 104), 3.0f);
+                    for (size_t pointIndex = 1; pointIndex < road.m_points.size(); ++pointIndex)
+                    {
+                        const ImVec2 previous = mapToScreen(road.m_points[pointIndex - 1].m_x, road.m_points[pointIndex - 1].m_y);
+                        const ImVec2 current = mapToScreen(road.m_points[pointIndex].m_x, road.m_points[pointIndex].m_y);
+                        drawList->AddLine(previous, current, ColorU32(58, 39, 21, 180), roadUnderlayWidth);
+                        drawList->AddLine(previous, current, ColorU32(242, 214, 138, 210), roadLineWidth);
+                    }
                 }
             }
 
             const NetClient::NavigationAreaState* clickedArea = nullptr;
             float clickedAreaDistance = 999999.0f;
-            for (const auto& area : worldState.m_session.m_navigationAreas)
+            if (drawCalibratedOverlays)
             {
-                const ImVec2 center = mapToScreen(area.m_centerX, area.m_centerY);
-                const float radius = static_cast<float>((area.m_radius / width) * (canvasSize.x - 36.0f));
-                const ImU32 areaColor = area.m_kind == "hostile_objective" ? ColorU32(135, 74, 52, 65) : ColorU32(72, 121, 112, 55);
-                drawList->AddCircleFilled(center, AZ::GetClamp(radius, 8.0f, 42.0f), areaColor, 32);
-                drawList->AddCircle(center, AZ::GetClamp(radius, 8.0f, 42.0f), ColorU32(178, 166, 124, 130), 32, 1.0f);
-                if (canvasClicked && !area.m_questIds.empty())
+                for (const auto& area : worldState.m_session.m_navigationAreas)
                 {
-                    const float deltaX = clickPoint.x - center.x;
-                    const float deltaY = clickPoint.y - center.y;
-                    const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
-                    const float clickRadius = AZ::GetClamp(radius, 10.0f, 48.0f);
-                    if (distance <= clickRadius && distance < clickedAreaDistance)
+                    const ImVec2 center = mapToScreen(area.m_centerX, area.m_centerY);
+                    if (!PointInsideRect(center, artCanvasMin, artCanvasMax))
                     {
-                        clickedArea = &area;
-                        clickedAreaDistance = distance;
+                        continue;
+                    }
+                    const ImVec2 radiusPoint = mapToScreen(area.m_centerX + area.m_radius, area.m_centerY);
+                    const float radius = Distance2D(center.x, center.y, radiusPoint.x, radiusPoint.y);
+                    const ImU32 areaColor = area.m_kind == "hostile_objective" ? ColorU32(135, 74, 52, 65) : ColorU32(72, 121, 112, 55);
+                    const float visibleRadius = AZ::GetClamp(radius, 8.0f, 72.0f);
+                    drawList->AddCircleFilled(center, visibleRadius, areaColor, 32);
+                    drawList->AddCircle(center, visibleRadius, ColorU32(32, 23, 14, 155), 32, 1.0f);
+                    if (canvasClicked && !area.m_questIds.empty())
+                    {
+                        const float deltaX = clickPoint.x - center.x;
+                        const float deltaY = clickPoint.y - center.y;
+                        const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
+                        const float clickRadius = AZ::GetClamp(radius, 10.0f, 76.0f);
+                        if (distance <= clickRadius && distance < clickedAreaDistance)
+                        {
+                            clickedArea = &area;
+                            clickedAreaDistance = distance;
+                        }
                     }
                 }
             }
 
             AZStd::vector<MapLabelRect> placedLabels;
-            for (const auto& landmark : zoneMap.m_landmarks)
+            if (drawCalibratedOverlays)
             {
-                const ImVec2 point = mapToScreen(landmark.m_x, landmark.m_y);
-                drawList->AddRectFilled(
-                    ImVec2(point.x - 5.5f, point.y - 5.5f),
-                    ImVec2(point.x + 5.5f, point.y + 5.5f),
-                    ColorU32(206, 198, 154),
-                    2.0f);
-                drawList->AddRect(
-                    ImVec2(point.x - 7.0f, point.y - 7.0f),
-                    ImVec2(point.x + 7.0f, point.y + 7.0f),
-                    ColorU32(35, 28, 18),
-                    2.0f,
-                    0,
-                    1.5f);
-                TryDrawMapLabel(
-                    drawList,
-                    placedLabels,
-                    point,
-                    landmark.m_displayName.c_str(),
-                    ColorU32(223, 219, 199),
-                    LandmarkPriority(landmark.m_kind));
+                for (const auto& landmark : zoneMap.m_landmarks)
+                {
+                    const ImVec2 point = mapToScreen(landmark.m_x, landmark.m_y);
+                    if (!PointInsideRect(point, artCanvasMin, artCanvasMax))
+                    {
+                        continue;
+                    }
+                    drawList->AddRectFilled(
+                        ImVec2(point.x - 5.5f, point.y - 5.5f),
+                        ImVec2(point.x + 5.5f, point.y + 5.5f),
+                        ColorU32(230, 219, 166),
+                        2.0f);
+                    drawList->AddRect(
+                        ImVec2(point.x - 7.0f, point.y - 7.0f),
+                        ImVec2(point.x + 7.0f, point.y + 7.0f),
+                        ColorU32(35, 28, 18),
+                        2.0f,
+                        0,
+                        1.5f);
+                    TryDrawMapLabel(
+                        drawList,
+                        placedLabels,
+                        point,
+                        landmark.m_displayName.c_str(),
+                        ColorU32(246, 238, 208),
+                        LandmarkPriority(landmark.m_kind));
+                }
             }
 
             AZStd::vector<const NetClient::MapMarkerState*> sortedMarkers;
@@ -2466,50 +2976,96 @@ namespace UiClient
 
             const NetClient::MapMarkerState* clickedMarker = nullptr;
             float clickedMarkerDistance = 999999.0f;
-            for (const auto* marker : sortedMarkers)
+            if (drawCalibratedOverlays)
             {
-                if (!marker)
+                const float markerRadius = AZ::GetClamp(6.0f * AZStd::sqrt(mapViewState.m_zoom), 6.0f, 10.0f);
+                for (const auto* marker : sortedMarkers)
                 {
-                    continue;
-                }
-
-                const ImVec2 point = mapToScreen(marker->m_x, marker->m_y);
-                drawList->AddCircleFilled(point, 6.0f, MapMarkerColor(marker->m_kind), 20);
-                drawList->AddCircle(point, 7.5f, ColorU32(21, 25, 27), 20, 1.5f);
-                if (canvasClicked)
-                {
-                    const float deltaX = clickPoint.x - point.x;
-                    const float deltaY = clickPoint.y - point.y;
-                    const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
-                    if (distance <= 18.0f && distance < clickedMarkerDistance)
+                    if (!marker)
                     {
-                        clickedMarker = marker;
-                        clickedMarkerDistance = distance;
+                        continue;
                     }
-                }
-                const int priority = MapMarkerPriority(marker->m_kind);
-                if (!marker->m_displayName.empty() && priority <= 3)
-                {
-                    TryDrawMapLabel(
-                        drawList,
-                        placedLabels,
-                        point,
-                        marker->m_displayName.c_str(),
-                        ColorU32(240, 232, 206),
-                        priority);
+
+                    const ImVec2 point = mapToScreen(marker->m_x, marker->m_y);
+                    if (!PointInsideRect(point, artCanvasMin, artCanvasMax))
+                    {
+                        continue;
+                    }
+                    drawList->AddCircleFilled(point, markerRadius, MapMarkerColor(marker->m_kind), 20);
+                    drawList->AddCircle(point, markerRadius + 1.5f, ColorU32(21, 25, 27), 20, 1.5f);
+                    if (canvasClicked)
+                    {
+                        const float deltaX = clickPoint.x - point.x;
+                        const float deltaY = clickPoint.y - point.y;
+                        const float distance = AZStd::sqrt((deltaX * deltaX) + (deltaY * deltaY));
+                        if (distance <= markerRadius + 12.0f && distance < clickedMarkerDistance)
+                        {
+                            clickedMarker = marker;
+                            clickedMarkerDistance = distance;
+                        }
+                    }
+                    const int priority = MapMarkerPriority(marker->m_kind);
+                    if (!marker->m_displayName.empty() && priority <= 3)
+                    {
+                        TryDrawMapLabel(
+                            drawList,
+                            placedLabels,
+                            point,
+                            marker->m_displayName.c_str(),
+                            ColorU32(240, 232, 206),
+                            priority);
+                    }
                 }
             }
 
-            const ImVec2 playerPoint = mapToScreen(playerX, playerY);
-            drawList->AddTriangleFilled(
-                ImVec2(playerPoint.x, playerPoint.y - 9.0f),
-                ImVec2(playerPoint.x - 7.0f, playerPoint.y + 7.0f),
-                ImVec2(playerPoint.x + 7.0f, playerPoint.y + 7.0f),
-                ColorU32(226, 240, 243));
-
-            if (canvasClicked && gameCore)
+            if (drawCalibratedOverlays)
             {
-                if (clickedMarker && !clickedMarker->m_entityId.empty())
+                const ImVec2 playerPoint = mapToScreen(playerX, playerY);
+                if (PointInsideRect(playerPoint, artCanvasMin, artCanvasMax))
+                {
+                    const float playerMarkerScale = AZ::GetClamp(AZStd::sqrt(mapViewState.m_zoom), 1.0f, 1.35f);
+                    drawList->AddTriangleFilled(
+                        ImVec2(playerPoint.x, playerPoint.y - (9.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x - (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x + (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ColorU32(226, 240, 243));
+                    drawList->AddTriangle(
+                        ImVec2(playerPoint.x, playerPoint.y - (9.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x - (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ImVec2(playerPoint.x + (7.0f * playerMarkerScale), playerPoint.y + (7.0f * playerMarkerScale)),
+                        ColorU32(24, 31, 32),
+                        1.5f);
+                }
+            }
+            else
+            {
+                drawList->AddText(
+                    ImVec2(artMin.x + 14.0f, artMax.y - 28.0f),
+                    ColorU32(245, 238, 206),
+                    "Display reference - runtime markers hidden until this zone is calibrated.");
+            }
+            drawList->PopClipRect();
+
+            if (drawCalibratedOverlays && canvasClicked && gameCore)
+            {
+                if (clickedMarker && !clickedMarker->m_questId.empty())
+                {
+                    selectedQuestId = clickedMarker->m_questId;
+                    openQuestLogRequested = true;
+                    if (!clickedMarker->m_entityId.empty())
+                    {
+                        gameCore->SetTarget(clickedMarker->m_entityId);
+                    }
+                    if (clickedMarker->m_kind != "quest_available" && gameCore->TrackQuest(clickedMarker->m_questId, true))
+                    {
+                        AZ_Printf(
+                            "amandacore",
+                            "client.zone_map_quest_tracked questId=%s markerId=%s",
+                            clickedMarker->m_questId.c_str(),
+                            clickedMarker->m_id.c_str());
+                    }
+                }
+                else if (clickedMarker && !clickedMarker->m_entityId.empty())
                 {
                     if (gameCore->SetTarget(clickedMarker->m_entityId))
                     {
@@ -2520,19 +3076,10 @@ namespace UiClient
                             clickedMarker->m_id.c_str());
                     }
                 }
-                else if (clickedMarker && !clickedMarker->m_questId.empty())
-                {
-                    if (gameCore->TrackQuest(clickedMarker->m_questId, true))
-                    {
-                        AZ_Printf(
-                            "amandacore",
-                            "client.zone_map_quest_tracked questId=%s markerId=%s",
-                            clickedMarker->m_questId.c_str(),
-                            clickedMarker->m_id.c_str());
-                    }
-                }
                 else if (clickedArea && !clickedArea->m_questIds.empty())
                 {
+                    selectedQuestId = clickedArea->m_questIds[0];
+                    openQuestLogRequested = true;
                     if (gameCore->TrackQuest(clickedArea->m_questIds[0], true))
                     {
                         AZ_Printf(
@@ -2544,7 +3091,7 @@ namespace UiClient
                 }
             }
 
-            ImGui::TextUnformatted("Legend: white player, rust objective, gold available, green turn-in, blue trainer, violet vendor. Click markers to target or track.");
+            ImGui::TextUnformatted("Legend: white player, rust objective, gold available, green turn-in, blue trainer, violet vendor, teal travel, slate bind. Click quest markers to inspect or track.");
         }
 
         void DrawStonewakeLandmarkNameplates(
@@ -2659,120 +3206,140 @@ namespace UiClient
             }
         }
 
-        void DrawQuestTracker(
+        bool DrawQuestTracker(
             const GameCore::ClientWorldState& worldState,
             bool nearCommandPoint,
             float distanceToCommandPoint,
-            float distanceToEncounter)
+            float distanceToEncounter,
+            bool& collapsed,
+            AZStd::string& selectedQuestId)
         {
-            const NetClient::QuestState* trackerQuest = &worldState.m_session.m_quest;
+            bool openQuestLogRequested = false;
+            if (ImGui::SmallButton(collapsed ? "Expand" : "Collapse"))
+            {
+                collapsed = !collapsed;
+            }
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Tracked Quests");
+            ImGui::Separator();
+            if (collapsed)
+            {
+                ImGui::TextDisabled("Objective tracker hidden.");
+                return false;
+            }
+
+            AZStd::vector<const NetClient::QuestState*> trackerQuests;
             for (const auto& quest : worldState.m_session.m_quests)
             {
-                if (quest.m_tracked)
+                if (quest.m_tracked && QuestCanBeTracked(quest))
                 {
-                    trackerQuest = &quest;
-                    break;
+                    trackerQuests.push_back(&quest);
                 }
             }
-
-            ImGui::TextUnformatted("Stonewake Orders");
-            ImGui::Separator();
-            const AZStd::string trackerTitle = GetQuestDisplayTitle(*trackerQuest);
-            ImGui::TextUnformatted(trackerTitle.c_str());
-            if (trackerQuest->m_groupRecommended)
+            if (trackerQuests.empty() && QuestCanBeTracked(worldState.m_session.m_quest))
             {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.93f, 0.70f, 0.33f, 1.0f));
-                if (trackerQuest->m_recommendedPlayers > 0)
-                {
-                    ImGui::Text("Recommended group: %d players", trackerQuest->m_recommendedPlayers);
-                }
-                else
-                {
-                    ImGui::TextUnformatted("Recommended group");
-                }
-                ImGui::PopStyleColor();
-                if (!trackerQuest->m_partyStatusText.empty())
-                {
-                    ImGui::TextWrapped(
-                        "%s Nearby: %d, eligible: %d.",
-                        trackerQuest->m_partyStatusText.c_str(),
-                        trackerQuest->m_partyNearbyCount,
-                        trackerQuest->m_partyEligibleCount);
-                }
+                trackerQuests.push_back(&worldState.m_session.m_quest);
             }
 
-            if (trackerQuest->m_state == "not_started")
+            if (trackerQuests.empty())
             {
-                ImGui::TextWrapped("%s", trackerQuest->m_objectiveText.c_str());
+                ImGui::TextDisabled("No tracked quests.");
+                ImGui::TextWrapped("Open the Quest Log to review available or completed objectives.");
+            }
+            for (const NetClient::QuestState* trackerQuest : trackerQuests)
+            {
+                if (!trackerQuest)
+                {
+                    continue;
+                }
+                ImGui::PushID(trackerQuest->m_id.c_str());
+                const bool completed = trackerQuest->m_state == "completed" || trackerQuest->m_statusBucket == "ready_to_turn_in";
+                if (completed)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.52f, 0.92f, 0.64f, 1.0f));
+                }
+                const AZStd::string trackerTitle = GetQuestDisplayTitle(*trackerQuest);
+                if (ImGui::Selectable(trackerTitle.c_str(), selectedQuestId == trackerQuest->m_id))
+                {
+                    selectedQuestId = trackerQuest->m_id;
+                    openQuestLogRequested = true;
+                }
+                if (completed)
+                {
+                    ImGui::PopStyleColor();
+                }
+                ImGui::TextDisabled("%s", QuestStateLabel(*trackerQuest));
+                if (!trackerQuest->m_objectiveGraph.empty())
+                {
+                    for (const auto& node : trackerQuest->m_objectiveGraph)
+                    {
+                        if (!node.m_active && !node.m_completed)
+                        {
+                            continue;
+                        }
+                        ImGui::BulletText(
+                            "%s: %d / %d%s",
+                            node.m_kind.empty() ? node.m_nodeId.c_str() : node.m_kind.c_str(),
+                            node.m_currentCount,
+                            node.m_targetCount,
+                            node.m_completed ? " complete" : "");
+                    }
+                }
+                else if (trackerQuest->m_targetCount > 0)
+                {
+                    ImGui::Text(
+                        "%s: %d / %d",
+                        trackerQuest->m_objectiveText.c_str(),
+                        trackerQuest->m_currentCount,
+                        trackerQuest->m_targetCount);
+                }
+                else if (!trackerQuest->m_objectiveText.empty())
+                {
+                    ImGui::TextWrapped("%s", trackerQuest->m_objectiveText.c_str());
+                }
+                if (!trackerQuest->m_objectiveAreaName.empty())
+                {
+                    ImGui::TextWrapped("%s", trackerQuest->m_objectiveAreaName.c_str());
+                }
+                if (!trackerQuest->m_routeHintText.empty())
+                {
+                    ImGui::TextWrapped("%s", trackerQuest->m_routeHintText.c_str());
+                }
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::PopID();
+            }
+
+            if (trackerQuests.empty())
+            {
                 ImGui::Spacing();
                 if (nearCommandPoint)
                 {
-                    ImGui::TextWrapped("Find the highlighted Stonewake quest giver, left-click to target, then right-click the NPC model to review orders.");
+                    ImGui::TextWrapped("A nearby quest giver has available orders.");
                 }
-                else
+                else if (distanceToCommandPoint > 0.0f)
                 {
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.93f, 0.70f, 0.33f, 1.0f));
-                    ImGui::TextWrapped("Find Commander Elian Rook in Hearthwatch Yard. Distance %.1fm.", distanceToCommandPoint);
-                    ImGui::PopStyleColor();
+                    ImGui::TextWrapped("Quest givers and objectives are shown on the Navigator and Zone Map when available.");
                 }
-            }
-            else if (trackerQuest->m_state == "active")
-            {
-                ImGui::Text(
-                    "%s: %d / %d",
-                    trackerQuest->m_objectiveText.c_str(),
-                    trackerQuest->m_currentCount,
-                    trackerQuest->m_targetCount);
-                const AZStd::string routeHint = trackerQuest->m_routeHintText.empty()
-                    ? AZStd::string::format("Follow the Stonewake route markers. Next landmark distance %.1fm.", distanceToEncounter)
-                    : trackerQuest->m_routeHintText;
-                ImGui::TextWrapped("%s", routeHint.c_str());
-                ImGui::Text(
-                    "Reward: %d XP and %dg %ds %dc",
-                    trackerQuest->m_rewardXp,
-                    trackerQuest->m_rewardCurrencyGold,
-                    trackerQuest->m_rewardCurrencySilver,
-                    trackerQuest->m_rewardCurrencyCopper);
-            }
-            else if (trackerQuest->m_state == "completed")
-            {
-                ImGui::TextWrapped("Objective complete. Return to the listed turn-in NPC and right-click to claim the reward.");
-                ImGui::Text(
-                    "Reward: %d XP and %dg %ds %dc",
-                    trackerQuest->m_rewardXp,
-                    trackerQuest->m_rewardCurrencyGold,
-                    trackerQuest->m_rewardCurrencySilver,
-                    trackerQuest->m_rewardCurrencyCopper);
-            }
-            else if (trackerQuest->m_state == "reward_granted")
-            {
-                ImGui::TextWrapped("Completed and persisted.");
-                ImGui::Text(
-                    "Rewards: +%d XP  |  +%dg %ds %dc",
-                    trackerQuest->m_rewardXp,
-                    trackerQuest->m_rewardCurrencyGold,
-                    trackerQuest->m_rewardCurrencySilver,
-                    trackerQuest->m_rewardCurrencyCopper);
-                ImGui::TextUnformatted("Reconnects and restarts preserve this state.");
             }
 
             ImGui::Spacing();
             ImGui::Separator();
-            ImGui::TextUnformatted("Warrior Trainer");
+            ImGui::TextUnformatted("Nearby Services");
             if (!worldState.m_session.m_trainer.m_displayName.empty())
             {
-                ImGui::TextUnformatted(worldState.m_session.m_trainer.m_displayName.c_str());
+                ImGui::Text("Trainer: %s", worldState.m_session.m_trainer.m_displayName.c_str());
             }
             if (nearCommandPoint)
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.74f, 0.88f, 0.66f, 1.0f));
-                ImGui::TextWrapped("Find the blue-gold trainer NPC, left-click to target, then right-click the NPC model to train.");
+                ImGui::TextWrapped("Friendly quest and trainer services are nearby.");
                 ImGui::PopStyleColor();
             }
             else
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.93f, 0.70f, 0.33f, 1.0f));
-                ImGui::TextWrapped("Find the blue-gold trainer NPC near the service markers. Distance %.1fm.", distanceToCommandPoint);
+                ImGui::TextWrapped("Service markers appear on the Navigator when available.");
                 ImGui::PopStyleColor();
             }
 
@@ -2802,6 +3369,8 @@ namespace UiClient
             ImGui::Separator();
             ImGui::TextUnformatted("Controls");
             ImGui::TextWrapped("WASD move  |  RMB orbit  |  Tab target  |  E interact  |  ESC close/menu");
+            AZ_UNUSED(distanceToEncounter);
+            return openQuestLogRequested;
         }
 
         void DrawEventLog(const AZStd::deque<AZStd::string>& eventLog)
@@ -3747,42 +4316,58 @@ namespace UiClient
         const char* DrawQuestGossipWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
         {
             const auto* targetEntity = FindTargetEntity(worldState);
+            const NetClient::QuestState* quest = targetEntity
+                ? FindQuestForEntityInteraction(worldState, *targetEntity)
+                : nullptr;
             ImGui::TextUnformatted(targetEntity ? targetEntity->m_displayName.c_str() : "Quest Giver");
+            if (targetEntity && !targetEntity->m_classification.empty())
+            {
+                ImGui::TextDisabled("%s", targetEntity->m_classification.c_str());
+            }
             ImGui::Separator();
-            ImGui::TextUnformatted(worldState.m_session.m_quest.m_title.c_str());
-            ImGui::TextWrapped("%s", worldState.m_session.m_quest.m_objectiveText.c_str());
+            if (!quest)
+            {
+                ImGui::TextWrapped("This NPC has no quest dialogue available in the current world state.");
+                return nullptr;
+            }
+
+            ImGui::TextUnformatted(quest->m_title.c_str());
+            ImGui::TextDisabled("%s", QuestStateLabel(*quest));
+            ImGui::TextWrapped("%s", quest->m_objectiveText.c_str());
+            ImGui::Spacing();
+            DrawQuestRewardPreview(*quest);
             ImGui::Spacing();
 
-            if (worldState.m_session.m_quest.m_state == "not_started")
+            if (quest->m_state == "not_started" || quest->m_statusBucket == "available")
             {
-                ImGui::TextWrapped("This Stonewake order is ready. Accept it here, then follow the objective text in your tracker.");
+                ImGui::TextWrapped("This order is available from the current quest giver.");
                 if (ImGui::Button("Accept Quest", ImVec2(190.0f, 32.0f)))
                 {
-                    if (gameCore && gameCore->AcceptQuest(worldState.m_session.m_quest.m_id))
+                    if (gameCore && gameCore->AcceptQuest(quest->m_id))
                     {
                         return "accepted";
                     }
                 }
             }
-            else if (worldState.m_session.m_quest.m_state == "active")
+            else if (quest->m_state == "active")
             {
                 ImGui::Text(
                     "Progress: %d / %d",
-                    worldState.m_session.m_quest.m_currentCount,
-                    worldState.m_session.m_quest.m_targetCount);
+                    quest->m_currentCount,
+                    quest->m_targetCount);
                 const bool objectiveCountReady =
-                    worldState.m_session.m_quest.m_currentCount >= worldState.m_session.m_quest.m_targetCount;
+                    quest->m_targetCount > 0 && quest->m_currentCount >= quest->m_targetCount;
                 const bool serviceObjective =
-                    worldState.m_session.m_quest.m_objectiveType == "talk" ||
-                    worldState.m_session.m_quest.m_objectiveType == "trainer" ||
-                    worldState.m_session.m_quest.m_objectiveType == "explore" ||
-                    worldState.m_session.m_quest.m_objectiveType == "use_location";
+                    quest->m_objectiveType == "talk" ||
+                    quest->m_objectiveType == "trainer" ||
+                    quest->m_objectiveType == "explore" ||
+                    quest->m_objectiveType == "use_location";
                 if (objectiveCountReady || serviceObjective)
                 {
-                    ImGui::TextWrapped("Continue only when this target is the active objective or turn-in.");
-                    if (ImGui::Button("Continue Quest", ImVec2(190.0f, 32.0f)))
+                    ImGui::TextWrapped("Complete this step only when the current target is the active objective or turn-in.");
+                    if (ImGui::Button("Complete Step", ImVec2(190.0f, 32.0f)))
                     {
-                        if (gameCore && gameCore->AcceptQuest(worldState.m_session.m_quest.m_id))
+                        if (gameCore && gameCore->CompleteQuest(quest->m_id))
                         {
                             return "turn_in";
                         }
@@ -3793,26 +4378,21 @@ namespace UiClient
                     ImGui::TextWrapped("Complete the field objective first.");
                 }
             }
-            else if (worldState.m_session.m_quest.m_state == "completed")
+            else if (quest->m_state == "completed" || quest->m_state == "ready" ||
+                quest->m_statusBucket == "ready_to_turn_in" || quest->m_statusBucket == "ready_to_complete")
             {
                 ImGui::TextWrapped("The objective is complete. Claim the reward from the turn-in NPC.");
                 if (ImGui::Button("Complete Quest", ImVec2(190.0f, 32.0f)))
                 {
-                    if (gameCore && gameCore->AcceptQuest(worldState.m_session.m_quest.m_id))
+                    if (gameCore && gameCore->CompleteQuest(quest->m_id))
                     {
                         return "turn_in";
                     }
                 }
             }
-            else if (worldState.m_session.m_quest.m_state == "reward_granted")
+            else if (quest->m_state == "reward_granted")
             {
                 ImGui::TextWrapped("Field orders are complete and persisted.");
-                ImGui::Text(
-                    "Reward: %d XP and %dg %ds %dc",
-                    worldState.m_session.m_quest.m_rewardXp,
-                    worldState.m_session.m_quest.m_rewardCurrencyGold,
-                    worldState.m_session.m_quest.m_rewardCurrencySilver,
-                    worldState.m_session.m_quest.m_rewardCurrencyCopper);
             }
             else
             {
@@ -5079,6 +5659,10 @@ namespace UiClient
             {
                 return "Ready to Turn In";
             }
+            if (statusBucket == "ready_to_complete")
+            {
+                return "Ready to Complete";
+            }
             if (statusBucket == "completed")
             {
                 return "Completed";
@@ -5086,7 +5670,141 @@ namespace UiClient
             return "Available";
         }
 
-        void DrawQuestLogWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState)
+        const char* QuestStateLabel(const NetClient::QuestState& quest)
+        {
+            if (quest.m_statusBucket == "ready_to_turn_in" || quest.m_statusBucket == "ready_to_complete" ||
+                quest.m_state == "completed" || quest.m_state == "ready")
+            {
+                return "Ready to Turn In";
+            }
+            if (quest.m_state == "reward_granted" || quest.m_statusBucket == "completed")
+            {
+                return "Completed";
+            }
+            if (quest.m_state == "active")
+            {
+                return "In Progress";
+            }
+            if (quest.m_state == "not_started" || quest.m_statusBucket == "available")
+            {
+                return "Available";
+            }
+            if (quest.m_state == "ready")
+            {
+                return "Ready";
+            }
+            return quest.m_state.empty() ? "Unknown" : quest.m_state.c_str();
+        }
+
+        bool QuestCanBeTracked(const NetClient::QuestState& quest)
+        {
+            return quest.m_state == "active" || quest.m_state == "completed" || quest.m_statusBucket == "ready_to_turn_in";
+        }
+
+        NetClient::CurrencyState QuestRewardCurrency(const NetClient::QuestState& quest)
+        {
+            NetClient::CurrencyState currency;
+            currency.m_totalCopper = quest.m_rewardCurrencyTotalCopper;
+            currency.m_gold = quest.m_rewardCurrencyGold;
+            currency.m_silver = quest.m_rewardCurrencySilver;
+            currency.m_copper = quest.m_rewardCurrencyCopper;
+            return currency;
+        }
+
+        const NetClient::QuestState* FindQuestById(const AZStd::vector<NetClient::QuestState>& quests, const AZStd::string& questId)
+        {
+            if (questId.empty())
+            {
+                return nullptr;
+            }
+            for (const auto& quest : quests)
+            {
+                if (quest.m_id == questId)
+                {
+                    return &quest;
+                }
+            }
+            return nullptr;
+        }
+
+        void DrawQuestRewardPreview(const NetClient::QuestState& quest)
+        {
+            ImGui::TextUnformatted("Rewards");
+            ImGui::Separator();
+            bool wroteReward = false;
+            if (quest.m_rewardXp > 0)
+            {
+                ImGui::BulletText("%d XP", quest.m_rewardXp);
+                wroteReward = true;
+            }
+            if (quest.m_rewardCurrencyTotalCopper > 0)
+            {
+                const NetClient::CurrencyState currency = QuestRewardCurrency(quest);
+                ImGui::BulletText("%s", FormatCurrency(currency).c_str());
+                wroteReward = true;
+            }
+            for (const auto& item : quest.m_rewardItems)
+            {
+                if (item.m_itemId.empty())
+                {
+                    continue;
+                }
+                const char* displayName = item.m_displayName.empty() ? item.m_itemId.c_str() : item.m_displayName.c_str();
+                ImGui::BulletText("%s x%d", displayName, item.m_stackCount > 0 ? item.m_stackCount : 1);
+                wroteReward = true;
+            }
+            if (!wroteReward)
+            {
+                ImGui::TextDisabled("No reward data is available for this quest.");
+            }
+        }
+
+        void DrawQuestObjectiveSummary(const NetClient::QuestState& quest)
+        {
+            ImGui::TextUnformatted("Objectives");
+            ImGui::Separator();
+            if (!quest.m_objectiveText.empty())
+            {
+                ImGui::TextWrapped("%s", quest.m_objectiveText.c_str());
+            }
+            if (!quest.m_objectiveGraph.empty())
+            {
+                for (const auto& node : quest.m_objectiveGraph)
+                {
+                    ImGui::PushID(node.m_nodeId.c_str());
+                    const char* stateLabel = node.m_completed ? "complete" : (node.m_active ? "active" : "locked");
+                    ImGui::BulletText(
+                        "%s  %d / %d  (%s)",
+                        node.m_kind.empty() ? node.m_nodeId.c_str() : node.m_kind.c_str(),
+                        node.m_currentCount,
+                        node.m_targetCount,
+                        stateLabel);
+                    ImGui::PopID();
+                }
+            }
+            else if (quest.m_targetCount > 0)
+            {
+                ImGui::Text("Progress: %d / %d", quest.m_currentCount, quest.m_targetCount);
+            }
+            else
+            {
+                ImGui::TextDisabled("No objective counters are available.");
+            }
+            if (!quest.m_objectiveAreaName.empty())
+            {
+                ImGui::Spacing();
+                ImGui::TextWrapped("Area: %s", quest.m_objectiveAreaName.c_str());
+                if (!quest.m_routeHintText.empty())
+                {
+                    ImGui::TextWrapped("%s", quest.m_routeHintText.c_str());
+                }
+            }
+        }
+
+        void DrawQuestLogWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            AZStd::string& selectedQuestId)
         {
             AZStd::vector<NetClient::QuestState> fallbackQuests;
             const AZStd::vector<NetClient::QuestState>* quests = &worldState.m_session.m_quests;
@@ -5096,10 +5814,24 @@ namespace UiClient
                 quests = &fallbackQuests;
             }
 
-            ImGui::TextUnformatted("Stonewake Vale");
+            if (!quests->empty() && !FindQuestById(*quests, selectedQuestId))
+            {
+                selectedQuestId = (*quests)[0].m_id;
+            }
+
+            ImGui::TextUnformatted(worldState.m_session.m_zoneMap.m_displayName.empty() ? "Quest Log" : worldState.m_session.m_zoneMap.m_displayName.c_str());
             ImGui::Separator();
-            ImGui::BeginChild("##quest_log_scroll", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-            const char* buckets[] = {"active", "ready_to_turn_in", "available", "completed"};
+            if (quests->empty())
+            {
+                ImGui::TextWrapped("No quest data is available in the current world session.");
+                ImGui::TextDisabled("Accepted and available quests will appear here after the world service sends them.");
+                return;
+            }
+
+            const float listWidth = 244.0f;
+            const float footerHeight = 34.0f;
+            ImGui::BeginChild("##quest_log_list", ImVec2(listWidth, 0.0f), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            const char* buckets[] = {"active", "ready_to_turn_in", "ready_to_complete", "available", "completed"};
             for (const char* bucket : buckets)
             {
                 bool wroteHeader = false;
@@ -5118,44 +5850,12 @@ namespace UiClient
 
                     ImGui::PushID(quest.m_id.c_str());
                     const AZStd::string questTitle = GetQuestDisplayTitle(quest);
-                    ImGui::TextUnformatted(questTitle.c_str());
-                    ImGui::SameLine();
+                    if (ImGui::Selectable(questTitle.c_str(), selectedQuestId == quest.m_id))
+                    {
+                        selectedQuestId = quest.m_id;
+                    }
                     ImGui::TextDisabled("%s", quest.m_category.empty() ? "Stonewake Vale" : quest.m_category.c_str());
-                    if (quest.m_groupRecommended)
-                    {
-                        ImGui::SameLine();
-                        ImGui::TextDisabled("Recommended Group");
-                    }
-                    if (!quest.m_partyStatusText.empty())
-                    {
-                        ImGui::TextWrapped(
-                            "Party credit: %s Nearby %d, eligible %d.",
-                            quest.m_partyStatusText.c_str(),
-                            quest.m_partyNearbyCount,
-                            quest.m_partyEligibleCount);
-                    }
-                    ImGui::TextWrapped("%s", quest.m_objectiveText.c_str());
-                    ImGui::Text(
-                        "Progress: %d / %d  |  Reward: %d XP and %dg %ds %dc",
-                        quest.m_currentCount,
-                        quest.m_targetCount,
-                        quest.m_rewardXp,
-                        quest.m_rewardCurrencyGold,
-                        quest.m_rewardCurrencySilver,
-                        quest.m_rewardCurrencyCopper);
-                    if (!quest.m_objectiveAreaName.empty())
-                    {
-                        ImGui::TextWrapped("Area: %s. %s", quest.m_objectiveAreaName.c_str(), quest.m_routeHintText.c_str());
-                    }
-                    const bool trackable = quest.m_statusBucket == "active" || quest.m_statusBucket == "ready_to_turn_in";
-                    if (trackable && gameCore)
-                    {
-                        const char* buttonLabel = quest.m_tracked ? "Untrack" : "Track";
-                        if (ImGui::Button(buttonLabel, HudButtonSize(96.0f)))
-                        {
-                            gameCore->TrackQuest(quest.m_id, !quest.m_tracked);
-                        }
-                    }
+                    ImGui::TextDisabled("%s", QuestStateLabel(quest));
                     ImGui::Spacing();
                     ImGui::Separator();
                     ImGui::PopID();
@@ -5166,6 +5866,61 @@ namespace UiClient
                 }
             }
             ImGui::EndChild();
+
+            ImGui::SameLine();
+            ImGui::BeginChild("##quest_log_detail", ImVec2(0.0f, -footerHeight), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            const NetClient::QuestState* selectedQuest = FindQuestById(*quests, selectedQuestId);
+            if (!selectedQuest)
+            {
+                ImGui::TextWrapped("Select a quest to inspect its objectives and rewards.");
+            }
+            else
+            {
+                const AZStd::string questTitle = GetQuestDisplayTitle(*selectedQuest);
+                ImGui::TextUnformatted(questTitle.c_str());
+                ImGui::TextDisabled(
+                    "%s  |  %s%s%s",
+                    selectedQuest->m_category.empty() ? "Stonewake Vale" : selectedQuest->m_category.c_str(),
+                    QuestStateLabel(*selectedQuest),
+                    selectedQuest->m_levelBand.empty() ? "" : "  |  Level ",
+                    selectedQuest->m_levelBand.empty() ? "" : selectedQuest->m_levelBand.c_str());
+                if (selectedQuest->m_groupRecommended)
+                {
+                    ImGui::TextDisabled(
+                        selectedQuest->m_recommendedPlayers > 0 ? "Recommended group: %d players" : "Recommended group",
+                        selectedQuest->m_recommendedPlayers);
+                }
+                if (!selectedQuest->m_partyStatusText.empty())
+                {
+                    ImGui::TextWrapped(
+                        "Party credit: %s Nearby %d, eligible %d.",
+                        selectedQuest->m_partyStatusText.c_str(),
+                        selectedQuest->m_partyNearbyCount,
+                        selectedQuest->m_partyEligibleCount);
+                }
+                ImGui::Spacing();
+                DrawQuestObjectiveSummary(*selectedQuest);
+                ImGui::Spacing();
+                DrawQuestRewardPreview(*selectedQuest);
+            }
+            ImGui::EndChild();
+
+            if (selectedQuest)
+            {
+                const bool trackable = QuestCanBeTracked(*selectedQuest);
+                if (trackable && gameCore)
+                {
+                    const char* buttonLabel = selectedQuest->m_tracked ? "Untrack" : "Track";
+                    if (ImGui::Button(buttonLabel, HudButtonSize(112.0f)))
+                    {
+                        gameCore->TrackQuest(selectedQuest->m_id, !selectedQuest->m_tracked);
+                    }
+                }
+                else
+                {
+                    ImGui::TextDisabled("Tracking is available after a quest is accepted.");
+                }
+            }
         }
 
         ImVec4 ChatChannelColor(const AZStd::string& channel)
@@ -7530,7 +8285,7 @@ namespace UiClient
         const ImVec2 rightActionBarSize(66.0f, AZ::GetClamp(displaySize.y - 330.0f, 360.0f, 748.0f));
         const ImVec2 rightActionBarOnePos(displaySize.x - rightActionBarSize.x - 12.0f, 312.0f);
         const ImVec2 rightActionBarTwoPos(rightActionBarOnePos.x - rightActionBarSize.x - 4.0f, 312.0f);
-        const ImVec2 trackerSize(292.0f, 292.0f);
+        const ImVec2 trackerSize(316.0f, 318.0f);
         const ImVec2 trackerDefaultPos(rightActionBarTwoPos.x - trackerSize.x - 12.0f, 286.0f);
         const ImVec2 trackerPos = ApplyHudOffset(
             trackerDefaultPos,
@@ -7576,9 +8331,11 @@ namespace UiClient
         const ImVec2 professionsPos(
             AZ::GetMin(characterPos.x + characterSize.x + 18.0f, displaySize.x - professionsSize.x - 18.0f),
             AZ::GetMax(18.0f, talentsPos.y - professionsSize.y - 18.0f));
-        const ImVec2 questLogSize(460.0f, 360.0f);
-        const ImVec2 questLogPos(280.0f, AZ::GetMax(18.0f, displaySize.y - questLogSize.y - 176.0f));
-        const ImVec2 mapSize(700.0f, 510.0f);
+        const ImVec2 questLogSize(AZ::GetClamp(displaySize.x - 420.0f, 620.0f, 780.0f), AZ::GetClamp(displaySize.y - 220.0f, 410.0f, 520.0f));
+        const ImVec2 questLogPos(250.0f, AZ::GetMax(18.0f, displaySize.y - questLogSize.y - 156.0f));
+        const ImVec2 mapSize(
+            AZ::GetMin(AZ::GetClamp(displaySize.x - 280.0f, 760.0f, 1040.0f), displaySize.x - 36.0f),
+            AZ::GetMin(AZ::GetClamp(displaySize.y - 160.0f, 540.0f, 720.0f), displaySize.y - 36.0f));
         const ImVec2 mapPos((displaySize.x - mapSize.x) * 0.5f, (displaySize.y - mapSize.y) * 0.5f);
         const ImVec2 partyFramesSize(250.0f, 250.0f);
         const ImVec2 partyFramesPos(18.0f, 158.0f);
@@ -7772,7 +8529,17 @@ namespace UiClient
 
         if (BeginHudPanel("##quest_tracker", "Objectives", trackerPos, trackerSize, false, false, m_uiEditMode, m_uiEditMode))
         {
-            DrawQuestTracker(worldState, nearCommandPoint, distanceToCommandPoint, distanceToEncounter);
+            if (DrawQuestTracker(
+                    worldState,
+                    nearCommandPoint,
+                    distanceToCommandPoint,
+                    distanceToEncounter,
+                    m_objectiveTrackerCollapsed,
+                    m_selectedQuestId))
+            {
+                m_questLogOpen = true;
+                MarkGameplayPanelOpened(PanelQuestLog);
+            }
             if (m_uiEditMode &&
                 CaptureHudOffset(
                     trackerDefaultPos,
@@ -8072,7 +8839,7 @@ namespace UiClient
             }
             else
             {
-                DrawQuestLogWindow(gameCore, worldState);
+                DrawQuestLogWindow(gameCore, worldState, m_selectedQuestId);
             }
         }
         if (questLogPanelWasOpen)
@@ -8089,7 +8856,13 @@ namespace UiClient
             }
             else
             {
-                DrawZoneMapWindow(gameCore, worldState, playerX, playerY);
+                bool openQuestLogRequested = false;
+                DrawZoneMapWindow(gameCore, worldState, playerX, playerY, m_selectedQuestId, openQuestLogRequested);
+                if (openQuestLogRequested)
+                {
+                    m_questLogOpen = true;
+                    MarkGameplayPanelOpened(PanelQuestLog);
+                }
             }
         }
         if (mapPanelWasOpen)

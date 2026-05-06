@@ -243,6 +243,13 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) override;
 
+        bool CompleteQuest(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& questId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) override;
+
         bool EnterDungeon(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,

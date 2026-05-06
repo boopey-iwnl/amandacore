@@ -14,6 +14,7 @@ AmandaCore source art assets live under `Content/Art`. Generated O3DE cache outp
 - `Content/Art/Textures/Props` - barrels, crates, sacks, signs, and other prop surfaces.
 - `Content/Art/Textures/FX` - lava, rune, glow, foam, and other effect textures.
 - `Content/Art/Icons` - UI-ready ability, item, inventory, currency, and menu icons.
+- `Content/Art/UI/Maps` - curated authored world and zone map PNGs used by the built-in map shell.
 - `Content/Art/Materials` - O3DE source `.material` files referencing imported texture assets.
 - `Content/Art/Manifests` - release-scoped asset manifests and provenance metadata.
 
@@ -21,12 +22,16 @@ AmandaCore source art assets live under `Content/Art`. Generated O3DE cache outp
 
 Use a curated import for each release. Do not commit the full source download folder, duplicates, screenshots, reference maps, generated cache output, logs, release zips, or unrelated downloads.
 
-Imported filenames must be lowercase snake_case and should describe project usage rather than source filenames. Manifest entries record the source file as a relative path plus SHA-256 hash; absolute local download paths are intentionally omitted.
+Imported filenames must be lowercase snake_case and should describe project usage rather than source filenames. Manifest entries record the source filename plus SHA-256 hash; absolute local download paths are intentionally omitted.
 
 Terrain and building textures should be power-of-two PNGs for O3DE processing. Release 0.2.0 uses 1024x1024 runtime source PNGs for broad material coverage. UI icons should be 128x128 PNGs with `Content/Art/Icons/UI/icon_missing.png` as the deliberate fallback.
+
+Authored map PNGs are allowed to keep their approved source dimensions when the UI consumes them as raster map art. `Content/Art/Manifests/MapArtManifest.json` tracks the repo-relative runtime path, dimensions, SHA-256, source filename only, and calibration accuracy. `Content/GameData/Maps/dawnwake_map_calibration.json` defines map-to-world bounds and must not contain machine-local source paths.
 
 ## Runtime Wiring
 
 O3DE source material files in `Content/Art/Materials` use `StandardPBR.materialtype` and reference imported texture PNGs. The current playable O3DE scene still uses procedural AuxGeom presentation for the Stonewake validation arena, so Release 0.2.0 also maps material IDs to visible terrain, road, building, foliage, landmark, and water proxy surfaces in the client.
 
 Gameplay responses expose icon IDs through `iconKind`. The client maps those IDs to visible action bar, spellbook, inventory, and fallback icon presentation. Missing or unknown IDs must resolve to `icon_missing` behavior, never a blank slot.
+
+The built-in World Map resolves repo-local PNGs under `Content/Art/UI/Maps/**` and overlays server-provided markers using explicit calibration metadata. Missing map art or calibration must show a visible fallback rather than crash or hide the map panel.

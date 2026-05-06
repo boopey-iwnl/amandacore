@@ -1310,6 +1310,33 @@ namespace GameCore
         return true;
     }
 
+    bool GameCoreSystemComponent::CompleteQuest(const AZStd::string& questId)
+    {
+        if (!m_worldState.m_worldConnected)
+        {
+            return false;
+        }
+
+        NetClient::WorldSessionResponse response;
+        AZStd::string error;
+        if (!NetClient::IWorldHttpClient::Get() ||
+            !NetClient::IWorldHttpClient::Get()->CompleteQuest(
+                m_launchOptions.m_worldEndpoint,
+                m_worldState.m_session.m_worldSessionToken,
+                questId,
+                response,
+                error))
+        {
+            m_worldState.m_errorMessage = error;
+            AZ_Warning("amandacore", false, "CompleteQuest failed: %s", error.c_str());
+            return false;
+        }
+
+        m_worldState.m_errorMessage.clear();
+        ApplyWorldSessionResponse(AZStd::move(response), "quest_complete");
+        return true;
+    }
+
     bool GameCoreSystemComponent::EnterDungeon(const AZStd::string& dungeonId)
     {
         if (!m_worldState.m_worldConnected)
