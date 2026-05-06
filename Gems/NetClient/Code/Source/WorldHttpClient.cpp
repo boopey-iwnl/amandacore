@@ -1384,7 +1384,13 @@ namespace NetClient
                     {
                         entity.m_targetable = entityValue["targetable"].GetBool();
                     }
+                    ReadBool(entityValue, "isInCombat", entity.m_isInCombat);
                     ReadBool(entityValue, "duelOpponent", entity.m_duelOpponent);
+                    ReadString(entityValue, "currentTargetEntityId", entity.m_currentTargetEntityId);
+                    ReadString(entityValue, "lastDamagedByEntityId", entity.m_lastDamagedByEntityId);
+                    ReadInt64(entityValue, "respawnDelayMs", entity.m_respawnDelayMs);
+                    ReadInt64(entityValue, "deathTick", entity.m_deathTick);
+                    ReadInt64(entityValue, "respawnTick", entity.m_respawnTick);
                     ReadString(entityValue, "aiState", entity.m_aiState);
                     ReadString(entityValue, "pvpState", entity.m_pvpState);
                     if (entityValue.HasMember("auras"))

@@ -45,6 +45,8 @@ namespace UiClient
             int rewardSilver,
             int rewardCopper);
         void AddHudEvent(const AZStd::string& message);
+        void AddCombatFeedbackPulse(const AZStd::string& message, AZ::s64 nowMs);
+        void DrawCombatFeedbackPulses(AZ::s64 nowMs, const ImVec2& displaySize);
         void LoadUiSettings();
         void SaveUiSettings() const;
         void LoadDefaultKeybindings();
@@ -84,9 +86,12 @@ namespace UiClient
         AZStd::string m_selectedQuestId;
         AZStd::string m_questToast;
         AZStd::deque<AZStd::string> m_eventLog;
+        AZStd::deque<AZStd::string> m_combatPulseTexts;
+        AZStd::deque<AZ::s64> m_combatPulseExpiresAt;
         AZ::u64 m_lastHandledInteractionSequence = 0;
         AZ::s64 m_lastCombatDomainEventSequence = 0;
         AZ::s64 m_lastCombatStateDiffSequence = 0;
+        AZ::s64 m_lastCombatPulseAt = 0;
         AZ::s64 m_questToastExpiresAt = 0;
         bool m_spellbookOpen = false;
         bool m_questGossipOpen = false;
