@@ -205,6 +205,23 @@ func TestHTTPContractManifestDocumentsWorldPayloads(t *testing.T) {
 			"implemented",
 			"canLearn",
 		},
+		"worldSession.entities[]": {
+			"id",
+			"displayName",
+			"kind",
+			"health",
+			"maxHealth",
+			"alive",
+			"targetable",
+			"isInCombat",
+			"currentTargetEntityId",
+			"lastDamagedByEntityId",
+			"respawnDelayMs",
+			"deathTick",
+			"respawnTick",
+			"aiState",
+			"auras",
+		},
 	}
 
 	shapesByName := map[string]map[string]bool{}

@@ -137,8 +137,14 @@ namespace NetClient
         double m_maxHealth = 0.0;
         bool m_alive = false;
         bool m_targetable = false;
+        bool m_isInCombat = false;
         bool m_elite = false;
         bool m_duelOpponent = false;
+        AZStd::string m_currentTargetEntityId;
+        AZStd::string m_lastDamagedByEntityId;
+        AZ::s64 m_respawnDelayMs = 0;
+        AZ::s64 m_deathTick = 0;
+        AZ::s64 m_respawnTick = 0;
         AZStd::string m_aiState;
         AZStd::string m_pvpState;
         AZStd::vector<NpcServiceState> m_services;

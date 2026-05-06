@@ -188,6 +188,37 @@
         "implemented",
         "canLearn"
       ]
+    },
+    {
+      "name": "worldSession.entities[]",
+      "surface": "world-session",
+      "fields": [
+        "id",
+        "displayName",
+        "kind",
+        "mobTypeId",
+        "disposition",
+        "classification",
+        "elite",
+        "x",
+        "y",
+        "z",
+        "health",
+        "maxHealth",
+        "alive",
+        "targetable",
+        "isInCombat",
+        "currentTargetEntityId",
+        "lastDamagedByEntityId",
+        "respawnDelayMs",
+        "deathTick",
+        "respawnTick",
+        "aiState",
+        "pvpState",
+        "duelOpponent",
+        "npcServices",
+        "auras"
+      ]
     }
   ],
   "routes": [

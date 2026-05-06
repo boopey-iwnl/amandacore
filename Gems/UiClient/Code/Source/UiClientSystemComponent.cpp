@@ -43,9 +43,15 @@ namespace UiClient
         constexpr float EncounterAnchorX = 380.0f;
         constexpr float EncounterAnchorY = 231.0f;
         constexpr float FriendlyNameplateDrawDistance = 36.0f;
+        constexpr float HostileNameplateDrawDistance = 44.0f;
+        constexpr float PlayerNameplateDrawDistance = 34.0f;
         constexpr float MeleeRange = 5.5f;
         constexpr float SpellRange = 24.0f;
         constexpr size_t MaxEventLogEntries = 9;
+        constexpr size_t MaxCombatPulseEntries = 5;
+        constexpr int MaxWorldNameplates = 12;
+        constexpr AZ::s64 CombatPulseLifetimeMs = 2200;
+        constexpr AZ::s64 CombatPulseMinIntervalMs = 220;
         constexpr const char* AutoAttackAbilityId = "auto_attack";
         constexpr const char* SteadyStrikeAbilityId = "steady_strike";
         constexpr const char* BraceAbilityId = "brace";
@@ -1232,6 +1238,69 @@ namespace UiClient
             return line;
         }
 
+        bool AuraKindMatches(const NetClient::AuraState& aura, const char* kind)
+        {
+            return aura.m_kind == kind || aura.m_kind.find(kind) != AZStd::string::npos;
+        }
+
+        AZStd::string FormatAuraLineByKind(
+            const AZStd::vector<NetClient::AuraState>& auras,
+            AZ::s64 nowMs,
+            const char* kind,
+            size_t maxAuras)
+        {
+            AZStd::vector<NetClient::AuraState> matchingAuras;
+            matchingAuras.reserve(auras.size());
+            for (const auto& aura : auras)
+            {
+                if (AuraKindMatches(aura, kind))
+                {
+                    matchingAuras.push_back(aura);
+                }
+            }
+            return FormatAuraLine(matchingAuras, nowMs, maxAuras);
+        }
+
+        AZStd::string FormatAuraLineWithoutKnownKind(
+            const AZStd::vector<NetClient::AuraState>& auras,
+            AZ::s64 nowMs,
+            size_t maxAuras)
+        {
+            AZStd::vector<NetClient::AuraState> matchingAuras;
+            matchingAuras.reserve(auras.size());
+            for (const auto& aura : auras)
+            {
+                if (!AuraKindMatches(aura, "buff") && !AuraKindMatches(aura, "debuff"))
+                {
+                    matchingAuras.push_back(aura);
+                }
+            }
+            return FormatAuraLine(matchingAuras, nowMs, maxAuras);
+        }
+
+        void DrawAuraRows(const char* ownerLabel, const AZStd::vector<NetClient::AuraState>& auras, AZ::s64 nowMs, size_t maxAuras)
+        {
+            const AZStd::string buffs = FormatAuraLineByKind(auras, nowMs, "buff", maxAuras);
+            const AZStd::string debuffs = FormatAuraLineByKind(auras, nowMs, "debuff", maxAuras);
+            const AZStd::string otherAuras = FormatAuraLineWithoutKnownKind(auras, nowMs, maxAuras);
+            if (!buffs.empty())
+            {
+                ImGui::TextWrapped("%s buffs: %s", ownerLabel, buffs.c_str());
+            }
+            if (!debuffs.empty())
+            {
+                ImGui::TextWrapped("%s debuffs: %s", ownerLabel, debuffs.c_str());
+            }
+            if (!otherAuras.empty())
+            {
+                ImGui::TextWrapped("%s effects: %s", ownerLabel, otherAuras.c_str());
+            }
+            if (auras.empty())
+            {
+                ImGui::TextDisabled("%s auras: none reported", ownerLabel);
+            }
+        }
+
         AZStd::string FormatKillCreditSummary(const AZStd::vector<NetClient::KillCreditState>& credits)
         {
             if (credits.empty())
@@ -1279,6 +1348,38 @@ namespace UiClient
                 sequence = AZ::GetMax(sequence, event.m_sequence);
             }
             return sequence;
+        }
+
+        AZStd::string FormatCombatPulseText(const NetClient::WorldEventEntry& event)
+        {
+            if (!event.m_summary.empty())
+            {
+                return event.m_summary;
+            }
+            if (!event.m_type.empty())
+            {
+                return event.m_type;
+            }
+            return {};
+        }
+
+        void AppendNewCombatPulses(
+            const AZStd::vector<NetClient::WorldEventEntry>& events,
+            AZ::s64 lastSequence,
+            AZStd::vector<AZStd::string>& outPulses)
+        {
+            for (const auto& event : events)
+            {
+                if (event.m_sequence <= lastSequence || !IsCombatEventType(event.m_type))
+                {
+                    continue;
+                }
+                AZStd::string text = FormatCombatPulseText(event);
+                if (!text.empty())
+                {
+                    outPulses.push_back(text);
+                }
+            }
         }
 
         bool HasVisibleCooldown(const NetClient::WorldSessionResponse& session, AZ::s64 nowMs)
@@ -2019,6 +2120,33 @@ namespace UiClient
                 text.c_str());
         }
 
+        void DrawCastStateShell(const NetClient::WorldSessionResponse& session, AZ::s64 nowMs)
+        {
+            const AZStd::string castRemaining = FormatRemainingTime(session.m_castEndsAt, nowMs);
+            if (castRemaining.empty())
+            {
+                ImGui::TextDisabled("Cast: none reported");
+                return;
+            }
+
+            const AZStd::string abilityName = GetAbilityDisplayName(session, session.m_castingAbilityId);
+            const ImVec2 barPosition = ImGui::GetCursorScreenPos();
+            const ImVec2 barSize(184.0f, 15.0f);
+            ImGui::InvisibleButton("##player_cast_shell", barSize);
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            drawList->AddRectFilled(barPosition, AddVec2(barPosition, barSize), ColorU32(19, 25, 31, 235), 6.0f);
+            drawList->AddRect(barPosition, AddVec2(barPosition, barSize), ColorU32(105, 146, 174, 210), 6.0f, 0, 1.2f);
+            const AZStd::string text = AZStd::string::format(
+                "%s  %s",
+                abilityName.empty() ? "Casting" : abilityName.c_str(),
+                castRemaining.c_str());
+            const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+            drawList->AddText(
+                ImVec2(barPosition.x + ((barSize.x - textSize.x) * 0.5f), barPosition.y + ((barSize.y - textSize.y) * 0.5f)),
+                ColorU32(221, 236, 241),
+                text.c_str());
+        }
+
         void DrawPortraitBadge(const AZStd::string& glyph, const ImVec2& center, ImU32 fillColor)
         {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -2354,26 +2482,33 @@ namespace UiClient
 
             ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
             ImGui::Text("%s  |  Level %d", worldState.m_session.m_displayName.c_str(), worldState.m_session.m_level);
-            ImGui::TextUnformatted(nearCommandPoint ? "Near friendly NPC services" : "Stonewake Vale patrol");
-            DrawMeter("Vitality", static_cast<float>(worldState.m_session.m_health), static_cast<float>(worldState.m_session.m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
+            ImGui::TextUnformatted(worldState.m_session.m_alive ? "Combat ready" : "Defeated");
+            const float healthRatio = worldState.m_session.m_maxHealth > 0.0
+                ? Clamp01(static_cast<float>(worldState.m_session.m_health / worldState.m_session.m_maxHealth))
+                : 0.0f;
+            DrawMeter(
+                "Health",
+                static_cast<float>(worldState.m_session.m_health),
+                static_cast<float>(worldState.m_session.m_maxHealth),
+                healthRatio <= 0.25f ? ColorU32(210, 63, 52) : ColorU32(173, 52, 44),
+                ImVec2(184.0f, 18.0f));
             DrawMeter(
                 worldState.m_session.m_resourceName.empty() ? "Grit" : worldState.m_session.m_resourceName.c_str(),
                 static_cast<float>(worldState.m_session.m_resource),
                 static_cast<float>(worldState.m_session.m_maxResource),
                 ColorU32(54, 117, 181),
-                ImVec2(160.0f, 16.0f));
+                ImVec2(184.0f, 16.0f));
             const AZ::s64 nowMs = NowMs();
-            const AZStd::string castRemaining = FormatRemainingTime(worldState.m_session.m_castEndsAt, nowMs);
-            if (!castRemaining.empty())
+            DrawCastStateShell(worldState.m_session, nowMs);
+            DrawAuraRows("Player", worldState.m_session.m_auras, nowMs, 2);
+            ImGui::Text(
+                "%s  |  services %.1fm",
+                worldState.m_session.m_autoAttackActive ? "Auto-attack active" : "Auto-attack idle",
+                distanceToCommandPoint);
+            if (nearCommandPoint)
             {
-                ImGui::Text("Casting %s  |  %s", GetAbilityDisplayName(worldState.m_session, worldState.m_session.m_castingAbilityId).c_str(), castRemaining.c_str());
+                ImGui::TextUnformatted("Near friendly NPC services");
             }
-            const AZStd::string auraLine = FormatAuraLine(worldState.m_session.m_auras, nowMs, 2);
-            if (!auraLine.empty())
-            {
-                ImGui::TextWrapped("Auras: %s", auraLine.c_str());
-            }
-            ImGui::Text("Friendly NPCs %.1fm", distanceToCommandPoint);
         }
 
         void DrawTargetFrame(
@@ -2433,13 +2568,16 @@ namespace UiClient
                 ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
                 ImGui::TextUnformatted(targetEntity->m_displayName.c_str());
                 ImGui::Text("%s  |  %s", targetEntity->m_duelOpponent ? "Duel opponent" : "Player", targetEntity->m_alive ? "available" : "down");
-                DrawMeter("Vitality", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(173, 52, 44), ImVec2(160.0f, 18.0f));
+                DrawMeter("Health", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(173, 52, 44), ImVec2(168.0f, 18.0f));
                 ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
-                const AZStd::string auraLine = FormatAuraLine(targetEntity->m_auras, NowMs(), 2);
-                if (!auraLine.empty())
+                if (!targetEntity->m_currentTargetEntityId.empty())
                 {
-                    ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+                    ImGui::TextUnformatted(
+                        targetEntity->m_currentTargetEntityId == worldState.m_session.m_characterId
+                            ? "Targeting you"
+                            : "Targeting another entity");
                 }
+                DrawAuraRows("Target", targetEntity->m_auras, NowMs(), 2);
                 if (worldState.m_session.m_pvp.m_safeZone.m_noDuel)
                 {
                     ImGui::TextUnformatted("Safe zone: duels unavailable");
@@ -2474,18 +2612,47 @@ namespace UiClient
             DrawPortraitBadge("!", ImVec2(origin.x + 34.0f, origin.y + 42.0f), ColorU32(146, 72, 44));
             ImGui::SetCursorScreenPos(ImVec2(origin.x + 74.0f, origin.y));
             ImGui::TextUnformatted(targetLabel.c_str());
-            ImGui::Text("%s  |  %s  |  %s", "Hostile", targetEntity->m_elite ? "elite" : "normal", targetEntity->m_alive ? "engageable" : "down");
-            DrawMeter("Integrity", static_cast<float>(targetEntity->m_health), static_cast<float>(targetEntity->m_maxHealth), ColorU32(198, 93, 34), ImVec2(160.0f, 18.0f));
+            ImGui::Text(
+                "%s  |  %s  |  %s",
+                "Hostile",
+                targetEntity->m_elite ? "elite" : "normal",
+                targetEntity->m_alive ? (targetEntity->m_isInCombat ? "in combat" : "engageable") : "down");
+            const float targetHealthRatio = targetEntity->m_maxHealth > 0.0
+                ? Clamp01(static_cast<float>(targetEntity->m_health / targetEntity->m_maxHealth))
+                : 0.0f;
+            DrawMeter(
+                "Health",
+                static_cast<float>(targetEntity->m_health),
+                static_cast<float>(targetEntity->m_maxHealth),
+                targetHealthRatio <= 0.25f ? ColorU32(219, 70, 48) : ColorU32(198, 93, 34),
+                ImVec2(168.0f, 18.0f));
             ImGui::TextUnformatted(FormatDistanceState(distanceToTarget).c_str());
-            ImGui::Text("Behavior: %s", targetEntity->m_aiState.empty() ? "idle" : targetEntity->m_aiState.c_str());
-            const AZStd::string auraLine = FormatAuraLine(targetEntity->m_auras, NowMs(), 2);
-            if (!auraLine.empty())
+            ImGui::Text("Behavior: %s", targetEntity->m_aiState.empty() ? "not reported" : targetEntity->m_aiState.c_str());
+            if (!targetEntity->m_currentTargetEntityId.empty())
             {
-                ImGui::TextWrapped("Auras: %s", auraLine.c_str());
+                ImGui::TextUnformatted(
+                    targetEntity->m_currentTargetEntityId == worldState.m_session.m_characterId
+                        ? "Threat: targeting you"
+                        : "Threat: targeting another entity");
             }
+            else
+            {
+                ImGui::TextDisabled("Threat: no target reported");
+            }
+            DrawAuraRows("Target", targetEntity->m_auras, NowMs(), 2);
             if (!targetEntity->m_alive)
             {
-                ImGui::TextUnformatted("Defeated. Awaiting authoritative respawn.");
+                if (targetEntity->m_respawnTick > 0 || targetEntity->m_respawnDelayMs > 0)
+                {
+                    ImGui::Text(
+                        "Defeated. Respawn data tick=%lld delay=%lldms.",
+                        static_cast<long long>(targetEntity->m_respawnTick),
+                        static_cast<long long>(targetEntity->m_respawnDelayMs));
+                }
+                else
+                {
+                    ImGui::TextUnformatted("Defeated. Awaiting authoritative respawn.");
+                }
             }
         }
 
@@ -3144,15 +3311,20 @@ namespace UiClient
             }
         }
 
-        void DrawFriendlyNpcNameplates(
+        void DrawWorldNameplates(
             const GameCore::ClientWorldState& worldState,
             const GameCore::ClientCameraState& cameraState,
             const ImVec2& displaySize)
         {
             ImDrawList* drawList = ImGui::GetForegroundDrawList();
+            int drawnNameplates = 0;
             for (const auto& entity : worldState.m_session.m_entities)
             {
-                if (!entity.m_alive || !entity.m_targetable || !IsFriendlyNpc(entity))
+                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
+                const bool isFriendly = IsFriendlyNpc(entity);
+                const bool isHostile = entity.m_kind == "hostile_mob";
+                const bool isPlayer = entity.m_kind == "player";
+                if ((!entity.m_alive && !isSelected) || !entity.m_targetable || (!isFriendly && !isHostile && !isPlayer))
                 {
                     continue;
                 }
@@ -3162,8 +3334,14 @@ namespace UiClient
                     static_cast<float>(worldState.m_session.m_position.m_y),
                     static_cast<float>(entity.m_x),
                     static_cast<float>(entity.m_y));
-                const bool isSelected = entity.m_id == worldState.m_session.m_currentTargetId;
-                if (!isSelected && distanceToPlayer > FriendlyNameplateDrawDistance)
+                const float drawDistance = isHostile
+                    ? HostileNameplateDrawDistance
+                    : (isPlayer ? PlayerNameplateDrawDistance : FriendlyNameplateDrawDistance);
+                if (!isSelected && distanceToPlayer > drawDistance)
+                {
+                    continue;
+                }
+                if (!isSelected && drawnNameplates >= MaxWorldNameplates)
                 {
                     continue;
                 }
@@ -3183,26 +3361,54 @@ namespace UiClient
 
                 const bool isTrainer = IsTrainerNpc(entity);
                 const bool isProfessionTrainer = IsProfessionTrainerNpc(entity);
-                const char* roleLabel = FriendlyNpcRoleLabel(entity);
+                const char* roleLabel = isFriendly ? FriendlyNpcRoleLabel(entity) : (isPlayer ? "Player" : "Hostile");
                 const AZStd::string label = AZStd::string::format(
                     "%s  %s",
                     roleLabel,
                     entity.m_displayName.c_str());
                 const ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+                const bool showHealth = isHostile || isPlayer;
+                const float healthBarHeight = showHealth ? 7.0f : 0.0f;
                 const ImVec2 panelMin(screenPosition.x - (textSize.x * 0.5f) - 10.0f, screenPosition.y - 12.0f);
-                const ImVec2 panelMax(screenPosition.x + (textSize.x * 0.5f) + 10.0f, screenPosition.y + textSize.y + 6.0f);
-                const ImU32 fillColor = isTrainer
-                    ? ColorU32(20, 55, 98, isSelected ? 242 : 220)
-                    : (isProfessionTrainer ? ColorU32(72, 54, 105, isSelected ? 242 : 220)
-                        : ColorU32(20, 79, 46, isSelected ? 242 : 220));
+                const ImVec2 panelMax(
+                    screenPosition.x + (textSize.x * 0.5f) + 10.0f,
+                    screenPosition.y + textSize.y + 6.0f + healthBarHeight);
+                const ImU32 fillColor = isHostile
+                    ? ColorU32(82, 35, 25, isSelected ? 242 : 218)
+                    : (isPlayer ? ColorU32(24, 42, 75, isSelected ? 242 : 218)
+                        : (isTrainer
+                            ? ColorU32(20, 55, 98, isSelected ? 242 : 220)
+                            : (isProfessionTrainer ? ColorU32(72, 54, 105, isSelected ? 242 : 220)
+                                : ColorU32(20, 79, 46, isSelected ? 242 : 220))));
                 const ImU32 borderColor = isSelected
                     ? ColorU32(248, 224, 128)
-                    : (isTrainer ? ColorU32(101, 174, 238)
-                        : (isProfessionTrainer ? ColorU32(177, 139, 235) : ColorU32(98, 224, 150)));
+                    : (isHostile ? ColorU32(230, 116, 78)
+                        : (isPlayer ? ColorU32(98, 150, 226)
+                            : (isTrainer ? ColorU32(101, 174, 238)
+                                : (isProfessionTrainer ? ColorU32(177, 139, 235) : ColorU32(98, 224, 150)))));
 
                 drawList->AddRectFilled(panelMin, panelMax, fillColor, 10.0f);
                 drawList->AddRect(panelMin, panelMax, borderColor, 10.0f, 0, 2.0f);
                 drawList->AddText(ImVec2(panelMin.x + 10.0f, panelMin.y + 4.0f), ColorU32(244, 235, 214), label.c_str());
+                if (showHealth)
+                {
+                    const float ratio = entity.m_maxHealth > 0.0
+                        ? Clamp01(static_cast<float>(entity.m_health / entity.m_maxHealth))
+                        : 0.0f;
+                    const ImVec2 healthMin(panelMin.x + 8.0f, panelMax.y - 8.0f);
+                    const ImVec2 healthMax(panelMax.x - 8.0f, panelMax.y - 3.0f);
+                    drawList->AddRectFilled(healthMin, healthMax, ColorU32(13, 17, 19, 235), 3.0f);
+                    drawList->AddRectFilled(
+                        healthMin,
+                        ImVec2(healthMin.x + ((healthMax.x - healthMin.x) * ratio), healthMax.y),
+                        entity.m_alive ? ColorU32(190, 64, 48) : ColorU32(90, 92, 96),
+                        3.0f);
+                }
+                if (entity.m_currentTargetEntityId == worldState.m_session.m_characterId)
+                {
+                    drawList->AddText(ImVec2(panelMax.x + 5.0f, panelMin.y + 4.0f), ColorU32(255, 202, 115), "!");
+                }
+                ++drawnNameplates;
             }
         }
 
@@ -3430,6 +3636,17 @@ namespace UiClient
                     targetEntity->m_health,
                     targetEntity->m_maxHealth,
                     targetEntity->m_alive ? "alive" : "dead");
+                if (!targetEntity->m_currentTargetEntityId.empty())
+                {
+                    ImGui::TextUnformatted(
+                        targetEntity->m_currentTargetEntityId == worldState.m_session.m_characterId
+                            ? "Threat shell: targeting you"
+                            : "Threat shell: target data present");
+                }
+                else
+                {
+                    ImGui::TextDisabled("Threat shell: no threat target reported");
+                }
             }
             else
             {
@@ -3446,6 +3663,10 @@ namespace UiClient
             if (!playerAuras.empty())
             {
                 ImGui::TextWrapped("Player auras: %s", playerAuras.c_str());
+            }
+            else
+            {
+                ImGui::TextDisabled("Player auras: none reported");
             }
 
             const AZStd::string creditSummary = FormatKillCreditSummary(worldState.m_session.m_killCredits);
@@ -3490,6 +3711,7 @@ namespace UiClient
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
             bool hasHostileTarget,
+            float targetDistance,
             const AZStd::array<AZStd::string, ActionBarSlotCount>& actionSlotBindings,
             int firstSlot,
             int slotCount,
@@ -3533,8 +3755,15 @@ namespace UiClient
                 const bool blockedByResource = hasAbility &&
                     slotState->m_resourceCost > 0.0 &&
                     worldState.m_session.m_resource + 0.01 < slotState->m_resourceCost;
+                const bool blockedByTarget = hasAbility && slotState->m_requiresTarget && !hasHostileTarget;
+                const bool blockedByRange = hasAbility &&
+                    hasHostileTarget &&
+                    slotState->m_rangeMeters > 0.0 &&
+                    targetDistance >= 0.0f &&
+                    targetDistance > static_cast<float>(slotState->m_rangeMeters);
                 const bool clickable = hasAbility &&
-                    (!slotState->m_requiresTarget || hasHostileTarget) &&
+                    !blockedByTarget &&
+                    !blockedByRange &&
                     !blockedByCooldown &&
                     !blockedByResource;
                 if (editMode)
@@ -3617,6 +3846,16 @@ namespace UiClient
                 {
                     drawList->AddRectFilled(slotMin, slotMax, ColorU32(15, 18, 24, 150), 8.0f);
                     drawList->AddText(ImVec2(slotMin.x + 34.0f, slotMax.y - 18.0f), ColorU32(112, 154, 214), "G");
+                }
+                else if (hasAbility && blockedByTarget)
+                {
+                    drawList->AddRectFilled(slotMin, slotMax, ColorU32(24, 19, 14, 138), 8.0f);
+                    drawList->AddText(ImVec2(slotMin.x + 34.0f, slotMax.y - 18.0f), ColorU32(224, 162, 82), "T");
+                }
+                else if (hasAbility && blockedByRange)
+                {
+                    drawList->AddRectFilled(slotMin, slotMax, ColorU32(17, 21, 27, 145), 8.0f);
+                    drawList->AddText(ImVec2(slotMin.x + 34.0f, slotMax.y - 18.0f), ColorU32(172, 190, 224), "R");
                 }
 
                 if (!editMode && pressed && clickable)
@@ -3755,6 +3994,14 @@ namespace UiClient
                     {
                         tooltip += "\nNot enough Grit.";
                     }
+                    if (blockedByTarget)
+                    {
+                        tooltip += "\nRequires a hostile target.";
+                    }
+                    if (blockedByRange)
+                    {
+                        tooltip += "\nTarget is out of range.";
+                    }
                     if (editMode)
                     {
                         tooltip += "\nClick to arm move, drag to move, or right-click to clear.";
@@ -3777,6 +4024,7 @@ namespace UiClient
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
             bool hasHostileTarget,
+            float targetDistance,
             const AZStd::array<AZStd::string, ActionBarSlotCount>& actionSlotBindings,
             const AZStd::string& spellbookBinding,
             const AZStd::string& bagBinding,
@@ -3805,6 +4053,7 @@ namespace UiClient
                 gameCore,
                 worldState,
                 hasHostileTarget,
+                targetDistance,
                 actionSlotBindings,
                 0,
                 12,
@@ -3877,6 +4126,7 @@ namespace UiClient
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
             bool hasHostileTarget,
+            float targetDistance,
             const AZStd::array<AZStd::string, ActionBarSlotCount>& actionSlotBindings,
             int firstSlot,
             bool vertical,
@@ -3888,6 +4138,7 @@ namespace UiClient
                 gameCore,
                 worldState,
                 hasHostileTarget,
+                targetDistance,
                 actionSlotBindings,
                 firstSlot,
                 12,
@@ -8033,6 +8284,8 @@ namespace UiClient
             m_lastKillCreditSummary.clear();
             m_lastCombatDomainEventSequence = 0;
             m_lastCombatStateDiffSequence = 0;
+            m_combatPulseTexts.clear();
+            m_combatPulseExpiresAt.clear();
             return;
         }
         if (!m_loggedPlayableZoneReady)
@@ -8073,6 +8326,8 @@ namespace UiClient
             m_lastKillCreditSummary.clear();
             m_lastCombatDomainEventSequence = 0;
             m_lastCombatStateDiffSequence = 0;
+            m_combatPulseTexts.clear();
+            m_combatPulseExpiresAt.clear();
             return;
         }
 
@@ -8086,6 +8341,13 @@ namespace UiClient
         const bool nearCommandPoint = distanceToCommandPoint <= CommandPointRadius;
         const auto* targetEntity = FindTargetEntity(worldState);
         const bool hasHostileTarget = targetEntity && targetEntity->m_kind == "hostile_mob";
+        const float targetDistance = targetEntity
+            ? Distance2D(
+                playerX,
+                playerY,
+                static_cast<float>(targetEntity->m_x),
+                static_cast<float>(targetEntity->m_y))
+            : -1.0f;
         const auto& cameraState = gameCore->GetCameraState();
         const bool actionEditMode = m_uiEditMode || m_shiftHeld || ImGui::GetIO().KeyShift;
 
@@ -8135,6 +8397,8 @@ namespace UiClient
             m_lastKillCreditSummary.clear();
             m_lastCombatDomainEventSequence = 0;
             m_lastCombatStateDiffSequence = 0;
+            m_combatPulseTexts.clear();
+            m_combatPulseExpiresAt.clear();
         }
         if (nearCommandPoint != m_lastNearCommandPoint)
         {
@@ -8162,24 +8426,29 @@ namespace UiClient
                 m_lastHudTargetId = targetEntity->m_id;
             }
             const AZStd::string targetFrameSummary = AZStd::string::format(
-                "%s|%.0f|%.0f|%s|%zu|%s",
+                "%s|%.0f|%.0f|%s|%zu|%s|%s|%s|%lld",
                 targetEntity->m_id.c_str(),
                 targetEntity->m_health,
                 targetEntity->m_maxHealth,
                 targetEntity->m_alive ? "alive" : "dead",
                 targetEntity->m_auras.size(),
-                targetEntity->m_aiState.c_str());
+                targetEntity->m_aiState.c_str(),
+                targetEntity->m_isInCombat ? "combat" : "idle",
+                targetEntity->m_currentTargetEntityId.c_str(),
+                static_cast<long long>(targetEntity->m_respawnTick));
             if (targetFrameSummary != m_lastTargetFrameSummary)
             {
                 AZ_Printf(
                     "amandacore",
-                    "client.target_frame_updated targetId=%s health=%.0f maxHealth=%.0f alive=%s auras=%zu aiState=%s",
+                    "client.target_frame_updated targetId=%s health=%.0f maxHealth=%.0f alive=%s auras=%zu aiState=%s inCombat=%s targetOfTarget=%s",
                     targetEntity->m_id.c_str(),
                     targetEntity->m_health,
                     targetEntity->m_maxHealth,
                     targetEntity->m_alive ? "true" : "false",
                     targetEntity->m_auras.size(),
-                    targetEntity->m_aiState.c_str());
+                    targetEntity->m_aiState.c_str(),
+                    targetEntity->m_isInCombat ? "true" : "false",
+                    targetEntity->m_currentTargetEntityId.c_str());
                 if (!targetEntity->m_alive)
                 {
                     AddHudEvent(AZStd::string::format("Target defeated: %s", GetMobDisplayLabel(*targetEntity).c_str()));
@@ -8207,6 +8476,13 @@ namespace UiClient
         const AZ::s64 maxStateDiffSequence = MaxEventSequence(worldState.m_session.m_stateDiffs);
         if (maxDomainSequence > m_lastCombatDomainEventSequence || maxStateDiffSequence > m_lastCombatStateDiffSequence)
         {
+            AZStd::vector<AZStd::string> combatPulseCandidates;
+            AppendNewCombatPulses(worldState.m_session.m_domainEvents, m_lastCombatDomainEventSequence, combatPulseCandidates);
+            AppendNewCombatPulses(worldState.m_session.m_stateDiffs, m_lastCombatStateDiffSequence, combatPulseCandidates);
+            if (!combatPulseCandidates.empty())
+            {
+                AddCombatFeedbackPulse(combatPulseCandidates.back(), nowMs);
+            }
             AZ_Printf(
                 "amandacore",
                 "client.combat_hud_state_applied domainSeq=%lld stateDiffSeq=%lld domainEvents=%zu stateDiffs=%zu",
@@ -8569,6 +8845,7 @@ namespace UiClient
                 gameCore,
                 worldState,
                 hasHostileTarget,
+                targetDistance,
                 m_actionSlotBindings,
                 m_spellbookBinding,
                 m_bagBinding,
@@ -8618,6 +8895,7 @@ namespace UiClient
                 gameCore,
                 worldState,
                 hasHostileTarget,
+                targetDistance,
                 m_actionSlotBindings,
                 12,
                 false,
@@ -8636,6 +8914,7 @@ namespace UiClient
                 gameCore,
                 worldState,
                 hasHostileTarget,
+                targetDistance,
                 m_actionSlotBindings,
                 36,
                 true,
@@ -8654,6 +8933,7 @@ namespace UiClient
                 gameCore,
                 worldState,
                 hasHostileTarget,
+                targetDistance,
                 m_actionSlotBindings,
                 24,
                 true,
@@ -8930,8 +9210,9 @@ namespace UiClient
             ImGui::End();
         }
 
-        DrawFriendlyNpcNameplates(worldState, cameraState, displaySize);
+        DrawWorldNameplates(worldState, cameraState, displaySize);
         DrawStonewakeLandmarkNameplates(worldState, cameraState, displaySize);
+        DrawCombatFeedbackPulses(nowMs, displaySize);
 
         if (!m_questToast.empty() && nowMs < m_questToastExpiresAt)
         {
@@ -9030,5 +9311,61 @@ namespace UiClient
             m_eventLog.pop_front();
         }
         m_eventLog.push_back(message);
+    }
+
+    void UiClientSystemComponent::AddCombatFeedbackPulse(const AZStd::string& message, AZ::s64 nowMs)
+    {
+        if (message.empty() || nowMs - m_lastCombatPulseAt < CombatPulseMinIntervalMs)
+        {
+            return;
+        }
+        if (!m_combatPulseTexts.empty() && m_combatPulseTexts.back() == message)
+        {
+            return;
+        }
+        while (m_combatPulseTexts.size() >= MaxCombatPulseEntries)
+        {
+            m_combatPulseTexts.pop_front();
+            if (!m_combatPulseExpiresAt.empty())
+            {
+                m_combatPulseExpiresAt.pop_front();
+            }
+        }
+        m_combatPulseTexts.push_back(message);
+        m_combatPulseExpiresAt.push_back(nowMs + CombatPulseLifetimeMs);
+        m_lastCombatPulseAt = nowMs;
+    }
+
+    void UiClientSystemComponent::DrawCombatFeedbackPulses(AZ::s64 nowMs, const ImVec2& displaySize)
+    {
+        while (!m_combatPulseTexts.empty() &&
+            (m_combatPulseExpiresAt.empty() || m_combatPulseExpiresAt.front() <= nowMs))
+        {
+            m_combatPulseTexts.pop_front();
+            if (!m_combatPulseExpiresAt.empty())
+            {
+                m_combatPulseExpiresAt.pop_front();
+            }
+        }
+        if (m_combatPulseTexts.empty())
+        {
+            return;
+        }
+
+        ImDrawList* drawList = ImGui::GetForegroundDrawList();
+        const float anchorX = displaySize.x * 0.5f;
+        float y = displaySize.y * 0.35f;
+        for (size_t index = 0; index < m_combatPulseTexts.size(); ++index)
+        {
+            const AZ::s64 expiresAt = index < m_combatPulseExpiresAt.size() ? m_combatPulseExpiresAt[index] : nowMs;
+            const float fade = Clamp01(static_cast<float>(expiresAt - nowMs) / static_cast<float>(CombatPulseLifetimeMs));
+            const int alpha = static_cast<int>(80.0f + (fade * 175.0f));
+            const AZStd::string& text = m_combatPulseTexts[index];
+            const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+            const ImVec2 textPos(anchorX - (textSize.x * 0.5f), y);
+            drawList->AddText(ImVec2(textPos.x + 1.0f, textPos.y + 1.0f), ColorU32(3, 6, 8, alpha), text.c_str());
+            drawList->AddText(textPos, ColorU32(246, 214, 132, alpha), text.c_str());
+            y += textSize.y + 4.0f;
+        }
     }
 } // namespace UiClient
