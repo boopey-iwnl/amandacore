@@ -739,6 +739,25 @@ namespace NetClient
             }
         }
 
+        void ParseVendorOffer(const rapidjson::Value& offerValue, VendorOfferState& outOffer)
+        {
+            ReadString(offerValue, "itemId", outOffer.m_itemId);
+            ReadString(offerValue, "displayName", outOffer.m_displayName);
+            ReadString(offerValue, "type", outOffer.m_itemType);
+            ReadString(offerValue, "subtype", outOffer.m_itemSubtype);
+            ReadString(offerValue, "quality", outOffer.m_quality);
+            ReadBool(offerValue, "stackable", outOffer.m_stackable);
+            ReadInt(offerValue, "maxStack", outOffer.m_maxStack);
+            ReadInt(offerValue, "sellPriceCopper", outOffer.m_sellPriceCopper);
+            ReadInt(offerValue, "buyPriceCopper", outOffer.m_buyPriceCopper);
+            ReadString(offerValue, "requiredClass", outOffer.m_requiredClass);
+            ReadInt(offerValue, "requiredLevel", outOffer.m_requiredLevel);
+            ReadString(offerValue, "equipSlot", outOffer.m_equipSlot);
+            ReadInt(offerValue, "strength", outOffer.m_strength);
+            ReadInt(offerValue, "stamina", outOffer.m_stamina);
+            ReadInt(offerValue, "armor", outOffer.m_armor);
+        }
+
         bool ParseWorldSessionJson(const AZStd::string& payload, WorldSessionResponse& outResponse, AZStd::string& outError)
         {
             outResponse = WorldSessionResponse{};
@@ -1052,6 +1071,29 @@ namespace NetClient
                         ReadBool(offerValue, "actionBarAssignable", offer.m_actionBarAssignable);
                         ReadBool(offerValue, "trainable", offer.m_trainable);
                         outResponse.m_trainer.m_offers.push_back(AZStd::move(offer));
+                    }
+                }
+            }
+            outResponse.m_vendor = VendorState{};
+            if (document.HasMember("vendor") && document["vendor"].IsObject())
+            {
+                const rapidjson::Value& vendor = document["vendor"];
+                ReadString(vendor, "id", outResponse.m_vendor.m_id);
+                ReadString(vendor, "npcId", outResponse.m_vendor.m_npcId);
+                ReadString(vendor, "displayName", outResponse.m_vendor.m_displayName);
+                ReadBool(vendor, "inRange", outResponse.m_vendor.m_inRange);
+                if (vendor.HasMember("offers") && vendor["offers"].IsArray())
+                {
+                    for (const rapidjson::Value& offerValue : vendor["offers"].GetArray())
+                    {
+                        if (!offerValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        VendorOfferState offer;
+                        ParseVendorOffer(offerValue, offer);
+                        outResponse.m_vendor.m_offers.push_back(AZStd::move(offer));
                     }
                 }
             }
@@ -3085,6 +3127,68 @@ namespace NetClient
             worldSessionToken.c_str(),
             equipmentSlot.c_str());
         if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/inventory/unequip", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool BuyVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        const AZStd::string& itemId,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"vendorId\":\"%s\",\"itemId\":\"%s\",\"stackCount\":%d}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(vendorId).c_str(),
+            JsonEscape(itemId).c_str(),
+            stackCount);
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/vendor/buy", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool SellVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        int slotIndex,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"vendorId\":\"%s\",\"slotIndex\":%d,\"stackCount\":%d}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(vendorId).c_str(),
+            slotIndex,
+            stackCount);
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/vendor/sell", requestBody, responseBody, statusCode, outError))
         {
             return false;
         }

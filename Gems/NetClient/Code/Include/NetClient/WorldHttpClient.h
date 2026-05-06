@@ -399,6 +399,34 @@ namespace NetClient
         int m_currencyCopper = 0;
     };
 
+    struct VendorOfferState
+    {
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        AZStd::string m_itemType;
+        AZStd::string m_itemSubtype;
+        AZStd::string m_quality;
+        AZStd::string m_requiredClass;
+        AZStd::string m_equipSlot;
+        bool m_stackable = false;
+        int m_maxStack = 0;
+        int m_sellPriceCopper = 0;
+        int m_buyPriceCopper = 0;
+        int m_requiredLevel = 0;
+        int m_strength = 0;
+        int m_stamina = 0;
+        int m_armor = 0;
+    };
+
+    struct VendorState
+    {
+        AZStd::string m_id;
+        AZStd::string m_npcId;
+        AZStd::string m_displayName;
+        bool m_inRange = false;
+        AZStd::vector<VendorOfferState> m_offers;
+    };
+
     struct SpellbookEntryState
     {
         AZStd::string m_id;
@@ -663,6 +691,7 @@ namespace NetClient
         AZStd::vector<SpellbookEntryState> m_spellbookEntries;
         AZStd::vector<ActionBarSlotState> m_actionBarSlots;
         TrainerState m_trainer;
+        VendorState m_vendor;
         bool m_alive = false;
         QuestState m_quest;
         AZStd::vector<QuestState> m_quests;
@@ -1195,6 +1224,24 @@ namespace NetClient
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
             const AZStd::string& equipmentSlot,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool BuyVendorItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& vendorId,
+            const AZStd::string& itemId,
+            int stackCount,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool SellVendorItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& vendorId,
+            int slotIndex,
+            int stackCount,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 

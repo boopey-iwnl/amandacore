@@ -190,6 +190,38 @@
       ]
     },
     {
+      "name": "worldSession.vendor",
+      "surface": "world-economy",
+      "fields": [
+        "id",
+        "npcId",
+        "displayName",
+        "inRange",
+        "offers"
+      ]
+    },
+    {
+      "name": "worldSession.vendor.offers[]",
+      "surface": "world-economy",
+      "fields": [
+        "itemId",
+        "displayName",
+        "type",
+        "subtype",
+        "quality",
+        "stackable",
+        "maxStack",
+        "sellPriceCopper",
+        "buyPriceCopper",
+        "requiredClass",
+        "requiredLevel",
+        "equipSlot",
+        "strength",
+        "stamina",
+        "armor"
+      ]
+    },
+    {
       "name": "worldSession.entities[]",
       "surface": "world-session",
       "fields": [

@@ -124,6 +124,8 @@ namespace GameCore
         virtual bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) = 0;
         virtual bool EquipInventorySlot(int slotIndex) = 0;
         virtual bool UnequipInventorySlot(const AZStd::string& equipmentSlot) = 0;
+        virtual bool BuyVendorItem(const AZStd::string& vendorId, const AZStd::string& itemId, int stackCount) = 0;
+        virtual bool SellVendorItem(const AZStd::string& vendorId, int slotIndex, int stackCount) = 0;
         virtual bool BrowseAuctions(
             const AZStd::string& search,
             const AZStd::string& itemType,

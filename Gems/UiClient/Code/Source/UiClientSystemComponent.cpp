@@ -69,6 +69,7 @@ namespace UiClient
         constexpr const char* ProfessionTrainerServiceType = "profession_trainer";
         constexpr const char* QuestServiceType = "quest";
         constexpr const char* AuctionServiceType = "auction";
+        constexpr const char* VendorServiceType = "vendor";
         constexpr const char* DungeonEntranceServiceType = "dungeon_entrance";
         constexpr const char* DungeonExitServiceType = "dungeon_exit";
         constexpr const char* SpellbookAbilityPayloadType = "AmandaCoreSpellbookAbility";
@@ -5156,6 +5157,87 @@ namespace UiClient
             ImGui::PopID();
         }
 
+        void DrawMailShell(
+            const GameCore::ClientWorldState& worldState,
+            int& selectedMailIndex)
+        {
+            ImGui::TextDisabled("Inbox is read-only in this build.");
+            ImGui::SameLine();
+            ImGui::Text("Messages %zu", worldState.m_auction.m_mail.size());
+            ImGui::Separator();
+
+            if (worldState.m_auction.m_mail.empty())
+            {
+                selectedMailIndex = -1;
+                ImGui::TextWrapped("No mail is available from the active auction/mail state.");
+                ImGui::TextDisabled("Claim and compose require runtime endpoints that are not exposed yet.");
+                return;
+            }
+
+            if (selectedMailIndex < 0 ||
+                selectedMailIndex >= static_cast<int>(worldState.m_auction.m_mail.size()))
+            {
+                selectedMailIndex = 0;
+            }
+
+            ImGui::BeginChild("##mail_list", ImVec2(236.0f, 0.0f), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            for (int index = 0; index < static_cast<int>(worldState.m_auction.m_mail.size()); ++index)
+            {
+                const auto& mail = worldState.m_auction.m_mail[index];
+                const AZStd::string label = AZStd::string::format(
+                    "%s\n%s",
+                    mail.m_subject.empty() ? "(no subject)" : mail.m_subject.c_str(),
+                    mail.m_senderDisplayName.empty() ? "system" : mail.m_senderDisplayName.c_str());
+                if (mail.m_mailId.empty())
+                {
+                    ImGui::PushID(index);
+                }
+                else
+                {
+                    ImGui::PushID(mail.m_mailId.c_str());
+                }
+                if (ImGui::Selectable(label.c_str(), selectedMailIndex == index))
+                {
+                    selectedMailIndex = index;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            const auto& mail = worldState.m_auction.m_mail[selectedMailIndex];
+            ImGui::TextWrapped("%s", mail.m_subject.empty() ? "(no subject)" : mail.m_subject.c_str());
+            ImGui::TextDisabled("From %s", mail.m_senderDisplayName.empty() ? "system" : mail.m_senderDisplayName.c_str());
+            ImGui::Separator();
+            ImGui::TextWrapped("%s", mail.m_body.empty() ? "No message body." : mail.m_body.c_str());
+            if (mail.m_currencyCopper > 0)
+            {
+                ImGui::Text("Currency attached: %s", FormatCopperAmount(mail.m_currencyCopper).c_str());
+            }
+            if (!mail.m_itemAttachments.empty())
+            {
+                ImGui::TextUnformatted("Attachments");
+                for (const auto& attachment : mail.m_itemAttachments)
+                {
+                    ImGui::BulletText("%s x%d", attachment.m_displayName.c_str(), attachment.m_stackCount);
+                }
+            }
+            ImGui::Separator();
+            ImGui::Button("Claim", HudButtonSize(86.0f));
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Mail claim has no live runtime endpoint in this build.");
+            }
+            ImGui::SameLine();
+            ImGui::Button("Compose", HudButtonSize(104.0f));
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Mail send has no live runtime endpoint in this build.");
+            }
+            ImGui::EndGroup();
+        }
+
         void DrawAuctionWindow(
             GameCore::IGameCoreRequests* gameCore,
             const GameCore::ClientWorldState& worldState,
@@ -5165,7 +5247,8 @@ namespace UiClient
             size_t buyoutBufferLength,
             int& selectedSellSlot,
             int& stackCount,
-            int& pendingBuyoutIndex)
+            int& pendingBuyoutIndex,
+            int& selectedMailIndex)
         {
             const char* itemTypes[] = {"", "weapon", "armor", "consumable", "material", "junk"};
             static int selectedItemType = 0;
@@ -5384,6 +5467,235 @@ namespace UiClient
                         DrawAuctionListingRow(gameCore, worldState.m_auction.m_myAuctions[index], index, false, pendingBuyoutIndex);
                     }
                     ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Mail"))
+                {
+                    DrawMailShell(worldState, selectedMailIndex);
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+        }
+
+        void DrawVendorOfferTooltip(const NetClient::VendorOfferState& offer)
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextColored(QualityTextColor(offer.m_quality), "%s", offer.m_displayName.c_str());
+            DrawItemMetadataLines(
+                offer.m_itemType,
+                offer.m_itemSubtype,
+                offer.m_equipSlot,
+                offer.m_requiredClass,
+                offer.m_requiredLevel,
+                offer.m_sellPriceCopper,
+                offer.m_strength,
+                offer.m_stamina,
+                offer.m_armor,
+                {});
+            if (offer.m_buyPriceCopper > 0)
+            {
+                ImGui::Separator();
+                ImGui::TextDisabled("Buy price: %s", FormatCopperAmount(offer.m_buyPriceCopper).c_str());
+            }
+            ImGui::EndTooltip();
+        }
+
+        void DrawVendorWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            int& selectedSellSlot,
+            int& stackCount)
+        {
+            const auto& vendor = worldState.m_session.m_vendor;
+            if (vendor.m_id.empty())
+            {
+                ImGui::TextDisabled("Vendor is unavailable.");
+                ImGui::TextWrapped("Target a real vendor NPC and interact again to load the server-provided catalog.");
+                return;
+            }
+
+            if (stackCount < 1)
+            {
+                stackCount = 1;
+            }
+
+            ImGui::Text("%s", vendor.m_displayName.empty() ? "Vendor" : vendor.m_displayName.c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", vendor.m_inRange ? "in range" : "move closer");
+            ImGui::SameLine();
+            ImGui::TextDisabled("Purse %s", FormatCurrency(worldState.m_session.m_currency).c_str());
+            if (!worldState.m_errorMessage.empty())
+            {
+                ImGui::TextColored(ImVec4(0.95f, 0.34f, 0.28f, 1.0f), "Status");
+                ImGui::SameLine();
+                ImGui::TextWrapped("%s", worldState.m_errorMessage.c_str());
+            }
+            ImGui::Separator();
+
+            if (ImGui::BeginTabBar("##vendor_tabs"))
+            {
+                if (ImGui::BeginTabItem("Buy"))
+                {
+                    ImGui::SetNextItemWidth(110.0f);
+                    ImGui::InputInt("Stack", &stackCount);
+                    if (stackCount < 1)
+                    {
+                        stackCount = 1;
+                    }
+                    ImGui::Separator();
+                    if (vendor.m_offers.empty())
+                    {
+                        ImGui::TextDisabled("This vendor has no catalog entries in the current payload.");
+                    }
+                    ImGui::BeginChild("##vendor_buy_list", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (const auto& offer : vendor.m_offers)
+                    {
+                        if (offer.m_itemId.empty())
+                        {
+                            continue;
+                        }
+                        int buyStack = stackCount;
+                        if (!offer.m_stackable)
+                        {
+                            buyStack = 1;
+                        }
+                        else if (offer.m_maxStack > 0 && buyStack > offer.m_maxStack)
+                        {
+                            buyStack = offer.m_maxStack;
+                        }
+                        const int totalPrice = offer.m_buyPriceCopper * buyStack;
+                        const bool canBuy = vendor.m_inRange &&
+                            offer.m_buyPriceCopper > 0 &&
+                            worldState.m_session.m_currency.m_totalCopper >= totalPrice;
+
+                        ImGui::PushID(offer.m_itemId.c_str());
+                        ImGui::TextColored(QualityTextColor(offer.m_quality), "%s", offer.m_displayName.c_str());
+                        if (ImGui::IsItemHovered())
+                        {
+                            DrawVendorOfferTooltip(offer);
+                        }
+                        ImGui::SameLine(260.0f);
+                        ImGui::Text("%s", FormatCopperAmount(totalPrice).c_str());
+                        ImGui::SameLine(420.0f);
+                        if (!canBuy)
+                        {
+                            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+                        }
+                        if (ImGui::Button("Buy", HudButtonSize(72.0f)) && canBuy && gameCore)
+                        {
+                            gameCore->BuyVendorItem(vendor.m_id, offer.m_itemId, buyStack);
+                        }
+                        if (!canBuy && ImGui::IsItemHovered())
+                        {
+                            const char* reason = !vendor.m_inRange
+                                ? "Move closer to buy from this vendor."
+                                : (offer.m_buyPriceCopper <= 0 ? "This item has no buy price." : "Not enough currency.");
+                            ImGui::SetTooltip("%s", reason);
+                        }
+                        if (!canBuy)
+                        {
+                            ImGui::PopStyleVar();
+                        }
+                        ImGui::Separator();
+                        ImGui::PopID();
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Sell"))
+                {
+                    ImGui::TextDisabled("Selling uses the live vendor route and current inventory payload.");
+                    ImGui::BeginChild("##vendor_sell_inventory", ImVec2(310.0f, 280.0f), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (const auto& slot : worldState.m_session.m_inventory.m_slots)
+                    {
+                        if (slot.m_itemId.empty() || slot.m_stackCount <= 0)
+                        {
+                            continue;
+                        }
+                        ImGui::PushID(slot.m_slotIndex);
+                        const bool canSellSlot = slot.m_sellPriceCopper > 0;
+                        const AZStd::string label = AZStd::string::format(
+                            "%02d  %s x%d",
+                            slot.m_slotIndex + 1,
+                            slot.m_displayName.c_str(),
+                            slot.m_stackCount);
+                        if (!canSellSlot)
+                        {
+                            ImGui::TextDisabled("%s", label.c_str());
+                        }
+                        else if (ImGui::Selectable(label.c_str(), selectedSellSlot == slot.m_slotIndex))
+                        {
+                            selectedSellSlot = slot.m_slotIndex;
+                            if (stackCount > slot.m_stackCount)
+                            {
+                                stackCount = slot.m_stackCount;
+                            }
+                        }
+                        if (ImGui::IsItemHovered())
+                        {
+                            DrawInventoryItemTooltip(slot, worldState.m_session, false);
+                        }
+                        ImGui::PopID();
+                    }
+                    ImGui::EndChild();
+                    ImGui::SameLine();
+                    ImGui::BeginGroup();
+                    const auto* selectedSlot = FindInventorySlot(worldState.m_session.m_inventory, selectedSellSlot);
+                    if (selectedSlot)
+                    {
+                        if (stackCount > selectedSlot->m_stackCount)
+                        {
+                            stackCount = selectedSlot->m_stackCount;
+                        }
+                        if (stackCount < 1)
+                        {
+                            stackCount = 1;
+                        }
+                        ImGui::TextWrapped("%s x%d", selectedSlot->m_displayName.c_str(), selectedSlot->m_stackCount);
+                        ImGui::SetNextItemWidth(110.0f);
+                        ImGui::InputInt("Count", &stackCount);
+                        if (stackCount < 1)
+                        {
+                            stackCount = 1;
+                        }
+                        if (stackCount > selectedSlot->m_stackCount)
+                        {
+                            stackCount = selectedSlot->m_stackCount;
+                        }
+                        ImGui::TextDisabled("Value %s", FormatCopperAmount(selectedSlot->m_sellPriceCopper * stackCount).c_str());
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Select an item with sell value.");
+                    }
+
+                    const bool canSell = vendor.m_inRange &&
+                        selectedSlot &&
+                        selectedSlot->m_sellPriceCopper > 0 &&
+                        stackCount > 0;
+                    if (!canSell)
+                    {
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+                    }
+                    if (ImGui::Button("Sell", HudButtonSize(86.0f)) && canSell && gameCore)
+                    {
+                        if (gameCore->SellVendorItem(vendor.m_id, selectedSellSlot, stackCount))
+                        {
+                            selectedSellSlot = -1;
+                            stackCount = 1;
+                        }
+                    }
+                    if (!canSell && ImGui::IsItemHovered())
+                    {
+                        ImGui::SetTooltip("%s", vendor.m_inRange ? "Select a sellable inventory item." : "Move closer to sell to this vendor.");
+                    }
+                    if (!canSell)
+                    {
+                        ImGui::PopStyleVar();
+                    }
+                    ImGui::EndGroup();
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
@@ -6216,9 +6528,57 @@ namespace UiClient
             return "Say";
         }
 
+        bool ChatChannelVisible(
+            const GameCore::ClientWorldState& worldState,
+            const AZStd::string& channel)
+        {
+            if (channel == "party")
+            {
+                return worldState.m_social.m_hasParty;
+            }
+            if (channel == "guild")
+            {
+                return worldState.m_social.m_hasGuild;
+            }
+            return true;
+        }
+
+        bool DrawChatChannelButton(
+            const char* label,
+            bool selected,
+            bool enabled,
+            const char* unavailableReason)
+        {
+            if (selected)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.32f, 0.27f, 0.18f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.40f, 0.34f, 0.22f, 1.0f));
+            }
+            if (!enabled)
+            {
+                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.45f);
+            }
+            const float width = AZ::GetClamp(ImGui::CalcTextSize(label).x + 22.0f, 52.0f, 88.0f);
+            const bool clicked = ImGui::Button(label, ImVec2(width, 24.0f)) && enabled;
+            if (!enabled && ImGui::IsItemHovered() && unavailableReason && unavailableReason[0] != '\0')
+            {
+                ImGui::SetTooltip("%s", unavailableReason);
+            }
+            if (!enabled)
+            {
+                ImGui::PopStyleVar();
+            }
+            if (selected)
+            {
+                ImGui::PopStyleColor(2);
+            }
+            return clicked;
+        }
+
         bool DrawChatWindow(
             const GameCore::ClientWorldState& worldState,
             AZStd::string& selectedChannel,
+            AZStd::string& filterChannel,
             char* inputBuffer,
             size_t inputBufferSize,
             char* whisperTargetBuffer,
@@ -6227,12 +6587,54 @@ namespace UiClient
             bool& inputActive,
             AZStd::string& outSubmittedInput)
         {
-            AZ_UNUSED(whisperTargetBuffer);
-            AZ_UNUSED(whisperTargetBufferSize);
-            selectedChannel = "say";
-            ImGui::BeginChild("##chat_scrollback", ImVec2(0.0f, 158.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            if (!ChatChannelVisible(worldState, selectedChannel))
+            {
+                selectedChannel = "say";
+            }
+            if (filterChannel != "all" && !ChatChannelVisible(worldState, filterChannel))
+            {
+                filterChannel = "all";
+            }
+
+            ImGui::TextDisabled("Filter");
+            ImGui::SameLine();
+            struct ChatFilterButtonState
+            {
+                const char* m_id;
+                const char* m_label;
+            };
+            const ChatFilterButtonState filters[] = {
+                {"all", "All"},
+                {"system", "System"},
+                {"say", "Say"},
+                {"party", "Party"},
+                {"guild", "Guild"},
+                {"whisper", "Whisper"},
+            };
+            for (size_t index = 0; index < AZ_ARRAY_SIZE(filters); ++index)
+            {
+                if (index > 0)
+                {
+                    ImGui::SameLine();
+                }
+                const AZStd::string channelId = filters[index].m_id;
+                const bool enabled = channelId == "all" || ChatChannelVisible(worldState, channelId);
+                const char* unavailableReason = channelId == "party"
+                    ? "Party chat is available after joining a party."
+                    : (channelId == "guild" ? "Guild chat is available after joining a guild." : "");
+                if (DrawChatChannelButton(filters[index].m_label, filterChannel == channelId, enabled, unavailableReason))
+                {
+                    filterChannel = channelId;
+                }
+            }
+
+            ImGui::BeginChild("##chat_scrollback", ImVec2(0.0f, 122.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
             for (const auto& message : worldState.m_social.m_chatMessages)
             {
+                if (filterChannel != "all" && message.m_channel != filterChannel)
+                {
+                    continue;
+                }
                 ImGui::PushStyleColor(ImGuiCol_Text, ChatChannelColor(message.m_channel));
                 ImGui::Text("[%s]", ChatChannelLabel(message.m_channel));
                 ImGui::PopStyleColor();
@@ -6252,12 +6654,35 @@ namespace UiClient
             }
             ImGui::EndChild();
 
-            if (ImGui::Button("Say", ImVec2(58.0f, 24.0f)))
+            ImGui::TextDisabled("Send");
+            ImGui::SameLine();
+            if (DrawChatChannelButton("Say", selectedChannel == "say", true, ""))
             {
                 selectedChannel = "say";
             }
             ImGui::SameLine();
-            ImGui::Text("Channel: %s", ChatChannelLabel(selectedChannel));
+            if (DrawChatChannelButton("Party", selectedChannel == "party", worldState.m_social.m_hasParty, "Join a party before sending party chat."))
+            {
+                selectedChannel = "party";
+            }
+            ImGui::SameLine();
+            if (DrawChatChannelButton("Guild", selectedChannel == "guild", worldState.m_social.m_hasGuild, "Join a guild before sending guild chat."))
+            {
+                selectedChannel = "guild";
+            }
+            ImGui::SameLine();
+            if (DrawChatChannelButton("Whisper", selectedChannel == "whisper", true, ""))
+            {
+                selectedChannel = "whisper";
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("Channel: %s", ChatChannelLabel(selectedChannel));
+
+            if (selectedChannel == "whisper")
+            {
+                ImGui::SetNextItemWidth(172.0f);
+                ImGui::InputText("Whisper To", whisperTargetBuffer, whisperTargetBufferSize);
+            }
 
             if (focusRequested)
             {
@@ -6460,6 +6885,11 @@ namespace UiClient
 
                     ImGui::Separator();
                     ImGui::BeginChild("##friends_list", ImVec2(0.0f, 280.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    if (worldState.m_social.m_friends.empty())
+                    {
+                        ImGui::TextDisabled("No friends are saved for this character.");
+                        ImGui::TextWrapped("Add/remove uses the live world social service; online state is shown only when the service reports it.");
+                    }
                     for (const auto& friendState : worldState.m_social.m_friends)
                     {
                         ImGui::Text(
@@ -6485,6 +6915,25 @@ namespace UiClient
                     ImGui::EndTabItem();
                 }
 
+                if (ImGui::BeginTabItem("Blocked"))
+                {
+                    ImGui::TextDisabled("Ignore and blocked-character lists are not exposed by the active runtime service.");
+                    ImGui::TextWrapped("The repository has store-level ignore foundations, but this client has no live HTTP/client contract for add, remove, list, or chat filtering in this build.");
+                    ImGui::Separator();
+                    ImGui::Button("Add Block", HudButtonSize(104.0f));
+                    if (ImGui::IsItemHovered())
+                    {
+                        ImGui::SetTooltip("Blocked-list mutation is unavailable in this build.");
+                    }
+                    ImGui::SameLine();
+                    ImGui::Button("Remove", HudButtonSize(86.0f));
+                    if (ImGui::IsItemHovered())
+                    {
+                        ImGui::SetTooltip("Blocked-list mutation is unavailable in this build.");
+                    }
+                    ImGui::EndTabItem();
+                }
+
                 if (ImGui::BeginTabItem("Party"))
                 {
                     ImGui::SetNextItemWidth(210.0f);
@@ -6500,7 +6949,16 @@ namespace UiClient
                         gameCore->LeaveParty();
                     }
                     ImGui::Separator();
+                    if (!worldState.m_social.m_partyInvites.empty())
+                    {
+                        DrawPartyInvitePrompt(gameCore, worldState);
+                        ImGui::Separator();
+                    }
                     DrawPartyFrames(worldState);
+                    if (!worldState.m_social.m_hasParty)
+                    {
+                        ImGui::TextWrapped("Party membership is server-owned. Invite and accept actions call the live party routes when available.");
+                    }
                     ImGui::EndTabItem();
                 }
 
@@ -6567,6 +7025,10 @@ namespace UiClient
 
                         ImGui::Separator();
                         ImGui::BeginChild("##guild_roster", ImVec2(0.0f, 250.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                        if (guild.m_members.empty())
+                        {
+                            ImGui::TextDisabled("Guild roster has no members in the current runtime payload.");
+                        }
                         for (const auto& member : guild.m_members)
                         {
                             ImGui::PushID(member.m_characterId.c_str());
@@ -6615,6 +7077,12 @@ namespace UiClient
                     }
                     ImGui::EndTabItem();
                 }
+                if (ImGui::BeginTabItem("Trade"))
+                {
+                    ImGui::TextDisabled("Player trade is unavailable in this alpha build.");
+                    ImGui::TextWrapped("No player-trade runtime state or HTTP endpoints are exposed, so the client does not offer item or currency transfer controls.");
+                    ImGui::EndTabItem();
+                }
                 ImGui::EndTabBar();
             }
         }
@@ -6637,7 +7105,6 @@ namespace UiClient
                 bool* m_toggle;
             };
 
-            AZ_UNUSED(socialOpen);
             const char* toggledPanel = nullptr;
             MenuButtonState buttons[] = {
                 {"Char", PanelCharacter, &characterSheetOpen},
@@ -6646,6 +7113,7 @@ namespace UiClient
                 {"Prof", PanelProfessions, &professionsOpen},
                 {"Quests", PanelQuestLog, &questLogOpen},
                 {"Map", PanelMap, &mapOpen},
+                {"Social", PanelSocial, &socialOpen},
                 {"Bag", PanelBag, &bagOpen},
                 {"Settings", PanelSettings, &settingsOpen},
             };
@@ -6732,6 +7200,7 @@ namespace UiClient
         m_lastHandledInteractionSequence = 0;
         m_questGossipOpen = false;
         m_auctionOpen = false;
+        m_vendorOpen = false;
         m_professionsOpen = false;
         m_lastNearCommandPoint = false;
         m_lastWorldConnected = false;
@@ -6744,8 +7213,12 @@ namespace UiClient
         m_characterPanelNotice.clear();
         m_pendingAuctionSellSlot = -1;
         m_pendingAuctionBuyoutIndex = -1;
+        m_selectedMailIndex = -1;
+        m_pendingVendorSellSlot = -1;
         m_auctionStackCount = 1;
+        m_vendorStackCount = 1;
         m_chatChannel = "say";
+        m_chatFilterChannel = "all";
         m_chatFocusRequested = false;
         m_chatInputActive = false;
         m_chatInputBuffer[0] = '\0';
@@ -7150,8 +7623,9 @@ namespace UiClient
         const bool questWasOpen = m_questGossipOpen;
         const bool trainerWasOpen = m_trainerOpen;
         const bool auctionWasOpen = m_auctionOpen;
+        const bool vendorWasOpen = m_vendorOpen;
         const bool professionsWasOpen = m_professionsOpen && m_activeInteractionKind == "profession_trainer";
-        if (!questWasOpen && !trainerWasOpen && !auctionWasOpen && !professionsWasOpen)
+        if (!questWasOpen && !trainerWasOpen && !auctionWasOpen && !vendorWasOpen && !professionsWasOpen)
         {
             m_activeInteractionEntityId.clear();
             m_activeInteractionKind.clear();
@@ -7177,6 +7651,7 @@ namespace UiClient
         m_questGossipOpen = false;
         m_trainerOpen = false;
         m_auctionOpen = false;
+        m_vendorOpen = false;
         m_professionsOpen = false;
         m_activeInteractionEntityId.clear();
         m_activeInteractionKind.clear();
@@ -7432,6 +7907,7 @@ namespace UiClient
             if (gameCore->BrowseAuctions(m_auctionSearchBuffer, {}, "buyout_asc"))
             {
                 m_auctionOpen = true;
+                m_vendorOpen = false;
                 m_questGossipOpen = false;
                 m_trainerOpen = false;
                 m_professionsOpen = false;
@@ -7455,12 +7931,38 @@ namespace UiClient
             return false;
         }
 
+        if (EntityHasService(entity, VendorServiceType))
+        {
+            m_vendorOpen = true;
+            m_auctionOpen = false;
+            m_questGossipOpen = false;
+            m_trainerOpen = false;
+            m_professionsOpen = false;
+            m_pendingVendorSellSlot = -1;
+            m_vendorStackCount = 1;
+            m_activeInteractionEntityId = entity.m_id;
+            m_activeInteractionKind = "vendor";
+            AZ_Printf(
+                "amandacore",
+                "client.npc_interaction_opened source=%s targetId=%s kind=vendor",
+                source,
+                entity.m_id.c_str());
+            AZ_Printf(
+                "amandacore",
+                "client.vendor_visible open=true source=%s targetId=%s",
+                source,
+                entity.m_id.c_str());
+            AddHudEvent(AZStd::string::format("Browsing %s", entity.m_displayName.c_str()));
+            return true;
+        }
+
         if (IsProfessionTrainerNpc(entity))
         {
             m_professionsOpen = true;
             m_questGossipOpen = false;
             m_trainerOpen = false;
             m_auctionOpen = false;
+            m_vendorOpen = false;
             m_activeInteractionEntityId = entity.m_id;
             m_activeInteractionKind = "profession_trainer";
             AZ_Printf(
@@ -7482,6 +7984,7 @@ namespace UiClient
             m_questGossipOpen = true;
             m_trainerOpen = false;
             m_auctionOpen = false;
+            m_vendorOpen = false;
             m_professionsOpen = false;
             m_activeInteractionEntityId = entity.m_id;
             m_activeInteractionKind = "quest";
@@ -7504,6 +8007,7 @@ namespace UiClient
             m_trainerOpen = true;
             m_questGossipOpen = false;
             m_auctionOpen = false;
+            m_vendorOpen = false;
             m_professionsOpen = false;
             m_activeInteractionEntityId = entity.m_id;
             m_activeInteractionKind = "trainer";
@@ -7526,6 +8030,7 @@ namespace UiClient
             m_questGossipOpen = true;
             m_trainerOpen = false;
             m_auctionOpen = false;
+            m_vendorOpen = false;
             m_professionsOpen = false;
             m_activeInteractionEntityId = entity.m_id;
             m_activeInteractionKind = "quest";
@@ -7669,7 +8174,6 @@ namespace UiClient
 
     void UiClientSystemComponent::BeginChatInput()
     {
-        m_chatChannel = "say";
         m_chatInputActive = true;
         m_chatFocusRequested = true;
         ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, true);
@@ -8576,7 +9080,7 @@ namespace UiClient
         const ImVec2 actionBarPos = ApplyHudOffset(actionBarDefaultPos, m_actionBarOffsetX, m_actionBarOffsetY, actionBarSize, displaySize);
         const ImVec2 upperActionBarSize(744.0f, 72.0f);
         const ImVec2 upperActionBarPos(actionBarPos.x, actionBarPos.y - upperActionBarSize.y - 6.0f);
-        const ImVec2 microMenuSize(642.0f, 44.0f);
+        const ImVec2 microMenuSize(720.0f, 44.0f);
         const float microMenuRightX = actionBarPos.x + actionBarSize.x + 8.0f;
         const bool microMenuFitsRight = microMenuRightX + microMenuSize.x < rightActionBarTwoPos.x - 12.0f;
         const ImVec2 microMenuPos(
@@ -8625,6 +9129,10 @@ namespace UiClient
             AZ::GetMax(18.0f, displaySize.y - socialSize.y - 176.0f));
         const ImVec2 auctionSize(720.0f, 520.0f);
         const ImVec2 auctionPos((displaySize.x - auctionSize.x) * 0.5f, (displaySize.y - auctionSize.y) * 0.5f);
+        const ImVec2 vendorSize(560.0f, 470.0f);
+        const ImVec2 vendorPos(
+            AZ::GetMax(18.0f, spellbookPos.x - vendorSize.x - 18.0f),
+            AZ::GetMax(18.0f, displaySize.y - vendorSize.y - 176.0f));
         const ImVec2 invitePromptSize(360.0f, 92.0f);
         const ImVec2 invitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 170.0f);
         const ImVec2 guildInvitePromptPos((displaySize.x - invitePromptSize.x) * 0.5f, 270.0f);
@@ -8695,6 +9203,17 @@ namespace UiClient
         {
             CloseNpcInteraction("target_changed");
         }
+        if (m_vendorOpen && (!targetEntity || !EntityHasService(*targetEntity, VendorServiceType)))
+        {
+            CloseNpcInteraction("target_changed");
+        }
+        if (m_vendorOpen &&
+            !worldState.m_session.m_vendor.m_id.empty() &&
+            (!worldState.m_session.m_vendor.m_inRange ||
+                worldState.m_session.m_currentTargetId != worldState.m_session.m_vendor.m_npcId))
+        {
+            CloseNpcInteraction("out_of_range");
+        }
         if (m_professionsOpen && m_activeInteractionKind == "profession_trainer" && (!targetEntity || !IsProfessionTrainerNpc(*targetEntity)))
         {
             CloseNpcInteraction("target_changed");
@@ -8734,6 +9253,7 @@ namespace UiClient
             if (DrawChatWindow(
                     worldState,
                     m_chatChannel,
+                    m_chatFilterChannel,
                     m_chatInputBuffer,
                     AZ_ARRAY_SIZE(m_chatInputBuffer),
                     m_chatWhisperTargetBuffer,
@@ -9168,10 +9688,32 @@ namespace UiClient
                     AZ_ARRAY_SIZE(m_auctionBuyoutBuffer),
                     m_pendingAuctionSellSlot,
                     m_auctionStackCount,
-                    m_pendingAuctionBuyoutIndex);
+                    m_pendingAuctionBuyoutIndex,
+                    m_selectedMailIndex);
             }
         }
         if (auctionPanelWasOpen)
+        {
+            ImGui::End();
+        }
+
+        const bool vendorPanelWasOpen = m_vendorOpen;
+        if (vendorPanelWasOpen && BeginHudPanel("##vendor", "Vendor", vendorPos, vendorSize, false, true))
+        {
+            if (DrawHudPanelCloseButton())
+            {
+                CloseNpcInteraction("close_button");
+            }
+            else
+            {
+                DrawVendorWindow(
+                    gameCore,
+                    worldState,
+                    m_pendingVendorSellSlot,
+                    m_vendorStackCount);
+            }
+        }
+        if (vendorPanelWasOpen)
         {
             ImGui::End();
         }
