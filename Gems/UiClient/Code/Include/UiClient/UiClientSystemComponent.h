@@ -68,6 +68,7 @@ namespace UiClient
         bool IsGameplayPanelOpen(const char* panelId) const;
         bool CloseGameplayPanelById(const char* panelId, const char* reason);
         void ResetHudLayout();
+        void ResetUiOptionsToDefaults();
         void DrawPreWorldFrontend(GameCore::IGameCoreRequests* gameCore, const ImVec2& displaySize);
         void ResetCharacterCreationDraft();
 
@@ -97,6 +98,7 @@ namespace UiClient
         bool m_questGossipOpen = false;
         bool m_trainerOpen = false;
         bool m_bagOpen = false;
+        bool m_gameMenuOpen = false;
         bool m_settingsOpen = false;
         bool m_socialOpen = false;
         bool m_auctionOpen = false;
@@ -110,6 +112,18 @@ namespace UiClient
         bool m_uiLayoutDirty = false;
         bool m_objectiveTrackerCollapsed = false;
         int m_settingsTab = 0;
+        float m_uiScale = 1.0f;
+        float m_readabilityScale = 1.0f;
+        bool m_uiFramesLocked = true;
+        bool m_chatFrameVisible = true;
+        bool m_objectiveTrackerVisible = true;
+        bool m_minimapVisible = true;
+        bool m_actionBarsVisible = true;
+        bool m_combatTextVisible = true;
+        bool m_nameplatesVisible = true;
+        bool m_tooltipComparisonEnabled = true;
+        bool m_reduceUiMotion = false;
+        AZStd::string m_layoutProfileName = "Default";
         bool m_extraUpperActionBarVisible = true;
         bool m_rightActionBarOneVisible = true;
         bool m_rightActionBarTwoVisible = false;
@@ -133,6 +147,7 @@ namespace UiClient
         AZStd::string m_targetHostileBinding;
         AZStd::string m_chatChannel = "say";
         AZStd::string m_chatFilterChannel = "all";
+        AZStd::string m_keybindNotice;
         bool m_chatFocusRequested = false;
         bool m_chatInputActive = false;
         bool m_preWorldDiscreteInputEnabled = false;

@@ -82,10 +82,26 @@ namespace UiClient
         constexpr const char* PanelQuestLog = "questLog";
         constexpr const char* PanelMap = "map";
         constexpr const char* PanelBag = "bag";
+        constexpr const char* PanelGameMenu = "gameMenu";
         constexpr const char* PanelSettings = "settings";
         constexpr const char* PanelSocial = "social";
         constexpr const char* PanelTalents = "talents";
         constexpr const char* PanelProfessions = "professions";
+
+        enum SettingsTabIndex
+        {
+            SettingsTabInterface = 0,
+            SettingsTabKeybinds,
+            SettingsTabLayout,
+            SettingsTabAccessibility,
+            SettingsTabAudio,
+            SettingsTabVideo,
+            SettingsTabGameplay,
+            SettingsTabChat,
+            SettingsTabCombat,
+            SettingsTabNameplates,
+            SettingsTabObjectives,
+        };
 
         struct SpellbookAbilityDragPayload
         {
@@ -4656,9 +4672,14 @@ namespace UiClient
         void DrawInventoryItemTooltip(
             const NetClient::InventorySlotState& slot,
             const NetClient::WorldSessionResponse& session,
-            bool includeMoveHelp);
+            bool includeMoveHelp,
+            bool comparisonEnabled);
 
-        void DrawInventoryWindow(GameCore::IGameCoreRequests* gameCore, const GameCore::ClientWorldState& worldState, int& pendingInventoryMoveSlot)
+        void DrawInventoryWindow(
+            GameCore::IGameCoreRequests* gameCore,
+            const GameCore::ClientWorldState& worldState,
+            int& pendingInventoryMoveSlot,
+            bool tooltipComparisonEnabled)
         {
             const int slotCount = worldState.m_session.m_inventory.m_slotCount > 0
                 ? worldState.m_session.m_inventory.m_slotCount
@@ -4796,7 +4817,7 @@ namespace UiClient
                 }
                 if (slotState && !slotState->m_itemId.empty() && slotState->m_stackCount > 0 && ImGui::IsItemHovered())
                 {
-                    DrawInventoryItemTooltip(*slotState, worldState.m_session, true);
+                    DrawInventoryItemTooltip(*slotState, worldState.m_session, true, tooltipComparisonEnabled);
                 }
                 ImGui::PopID();
             }
@@ -4997,7 +5018,8 @@ namespace UiClient
         void DrawInventoryItemTooltip(
             const NetClient::InventorySlotState& slot,
             const NetClient::WorldSessionResponse& session,
-            bool includeMoveHelp)
+            bool includeMoveHelp,
+            bool comparisonEnabled)
         {
             ImGui::BeginTooltip();
             ImGui::TextColored(QualityTextColor(slot.m_quality), "%s x%d", slot.m_displayName.c_str(), slot.m_stackCount);
@@ -5012,27 +5034,35 @@ namespace UiClient
                 slot.m_stamina,
                 slot.m_armor,
                 slot.m_description);
-            if (const NetClient::EquipmentSlotState* equipped = FindEquippedComparison(session, slot))
+            if (comparisonEnabled)
             {
-                ImGui::Separator();
-                ImGui::TextDisabled("Equipped %s", EquipmentSlotLabel(equipped->m_slot).c_str());
-                ImGui::TextColored(QualityTextColor(equipped->m_quality), "%s", equipped->m_displayName.c_str());
-                DrawItemMetadataLines(
-                    equipped->m_itemType,
-                    equipped->m_itemSubtype,
-                    equipped->m_equipSlot,
-                    equipped->m_requiredArchetype,
-                    equipped->m_requiredLevel,
-                    equipped->m_sellPriceCopper,
-                    equipped->m_strength,
-                    equipped->m_stamina,
-                    equipped->m_armor,
-                    equipped->m_description);
+                if (const NetClient::EquipmentSlotState* equipped = FindEquippedComparison(session, slot))
+                {
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Equipped %s", EquipmentSlotLabel(equipped->m_slot).c_str());
+                    ImGui::TextColored(QualityTextColor(equipped->m_quality), "%s", equipped->m_displayName.c_str());
+                    DrawItemMetadataLines(
+                        equipped->m_itemType,
+                        equipped->m_itemSubtype,
+                        equipped->m_equipSlot,
+                        equipped->m_requiredArchetype,
+                        equipped->m_requiredLevel,
+                        equipped->m_sellPriceCopper,
+                        equipped->m_strength,
+                        equipped->m_stamina,
+                        equipped->m_armor,
+                        equipped->m_description);
+                }
+                else if (!slot.m_equipSlot.empty())
+                {
+                    ImGui::Separator();
+                    ImGui::TextDisabled("No equipped comparison for this slot.");
+                }
             }
             else if (!slot.m_equipSlot.empty())
             {
                 ImGui::Separator();
-                ImGui::TextDisabled("No equipped comparison for this slot.");
+                ImGui::TextDisabled("Equipment comparison disabled in Interface options.");
             }
             if (includeMoveHelp)
             {
@@ -5635,7 +5665,7 @@ namespace UiClient
                         }
                         if (ImGui::IsItemHovered())
                         {
-                            DrawInventoryItemTooltip(slot, worldState.m_session, false);
+                            DrawInventoryItemTooltip(slot, worldState.m_session, false, true);
                         }
                         ImGui::PopID();
                     }
@@ -5702,31 +5732,159 @@ namespace UiClient
             }
         }
 
+        void SetDefaultActionSlotBindings(AZStd::array<AZStd::string, ActionBarSlotCount>& actionSlotBindings)
+        {
+            for (auto& binding : actionSlotBindings)
+            {
+                binding.clear();
+            }
+
+            actionSlotBindings[0] = AzFramework::InputDeviceKeyboard::Key::AlphanumericF.GetName();
+            actionSlotBindings[1] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric1.GetName();
+            actionSlotBindings[2] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric2.GetName();
+            actionSlotBindings[3] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric3.GetName();
+            actionSlotBindings[4] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric4.GetName();
+            actionSlotBindings[5] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric5.GetName();
+            actionSlotBindings[6] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric6.GetName();
+            actionSlotBindings[7] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric7.GetName();
+            actionSlotBindings[8] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric8.GetName();
+            actionSlotBindings[9] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric9.GetName();
+            actionSlotBindings[10] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric0.GetName();
+        }
+
+        void SetDefaultPanelKeybindings(
+            AZStd::string& spellbookBinding,
+            AZStd::string& bagBinding,
+            AZStd::string& characterBinding,
+            AZStd::string& questLogBinding,
+            AZStd::string& mapBinding,
+            AZStd::string& settingsBinding,
+            AZStd::string& interactBinding,
+            AZStd::string& targetHostileBinding)
+        {
+            spellbookBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericP.GetName();
+            bagBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericB.GetName();
+            characterBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericC.GetName();
+            questLogBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericL.GetName();
+            mapBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericM.GetName();
+            settingsBinding = AzFramework::InputDeviceKeyboard::Key::Escape.GetName();
+            interactBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericE.GetName();
+            targetHostileBinding = AzFramework::InputDeviceKeyboard::Key::EditTab.GetName();
+        }
+
+        bool DrawSettingsCategoryButton(const char* label, int tab, int& selectedTab)
+        {
+            const bool selected = selectedTab == tab;
+            if (selected)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.24f, 0.32f, 0.38f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.38f, 0.45f, 1.0f));
+            }
+            const bool clicked = ImGui::Button(label, ImVec2(180.0f, 28.0f));
+            if (selected)
+            {
+                ImGui::PopStyleColor(2);
+            }
+            if (clicked)
+            {
+                selectedTab = tab;
+            }
+            return clicked;
+        }
+
+        void DrawUnavailableOption(const char* label, const char* reason)
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.55f);
+            ImGui::Button(label, ImVec2(220.0f, 26.0f));
+            ImGui::PopStyleVar();
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("%s", reason);
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", reason);
+        }
+
+        void OpenSettingsTabFromMenu(bool& gameMenuOpen, bool& settingsOpen, int& selectedTab, int tab)
+        {
+            selectedTab = tab;
+            settingsOpen = true;
+            gameMenuOpen = false;
+        }
+
+        bool DrawGameMenuWindow(bool& gameMenuOpen, bool& settingsOpen, int& selectedTab)
+        {
+            bool changed = false;
+            ImGui::TextUnformatted("Game Menu");
+            ImGui::Separator();
+            if (ImGui::Button("Return to Game", ImVec2(240.0f, 32.0f)))
+            {
+                gameMenuOpen = false;
+                changed = true;
+            }
+            if (ImGui::Button("Settings / Options", ImVec2(240.0f, 32.0f)))
+            {
+                OpenSettingsTabFromMenu(gameMenuOpen, settingsOpen, selectedTab, SettingsTabInterface);
+                changed = true;
+            }
+            if (ImGui::Button("Keybinds", ImVec2(240.0f, 32.0f)))
+            {
+                OpenSettingsTabFromMenu(gameMenuOpen, settingsOpen, selectedTab, SettingsTabKeybinds);
+                changed = true;
+            }
+            if (ImGui::Button("UI Layout / Edit Mode", ImVec2(240.0f, 32.0f)))
+            {
+                OpenSettingsTabFromMenu(gameMenuOpen, settingsOpen, selectedTab, SettingsTabLayout);
+                changed = true;
+            }
+            DrawUnavailableOption("Logout / Character Select", "Unavailable in this alpha build; the current world handoff still returns through the launcher.");
+            if (ImGui::Button("Exit Game", ImVec2(240.0f, 32.0f)))
+            {
+                AZ_Printf("amandacore", "client.exit_game_requested source=game_menu");
+                AzFramework::ApplicationRequests::Bus::Broadcast(
+                    &AzFramework::ApplicationRequests::Bus::Events::ExitMainLoop);
+                changed = true;
+            }
+            ImGui::Separator();
+            ImGui::TextDisabled("No AddOns surface is available. AmandaCore UI options are first-party systems only.");
+            return changed;
+        }
+
         bool DrawKeyBindingRow(
             const char* label,
             const char* actionId,
             AZStd::string& binding,
-            AZStd::string& pendingKeybindActionId)
+            AZStd::string& pendingKeybindActionId,
+            AZStd::string& keybindNotice)
         {
             bool changed = false;
             ImGui::PushID(actionId);
             ImGui::TextUnformatted(label);
-            ImGui::SameLine(250.0f);
+            ImGui::SameLine(235.0f);
             const AZStd::string buttonLabel = pendingKeybindActionId == actionId
                 ? "Press a key..."
                 : DisplayKeyName(binding);
             if (ImGui::Button(buttonLabel.c_str(), HudButtonSize(132.0f)))
             {
-                pendingKeybindActionId = actionId;
+                if (ImGui::GetIO().WantTextInput)
+                {
+                    keybindNotice = "Keybind capture is blocked while text input is active.";
+                }
+                else
+                {
+                    pendingKeybindActionId = actionId;
+                    keybindNotice = AZStd::string::format("Press a key for %s. ESC cancels.", label);
+                }
             }
             ImGui::SameLine();
-            if (ImGui::Button("Unbind", HudButtonSize(74.0f)))
+            if (ImGui::Button("Clear", HudButtonSize(74.0f)))
             {
                 binding.clear();
                 if (pendingKeybindActionId == actionId)
                 {
                     pendingKeybindActionId.clear();
                 }
+                keybindNotice = AZStd::string::format("Cleared keybind: %s.", label);
                 changed = true;
             }
             ImGui::PopID();
@@ -5734,11 +5892,25 @@ namespace UiClient
         }
 
         bool DrawSettingsWindow(
-            GameCore::IGameCoreRequests* gameCore,
+            int& selectedTab,
             bool& upperBarVisible,
             bool& rightBarOneVisible,
             bool& rightBarTwoVisible,
             bool& uiEditMode,
+            bool& uiFramesLocked,
+            float& uiScale,
+            float& readabilityScale,
+            bool& chatFrameVisible,
+            bool& objectiveTrackerVisible,
+            bool& objectiveTrackerCollapsed,
+            bool& minimapVisible,
+            bool& actionBarsVisible,
+            bool& combatTextVisible,
+            bool& nameplatesVisible,
+            bool& tooltipComparisonEnabled,
+            bool& reduceUiMotion,
+            AZStd::string& layoutProfileName,
+            AZStd::string& chatFilterChannel,
             AZStd::array<AZStd::string, ActionBarSlotCount>& actionSlotBindings,
             AZStd::string& spellbookBinding,
             AZStd::string& bagBinding,
@@ -5749,133 +5921,306 @@ namespace UiClient
             AZStd::string& interactBinding,
             AZStd::string& targetHostileBinding,
             AZStd::string& pendingKeybindActionId,
-            bool& resetHudLayoutRequested)
+            AZStd::string& keybindNotice,
+            bool& resetHudLayoutRequested,
+            bool& resetOptionsRequested,
+            bool& closeSettingsRequested)
         {
             bool changed = false;
-            if (ImGui::BeginTabBar("##settings_tabs"))
-            {
-                if (ImGui::BeginTabItem("Interface"))
-                {
-                    ImGui::TextUnformatted("Action Bars");
-                    changed |= ImGui::Checkbox("Upper horizontal action bar", &upperBarVisible);
-                    changed |= ImGui::Checkbox("Right action bar 1", &rightBarOneVisible);
-                    changed |= ImGui::Checkbox("Right action bar 2", &rightBarTwoVisible);
-                    ImGui::Spacing();
-                    ImGui::TextWrapped("These bars use the same live action-slot payload as the main bar.");
-                    ImGui::TextWrapped("Bars stay locked during normal play. Hold SHIFT or enable UI edit mode to drag learned abilities from the spellbook, move existing buttons, or clear slots.");
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Keybinds"))
-                {
-                    ImGui::TextUnformatted("Built-in keybind mode");
-                    ImGui::TextWrapped("Click a binding, then press a replacement key. Rebinding a key removes it from any conflicting first-party action.");
-                    if (!pendingKeybindActionId.empty())
-                    {
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
-                        ImGui::Text("Waiting for key: %s", pendingKeybindActionId.c_str());
-                        ImGui::PopStyleColor();
-                    }
-                    ImGui::Separator();
-                    changed |= DrawKeyBindingRow("Spellbook", "spellbook", spellbookBinding, pendingKeybindActionId);
-                    changed |= DrawKeyBindingRow("Bag", "bag", bagBinding, pendingKeybindActionId);
-                    changed |= DrawKeyBindingRow("Character", "character", characterBinding, pendingKeybindActionId);
-                    changed |= DrawKeyBindingRow("Quest Log", "questLog", questLogBinding, pendingKeybindActionId);
-                    changed |= DrawKeyBindingRow("Map", "map", mapBinding, pendingKeybindActionId);
-                    changed |= DrawKeyBindingRow("Settings/Menu", "settings", settingsBinding, pendingKeybindActionId);
-                    changed |= DrawKeyBindingRow("Interact", "interact", interactBinding, pendingKeybindActionId);
-                    changed |= DrawKeyBindingRow("Target Hostile", "targetHostile", targetHostileBinding, pendingKeybindActionId);
-                    ImGui::Separator();
-                    if (ImGui::TreeNodeEx("Action Bar Slots", ImGuiTreeNodeFlags_DefaultOpen))
-                    {
-                        ImGui::BeginChild("##action_keybind_scroll", ImVec2(0.0f, 220.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-                        for (int slotIndex = 0; slotIndex < ActionBarSlotCount; ++slotIndex)
-                        {
-                            const char* barName = slotIndex < 12
-                                ? "Main"
-                                : slotIndex < 24
-                                    ? "Upper"
-                                    : slotIndex < 36
-                                        ? "Right 1"
-                                        : "Right 2";
-                            const AZStd::string label = AZStd::string::format("%s slot %02d", barName, (slotIndex % 12) + 1);
-                            const AZStd::string actionId = SlotActionId(slotIndex);
-                            changed |= DrawKeyBindingRow(label.c_str(), actionId.c_str(), actionSlotBindings[slotIndex], pendingKeybindActionId);
-                        }
-                        ImGui::EndChild();
-                        ImGui::TreePop();
-                    }
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("UI Layout"))
-                {
-                    ImGui::TextUnformatted("Built-in Edit Mode");
-                    ImGui::Separator();
-                    ImGui::Checkbox("Enable HUD edit mode", &uiEditMode);
-                    ImGui::TextWrapped("When enabled, supported HUD frames show cyan outlines and can be dragged. Normal gameplay mode keeps frames locked.");
-                    ImGui::TextWrapped("Supported frames in this milestone: chat, objectives, action bars, pack anchor, and navigator.");
-                    if (ImGui::Button("Reset HUD Layout", HudButtonSize(170.0f)))
-                    {
-                        resetHudLayoutRequested = true;
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("Restores default anchors for the supported frames.");
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Video"))
-                {
-                    ImGui::TextUnformatted("Video Settings");
-                    ImGui::Separator();
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
-                    ImGui::TextUnformatted("Unavailable in this slice");
-                    ImGui::PopStyleColor();
-                    ImGui::TextWrapped("No safe engine-backed video toggles are exposed in this milestone yet.");
-                    ImGui::TextWrapped("Resolution, fullscreen, and graphics presets are intentionally deferred instead of shown as fake controls.");
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Audio"))
-                {
-                    ImGui::TextUnformatted("Audio Settings");
-                    ImGui::Separator();
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
-                    ImGui::TextUnformatted("Unavailable in this slice");
-                    ImGui::PopStyleColor();
-                    ImGui::TextWrapped("No live sound bus settings are wired in this slice yet.");
-                    ImGui::TextWrapped("Volume controls are deferred until the audio path is active.");
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Gameplay"))
-                {
-                    ImGui::TextUnformatted("Gameplay Settings");
-                    ImGui::Separator();
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
-                    ImGui::TextUnformatted("Unavailable in this slice");
-                    ImGui::PopStyleColor();
-                    ImGui::TextWrapped("Movement, camera, combat, and server-authoritative gameplay controls remain owned by existing game systems.");
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
-            }
-            ImGui::Spacing();
+            bool saveRequested = false;
+
+            ImGui::BeginChild("##settings_categories", ImVec2(190.0f, -44.0f), true);
+            DrawSettingsCategoryButton("Interface", SettingsTabInterface, selectedTab);
+            DrawSettingsCategoryButton("Keybinds", SettingsTabKeybinds, selectedTab);
+            DrawSettingsCategoryButton("UI Layout", SettingsTabLayout, selectedTab);
+            DrawSettingsCategoryButton("Accessibility", SettingsTabAccessibility, selectedTab);
+            DrawSettingsCategoryButton("Audio", SettingsTabAudio, selectedTab);
+            DrawSettingsCategoryButton("Video", SettingsTabVideo, selectedTab);
+            DrawSettingsCategoryButton("Gameplay", SettingsTabGameplay, selectedTab);
+            DrawSettingsCategoryButton("Chat", SettingsTabChat, selectedTab);
+            DrawSettingsCategoryButton("Combat", SettingsTabCombat, selectedTab);
+            DrawSettingsCategoryButton("Nameplates", SettingsTabNameplates, selectedTab);
+            DrawSettingsCategoryButton("Objectives / Map", SettingsTabObjectives, selectedTab);
             ImGui::Separator();
-            if (ImGui::Button("Logout to Character Screen", ImVec2(230.0f, 30.0f)))
+            ImGui::TextWrapped("Local first-party settings only.");
+            ImGui::TextDisabled("No AddOns tab.");
+            ImGui::EndChild();
+
+            ImGui::SameLine();
+            ImGui::BeginChild("##settings_content", ImVec2(0.0f, -44.0f), true);
+            if (selectedTab == SettingsTabInterface)
             {
-                if (gameCore)
+                ImGui::TextUnformatted("Interface Options");
+                ImGui::Separator();
+                changed |= ImGui::SliderFloat("UI scale", &uiScale, 0.85f, 1.25f, "%.2f");
+                changed |= ImGui::SliderFloat("Readability scale", &readabilityScale, 0.90f, 1.20f, "%.2f");
+                changed |= ImGui::Checkbox("Show chat frame", &chatFrameVisible);
+                changed |= ImGui::Checkbox("Show objective tracker", &objectiveTrackerVisible);
+                changed |= ImGui::Checkbox("Show navigator / minimap", &minimapVisible);
+                changed |= ImGui::Checkbox("Show main action bar cluster", &actionBarsVisible);
+                changed |= ImGui::Checkbox("Tooltip equipment comparison", &tooltipComparisonEnabled);
+                ImGui::Spacing();
+                ImGui::TextUnformatted("Action Bars");
+                changed |= ImGui::Checkbox("Upper horizontal action bar", &upperBarVisible);
+                changed |= ImGui::Checkbox("Right action bar 1", &rightBarOneVisible);
+                changed |= ImGui::Checkbox("Right action bar 2", &rightBarTwoVisible);
+                ImGui::TextWrapped("All visible bars use the same server-backed action-slot payload. Hidden bars do not disable keybind activation.");
+            }
+            else if (selectedTab == SettingsTabKeybinds)
+            {
+                ImGui::TextUnformatted("Keybinds");
+                ImGui::Separator();
+                ImGui::TextWrapped("Click a binding, then press a replacement key. Duplicate keys clear the previous first-party binding and show a warning.");
+                if (!pendingKeybindActionId.empty())
                 {
-                    gameCore->DisconnectWorld();
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.76f, 0.45f, 1.0f));
+                    ImGui::Text("Waiting for key: %s", pendingKeybindActionId.c_str());
+                    ImGui::PopStyleColor();
                 }
-                AZ_Printf("amandacore", "client.logout_to_character_screen_requested");
-                AzFramework::ApplicationRequests::Bus::Broadcast(
-                    &AzFramework::ApplicationRequests::Bus::Events::ExitMainLoop);
+                if (!keybindNotice.empty())
+                {
+                    ImGui::TextWrapped("%s", keybindNotice.c_str());
+                }
+                ImGui::Separator();
+                if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    DrawUnavailableOption("Movement bindings", "WASD and camera/mouse movement remain owned by existing engine input in this milestone.");
+                }
+                if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    DrawUnavailableOption("Camera bindings", "Mouse-look and orbit controls are not exposed through local keybind persistence yet.");
+                }
+                if (ImGui::CollapsingHeader("Targeting", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    changed |= DrawKeyBindingRow("Target Hostile", "targetHostile", targetHostileBinding, pendingKeybindActionId, keybindNotice);
+                    changed |= DrawKeyBindingRow("Interact", "interact", interactBinding, pendingKeybindActionId, keybindNotice);
+                }
+                if (ImGui::CollapsingHeader("UI Panels", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    changed |= DrawKeyBindingRow("Spellbook", "spellbook", spellbookBinding, pendingKeybindActionId, keybindNotice);
+                    changed |= DrawKeyBindingRow("Bag", "bag", bagBinding, pendingKeybindActionId, keybindNotice);
+                    changed |= DrawKeyBindingRow("Character", "character", characterBinding, pendingKeybindActionId, keybindNotice);
+                    changed |= DrawKeyBindingRow("Quest Log", "questLog", questLogBinding, pendingKeybindActionId, keybindNotice);
+                    changed |= DrawKeyBindingRow("Map", "map", mapBinding, pendingKeybindActionId, keybindNotice);
+                    changed |= DrawKeyBindingRow("Game Menu", "settings", settingsBinding, pendingKeybindActionId, keybindNotice);
+                }
+                if (ImGui::CollapsingHeader("Chat", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    DrawUnavailableOption("Chat focus binding", "Enter and Escape chat focus behavior is fixed to preserve text input reliability.");
+                }
+                if (ImGui::CollapsingHeader("Combat", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    DrawUnavailableOption("Combat command bindings", "Combat commands use action-bar slots and server-authoritative activation.");
+                }
+                if (ImGui::CollapsingHeader("Action Bars", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    ImGui::BeginChild("##action_keybind_scroll", ImVec2(0.0f, 220.0f), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    for (int slotIndex = 0; slotIndex < ActionBarSlotCount; ++slotIndex)
+                    {
+                        const char* barName = slotIndex < 12
+                            ? "Main"
+                            : slotIndex < 24
+                                ? "Upper"
+                                : slotIndex < 36
+                                    ? "Right 1"
+                                    : "Right 2";
+                        const AZStd::string label = AZStd::string::format("%s slot %02d", barName, (slotIndex % 12) + 1);
+                        const AZStd::string actionId = SlotActionId(slotIndex);
+                        changed |= DrawKeyBindingRow(label.c_str(), actionId.c_str(), actionSlotBindings[slotIndex], pendingKeybindActionId, keybindNotice);
+                    }
+                    ImGui::EndChild();
+                }
+                if (ImGui::Button("Reset UI Panel Keybinds", HudButtonSize(190.0f)))
+                {
+                    SetDefaultPanelKeybindings(spellbookBinding, bagBinding, characterBinding, questLogBinding, mapBinding, settingsBinding, interactBinding, targetHostileBinding);
+                    pendingKeybindActionId.clear();
+                    keybindNotice = "UI panel, targeting, and interaction keybinds reset to defaults.";
+                    changed = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Reset Action Bar Keybinds", HudButtonSize(210.0f)))
+                {
+                    SetDefaultActionSlotBindings(actionSlotBindings);
+                    pendingKeybindActionId.clear();
+                    keybindNotice = "Action-bar keybinds reset to defaults.";
+                    changed = true;
+                }
+                if (ImGui::Button("Reset All Keybinds", HudButtonSize(170.0f)))
+                {
+                    SetDefaultPanelKeybindings(spellbookBinding, bagBinding, characterBinding, questLogBinding, mapBinding, settingsBinding, interactBinding, targetHostileBinding);
+                    SetDefaultActionSlotBindings(actionSlotBindings);
+                    pendingKeybindActionId.clear();
+                    keybindNotice = "All first-party keybinds reset to defaults.";
+                    changed = true;
+                }
+            }
+            else if (selectedTab == SettingsTabLayout)
+            {
+                ImGui::TextUnformatted("UI Layout / Edit Mode");
+                ImGui::Separator();
+                ImGui::Text("Active profile: %s", layoutProfileName.c_str());
+                if (ImGui::Button("Save Local Custom Profile", HudButtonSize(210.0f)))
+                {
+                    layoutProfileName = "Custom";
+                    changed = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Use Default Profile", HudButtonSize(170.0f)))
+                {
+                    layoutProfileName = "Default";
+                    resetHudLayoutRequested = true;
+                    changed = true;
+                }
+                bool previousLocked = uiFramesLocked;
+                changed |= ImGui::Checkbox("Lock HUD frames", &uiFramesLocked);
+                if (previousLocked != uiFramesLocked)
+                {
+                    uiEditMode = !uiFramesLocked;
+                }
+                bool previousEditMode = uiEditMode;
+                changed |= ImGui::Checkbox("Enable HUD edit mode", &uiEditMode);
+                if (previousEditMode != uiEditMode)
+                {
+                    uiFramesLocked = !uiEditMode;
+                }
+                changed |= ImGui::Checkbox("Show chat frame", &chatFrameVisible);
+                changed |= ImGui::Checkbox("Show objective tracker", &objectiveTrackerVisible);
+                changed |= ImGui::Checkbox("Show navigator / minimap", &minimapVisible);
+                changed |= ImGui::Checkbox("Show main action bar cluster", &actionBarsVisible);
+                changed |= ImGui::Checkbox("Show upper action bar", &upperBarVisible);
+                changed |= ImGui::Checkbox("Show right action bar 1", &rightBarOneVisible);
+                changed |= ImGui::Checkbox("Show right action bar 2", &rightBarTwoVisible);
+                if (ImGui::Button("Reset HUD Layout", HudButtonSize(170.0f)))
+                {
+                    resetHudLayoutRequested = true;
+                }
+                ImGui::SameLine();
+                DrawUnavailableOption("Import / Export", "Deferred. No scriptable, addon-compatible, or executable profile format is supported.");
+            }
+            else if (selectedTab == SettingsTabAccessibility)
+            {
+                ImGui::TextUnformatted("Accessibility");
+                ImGui::Separator();
+                changed |= ImGui::SliderFloat("UI scale", &uiScale, 0.85f, 1.25f, "%.2f");
+                changed |= ImGui::SliderFloat("Readability scale", &readabilityScale, 0.90f, 1.20f, "%.2f");
+                changed |= ImGui::Checkbox("Show floating combat text", &combatTextVisible);
+                changed |= ImGui::Checkbox("Show nameplates", &nameplatesVisible);
+                changed |= ImGui::Checkbox("Reduce UI motion / notification pulses", &reduceUiMotion);
+                DrawUnavailableOption("High contrast theme", "Deferred until a full client-wide color pass can be applied safely.");
+                DrawUnavailableOption("Colorblind marker mode", "Deferred until marker/icon variants are authored as first-party assets.");
+                ImGui::TextWrapped("These are first-pass readability controls and do not claim full accessibility compliance.");
+            }
+            else if (selectedTab == SettingsTabAudio)
+            {
+                ImGui::TextUnformatted("Audio");
+                ImGui::Separator();
+                DrawUnavailableOption("Master volume", "No safe live sound bus setting is wired in this client slice.");
+                DrawUnavailableOption("Music volume", "Music routing is not exposed through a stable client setting yet.");
+                DrawUnavailableOption("Effects volume", "Effects routing is not exposed through a stable client setting yet.");
+                DrawUnavailableOption("Mute audio", "Deferred until the audio runtime path is active.");
+            }
+            else if (selectedTab == SettingsTabVideo)
+            {
+                ImGui::TextUnformatted("Video / Display");
+                ImGui::Separator();
+                DrawUnavailableOption("Resolution", "Changing O3DE window/runtime display settings is not safe in this milestone.");
+                DrawUnavailableOption("Fullscreen", "Deferred to avoid destabilizing client launch and world handoff.");
+                DrawUnavailableOption("VSync", "No stable engine-backed toggle is exposed here yet.");
+                DrawUnavailableOption("Graphics quality", "No graphics preset pipeline is wired in this slice.");
+                ImGui::TextWrapped("Use Interface or Accessibility for the safe UI scale controls available now.");
+            }
+            else if (selectedTab == SettingsTabGameplay)
+            {
+                ImGui::TextUnformatted("Gameplay");
+                ImGui::Separator();
+                changed |= ImGui::Checkbox("Tooltip equipment comparison", &tooltipComparisonEnabled);
+                DrawUnavailableOption("Auto-loot", "No live backend/client option is available in this milestone.");
+                DrawUnavailableOption("Camera sensitivity", "Camera tuning is owned by existing gameplay input and is not locally persisted yet.");
+                DrawUnavailableOption("Click-to-move", "Not implemented. This control remains disabled instead of pretending to work.");
+            }
+            else if (selectedTab == SettingsTabChat)
+            {
+                ImGui::TextUnformatted("Chat");
+                ImGui::Separator();
+                const char* filterLabels[] = {"All", "System", "Say", "Party", "Guild", "Whisper"};
+                const char* filterValues[] = {"all", "system", "say", "party", "guild", "whisper"};
+                int currentFilter = 0;
+                for (int index = 0; index < static_cast<int>(AZ_ARRAY_SIZE(filterValues)); ++index)
+                {
+                    if (chatFilterChannel == filterValues[index])
+                    {
+                        currentFilter = index;
+                        break;
+                    }
+                }
+                if (ImGui::Combo("Default visible filter", &currentFilter, filterLabels, AZ_ARRAY_SIZE(filterLabels)))
+                {
+                    chatFilterChannel = filterValues[currentFilter];
+                    changed = true;
+                }
+                changed |= ImGui::Checkbox("Show chat frame", &chatFrameVisible);
+                DrawUnavailableOption("Blocked-list filtering", "Store foundations exist, but no live client mutation contract is wired.");
+                DrawUnavailableOption("Chat font family", "No alternative first-party font assets are packaged for this milestone.");
+            }
+            else if (selectedTab == SettingsTabCombat)
+            {
+                ImGui::TextUnformatted("Combat");
+                ImGui::Separator();
+                changed |= ImGui::Checkbox("Show floating combat text", &combatTextVisible);
+                changed |= ImGui::Checkbox("Reduce combat notification motion", &reduceUiMotion);
+                DrawUnavailableOption("Damage number filters", "Combat events are displayed through the current server-authored feed only.");
+                DrawUnavailableOption("Threat display mode", "No stable threat presentation option is exposed in this slice.");
+            }
+            else if (selectedTab == SettingsTabNameplates)
+            {
+                ImGui::TextUnformatted("Nameplates");
+                ImGui::Separator();
+                changed |= ImGui::Checkbox("Show world nameplates", &nameplatesVisible);
+                DrawUnavailableOption("Hostile-only nameplates", "Separate friendly/hostile filters are deferred until the nameplate contract supports them.");
+                DrawUnavailableOption("Nameplate scale", "Nameplate geometry is fixed in this milestone.");
+            }
+            else if (selectedTab == SettingsTabObjectives)
+            {
+                ImGui::TextUnformatted("Objective Tracker / Map");
+                ImGui::Separator();
+                changed |= ImGui::Checkbox("Show objective tracker", &objectiveTrackerVisible);
+                changed |= ImGui::Checkbox("Collapse tracker details", &objectiveTrackerCollapsed);
+                changed |= ImGui::Checkbox("Show navigator / minimap", &minimapVisible);
+                DrawUnavailableOption("Auto-track new quests", "Quest tracking is driven by the current server-authored quest payload.");
+                DrawUnavailableOption("Tracker category filters", "Additional tracker filters are deferred until authored objective metadata exists.");
+            }
+            ImGui::EndChild();
+
+            ImGui::Separator();
+            if (ImGui::Button("Apply", ImVec2(96.0f, 30.0f)))
+            {
+                saveRequested = true;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Exit Game", ImVec2(120.0f, 30.0f)))
+            if (ImGui::Button("Cancel", ImVec2(96.0f, 30.0f)))
             {
-                AZ_Printf("amandacore", "client.exit_game_requested");
-                AzFramework::ApplicationRequests::Bus::Broadcast(
-                    &AzFramework::ApplicationRequests::Bus::Events::ExitMainLoop);
+                pendingKeybindActionId.clear();
+                closeSettingsRequested = true;
             }
-            ImGui::TextWrapped("Logout disconnects this world session and closes the game client so the launcher character flow can remain the owning shell for now.");
-            return changed;
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Settings apply immediately; use Defaults to restore baseline values.");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Defaults", ImVec2(110.0f, 30.0f)))
+            {
+                resetOptionsRequested = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Close", ImVec2(96.0f, 30.0f)))
+            {
+                pendingKeybindActionId.clear();
+                closeSettingsRequested = true;
+                saveRequested = true;
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("Local only: no account/session material is stored.");
+            return changed || saveRequested;
         }
 
         void DrawCharacterPreviewPane(const GameCore::ClientWorldState& worldState)
@@ -7238,31 +7583,16 @@ namespace UiClient
 
     void UiClientSystemComponent::LoadDefaultKeybindings()
     {
-        for (auto& binding : m_actionSlotBindings)
-        {
-            binding.clear();
-        }
-
-        m_actionSlotBindings[0] = AzFramework::InputDeviceKeyboard::Key::AlphanumericF.GetName();
-        m_actionSlotBindings[1] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric1.GetName();
-        m_actionSlotBindings[2] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric2.GetName();
-        m_actionSlotBindings[3] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric3.GetName();
-        m_actionSlotBindings[4] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric4.GetName();
-        m_actionSlotBindings[5] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric5.GetName();
-        m_actionSlotBindings[6] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric6.GetName();
-        m_actionSlotBindings[7] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric7.GetName();
-        m_actionSlotBindings[8] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric8.GetName();
-        m_actionSlotBindings[9] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric9.GetName();
-        m_actionSlotBindings[10] = AzFramework::InputDeviceKeyboard::Key::Alphanumeric0.GetName();
-
-        m_spellbookBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericP.GetName();
-        m_bagBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericB.GetName();
-        m_characterBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericC.GetName();
-        m_questLogBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericL.GetName();
-        m_mapBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericM.GetName();
-        m_settingsBinding = AzFramework::InputDeviceKeyboard::Key::Escape.GetName();
-        m_interactBinding = AzFramework::InputDeviceKeyboard::Key::AlphanumericE.GetName();
-        m_targetHostileBinding = AzFramework::InputDeviceKeyboard::Key::EditTab.GetName();
+        SetDefaultActionSlotBindings(m_actionSlotBindings);
+        SetDefaultPanelKeybindings(
+            m_spellbookBinding,
+            m_bagBinding,
+            m_characterBinding,
+            m_questLogBinding,
+            m_mapBinding,
+            m_settingsBinding,
+            m_interactBinding,
+            m_targetHostileBinding);
     }
 
     void UiClientSystemComponent::LoadUiSettings()
@@ -7312,6 +7642,19 @@ namespace UiClient
             readBool("upperActionBar", m_extraUpperActionBarVisible);
             readBool("rightActionBarOne", m_rightActionBarOneVisible);
             readBool("rightActionBarTwo", m_rightActionBarTwoVisible);
+            readFloat("ui.scale", m_uiScale);
+            readFloat("ui.readabilityScale", m_readabilityScale);
+            readBool("ui.framesLocked", m_uiFramesLocked);
+            readBool("ui.editMode", m_uiEditMode);
+            readBool("ui.chat.visible", m_chatFrameVisible);
+            readBool("ui.objectives.visible", m_objectiveTrackerVisible);
+            readBool("ui.objectives.collapsed", m_objectiveTrackerCollapsed);
+            readBool("ui.minimap.visible", m_minimapVisible);
+            readBool("ui.actionBars.visible", m_actionBarsVisible);
+            readBool("ui.combatText.visible", m_combatTextVisible);
+            readBool("ui.nameplates.visible", m_nameplatesVisible);
+            readBool("ui.tooltipComparison", m_tooltipComparisonEnabled);
+            readBool("ui.reduceMotion", m_reduceUiMotion);
             readFloat("layout.chat.x", m_chatOffsetX);
             readFloat("layout.chat.y", m_chatOffsetY);
             readFloat("layout.objectives.x", m_objectiveTrackerOffsetX);
@@ -7322,6 +7665,8 @@ namespace UiClient
             readFloat("layout.bag.y", m_bagOffsetY);
             readFloat("layout.minimap.x", m_minimapOffsetX);
             readFloat("layout.minimap.y", m_minimapOffsetY);
+            readString("layout.profile", m_layoutProfileName);
+            readString("chat.filter", m_chatFilterChannel);
             readString("bind.spellbook", m_spellbookBinding);
             readString("bind.bag", m_bagBinding);
             readString("bind.character", m_characterBinding);
@@ -7337,6 +7682,26 @@ namespace UiClient
             }
         }
         fclose(settingsFile);
+
+        m_uiScale = AZ::GetClamp(m_uiScale, 0.85f, 1.25f);
+        m_readabilityScale = AZ::GetClamp(m_readabilityScale, 0.90f, 1.20f);
+        if (m_layoutProfileName != "Custom")
+        {
+            m_layoutProfileName = "Default";
+        }
+        if (m_chatFilterChannel != "all" &&
+            m_chatFilterChannel != "system" &&
+            m_chatFilterChannel != "say" &&
+            m_chatFilterChannel != "party" &&
+            m_chatFilterChannel != "guild" &&
+            m_chatFilterChannel != "whisper")
+        {
+            m_chatFilterChannel = "all";
+        }
+        if (m_uiFramesLocked)
+        {
+            m_uiEditMode = false;
+        }
 
         AZ_Printf(
             "amandacore",
@@ -7357,9 +7722,23 @@ namespace UiClient
             return;
         }
 
+        fprintf(settingsFile, "settings.version=2\n");
         fprintf(settingsFile, "upperActionBar=%d\n", m_extraUpperActionBarVisible ? 1 : 0);
         fprintf(settingsFile, "rightActionBarOne=%d\n", m_rightActionBarOneVisible ? 1 : 0);
         fprintf(settingsFile, "rightActionBarTwo=%d\n", m_rightActionBarTwoVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.scale=%.2f\n", static_cast<double>(AZ::GetClamp(m_uiScale, 0.85f, 1.25f)));
+        fprintf(settingsFile, "ui.readabilityScale=%.2f\n", static_cast<double>(AZ::GetClamp(m_readabilityScale, 0.90f, 1.20f)));
+        fprintf(settingsFile, "ui.framesLocked=%d\n", m_uiFramesLocked ? 1 : 0);
+        fprintf(settingsFile, "ui.editMode=%d\n", m_uiEditMode ? 1 : 0);
+        fprintf(settingsFile, "ui.chat.visible=%d\n", m_chatFrameVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.objectives.visible=%d\n", m_objectiveTrackerVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.objectives.collapsed=%d\n", m_objectiveTrackerCollapsed ? 1 : 0);
+        fprintf(settingsFile, "ui.minimap.visible=%d\n", m_minimapVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.actionBars.visible=%d\n", m_actionBarsVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.combatText.visible=%d\n", m_combatTextVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.nameplates.visible=%d\n", m_nameplatesVisible ? 1 : 0);
+        fprintf(settingsFile, "ui.tooltipComparison=%d\n", m_tooltipComparisonEnabled ? 1 : 0);
+        fprintf(settingsFile, "ui.reduceMotion=%d\n", m_reduceUiMotion ? 1 : 0);
         fprintf(settingsFile, "layout.chat.x=%.1f\n", static_cast<double>(m_chatOffsetX));
         fprintf(settingsFile, "layout.chat.y=%.1f\n", static_cast<double>(m_chatOffsetY));
         fprintf(settingsFile, "layout.objectives.x=%.1f\n", static_cast<double>(m_objectiveTrackerOffsetX));
@@ -7370,6 +7749,8 @@ namespace UiClient
         fprintf(settingsFile, "layout.bag.y=%.1f\n", static_cast<double>(m_bagOffsetY));
         fprintf(settingsFile, "layout.minimap.x=%.1f\n", static_cast<double>(m_minimapOffsetX));
         fprintf(settingsFile, "layout.minimap.y=%.1f\n", static_cast<double>(m_minimapOffsetY));
+        fprintf(settingsFile, "layout.profile=%s\n", m_layoutProfileName.c_str());
+        fprintf(settingsFile, "chat.filter=%s\n", m_chatFilterChannel.c_str());
         fprintf(settingsFile, "bind.spellbook=%s\n", m_spellbookBinding.c_str());
         fprintf(settingsFile, "bind.bag=%s\n", m_bagBinding.c_str());
         fprintf(settingsFile, "bind.character=%s\n", m_characterBinding.c_str());
@@ -7388,6 +7769,28 @@ namespace UiClient
 
     void UiClientSystemComponent::ApplyKeyBinding(const AZStd::string& actionId, const AZStd::string& keyName)
     {
+        bool duplicateBinding = false;
+        auto detectConflict = [&actionId, &keyName, &duplicateBinding](const char* candidateActionId, const AZStd::string& binding)
+        {
+            if (!keyName.empty() && actionId != candidateActionId && binding == keyName)
+            {
+                duplicateBinding = true;
+            }
+        };
+        detectConflict("spellbook", m_spellbookBinding);
+        detectConflict("bag", m_bagBinding);
+        detectConflict("character", m_characterBinding);
+        detectConflict("questLog", m_questLogBinding);
+        detectConflict("map", m_mapBinding);
+        detectConflict("settings", m_settingsBinding);
+        detectConflict("interact", m_interactBinding);
+        detectConflict("targetHostile", m_targetHostileBinding);
+        for (int slotIndex = 0; slotIndex < ActionBarSlotCount; ++slotIndex)
+        {
+            const AZStd::string slotActionId = SlotActionId(slotIndex);
+            detectConflict(slotActionId.c_str(), m_actionSlotBindings[slotIndex]);
+        }
+
         auto clearConflicts = [&keyName](AZStd::string& binding)
         {
             if (!keyName.empty() && binding == keyName)
@@ -7452,6 +7855,9 @@ namespace UiClient
             "client.keybind_applied action=%s key=%s",
             actionId.c_str(),
             DisplayKeyName(keyName).c_str());
+        m_keybindNotice = duplicateBinding
+            ? AZStd::string::format("Duplicate key warning: %s replaced an existing first-party binding.", DisplayKeyName(keyName).c_str())
+            : AZStd::string::format("Binding saved: %s.", DisplayKeyName(keyName).c_str());
     }
 
     bool UiClientSystemComponent::ActivateActionSlot(GameCore::IGameCoreRequests* gameCore, int slotIndex)
@@ -7587,12 +7993,12 @@ namespace UiClient
             {
                 return true;
             }
-            m_settingsOpen = !m_settingsOpen;
-            if (m_settingsOpen)
+            m_gameMenuOpen = true;
+            if (m_gameMenuOpen)
             {
-                MarkGameplayPanelOpened(PanelSettings);
+                MarkGameplayPanelOpened(PanelGameMenu);
             }
-            AZ_Printf("amandacore", "client.settings_visible open=%s reason=esc", m_settingsOpen ? "true" : "false");
+            AZ_Printf("amandacore", "client.game_menu_visible open=%s reason=esc", m_gameMenuOpen ? "true" : "false");
             return true;
         }
         if (keyName == m_interactBinding)
@@ -7680,6 +8086,10 @@ namespace UiClient
         {
             return m_bagOpen;
         }
+        if (strcmp(panelId, PanelGameMenu) == 0)
+        {
+            return m_gameMenuOpen;
+        }
         if (strcmp(panelId, PanelSocial) == 0)
         {
             return m_socialOpen;
@@ -7729,6 +8139,10 @@ namespace UiClient
         {
             m_bagOpen = false;
             m_pendingInventoryMoveSlot = -1;
+        }
+        else if (strcmp(panelName, PanelGameMenu) == 0)
+        {
+            m_gameMenuOpen = false;
         }
         else if (strcmp(panelName, PanelSocial) == 0)
         {
@@ -7788,6 +8202,34 @@ namespace UiClient
         AZ_Printf("amandacore", "client.hud_layout_reset");
     }
 
+    void UiClientSystemComponent::ResetUiOptionsToDefaults()
+    {
+        m_uiScale = 1.0f;
+        m_readabilityScale = 1.0f;
+        m_uiFramesLocked = true;
+        m_uiEditMode = false;
+        m_chatFrameVisible = true;
+        m_objectiveTrackerVisible = true;
+        m_objectiveTrackerCollapsed = false;
+        m_minimapVisible = true;
+        m_actionBarsVisible = true;
+        m_combatTextVisible = true;
+        m_nameplatesVisible = true;
+        m_tooltipComparisonEnabled = true;
+        m_reduceUiMotion = false;
+        m_layoutProfileName = "Default";
+        m_chatFilterChannel = "all";
+        m_extraUpperActionBarVisible = true;
+        m_rightActionBarOneVisible = true;
+        m_rightActionBarTwoVisible = false;
+        m_pendingKeybindActionId.clear();
+        m_keybindNotice = "All local UI options reset to defaults.";
+        LoadDefaultKeybindings();
+        ResetHudLayout();
+        m_loggedActionBarVisible = false;
+        AZ_Printf("amandacore", "client.ui_options_reset_defaults");
+    }
+
     bool UiClientSystemComponent::CloseOpenGameplayPanel(const char* reason)
     {
         if (!m_topGameplayPanel.empty() && CloseGameplayPanelById(m_topGameplayPanel.c_str(), reason))
@@ -7795,6 +8237,7 @@ namespace UiClient
             return true;
         }
         const char* fallbackOrder[] = {
+            PanelGameMenu,
             PanelSettings,
             PanelMap,
             PanelQuestLog,
@@ -8263,7 +8706,7 @@ namespace UiClient
             {
                 return;
             }
-            const ImVec2 settingsSize(560.0f, 440.0f);
+            const ImVec2 settingsSize(760.0f, 560.0f);
             const ImVec2 settingsPos(
                 AZ::GetMax(18.0f, (displaySize.x - settingsSize.x) * 0.5f),
                 AZ::GetMax(18.0f, (displaySize.y - settingsSize.y) * 0.5f));
@@ -8276,12 +8719,28 @@ namespace UiClient
                 else
                 {
                     bool resetHudLayoutRequested = false;
+                    bool resetOptionsRequested = false;
+                    bool closeSettingsRequested = false;
                     if (DrawSettingsWindow(
-                            gameCore,
+                            m_settingsTab,
                             m_extraUpperActionBarVisible,
                             m_rightActionBarOneVisible,
                             m_rightActionBarTwoVisible,
                             m_uiEditMode,
+                            m_uiFramesLocked,
+                            m_uiScale,
+                            m_readabilityScale,
+                            m_chatFrameVisible,
+                            m_objectiveTrackerVisible,
+                            m_objectiveTrackerCollapsed,
+                            m_minimapVisible,
+                            m_actionBarsVisible,
+                            m_combatTextVisible,
+                            m_nameplatesVisible,
+                            m_tooltipComparisonEnabled,
+                            m_reduceUiMotion,
+                            m_layoutProfileName,
+                            m_chatFilterChannel,
                             m_actionSlotBindings,
                             m_spellbookBinding,
                             m_bagBinding,
@@ -8292,14 +8751,26 @@ namespace UiClient
                             m_interactBinding,
                             m_targetHostileBinding,
                             m_pendingKeybindActionId,
-                            resetHudLayoutRequested))
+                            m_keybindNotice,
+                            resetHudLayoutRequested,
+                            resetOptionsRequested,
+                            closeSettingsRequested))
                     {
+                        SaveUiSettings();
+                    }
+                    if (resetOptionsRequested)
+                    {
+                        ResetUiOptionsToDefaults();
                         SaveUiSettings();
                     }
                     if (resetHudLayoutRequested)
                     {
                         ResetHudLayout();
                         SaveUiSettings();
+                    }
+                    if (closeSettingsRequested)
+                    {
+                        m_preWorldSettingsOpen = false;
                     }
                 }
             }
@@ -8680,6 +9151,29 @@ namespace UiClient
         auto* gameCore = GameCore::IGameCoreRequests::Get();
         const AZStd::string keyName = channelId.GetName();
 
+        if (!m_pendingKeybindActionId.empty())
+        {
+            if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape)
+            {
+                m_pendingKeybindActionId.clear();
+                m_keybindNotice = "Keybind capture canceled.";
+                return true;
+            }
+            if (m_chatInputActive || ImGui::GetIO().WantTextInput)
+            {
+                m_keybindNotice = "Keybind capture is blocked while chat or text input is active.";
+                return true;
+            }
+            if (IsBindableKeyboardChannel(channelId))
+            {
+                ApplyKeyBinding(m_pendingKeybindActionId, keyName);
+                m_pendingKeybindActionId.clear();
+                SaveUiSettings();
+                AddHudEvent(AZStd::string::format("Keybinding updated: %s", DisplayKeyName(keyName).c_str()));
+            }
+            return true;
+        }
+
         if (gameCore && gameCore->IsPreWorldFrontendActive())
         {
             if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape)
@@ -8712,18 +9206,6 @@ namespace UiClient
                 return true;
             }
             return false;
-        }
-
-        if (!m_pendingKeybindActionId.empty())
-        {
-            if (IsBindableKeyboardChannel(channelId))
-            {
-                ApplyKeyBinding(m_pendingKeybindActionId, keyName);
-                m_pendingKeybindActionId.clear();
-                SaveUiSettings();
-                AddHudEvent(AZStd::string::format("Keybinding updated: %s", DisplayKeyName(keyName).c_str()));
-            }
-            return true;
         }
 
         if (m_chatInputActive || ImGui::GetIO().WantTextInput)
@@ -8761,7 +9243,9 @@ namespace UiClient
             worldState.m_session.m_quest.m_rewardCurrencySilver,
             worldState.m_session.m_quest.m_rewardCurrencyCopper);
 
-        const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+        ImGuiIO& io = ImGui::GetIO();
+        io.FontGlobalScale = AZ::GetClamp(m_uiScale * m_readabilityScale, 0.75f, 1.40f);
+        const ImVec2 displaySize = io.DisplaySize;
         if (displaySize.x <= 1.0f || displaySize.y <= 1.0f)
         {
             return;
@@ -9099,7 +9583,9 @@ namespace UiClient
             AZ::GetMax(18.0f, rightActionBarTwoPos.x - inventorySize.x - 14.0f),
             AZ::GetMax(18.0f, displaySize.y - inventorySize.y - 176.0f));
         const ImVec2 inventoryPos = ApplyHudOffset(inventoryDefaultPos, m_bagOffsetX, m_bagOffsetY, inventorySize, displaySize);
-        const ImVec2 settingsSize(680.0f, 520.0f);
+        const ImVec2 gameMenuSize(300.0f, 330.0f);
+        const ImVec2 gameMenuPos((displaySize.x - gameMenuSize.x) * 0.5f, (displaySize.y - gameMenuSize.y) * 0.5f);
+        const ImVec2 settingsSize(760.0f, 560.0f);
         const ImVec2 settingsPos((displaySize.x - settingsSize.x) * 0.5f, (displaySize.y - settingsSize.y) * 0.5f);
         const ImVec2 characterSize(690.0f, 540.0f);
         const ImVec2 characterPos(80.0f, AZ::GetMax(18.0f, displaySize.y - characterSize.y - 176.0f));
@@ -9246,7 +9732,8 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (BeginHudPanel("##chat_window", "Chat", chatPos, chatSize, false, false, m_uiEditMode, m_uiEditMode))
+        const bool chatPanelVisible = m_chatFrameVisible || m_chatInputActive;
+        if (chatPanelVisible && BeginHudPanel("##chat_window", "Chat", chatPos, chatSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             AZStd::string submittedInput;
             bool chatFieldActive = false;
@@ -9290,7 +9777,10 @@ namespace UiClient
                 m_uiLayoutDirty = true;
             }
         }
-        ImGui::End();
+        if (chatPanelVisible)
+        {
+            ImGui::End();
+        }
 
         if (!worldState.m_social.m_partyInvites.empty() && BeginHudPanel("##party_invite_prompt", "Party Invite", invitePromptPos, invitePromptSize))
         {
@@ -9323,7 +9813,7 @@ namespace UiClient
             ImGui::End();
         }
 
-        if (BeginHudPanel("##quest_tracker", "Objectives", trackerPos, trackerSize, false, false, m_uiEditMode, m_uiEditMode))
+        if (m_objectiveTrackerVisible && BeginHudPanel("##quest_tracker", "Objectives", trackerPos, trackerSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             if (DrawQuestTracker(
                     worldState,
@@ -9347,9 +9837,12 @@ namespace UiClient
                 m_uiLayoutDirty = true;
             }
         }
-        ImGui::End();
+        if (m_objectiveTrackerVisible)
+        {
+            ImGui::End();
+        }
 
-        if (BeginHudPanel("##stonewake_minimap", "Navigator", minimapPos, minimapSize, false, false, m_uiEditMode, m_uiEditMode))
+        if (m_minimapVisible && BeginHudPanel("##stonewake_minimap", "Navigator", minimapPos, minimapSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             DrawMinimap(worldState, playerX, playerY);
             if (m_uiEditMode && CaptureHudOffset(minimapDefaultPos, minimapSize, displaySize, m_minimapOffsetX, m_minimapOffsetY))
@@ -9357,9 +9850,12 @@ namespace UiClient
                 m_uiLayoutDirty = true;
             }
         }
-        ImGui::End();
+        if (m_minimapVisible)
+        {
+            ImGui::End();
+        }
 
-        if (BeginHudPanel("##action_bar", "Action Bar", actionBarPos, actionBarSize, false, false, m_uiEditMode, m_uiEditMode))
+        if (m_actionBarsVisible && BeginHudPanel("##action_bar", "Action Bar", actionBarPos, actionBarSize, false, false, m_uiEditMode, m_uiEditMode))
         {
             DrawActionBar(
                 gameCore,
@@ -9389,7 +9885,10 @@ namespace UiClient
                 m_uiLayoutDirty = true;
             }
         }
-        ImGui::End();
+        if (m_actionBarsVisible)
+        {
+            ImGui::End();
+        }
 
         if (BeginHudPanel("##micro_menu_bar", "", microMenuPos, microMenuSize, true))
         {
@@ -9409,7 +9908,7 @@ namespace UiClient
         }
         ImGui::End();
 
-        if (m_extraUpperActionBarVisible && BeginHudPanel("##upper_action_bar", "", upperActionBarPos, upperActionBarSize, true))
+        if (m_actionBarsVisible && m_extraUpperActionBarVisible && BeginHudPanel("##upper_action_bar", "", upperActionBarPos, upperActionBarSize, true))
         {
             DrawAuxiliaryActionBar(
                 gameCore,
@@ -9423,12 +9922,12 @@ namespace UiClient
                 m_pendingActionAssignmentAbilityId,
                 m_pendingActionMoveSlot);
         }
-        if (m_extraUpperActionBarVisible)
+        if (m_actionBarsVisible && m_extraUpperActionBarVisible)
         {
             ImGui::End();
         }
 
-        if (m_rightActionBarTwoVisible && BeginHudPanel("##right_action_bar_two", "", rightActionBarTwoPos, rightActionBarSize, true))
+        if (m_actionBarsVisible && m_rightActionBarTwoVisible && BeginHudPanel("##right_action_bar_two", "", rightActionBarTwoPos, rightActionBarSize, true))
         {
             DrawAuxiliaryActionBar(
                 gameCore,
@@ -9442,12 +9941,12 @@ namespace UiClient
                 m_pendingActionAssignmentAbilityId,
                 m_pendingActionMoveSlot);
         }
-        if (m_rightActionBarTwoVisible)
+        if (m_actionBarsVisible && m_rightActionBarTwoVisible)
         {
             ImGui::End();
         }
 
-        if (m_rightActionBarOneVisible && BeginHudPanel("##right_action_bar_one", "", rightActionBarOnePos, rightActionBarSize, true))
+        if (m_actionBarsVisible && m_rightActionBarOneVisible && BeginHudPanel("##right_action_bar_one", "", rightActionBarOnePos, rightActionBarSize, true))
         {
             DrawAuxiliaryActionBar(
                 gameCore,
@@ -9461,7 +9960,7 @@ namespace UiClient
                 m_pendingActionAssignmentAbilityId,
                 m_pendingActionMoveSlot);
         }
-        if (m_rightActionBarOneVisible)
+        if (m_actionBarsVisible && m_rightActionBarOneVisible)
         {
             ImGui::End();
         }
@@ -9475,7 +9974,7 @@ namespace UiClient
             }
             else
             {
-                DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot);
+                DrawInventoryWindow(gameCore, worldState, m_pendingInventoryMoveSlot, m_tooltipComparisonEnabled);
             }
             if (m_uiEditMode && CaptureHudOffset(inventoryDefaultPos, inventorySize, displaySize, m_bagOffsetX, m_bagOffsetY))
             {
@@ -9512,6 +10011,30 @@ namespace UiClient
             ImGui::End();
         }
 
+        const bool gameMenuWasOpen = m_gameMenuOpen;
+        if (gameMenuWasOpen && BeginHudPanel("##game_menu", "Game Menu", gameMenuPos, gameMenuSize, false, true))
+        {
+            if (DrawHudPanelCloseButton())
+            {
+                CloseGameplayPanelById(PanelGameMenu, "close_button");
+            }
+            else if (DrawGameMenuWindow(m_gameMenuOpen, m_settingsOpen, m_settingsTab))
+            {
+                if (m_settingsOpen)
+                {
+                    MarkGameplayPanelOpened(PanelSettings);
+                }
+                else if (!m_gameMenuOpen && m_topGameplayPanel == PanelGameMenu)
+                {
+                    m_topGameplayPanel.clear();
+                }
+            }
+        }
+        if (gameMenuWasOpen)
+        {
+            ImGui::End();
+        }
+
         const bool settingsPanelWasOpen = m_settingsOpen;
         if (settingsPanelWasOpen && BeginHudPanel("##settings_menu", "Settings", settingsPos, settingsSize, false, true))
         {
@@ -9522,12 +10045,28 @@ namespace UiClient
             else
             {
                 bool resetHudLayoutRequested = false;
+                bool resetOptionsRequested = false;
+                bool closeSettingsRequested = false;
                 if (DrawSettingsWindow(
-                        gameCore,
+                        m_settingsTab,
                         m_extraUpperActionBarVisible,
                         m_rightActionBarOneVisible,
                         m_rightActionBarTwoVisible,
                         m_uiEditMode,
+                        m_uiFramesLocked,
+                        m_uiScale,
+                        m_readabilityScale,
+                        m_chatFrameVisible,
+                        m_objectiveTrackerVisible,
+                        m_objectiveTrackerCollapsed,
+                        m_minimapVisible,
+                        m_actionBarsVisible,
+                        m_combatTextVisible,
+                        m_nameplatesVisible,
+                        m_tooltipComparisonEnabled,
+                        m_reduceUiMotion,
+                        m_layoutProfileName,
+                        m_chatFilterChannel,
                         m_actionSlotBindings,
                         m_spellbookBinding,
                         m_bagBinding,
@@ -9538,15 +10077,27 @@ namespace UiClient
                         m_interactBinding,
                         m_targetHostileBinding,
                         m_pendingKeybindActionId,
-                        resetHudLayoutRequested))
+                        m_keybindNotice,
+                        resetHudLayoutRequested,
+                        resetOptionsRequested,
+                        closeSettingsRequested))
                 {
                     SaveUiSettings();
                     m_loggedActionBarVisible = false;
+                }
+                if (resetOptionsRequested)
+                {
+                    ResetUiOptionsToDefaults();
+                    SaveUiSettings();
                 }
                 if (resetHudLayoutRequested)
                 {
                     ResetHudLayout();
                     SaveUiSettings();
+                }
+                if (closeSettingsRequested)
+                {
+                    CloseGameplayPanelById(PanelSettings, "settings_button");
                 }
             }
         }
@@ -9752,9 +10303,15 @@ namespace UiClient
             ImGui::End();
         }
 
-        DrawWorldNameplates(worldState, cameraState, displaySize);
-        DrawStonewakeLandmarkNameplates(worldState, cameraState, displaySize);
-        DrawCombatFeedbackPulses(nowMs, displaySize);
+        if (m_nameplatesVisible)
+        {
+            DrawWorldNameplates(worldState, cameraState, displaySize);
+            DrawStonewakeLandmarkNameplates(worldState, cameraState, displaySize);
+        }
+        if (m_combatTextVisible && !m_reduceUiMotion)
+        {
+            DrawCombatFeedbackPulses(nowMs, displaySize);
+        }
 
         if (!m_questToast.empty() && nowMs < m_questToastExpiresAt)
         {
