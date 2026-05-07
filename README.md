@@ -1,62 +1,88 @@
 # amandacore
 
-`amandacore` is a clean-room O3DE MMO foundation targeting the structural feel of WoW `3.3.5a` without copying proprietary code, content, assets, names, maps, or protocols. It is organized as a monorepo containing the shared gameplay domain, O3DE Gem scaffolding, backend services, and a Windows launcher.
+`amandacore` is an original, first-party, clean-room O3DE MMO foundation. It targets the structural feel and dense RPG UI rhythm of WoW `3.3.5a`, but it does not copy proprietary code, content, assets, maps, protocols, UI code, addon systems, names, formulas, or data.
 
-## Implemented foundation
+The repository is organized as a monorepo for shared gameplay contracts, Go backend services, O3DE Gems, launcher/bootstrap tooling, local operations tools, authored AmandaCore content, QA scripts, and architecture/runbook documentation.
 
+## Current Release
+
+Public release: [AmandaCore Alpha 0.2.0](https://github.com/boopey-iwnl/amandacore/releases/tag/alpha-0.2.0)
+
+- Package: `AmandaCore-Alpha-0.2.0-Windows-x64.zip`
+- SHA256: `ae41a4eb98fb3ac07ccf08e724570d990f419e32bead59cabbeaca57dd62af8e`
+- Platform/state: Windows x64 alpha prerelease package.
+
+Alpha 0.2.0 is a local/dev playable alpha. A downloader can launch the local stack, open the launcher/Play UI, start the game client, log in inside the client, select a realm, select or create a character, enter the world, and use the current first-party core UI systems.
+
+## Implemented Foundation
+
+- `Services`: Go services for auth, account, realm, character, world, and admin surfaces, with local/dev storage and validation hooks.
 - `Shared/AmandaCoreShared`: shared C++ gameplay and platform contracts for combat, movement, quests, loot, auth/session types, realm routing, character selection, and world join tickets.
-- `Services`: Go-based account, auth, realm, character, world, and admin service binaries sharing a functional dev file-store backend.
-- `Client/Launcher`: Windows-first C# launcher code for registration, login, realm listing, character flow, and world join handoff.
-- `Client/Game/AmandaCore.WorldClient`: diagnostic .NET world client for movement, target selection, Basic Strike, server health/death/cooldown/aura feedback, and kill-credit display.
-- `Gems`: expanded O3DE Gem source skeletons for the planned runtime split.
-- `Content` and `Docs`: clean-room schemas, example authored content, architecture guidance, and reference capture notes.
+- `Client/Launcher`: Windows-first patcher/bootstrapper/Play UI that checks local build/status, resolves the preferred O3DE `GameLauncher`, starts the local stack when requested, and launches the client.
+- `Gems/GameCore`, `Gems/NetClient`, and `Gems/UiClient`: O3DE client path for login, remembered-session restore, realm select, character select/create, join-ticket request, world entry, gameplay state, and UI rendering.
+- First-party HUD shell with player/target frames, action bars, chat, objective tracker, minimap/navigation, inventory, panel stacking, edit mode, and local UI persistence.
+- Character panel with equipment paper doll, stats, currency, reputation shell, and server-authoritative equipment interactions.
+- Spellbook, trainer, talents/professions shells, and action-bar integration.
+- Quest Log, Objective Tracker, Gossip/Dialogue, map UI, and authored Dawnwake/Stonewake map and traversal work.
+- Combat HUD, target frames, nameplates, cast/buff/debuff presentation, and combat feedback.
+- Social/economy/vendor shells including chat, party/guild/mail/auction/trade-facing UI surfaces where currently implemented.
+- Settings, keybinds, accessibility options, UI layout/edit mode, help/tutorial surfaces, notifications, and error states.
+- Integrated validation and hardening scripts for UI smoke, forbidden artifacts, release candidate checks, local builds, O3DE client build/verify, package hygiene, diagnostics, and local controls.
+- `Client/Tools/AmandaCore.LocalControls`: Local Ops GUI for starting/stopping the local stack, building, opening the launcher, collecting diagnostics, and running supported QA helpers.
 
-## Current constraints
+Detailed behavior is documented in `Docs/UI/DefaultScreenContract.md`, `Docs/Runbooks/InClientLoginCharacterCreation.md`, `Docs/Runbooks/ReleaseCandidateProcedure.md`, and `Docs/QA/UiReleaseCandidateChecklist.md`.
 
-- The Go and .NET surfaces are verified locally through the dev scripts in `Infra/dev`.
-- Shared C++ and O3DE Gem runtime proof are still blocked on a local CMake toolchain, C++ compiler, and O3DE SDK installation.
-- The backend is implemented to be functional in local/dev/staging with a shared file-backed store and secret-driven admin bootstrap, while remaining aligned to a future Postgres/Redis deployment shape.
-- The gameplay and content targets are `3.3.5a`-structured and greybox-equivalent, not exact Blizzard class kits, formulas, maps, or content data.
+## Launcher And Client Flow
 
-## Clean-room MMO architecture foundation
+The launcher is no longer the normal player registration/login/realm/character/world-join UI. The current flow is:
 
-- `Docs/CleanRoomReferencePolicy.md` defines the formal guardrail: external emulator projects are read-only architectural references only.
-- `Services/internal/simcore` defines original canonical server commands and domain events.
-- `Services/internal/worlds` includes a lightweight fixed-step runtime, deterministic command queue, and neutral zone/instance ownership skeleton.
-- `Services/internal/observability` exposes stable AmandaCore event names for ticks, command queues, entities, combat, admin actions, and persistence snapshots.
-- `Docs/ContentPipeline.md` documents the AmandaCore-owned future content package path.
+1. Launcher checks patch/build/status information and opens the Play UI.
+2. Launcher starts the O3DE game client.
+3. Game client owns player login, remember-login/session restore, realm selection, character selection/creation, join-ticket request, and world entry.
 
-Intentionally not implemented yet: full O3DE combat HUD wiring, production encounter content, loot table expansion, full quest objective UI, and finalized Dawnwake Isles world-space transforms from authored maps.
+The legacy direct `--join-ticket` / `--world-endpoint` launch path remains useful for development and backward-compatible diagnostics, but it is not the normal player Play flow.
 
-## Key paths
+## Local Run
 
-- `Shared/AmandaCoreShared`
-- `Client/Launcher/AmandaCore.Launcher`
-- `Client/Game/AmandaCore.WorldClient`
-- `Client/Tools/AmandaCore.LocalControls`
-- `Services`
-- `Infra/dev`
-- `Gems`
-- `Content`
-- `Docs/Milestone01-AccountToWorld.md`
+Recommended local startup from the repository root:
 
-## Dev admin bootstrap
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\start-local.ps1 -StartLauncher
+```
 
-- Local/dev/staging can seed the requested admin account through environment or a local ignored secrets file.
-- Username defaults can be `amanda`; the password must come from local secret configuration and is hashed before storage.
-- Copy `.secrets/amandacore.dev.env.example` to `.secrets/amandacore.dev.env` before running the local stack.
+This starts the local services and opens the launcher/Play UI. Pressing Play starts the client; the client then handles login, realm selection, character selection or creation, join-ticket request, and world entry.
 
-## Local runtime proof
+Stop local services when finished:
 
-1. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\build-local.ps1`
-2. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\start-local.ps1`
-3. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\verify-golden-path.ps1`
-4. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\verify-account-to-world-restart.ps1`
-5. `powershell -ExecutionPolicy Bypass -File .\Infra\dev\stop-local.ps1`
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\stop-local.ps1
+```
 
-## Local playable slice controls
+## Build And Verify
 
-The Local Playable Slice Controls surface is a compiled Windows desktop app at `Client/Tools/AmandaCore.LocalControls`. It wraps the existing `Infra/dev` and `Infra/qa` scripts for starting/stopping the local stack, building local binaries, building and verifying the O3DE client, opening logs, collecting diagnostics, and launching the AmandaCore launcher.
+Common local validation commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\build-local.ps1
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\build-o3de-client.ps1
+powershell -ExecutionPolicy Bypass -File .\Infra\dev\verify-o3de-client.ps1
+powershell -ExecutionPolicy Bypass -File .\Infra\qa\Validate-UiSmokeChecklist.ps1
+powershell -ExecutionPolicy Bypass -File .\Infra\qa\Scan-ForbiddenArtifacts.ps1
+```
+
+Run Go service tests from the service module:
+
+```powershell
+Push-Location Services
+go test ./... -count=1 -timeout 15m
+Pop-Location
+```
+
+For release-candidate procedure, package gates, human test expectations, and wrapper caveats, use `Docs/Runbooks/ReleaseCandidateProcedure.md` and `Docs/Runbooks/ReleaseGateChecklist.md`.
+
+## Local Ops GUI
+
+The Local Ops GUI is a compiled Windows desktop app at `Client/Tools/AmandaCore.LocalControls`. It wraps supported `Infra/dev` and `Infra/qa` scripts for local stack control, builds, launcher startup, diagnostics, QA docs, and guarded state reset actions.
 
 Build and run it with:
 
@@ -65,87 +91,69 @@ dotnet build .\Client\Tools\AmandaCore.LocalControls\AmandaCore.LocalControls.cs
 dotnet run --project .\Client\Tools\AmandaCore.LocalControls\AmandaCore.LocalControls.csproj
 ```
 
-The existing `Infra/dev/Launch-LocalOpsGui.cmd` wrapper now launches this compiled app for compatibility with desktop shortcuts.
+The compatibility wrapper `Infra/dev/Launch-LocalOpsGui.cmd` opens the compiled Local Ops app.
 
-The local stack waits for each service to report healthy before returning control. The verification script proves the current milestone path:
+## Clean-Room And No-Addon Policy
 
-- register
-- login
-- list realms
-- create character
-- request join ticket
-- launch the minimal world client
-- connect to the real world service
-- move
-- disconnect
-- reconnect
-- retain position state
+AmandaCore is first-party UI only:
 
-Milestone `0.1` hardening details, commands, and pass/fail behavior are documented in `Docs/Milestone01-AccountToWorld.md`.
+- No addon API.
+- No Lua addon loading.
+- No `AddOns` folder.
+- No plugin runtime.
+- No user-installed UI modules.
+- No arbitrary user script execution or addon compatibility layer.
 
-## Local load simulation
+Addon-like quality-of-life features should be implemented as built-in AmandaCore systems with normal code review, validation, and release gates.
 
-Run from the Go module root:
+`Docs/CleanRoomReferencePolicy.md` defines the formal reference policy. External projects and games may be used only as high-level architectural references. AmandaCore source, content, UI, assets, schemas, and runtime behavior must remain original.
 
-```powershell
-cd Services
-go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario content-package-basic --content ..\Content\Packs\dev_foundation\package.json
-```
+## Asset And Path Hygiene
 
-The default package can be overridden with `AMANDACORE_CONTENT_PACKAGE`.
+Repository and release packages must not depend on local machine texture folders or other developer-only source paths. Source art may be curated into repo-controlled paths such as `Content/Art` only after review, normalization, and package validation. Release/package scanners should remain clean of local absolute paths, secrets, logs, diagnostics, screenshots, archives, generated packages, runtime tickets, local databases, caches, and temporary files.
 
-Run the in-process multi-zone load harness:
+## Current Limitations
 
-```powershell
-cd Services
-go run ./cmd/loadsim --clients 5 --duration 10s --cmd-rate 2 --scenario multizone-pressure --content ..\Content\Packs\dawnwake_isles\package.json --seed 42
-```
+Alpha 0.2.0 is not production-ready.
 
-Scale tiers, scenarios, reports, and sharding behavior are documented in `Docs/LoadTesting.md` and `Docs/MultiZoneSharding.md`.
+- The package is focused on local/dev alpha testing.
+- World and content scale are still evolving.
+- Some systems are UI shells or first-pass implementations, especially where backend depth is intentionally deferred.
+- Social, economy, mail, auction, and trade depth is not final.
+- Authored map/world alignment is first-pass and will continue to mature.
+- O3DE/Terrain dependency warnings may still appear during local builds when the build and verifier otherwise pass.
+- Production hosting, cutover, telemetry, scaling, anti-cheat, and live operations remain future work.
 
-Run the server-authoritative ability/effect/aura harness:
+## Branch And Release Workflow
 
-```powershell
-cd Services
-go run ./cmd/loadsim --clients 3 --duration 10s --cmd-rate 2 --scenario ability-aura-basic
-```
+- Permanent branches: `main`, `develop`, and `functional`.
+- Feature branches should use `codex/<short-task-name>`.
+- Releases are cut from `main` after explicit approval and validation.
+- `develop` is the active integration branch.
+- `functional` tracks validated playable state only when explicitly synchronized.
+- Temporary feature or release branches should be cleaned up only after proof that useful work is merged and deletion is explicitly approved.
 
-The scenario exercises the original AmandaCore effect resolver, aura apply/tick/expire lifecycle, cast completion, and cooldown events without requiring O3DE.
+## Key Paths
 
-The fallback world client can drive a live combat diagnostic after a join ticket is issued:
+- `Shared/AmandaCoreShared`
+- `Services`
+- `Client/Launcher/AmandaCore.Launcher`
+- `Client/Tools/AmandaCore.LocalControls`
+- `Client/Game/AmandaCore.WorldClient`
+- `Gems/GameCore`
+- `Gems/NetClient`
+- `Gems/UiClient`
+- `Content`
+- `Infra/dev`
+- `Infra/qa`
+- `Docs`
+
+## Additional Developer Scenarios
+
+The diagnostic .NET world client remains available for direct-world development and test harnesses:
 
 ```powershell
 dotnet run --project Client/Game/AmandaCore.WorldClient -- --join-ticket <ticket> --world-endpoint http://localhost:8085 --auto-combat-demo
 ```
 
-The diagnostic client sends target and ability intents only. It renders target health, cooldowns, aura state, combat events, state diffs, NPC death, and kill credit from the authoritative world response.
-
-For the first multi-zone Dawnwake traversal package:
-
-```powershell
-cd Services
-go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-traversal-basic --content ..\Content\Packs\dawnwake_isles\package.json
-```
-
-For Dawnwake map export and streaming hook validation:
-
-```powershell
-cd Services
-go run ./cmd/content-exporter --input ..\Content\Authoring\DawnwakeIsles --output ..\Content\Packs\dawnwake_isles\maps --check
-go run ./cmd/loadsim --clients 1 --duration 30s --cmd-rate 2 --scenario dawnwake-streaming-basic --content ..\Content\Packs\dawnwake_isles\package.json
-```
-
-`Client/Game/AmandaCore.WorldClient` consumes the same streaming payload through a client preview model and `IWorldStreamingPreviewSink`, which is the placeholder O3DE adapter boundary for visual zone/cell streaming. Use `--streaming-sink scene-commands` to emit structured placeholder scene commands, or add `--streaming-command-file "$env:TEMP\amandacore\streaming.commands.jsonl"` to write deterministic JSON Lines for bridge testing. `Gems/ZoneStreaming` mirrors the same command contract as a C++ debug API, can tail the same path through `AMANDACORE_STREAMING_COMMAND_FILE`, and draws in-engine AuxGeom zone bounds, streaming cells, current-cell highlights, and transition affordances.
-
-The loadsim uses the loader default when `--content` is omitted. The HTTP world service loads package content when `AMANDACORE_CONTENT_PACKAGE` is set; otherwise it keeps the existing starter world.
-
-## Local persistence migrations
-
-Validate or apply the local durable-store migrations:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Infra\dev\run-db-migrations.ps1 -DryRun
-powershell -ExecutionPolicy Bypass -File .\Infra\dev\run-db-migrations.ps1
-```
-
-Persistence domains, transaction policy, recovery state, and migration rules are documented in `Docs/Persistence.md` and `Docs/DatabaseMigrations.md`.
+Load simulation, Dawnwake traversal, content export, world streaming, persistence migrations, release gates, and QA procedures are documented under `Docs/` and should be run from the repo-relative paths shown in those runbooks.
