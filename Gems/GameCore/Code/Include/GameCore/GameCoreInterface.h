@@ -11,11 +11,32 @@ namespace GameCore
     {
         AZStd::string m_joinTicketId;
         AZStd::string m_worldEndpoint;
+        AZStd::string m_authEndpoint = "http://127.0.0.1:8081";
+        AZStd::string m_realmEndpoint = "http://127.0.0.1:8083";
+        AZStd::string m_characterEndpoint = "http://127.0.0.1:8084";
+        AZStd::string m_worldServiceEndpoint = "http://127.0.0.1:8085";
 
         bool IsValid() const
         {
             return !m_joinTicketId.empty() && !m_worldEndpoint.empty();
         }
+    };
+
+    struct ClientFrontendState
+    {
+        bool m_preWorldActive = false;
+        bool m_requestInFlight = false;
+        AZStd::string m_screen = "login";
+        AZStd::string m_statusMessage;
+        AZStd::string m_errorMessage;
+        bool m_rememberLogin = false;
+        bool m_rememberedSessionAvailable = false;
+        NetClient::AuthSessionResponse m_authSession;
+        AZStd::vector<NetClient::RealmDescriptor> m_realms;
+        AZStd::vector<NetClient::CharacterSummary> m_characters;
+        int m_selectedRealmIndex = -1;
+        int m_selectedCharacterIndex = -1;
+        NetClient::CharacterSummary m_lastCreatedCharacter;
     };
 
     struct ClientWorldState
@@ -64,11 +85,26 @@ namespace GameCore
 
         virtual const ClientLaunchOptions& GetLaunchOptions() const = 0;
         virtual const ClientWorldState& GetClientWorldState() const = 0;
+        virtual const ClientFrontendState& GetClientFrontendState() const = 0;
         virtual const ClientCameraState& GetCameraState() const = 0;
+        virtual bool IsPreWorldFrontendActive() const = 0;
+        virtual bool SubmitFrontendLogin(const AZStd::string& username, const AZStd::string& password) = 0;
+        virtual bool RefreshFrontendRealms() = 0;
+        virtual bool SelectFrontendRealm(int realmIndex) = 0;
+        virtual bool RefreshFrontendCharacters() = 0;
+        virtual bool SelectFrontendCharacter(int characterIndex) = 0;
+        virtual bool OpenFrontendCharacterCreation() = 0;
+        virtual bool CreateFrontendCharacter(const AZStd::string& displayName, const AZStd::string& archetypeId) = 0;
+        virtual bool EnterWorldWithSelectedCharacter() = 0;
+        virtual bool NavigateFrontendBack() = 0;
+        virtual void SetFrontendRememberLogin(bool rememberLogin) = 0;
+        virtual bool ForgetFrontendRememberedSession() = 0;
+        virtual void ClearFrontendError() = 0;
         virtual bool SubmitMove(double deltaX, double deltaY) = 0;
         virtual bool SetTarget(const AZStd::string& targetId) = 0;
         virtual bool InteractWithEntity(const AZStd::string& entityId) = 0;
         virtual bool AcceptQuest(const AZStd::string& questId) = 0;
+        virtual bool CompleteQuest(const AZStd::string& questId) = 0;
         virtual bool EnterDungeon(const AZStd::string& dungeonId) = 0;
         virtual bool ExitDungeon() = 0;
         virtual bool TrackQuest(const AZStd::string& questId, bool tracked) = 0;
@@ -81,10 +117,15 @@ namespace GameCore
         virtual bool SurrenderDuel(const AZStd::string& duelId) = 0;
         virtual bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) = 0;
         virtual bool SelectTalent(const AZStd::string& talentId) = 0;
+        virtual bool LearnProfession(const AZStd::string& trainerId, const AZStd::string& professionId) = 0;
         virtual bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) = 0;
         virtual bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) = 0;
         virtual bool ClearActionBarSlot(int slotIndex) = 0;
         virtual bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) = 0;
+        virtual bool EquipInventorySlot(int slotIndex) = 0;
+        virtual bool UnequipInventorySlot(const AZStd::string& equipmentSlot) = 0;
+        virtual bool BuyVendorItem(const AZStd::string& vendorId, const AZStd::string& itemId, int stackCount) = 0;
+        virtual bool SellVendorItem(const AZStd::string& vendorId, int slotIndex, int stackCount) = 0;
         virtual bool BrowseAuctions(
             const AZStd::string& search,
             const AZStd::string& itemType,

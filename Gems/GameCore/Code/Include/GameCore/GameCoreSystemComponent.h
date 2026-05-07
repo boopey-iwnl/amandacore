@@ -33,11 +33,26 @@ namespace GameCore
 
         const ClientLaunchOptions& GetLaunchOptions() const override;
         const ClientWorldState& GetClientWorldState() const override;
+        const ClientFrontendState& GetClientFrontendState() const override;
         const ClientCameraState& GetCameraState() const override;
+        bool IsPreWorldFrontendActive() const override;
+        bool SubmitFrontendLogin(const AZStd::string& username, const AZStd::string& password) override;
+        bool RefreshFrontendRealms() override;
+        bool SelectFrontendRealm(int realmIndex) override;
+        bool RefreshFrontendCharacters() override;
+        bool SelectFrontendCharacter(int characterIndex) override;
+        bool OpenFrontendCharacterCreation() override;
+        bool CreateFrontendCharacter(const AZStd::string& displayName, const AZStd::string& archetypeId) override;
+        bool EnterWorldWithSelectedCharacter() override;
+        bool NavigateFrontendBack() override;
+        void SetFrontendRememberLogin(bool rememberLogin) override;
+        bool ForgetFrontendRememberedSession() override;
+        void ClearFrontendError() override;
         bool SubmitMove(double deltaX, double deltaY) override;
         bool SetTarget(const AZStd::string& targetId) override;
         bool InteractWithEntity(const AZStd::string& entityId) override;
         bool AcceptQuest(const AZStd::string& questId) override;
+        bool CompleteQuest(const AZStd::string& questId) override;
         bool EnterDungeon(const AZStd::string& dungeonId) override;
         bool ExitDungeon() override;
         bool TrackQuest(const AZStd::string& questId, bool tracked) override;
@@ -50,10 +65,15 @@ namespace GameCore
         bool SurrenderDuel(const AZStd::string& duelId) override;
         bool LearnTrainerAbility(const AZStd::string& trainerId, const AZStd::string& abilityId) override;
         bool SelectTalent(const AZStd::string& talentId) override;
+        bool LearnProfession(const AZStd::string& trainerId, const AZStd::string& professionId) override;
         bool AssignActionBarSlot(int slotIndex, const AZStd::string& abilityId) override;
         bool MoveActionBarSlot(int fromSlotIndex, int toSlotIndex) override;
         bool ClearActionBarSlot(int slotIndex) override;
         bool MoveInventorySlot(int fromSlotIndex, int toSlotIndex) override;
+        bool EquipInventorySlot(int slotIndex) override;
+        bool UnequipInventorySlot(const AZStd::string& equipmentSlot) override;
+        bool BuyVendorItem(const AZStd::string& vendorId, const AZStd::string& itemId, int stackCount) override;
+        bool SellVendorItem(const AZStd::string& vendorId, int slotIndex, int stackCount) override;
         bool BrowseAuctions(
             const AZStd::string& search,
             const AZStd::string& itemType,
@@ -91,6 +111,14 @@ namespace GameCore
         bool RequestStartupLevelLoad();
         void MarkLevelReady(const char* levelName);
         void AttemptInitialWorldConnect();
+        void SetFrontendBusy(bool busy, const char* statusMessage);
+        void SetFrontendError(const AZStd::string& errorMessage);
+        bool TryRestoreRememberedFrontendSession();
+        void ResetFrontendToLogin(const char* statusMessage);
+        bool HasFrontendSession() const;
+        bool HasSelectedRealm() const;
+        bool HasSelectedCharacter() const;
+        void SelectCreatedCharacterIfPresent();
         bool ApplyWorldSessionResponse(NetClient::WorldSessionResponse&& response, const char* source);
         bool ApplySocialStateResponse(NetClient::SocialStateResponse&& response, const char* source);
         bool ApplyAuctionStateResponse(NetClient::AuctionStateResponse&& response, const char* source);
@@ -104,6 +132,7 @@ namespace GameCore
 
         ClientLaunchOptions m_launchOptions;
         ClientWorldState m_worldState;
+        ClientFrontendState m_frontendState;
         ClientCameraState m_cameraState;
         bool m_levelReady = false;
         bool m_startupLevelLoadPending = false;

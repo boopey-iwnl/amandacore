@@ -84,8 +84,8 @@ func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
 
 	for _, npcID := range []string{npcScoutRowanID, npcRoadwardenIlyaID, objWatchLanternID, npcQuartermasterLyraID} {
 		npc := server.friendlyNPCs[npcID]
-		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance < 80.0 {
-			t.Fatalf("expected progression NPC %s outside spawn view, distance %.1f", npcID, distance)
+		if distance := math.Hypot(npc.X-starterSpawnX, npc.Y-starterSpawnY); distance < 54.0 {
+			t.Fatalf("expected progression NPC %s beyond the immediate hub, distance %.1f", npcID, distance)
 		}
 	}
 
@@ -95,16 +95,16 @@ func TestStonewakeLayoutIsReadableFromSpawn(t *testing.T) {
 		}
 	}
 
-	assertMobAreaCenter(t, server, mobTrainingDummyTypeID, 58.0, 32.0, 10.0)
-	assertMobAreaCenter(t, server, mobDitchRatTypeID, 119.0, 62.0, 24.0)
-	assertMobAreaCenter(t, server, mobFieldBoarTypeID, 163.0, 86.0, 32.0)
-	assertMobAreaCenter(t, server, mobRidgeCrowTypeID, 240.0, 127.0, 34.0)
-	assertMobAreaCenter(t, server, mobAshbandScoutTypeID, 313.0, 170.0, 34.0)
-	assertMobAreaCenter(t, server, mobAshbandPoacherTypeID, 375.0, 210.0, 42.0)
+	assertMobAreaCenter(t, server, mobTrainingDummyTypeID, 268.0, 146.0, 10.0)
+	assertMobAreaCenter(t, server, mobDitchRatTypeID, 361.0, 157.0, 24.0)
+	assertMobAreaCenter(t, server, mobFieldBoarTypeID, 197.0, 74.0, 32.0)
+	assertMobAreaCenter(t, server, mobRidgeCrowTypeID, 318.0, 96.0, 34.0)
+	assertMobAreaCenter(t, server, mobAshbandScoutTypeID, 380.0, 231.0, 34.0)
+	assertMobAreaCenter(t, server, mobAshbandPoacherTypeID, 375.0, 77.0, 42.0)
 
 	bram := server.mobs["mob_bram_kettle_01"]
-	if distance := math.Hypot(bram.X-420.0, bram.Y-224.0); distance > 1.0 {
-		t.Fatalf("expected Bram Kettle in isolated wagon stand, got %.1f, %.1f", bram.X, bram.Y)
+	if distance := math.Hypot(bram.X-358.0, bram.Y-39.0); distance > 1.0 {
+		t.Fatalf("expected Bram Kettle in Tiderown Ruins, got %.1f, %.1f", bram.X, bram.Y)
 	}
 }
 
@@ -125,6 +125,53 @@ func TestStonewakeSpawnsAreGrounded(t *testing.T) {
 		if node.Definition.ZoneID == defaultZoneID && node.Definition.Z < playableGroundZ {
 			t.Fatalf("expected gathering node %s to be grounded at %.2f or above, got %.2f", node.Definition.ID, playableGroundZ, node.Definition.Z)
 		}
+	}
+}
+
+func TestStonewakeInteractableNPCsAvoidVisualBlockouts(t *testing.T) {
+	server := newWorldServer(nil)
+
+	type visualBlockout struct {
+		name             string
+		centerX, centerY float64
+		halfX, halfY     float64
+	}
+
+	solidBlockouts := []visualBlockout{
+		{name: "training rail", centerX: 270.0, centerY: 143.0, halfX: 7.0, halfY: 0.35},
+		{name: "ValeFurrow shed", centerX: 198.0, centerY: 68.0, halfX: 6.0, halfY: 0.9},
+		{name: "Brookside crossing marker", centerX: 320.0, centerY: 76.0, halfX: 2.4, halfY: 2.4},
+		{name: "Lightkeeper tower", centerX: 386.0, centerY: 233.0, halfX: 4.4, halfY: 4.4},
+		{name: "Whispering Cave frontage", centerX: 381.0, centerY: 76.0, halfX: 6.5, halfY: 1.2},
+	}
+	keyInteractables := []string{
+		warriorTrainerID,
+		npcScoutRowanID,
+		npcRoadwardenIlyaID,
+		objWatchLanternID,
+		npcQuartermasterLyraID,
+	}
+	const interactionClearance = 1.0
+	for _, npcID := range keyInteractables {
+		npc := server.friendlyNPCs[npcID]
+		if npc.ID == "" {
+			t.Fatalf("expected Stonewake interactable %s to be loaded", npcID)
+		}
+		for _, blockout := range solidBlockouts {
+			insideX := npc.X >= blockout.centerX-blockout.halfX-interactionClearance &&
+				npc.X <= blockout.centerX+blockout.halfX+interactionClearance
+			insideY := npc.Y >= blockout.centerY-blockout.halfY-interactionClearance &&
+				npc.Y <= blockout.centerY+blockout.halfY+interactionClearance
+			if insideX && insideY {
+				t.Fatalf("expected %s at %.1f,%.1f to stay clear of %s visual blockout", npc.ID, npc.X, npc.Y, blockout.name)
+			}
+		}
+	}
+
+	roadwarden := server.friendlyNPCs[npcRoadwardenIlyaID]
+	roadsideQuest := server.quests["sv_roadside_marks"]
+	if math.Hypot(roadsideQuest.MarkerX-roadwarden.X, roadsideQuest.MarkerY-roadwarden.Y) > 0.1 {
+		t.Fatalf("expected Roadside Marks marker to follow Roadwarden Ilya, marker %.1f,%.1f npc %.1f,%.1f", roadsideQuest.MarkerX, roadsideQuest.MarkerY, roadwarden.X, roadwarden.Y)
 	}
 }
 

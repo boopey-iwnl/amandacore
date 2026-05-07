@@ -6,6 +6,48 @@
 
 namespace NetClient
 {
+    bool LoginRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& username,
+        const AZStd::string& password,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool RefreshSessionRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& refreshToken,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool ListRealmsRequest(
+        const AZStd::string& realmEndpoint,
+        AZStd::vector<RealmDescriptor>& outRealms,
+        AZStd::string& outError);
+
+    bool ListCharactersRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        AZStd::vector<CharacterSummary>& outCharacters,
+        AZStd::string& outError);
+
+    bool CreateCharacterRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& displayName,
+        const AZStd::string& archetypeId,
+        CharacterSummary& outCharacter,
+        AZStd::string& outError);
+
+    bool CreateJoinTicketRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& characterId,
+        WorldJoinTicketResponse& outTicket,
+        AZStd::string& outError);
+
     bool ConnectRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& ticketId,
@@ -128,6 +170,13 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool CompleteQuestRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool EnterDungeonRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -194,6 +243,14 @@ namespace NetClient
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
+    bool LearnProfessionRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& trainerId,
+        const AZStd::string& professionId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
     bool AssignActionBarSlotRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -222,6 +279,38 @@ namespace NetClient
         const AZStd::string& worldSessionToken,
         int fromSlotIndex,
         int toSlotIndex,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool EquipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool UnequipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& equipmentSlot,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool BuyVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        const AZStd::string& itemId,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError);
+
+    bool SellVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        int slotIndex,
+        int stackCount,
         WorldSessionResponse& outResponse,
         AZStd::string& outError);
 
@@ -297,6 +386,66 @@ namespace NetClient
         {
             IWorldHttpClient::Unregister(this);
         }
+    }
+
+    bool NetClientSystemComponent::Login(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& username,
+        const AZStd::string& password,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return LoginRequest(authEndpoint, username, password, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::RefreshSession(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& refreshToken,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return RefreshSessionRequest(authEndpoint, refreshToken, outResponse, outError);
+    }
+
+    bool NetClientSystemComponent::ListRealms(
+        const AZStd::string& realmEndpoint,
+        AZStd::vector<RealmDescriptor>& outRealms,
+        AZStd::string& outError)
+    {
+        return ListRealmsRequest(realmEndpoint, outRealms, outError);
+    }
+
+    bool NetClientSystemComponent::ListCharacters(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        AZStd::vector<CharacterSummary>& outCharacters,
+        AZStd::string& outError)
+    {
+        return ListCharactersRequest(characterEndpoint, accessToken, realmId, outCharacters, outError);
+    }
+
+    bool NetClientSystemComponent::CreateCharacter(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& displayName,
+        const AZStd::string& archetypeId,
+        CharacterSummary& outCharacter,
+        AZStd::string& outError)
+    {
+        return CreateCharacterRequest(characterEndpoint, accessToken, realmId, displayName, archetypeId, outCharacter, outError);
+    }
+
+    bool NetClientSystemComponent::CreateJoinTicket(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& characterId,
+        WorldJoinTicketResponse& outTicket,
+        AZStd::string& outError)
+    {
+        return CreateJoinTicketRequest(worldEndpoint, accessToken, realmId, characterId, outTicket, outError);
     }
 
     bool NetClientSystemComponent::Connect(
@@ -554,6 +703,16 @@ namespace NetClient
         return AcceptQuestRequest(worldEndpoint, worldSessionToken, questId, outResponse, outError);
     }
 
+    bool NetClientSystemComponent::CompleteQuest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return CompleteQuestRequest(worldEndpoint, worldSessionToken, questId, outResponse, outError);
+    }
+
     bool NetClientSystemComponent::EnterDungeon(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -682,6 +841,17 @@ namespace NetClient
         return SelectTalentRequest(worldEndpoint, worldSessionToken, talentId, outResponse, outError);
     }
 
+    bool NetClientSystemComponent::LearnProfession(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& trainerId,
+        const AZStd::string& professionId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return LearnProfessionRequest(worldEndpoint, worldSessionToken, trainerId, professionId, outResponse, outError);
+    }
+
     bool NetClientSystemComponent::AssignActionBarSlot(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -733,6 +903,74 @@ namespace NetClient
             worldSessionToken,
             fromSlotIndex,
             toSlotIndex,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::EquipInventorySlot(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return EquipInventorySlotRequest(
+            worldEndpoint,
+            worldSessionToken,
+            slotIndex,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::UnequipInventorySlot(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& equipmentSlot,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return UnequipInventorySlotRequest(
+            worldEndpoint,
+            worldSessionToken,
+            equipmentSlot,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::BuyVendorItem(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        const AZStd::string& itemId,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return BuyVendorItemRequest(
+            worldEndpoint,
+            worldSessionToken,
+            vendorId,
+            itemId,
+            stackCount,
+            outResponse,
+            outError);
+    }
+
+    bool NetClientSystemComponent::SellVendorItem(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        int slotIndex,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        return SellVendorItemRequest(
+            worldEndpoint,
+            worldSessionToken,
+            vendorId,
+            slotIndex,
+            stackCount,
             outResponse,
             outError);
     }

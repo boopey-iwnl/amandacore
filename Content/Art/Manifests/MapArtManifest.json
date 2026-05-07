@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "runtimePathsAreRepoRelative": true,
+    "sourcePathsAreNotStored": true,
+    "calibrationAccuracyValues": [
+      "calibrated_v1",
+      "display_reference"
+    ]
+  },
+  "maps": [
+    {
+      "mapArtId": "dawnwake_isles_world",
+      "mapId": "dawnwake_isles",
+      "zoneId": "",
+      "displayName": "Dawnwake Isles",
+      "imagePath": "Content/Art/UI/Maps/World/dawnwake_isles_world.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "AED95EF7BCD565DACB0E21690171151CD80A0D39D5CC09346BCE9DC21F2AF950",
+      "sourceFilename": "dawnwake-map.png",
+      "calibrationAccuracy": "calibrated_v1"
+    },
+    {
+      "mapArtId": "stonewake_vale",
+      "mapId": "dawnwake_isles",
+      "zoneId": "stonewake_vale",
+      "displayName": "Stonewake Vale",
+      "imagePath": "Content/Art/UI/Maps/Zones/stonewake_vale.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "88C02F43CF5C82DA8880C194D22018992B0B79F476126CA19EF8B44F00CD5AFD",
+      "sourceFilename": "stonewake-map.png",
+      "calibrationAccuracy": "calibrated_v1"
+    },
+    {
+      "mapArtId": "hearthmere_coast",
+      "mapId": "dawnwake_isles",
+      "zoneId": "hearthmere_coast",
+      "displayName": "Hearthmere Coast",
+      "imagePath": "Content/Art/UI/Maps/Zones/hearthmere_coast.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "267BF090CB03E75AFFE67E5E0922D8953EA4DB8B2D62BB40775BCC8998F6847A",
+      "sourceFilename": "hearthmere-map.png",
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "mapArtId": "tempest_hollow",
+      "mapId": "dawnwake_isles",
+      "zoneId": "tempest_hollow",
+      "displayName": "Tempest Hollow",
+      "imagePath": "Content/Art/UI/Maps/Zones/tempest_hollow.png",
+      "imageWidth": 1055,
+      "imageHeight": 1491,
+      "sha256": "0FA49AB374FD489554FCA06E4C7D90BFA6EDB26DA5292D20FDB31685454BD89E",
+      "sourceFilename": "tempest-map.png",
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "mapArtId": "ironroot_wilds",
+      "mapId": "dawnwake_isles",
+      "zoneId": "ironroot_wilds",
+      "displayName": "Ironroot Wilds",
+      "imagePath": "Content/Art/UI/Maps/Zones/ironroot_wilds.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "E109198A999AEDE509F920DBA2523A89E2C62C91D7D3B5C63821F95D652848DF",
+      "sourceFilename": "ironroot-map.png",
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "mapArtId": "ashenridge_highlands",
+      "mapId": "dawnwake_isles",
+      "zoneId": "ashenridge_highlands",
+      "displayName": "Ashenridge Highlands",
+      "imagePath": "Content/Art/UI/Maps/Zones/ashenridge_highlands.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "AA991AE6740CFD0D282D44BDCC3A860292E56EFBD66BA4F75696FB1E0BB23E7E",
+      "sourceFilename": "ashenridge-map.png",
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "mapArtId": "goldmere_plains",
+      "mapId": "dawnwake_isles",
+      "zoneId": "goldmere_plains",
+      "displayName": "Goldmere Plains",
+      "imagePath": "Content/Art/UI/Maps/Zones/goldmere_plains.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "10F451D9A366BF77B593AC2744DDC0FA517B4348EA855A818D5A29171CB16C84",
+      "sourceFilename": "goldmere-map.png",
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "mapArtId": "kingsfall_reach",
+      "mapId": "dawnwake_isles",
+      "zoneId": "kingsfall_reach",
+      "displayName": "Kingsfall Reach",
+      "imagePath": "Content/Art/UI/Maps/Zones/kingsfall_reach.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "E03D30FC7A0B6D555A8D41E4F72BDC5AE59CECB9ABEDF362F73DF6F43D6A972A",
+      "sourceFilename": "reach-map.png",
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "mapArtId": "kingsfall_harbor",
+      "mapId": "dawnwake_isles",
+      "zoneId": "kingsfall_harbor",
+      "displayName": "Kingsfall Harbor",
+      "imagePath": "Content/Art/UI/Maps/Zones/kingsfall_harbor.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "sha256": "8A10BEC8A68CF380D8C983CC5F4A1EFFB5342087692D2E1E309A49A2DC107B75",
+      "sourceFilename": "kingsfall-map.png",
+      "calibrationAccuracy": "display_reference"
+    }
+  ]
+}

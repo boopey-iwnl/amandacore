@@ -111,7 +111,7 @@ func TestAdminToolsMilestoneSlice(t *testing.T) {
 		"confirm":     true,
 	}, http.StatusOK, &worldState)
 	position := worldState["position"].(map[string]any)
-	if position["x"].(float64) != 10 || position["y"].(float64) != 10 {
+	if position["x"].(float64) != 232 || position["y"].(float64) != 130 {
 		t.Fatalf("expected teleport to Stonewake spawn, got %#v", position)
 	}
 

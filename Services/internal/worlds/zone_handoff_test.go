@@ -32,8 +32,8 @@ func TestBuildZoneShardAssignmentsStableAcrossSortedZones(t *testing.T) {
 func TestZoneHandoffCompletesAndUpdatesOwnership(t *testing.T) {
 	server := newWorldServer(nil)
 	session := newProgressionTestSession(server, "handoff_complete")
-	session.X = 470
-	session.Y = 260
+	session.X = 430
+	session.Y = 77
 
 	decision, err := server.requestZoneHandoffLocked(session, "to_brindlebrook")
 	if err != nil {
@@ -79,8 +79,8 @@ func TestZoneHandoffRejectsOutOfRangeWithoutMovingCharacter(t *testing.T) {
 func TestZoneHandoffDestinationUnavailableCanRetry(t *testing.T) {
 	server := newWorldServer(nil)
 	session := newProgressionTestSession(server, "handoff_retry")
-	session.X = 470
-	session.Y = 260
+	session.X = 430
+	session.Y = 77
 	destination, err := server.shardCoordinator.ResolveZone(secondZoneID)
 	if err != nil {
 		t.Fatalf("expected destination shard: %v", err)
@@ -115,8 +115,8 @@ func TestZoneHandoffDestinationUnavailableCanRetry(t *testing.T) {
 func TestZoneHandoffQueueBackpressureRejected(t *testing.T) {
 	server := newWorldServer(nil)
 	session := newProgressionTestSession(server, "handoff_queue")
-	session.X = 470
-	session.Y = 260
+	session.X = 430
+	session.Y = 77
 	queue := server.shardCoordinator.queues[secondZoneID]
 	if queue == nil {
 		t.Fatalf("expected destination queue")

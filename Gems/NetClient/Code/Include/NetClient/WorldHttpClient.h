@@ -13,6 +13,47 @@ namespace NetClient
         double m_z = 0.0;
     };
 
+    struct AuthSessionResponse
+    {
+        AZStd::string m_accessToken;
+        AZStd::string m_refreshToken;
+        AZStd::string m_accountId;
+    };
+
+    struct RealmDescriptor
+    {
+        AZStd::string m_id;
+        AZStd::string m_displayName;
+        AZStd::string m_region;
+        AZStd::string m_endpoint;
+        AZStd::string m_supportedBuild;
+        int m_onlinePlayers = 0;
+        bool m_online = false;
+    };
+
+    struct CharacterSummary
+    {
+        AZStd::string m_id;
+        AZStd::string m_realmId;
+        AZStd::string m_displayName;
+        AZStd::string m_raceId;
+        AZStd::string m_classId;
+        AZStd::string m_archetypeId;
+        int m_level = 0;
+        AZStd::string m_zoneId;
+    };
+
+    struct WorldJoinTicketResponse
+    {
+        AZStd::string m_ticketId;
+        AZStd::string m_sessionId;
+        AZStd::string m_accountId;
+        AZStd::string m_characterId;
+        AZStd::string m_realmId;
+        AZStd::string m_worldEndpoint;
+        AZ::s64 m_expiresAt = 0;
+    };
+
     struct NpcServiceState
     {
         AZStd::string m_type;
@@ -96,8 +137,14 @@ namespace NetClient
         double m_maxHealth = 0.0;
         bool m_alive = false;
         bool m_targetable = false;
+        bool m_isInCombat = false;
         bool m_elite = false;
         bool m_duelOpponent = false;
+        AZStd::string m_currentTargetEntityId;
+        AZStd::string m_lastDamagedByEntityId;
+        AZ::s64 m_respawnDelayMs = 0;
+        AZ::s64 m_deathTick = 0;
+        AZ::s64 m_respawnTick = 0;
         AZStd::string m_aiState;
         AZStd::string m_pvpState;
         AZStd::vector<NpcServiceState> m_services;
@@ -110,6 +157,7 @@ namespace NetClient
         AZStd::string m_title;
         AZStd::string m_category;
         AZStd::string m_statusBucket;
+        AZStd::string m_levelBand;
         AZStd::string m_objectiveType;
         AZStd::string m_objectiveText;
         AZStd::string m_state;
@@ -137,6 +185,28 @@ namespace NetClient
         int m_rewardCurrencySilver = 0;
         int m_rewardCurrencyGold = 0;
         int m_rewardCurrencyCopper = 0;
+        struct ObjectiveNode
+        {
+            AZStd::string m_nodeId;
+            AZStd::string m_kind;
+            AZStd::string m_targetNpcArchetype;
+            AZStd::string m_targetEntityId;
+            AZStd::string m_targetItemId;
+            AZStd::vector<AZStd::string> m_dependsOn;
+            int m_currentCount = 0;
+            int m_targetCount = 0;
+            bool m_completed = false;
+            bool m_active = false;
+            bool m_terminal = false;
+        };
+        struct RewardItem
+        {
+            AZStd::string m_itemId;
+            AZStd::string m_displayName;
+            int m_stackCount = 0;
+        };
+        AZStd::vector<ObjectiveNode> m_objectiveGraph;
+        AZStd::vector<RewardItem> m_rewardItems;
     };
 
     struct MapPointState
@@ -218,13 +288,45 @@ namespace NetClient
         AZStd::string m_itemSubtype;
         AZStd::string m_quality;
         AZStd::string m_iconKind;
+        AZStd::string m_description;
+        AZStd::string m_equipSlot;
+        AZStd::string m_requiredArchetype;
         int m_stackCount = 0;
+        int m_requiredLevel = 0;
+        int m_sellPriceCopper = 0;
+        int m_strength = 0;
+        int m_stamina = 0;
+        int m_armor = 0;
     };
 
     struct InventoryState
     {
         int m_slotCount = 0;
         AZStd::vector<InventorySlotState> m_slots;
+    };
+
+    struct EquipmentSlotState
+    {
+        AZStd::string m_slot;
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        AZStd::string m_itemType;
+        AZStd::string m_itemSubtype;
+        AZStd::string m_quality;
+        AZStd::string m_iconKind;
+        AZStd::string m_description;
+        AZStd::string m_equipSlot;
+        AZStd::string m_requiredArchetype;
+        int m_requiredLevel = 0;
+        int m_sellPriceCopper = 0;
+        int m_strength = 0;
+        int m_stamina = 0;
+        int m_armor = 0;
+    };
+
+    struct EquipmentState
+    {
+        AZStd::vector<EquipmentSlotState> m_slots;
     };
 
     struct MailItemAttachmentState
@@ -297,11 +399,41 @@ namespace NetClient
         int m_currencyCopper = 0;
     };
 
+    struct VendorOfferState
+    {
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        AZStd::string m_itemType;
+        AZStd::string m_itemSubtype;
+        AZStd::string m_quality;
+        AZStd::string m_requiredClass;
+        AZStd::string m_equipSlot;
+        bool m_stackable = false;
+        int m_maxStack = 0;
+        int m_sellPriceCopper = 0;
+        int m_buyPriceCopper = 0;
+        int m_requiredLevel = 0;
+        int m_strength = 0;
+        int m_stamina = 0;
+        int m_armor = 0;
+    };
+
+    struct VendorState
+    {
+        AZStd::string m_id;
+        AZStd::string m_npcId;
+        AZStd::string m_displayName;
+        bool m_inRange = false;
+        AZStd::vector<VendorOfferState> m_offers;
+    };
+
     struct SpellbookEntryState
     {
         AZStd::string m_id;
         AZStd::string m_displayName;
         AZStd::string m_classId;
+        AZStd::string m_category;
+        AZStd::string m_abilityType;
         AZStd::string m_description;
         AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
@@ -315,6 +447,9 @@ namespace NetClient
         bool m_requiresTarget = false;
         bool m_triggersGlobalCooldown = false;
         bool m_learned = false;
+        bool m_passive = false;
+        bool m_actionBarAssignable = false;
+        bool m_trainable = false;
     };
 
     struct ActionBarSlotState
@@ -324,6 +459,8 @@ namespace NetClient
         AZStd::string m_abilityId;
         AZStd::string m_displayName;
         AZStd::string m_buttonLabel;
+        AZStd::string m_category;
+        AZStd::string m_abilityType;
         AZStd::string m_resourceName;
         AZStd::string m_tooltipText;
         AZStd::string m_iconKind;
@@ -336,12 +473,16 @@ namespace NetClient
         bool m_requiresTarget = false;
         bool m_triggersGlobalCooldown = false;
         bool m_learned = false;
+        bool m_passive = false;
+        bool m_actionBarAssignable = false;
     };
 
     struct TrainerOfferState
     {
         AZStd::string m_abilityId;
         AZStd::string m_displayName;
+        AZStd::string m_category;
+        AZStd::string m_abilityType;
         AZStd::string m_description;
         AZStd::string m_tooltipText;
         AZStd::string m_requirementText;
@@ -355,6 +496,9 @@ namespace NetClient
         double m_rangeMeters = 0.0;
         bool m_learned = false;
         bool m_canLearn = false;
+        bool m_passive = false;
+        bool m_actionBarAssignable = false;
+        bool m_trainable = false;
     };
 
     struct TrainerState
@@ -399,6 +543,77 @@ namespace NetClient
         int m_pointsAvailable = 0;
         AZStd::vector<AZStd::string> m_categories;
         AZStd::vector<TalentEntryState> m_talents;
+    };
+
+    struct ProfessionRecipeMaterialState
+    {
+        AZStd::string m_itemId;
+        AZStd::string m_displayName;
+        int m_quantity = 0;
+    };
+
+    struct ProfessionRecipeState
+    {
+        AZStd::string m_recipeId;
+        AZStd::string m_professionId;
+        AZStd::string m_displayName;
+        AZStd::string m_outputItemId;
+        AZStd::string m_outputDisplayName;
+        AZStd::string m_category;
+        int m_requiredSkill = 0;
+        int m_outputQuantity = 0;
+        AZ::s64 m_craftTimeMs = 0;
+        bool m_learnedByDefault = false;
+        bool m_trainerTaught = false;
+        bool m_implemented = false;
+        AZStd::vector<ProfessionRecipeMaterialState> m_requiredMaterials;
+    };
+
+    struct ProfessionEntryState
+    {
+        AZStd::string m_professionId;
+        AZStd::string m_displayName;
+        AZStd::string m_category;
+        AZStd::string m_rankId;
+        AZStd::string m_unavailableReason;
+        int m_maxStarterSkill = 0;
+        int m_skillValue = 0;
+        bool m_implemented = false;
+        AZ::s64 m_learnedAt = 0;
+        AZ::s64 m_updatedAt = 0;
+        AZStd::vector<AZStd::string> m_knownRecipeIds;
+        AZStd::vector<ProfessionRecipeState> m_knownRecipes;
+    };
+
+    struct ProfessionSummaryState
+    {
+        int m_primaryLimit = 0;
+        AZStd::vector<ProfessionEntryState> m_learned;
+        AZStd::vector<ProfessionEntryState> m_catalog;
+    };
+
+    struct ProfessionTrainerOfferState
+    {
+        AZStd::string m_professionId;
+        AZStd::string m_displayName;
+        AZStd::string m_category;
+        AZStd::string m_requirementText;
+        AZStd::string m_unavailableReason;
+        int m_maxStarterSkill = 0;
+        int m_costCopper = 0;
+        bool m_learned = false;
+        bool m_implemented = false;
+        bool m_canLearn = false;
+    };
+
+    struct ProfessionTrainerState
+    {
+        AZStd::string m_id;
+        AZStd::string m_npcId;
+        AZStd::string m_displayName;
+        AZStd::string m_interactionHint;
+        bool m_inRange = false;
+        AZStd::vector<ProfessionTrainerOfferState> m_offers;
     };
 
     struct PvPStatsState
@@ -456,6 +671,7 @@ namespace NetClient
         AZStd::string m_realmId;
         AZStd::string m_zoneId;
         AZStd::string m_displayName;
+        AZStd::string m_archetypeId;
         int m_level = 0;
         WorldPosition m_position;
         double m_health = 0.0;
@@ -466,12 +682,16 @@ namespace NetClient
         int m_experience = 0;
         CurrencyState m_currency;
         InventoryState m_inventory;
+        EquipmentState m_equipment;
         StatBlockState m_stats;
         TalentState m_talents;
+        ProfessionSummaryState m_professions;
+        ProfessionTrainerState m_professionTrainer;
         AZStd::vector<AZStd::string> m_learnedAbilityIds;
         AZStd::vector<SpellbookEntryState> m_spellbookEntries;
         AZStd::vector<ActionBarSlotState> m_actionBarSlots;
         TrainerState m_trainer;
+        VendorState m_vendor;
         bool m_alive = false;
         QuestState m_quest;
         AZStd::vector<QuestState> m_quests;
@@ -641,6 +861,48 @@ namespace NetClient
         {
             AZ::Interface<IWorldHttpClient>::Unregister(instance);
         }
+
+        virtual bool Login(
+            const AZStd::string& authEndpoint,
+            const AZStd::string& username,
+            const AZStd::string& password,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool RefreshSession(
+            const AZStd::string& authEndpoint,
+            const AZStd::string& refreshToken,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool ListRealms(
+            const AZStd::string& realmEndpoint,
+            AZStd::vector<RealmDescriptor>& outRealms,
+            AZStd::string& outError) = 0;
+
+        virtual bool ListCharacters(
+            const AZStd::string& characterEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            AZStd::vector<CharacterSummary>& outCharacters,
+            AZStd::string& outError) = 0;
+
+        virtual bool CreateCharacter(
+            const AZStd::string& characterEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            const AZStd::string& displayName,
+            const AZStd::string& archetypeId,
+            CharacterSummary& outCharacter,
+            AZStd::string& outError) = 0;
+
+        virtual bool CreateJoinTicket(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& accessToken,
+            const AZStd::string& realmId,
+            const AZStd::string& characterId,
+            WorldJoinTicketResponse& outTicket,
+            AZStd::string& outError) = 0;
 
         virtual bool Connect(
             const AZStd::string& worldEndpoint,
@@ -819,6 +1081,13 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 
+        virtual bool CompleteQuest(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& questId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
         virtual bool EnterDungeon(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
@@ -905,6 +1174,14 @@ namespace NetClient
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 
+        virtual bool LearnProfession(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& trainerId,
+            const AZStd::string& professionId,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
         virtual bool AssignActionBarSlot(
             const AZStd::string& worldEndpoint,
             const AZStd::string& worldSessionToken,
@@ -933,6 +1210,38 @@ namespace NetClient
             const AZStd::string& worldSessionToken,
             int fromSlotIndex,
             int toSlotIndex,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool EquipInventorySlot(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            int slotIndex,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool UnequipInventorySlot(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& equipmentSlot,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool BuyVendorItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& vendorId,
+            const AZStd::string& itemId,
+            int stackCount,
+            WorldSessionResponse& outResponse,
+            AZStd::string& outError) = 0;
+
+        virtual bool SellVendorItem(
+            const AZStd::string& worldEndpoint,
+            const AZStd::string& worldSessionToken,
+            const AZStd::string& vendorId,
+            int slotIndex,
+            int stackCount,
             WorldSessionResponse& outResponse,
             AZStd::string& outError) = 0;
 

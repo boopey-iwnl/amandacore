@@ -29,8 +29,8 @@ func TestStonewakeHTTPHotPathUsesAuthoritativeLoop(t *testing.T) {
 	}, http.StatusOK)
 	state := getWorldHandler(t, server.handleState, "/v1/world/state?worldSessionToken="+token, http.StatusOK)
 	position := state["position"].(map[string]any)
-	if position["x"].(float64) != 13 || position["y"].(float64) != 12 {
-		t.Fatalf("expected loop-backed position 13,12 got %#v", position)
+	if position["x"].(float64) != 235 || position["y"].(float64) != 132 {
+		t.Fatalf("expected loop-backed position 235,132 got %#v", position)
 	}
 
 	postWorldHandler(t, server.handleDisconnect, map[string]any{"worldSessionToken": token}, http.StatusOK)
@@ -46,8 +46,8 @@ func TestStonewakeHTTPHotPathUsesAuthoritativeLoop(t *testing.T) {
 	if len(snapshot.Players) != 1 {
 		t.Fatalf("expected one Stonewake player in snapshot, got %d", len(snapshot.Players))
 	}
-	if snapshot.Players[0].Position.X != 13 || snapshot.Players[0].Position.Y != 12 {
-		t.Fatalf("expected authoritative snapshot position 13,12 got %#v", snapshot.Players[0].Position)
+	if snapshot.Players[0].Position.X != 235 || snapshot.Players[0].Position.Y != 132 {
+		t.Fatalf("expected authoritative snapshot position 235,132 got %#v", snapshot.Players[0].Position)
 	}
 
 	metrics := server.stonewakeLoop.Metrics()

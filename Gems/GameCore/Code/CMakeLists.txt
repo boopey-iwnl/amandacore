@@ -22,6 +22,8 @@ ly_add_target(
             Gem::NetClient
 )
 
+target_link_libraries(${gem_name}.Private.Object PRIVATE crypt32)
+
 ly_add_target(
     NAME ${gem_name} ${PAL_TRAIT_MONOLITHIC_DRIVEN_MODULE_TYPE}
     NAMESPACE Gem

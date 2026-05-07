@@ -38,14 +38,14 @@ namespace MovementPhysics
     namespace
     {
         constexpr float ValidationFloorZ = 0.0f;
-        constexpr float ValidationFloorExtent = 512.0f;
-        constexpr float ValidationFloorExtentY = 384.0f;
+        constexpr float ValidationFloorExtent = 460.0f;
+        constexpr float ValidationFloorExtentY = 270.0f;
         constexpr float ValidationMarkerZ = 0.08f;
         constexpr float ValidationSpawnMarkerRadius = 0.18f;
-        constexpr float ValidationSpawnX = 10.0f;
-        constexpr float ValidationSpawnY = 10.0f;
-        constexpr float EncounterAnchorX = 322.0f;
-        constexpr float EncounterAnchorY = 174.0f;
+        constexpr float ValidationSpawnX = 232.0f;
+        constexpr float ValidationSpawnY = 130.0f;
+        constexpr float EncounterAnchorX = 380.0f;
+        constexpr float EncounterAnchorY = 231.0f;
         constexpr float MoveSpeedUnitsPerSecond = 6.0f;
         constexpr float BackpedalSpeedFactor = 0.62f;
         constexpr float SubmitIntervalSeconds = 0.18f;
@@ -55,8 +55,8 @@ namespace MovementPhysics
         constexpr float CorrectionEpsilon = 0.002f;
         constexpr float CharacterBaseSnapZ = 0.05f;
         constexpr float AvatarTurnRate = 2.75f;
-        constexpr float CameraEncounterAnchorX = 34.0f;
-        constexpr float CameraEncounterAnchorY = 18.0f;
+        constexpr float CameraEncounterAnchorX = 232.0f;
+        constexpr float CameraEncounterAnchorY = 130.0f;
         constexpr float CameraPivotOffsetZ = 1.42f;
         constexpr float CameraLookAheadDistance = 0.82f;
         constexpr float CameraLookLiftZ = 0.16f;
@@ -106,8 +106,8 @@ namespace MovementPhysics
 
         bool IsInsideWestApproachObstacle(const AZ::Vector3& position)
         {
-            return position.GetX() >= 72.0f && position.GetX() <= 80.0f &&
-                position.GetY() >= 28.0f && position.GetY() <= 46.0f;
+            return position.GetX() >= 355.0f && position.GetX() <= 367.0f &&
+                position.GetY() >= 152.0f && position.GetY() <= 166.0f;
         }
 
         AZ::Vector3 ResolveMovementCollision(const AZ::Vector3& currentPosition, const AZ::Vector3& requestedPosition)
@@ -1175,7 +1175,7 @@ namespace MovementPhysics
                 "Stonewake_TexturedTerrain_Base",
                 StonewakeBaseGroundModelAssetPath,
                 "content/art/materials/mat_stonewake_grass_lush.azmaterial",
-                AZ::Vector3(256.0f, 192.0f, 0.018f),
+                AZ::Vector3(230.0f, 135.0f, 0.018f),
                 AZ::Vector3::CreateOne(),
                 flatRotation,
             },
@@ -1183,55 +1183,55 @@ namespace MovementPhysics
                 "Stonewake_Hearthwatch_CobbleYard",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_hearthwatch_cobble_path.azmaterial",
-                AZ::Vector3(42.0f, 26.0f, 0.205f),
-                AZ::Vector3(20.0f, 11.0f, 1.0f),
+                AZ::Vector3(232.0f, 130.0f, 0.205f),
+                AZ::Vector3(24.0f, 15.0f, 1.0f),
                 flatRotation,
             },
             {
                 "Stonewake_WornGrass_WestApproach",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_grass_worn.azmaterial",
-                AZ::Vector3(126.0f, 68.0f, 0.185f),
-                AZ::Vector3(17.0f, 9.0f, 1.0f),
+                AZ::Vector3(197.0f, 74.0f, 0.185f),
+                AZ::Vector3(18.0f, 12.0f, 1.0f),
                 flatRotation,
             },
             {
                 "Stonewake_RockyGround_Ridge",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_rocky_ground.azmaterial",
-                AZ::Vector3(292.0f, 158.0f, 0.185f),
-                AZ::Vector3(22.0f, 9.0f, 1.0f),
+                AZ::Vector3(361.0f, 157.0f, 0.185f),
+                AZ::Vector3(22.0f, 13.0f, 1.0f),
                 flatRotation,
             },
             {
                 "Stonewake_MossGrass_EastVale",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_foliage_mossy_grass.azmaterial",
-                AZ::Vector3(402.0f, 238.0f, 0.185f),
-                AZ::Vector3(19.0f, 11.0f, 1.0f),
+                AZ::Vector3(380.0f, 231.0f, 0.185f),
+                AZ::Vector3(22.0f, 14.0f, 1.0f),
                 flatRotation,
             },
             {
                 "Stonewake_DirtRoad_Hearthwatch",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_dirt_path.azmaterial",
-                AZ::Vector3(55.0f, 26.0f, 0.225f),
-                AZ::Vector3(13.0f, 1.7f, 1.0f),
+                AZ::Vector3(232.0f, 130.0f, 0.225f),
+                AZ::Vector3(26.0f, 1.9f, 1.0f),
                 flatRotation,
             },
             {
                 "Stonewake_DirtRoad_Training",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_dirt_path.azmaterial",
-                AZ::Vector3(154.0f, 82.0f, 0.225f),
-                AZ::Vector3(18.0f, 1.85f, 1.0f),
+                AZ::Vector3(197.0f, 74.0f, 0.225f),
+                AZ::Vector3(20.0f, 1.85f, 1.0f),
                 flatRotation,
             },
             {
                 "Stonewake_DirtRoad_CentralVale",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_dirt_path.azmaterial",
-                AZ::Vector3(314.0f, 172.0f, 0.225f),
+                AZ::Vector3(313.0f, 81.0f, 0.225f),
                 AZ::Vector3(20.0f, 2.0f, 1.0f),
                 flatRotation,
             },
@@ -1239,7 +1239,7 @@ namespace MovementPhysics
                 "Stonewake_DirtRoad_EastRise",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_dirt_path.azmaterial",
-                AZ::Vector3(438.0f, 246.0f, 0.225f),
+                AZ::Vector3(375.0f, 77.0f, 0.225f),
                 AZ::Vector3(11.0f, 2.1f, 1.0f),
                 flatRotation,
             },
@@ -1247,7 +1247,7 @@ namespace MovementPhysics
                 "Stonewake_TrainingRing_Dirt",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_dirt_path.azmaterial",
-                AZ::Vector3(91.0f, 44.0f, 0.235f),
+                AZ::Vector3(268.0f, 145.0f, 0.235f),
                 AZ::Vector3(4.8f, 4.8f, 1.0f),
                 flatRotation,
             },
@@ -1255,15 +1255,15 @@ namespace MovementPhysics
                 "Stonewake_FarmSoil_Valefurrow",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_valefurrow_farm_soil.azmaterial",
-                AZ::Vector3(198.0f, 116.0f, 0.205f),
-                AZ::Vector3(15.0f, 8.0f, 1.0f),
+                AZ::Vector3(197.0f, 74.0f, 0.205f),
+                AZ::Vector3(17.0f, 9.0f, 1.0f),
                 flatRotation,
             },
             {
                 "Stonewake_StreamWater_Crossing",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stream_water_placeholder.azmaterial",
-                AZ::Vector3(352.0f, 215.0f, 0.240f),
+                AZ::Vector3(313.0f, 81.0f, 0.240f),
                 AZ::Vector3(19.0f, 1.65f, 1.0f),
                 flatRotation,
             },
@@ -1271,7 +1271,7 @@ namespace MovementPhysics
                 "Stonewake_ShoreMud_Crossing",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_stonewake_mud_dark.azmaterial",
-                AZ::Vector3(352.0f, 215.0f, 0.200f),
+                AZ::Vector3(313.0f, 81.0f, 0.200f),
                 AZ::Vector3(20.0f, 3.2f, 1.0f),
                 flatRotation,
             },
@@ -1279,7 +1279,7 @@ namespace MovementPhysics
                 "Hearthwatch_CommandFloor_Wood",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_hearthwatch_village_wood.azmaterial",
-                AZ::Vector3(62.0f, 34.0f, 0.265f),
+                AZ::Vector3(232.0f, 130.0f, 0.265f),
                 AZ::Vector3(3.4f, 2.2f, 1.0f),
                 flatRotation,
             },
@@ -1287,7 +1287,7 @@ namespace MovementPhysics
                 "Hearthwatch_RoomFloor_Cobble",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_hearthwatch_cobble_path.azmaterial",
-                AZ::Vector3(38.0f, 18.0f, 0.265f),
+                AZ::Vector3(222.0f, 121.0f, 0.265f),
                 AZ::Vector3(2.8f, 2.1f, 1.0f),
                 flatRotation,
             },
@@ -1295,7 +1295,7 @@ namespace MovementPhysics
                 "Hearthwatch_WhitePlaster_Wall",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_hearthwatch_village_plaster.azmaterial",
-                AZ::Vector3(64.0f, 41.0f, 1.45f),
+                AZ::Vector3(242.0f, 137.0f, 1.45f),
                 AZ::Vector3(3.2f, 0.70f, 1.0f),
                 northWallRotation,
             },
@@ -1303,7 +1303,7 @@ namespace MovementPhysics
                 "Hearthwatch_CutStone_Wall",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_hearthwatch_cut_stone.azmaterial",
-                AZ::Vector3(74.0f, 30.0f, 1.35f),
+                AZ::Vector3(254.0f, 130.0f, 1.35f),
                 AZ::Vector3(2.8f, 0.65f, 1.0f),
                 eastWallRotation,
             },
@@ -1311,7 +1311,7 @@ namespace MovementPhysics
                 "Hearthwatch_ThatchRoof_Patch",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_hearthwatch_thatch_roof.azmaterial",
-                AZ::Vector3(64.0f, 34.0f, 2.45f),
+                AZ::Vector3(232.0f, 130.0f, 2.45f),
                 AZ::Vector3(3.8f, 2.5f, 1.0f),
                 roofRotation,
             },
@@ -1319,7 +1319,7 @@ namespace MovementPhysics
                 "Hearthwatch_ShingleRoof_Patch",
                 StonewakeSurfacePlaneModelAssetPath,
                 "content/art/materials/mat_hearthwatch_wood_shingles.azmaterial",
-                AZ::Vector3(38.0f, 18.0f, 2.20f),
+                AZ::Vector3(222.0f, 121.0f, 2.20f),
                 AZ::Vector3(3.1f, 2.3f, 1.0f),
                 roofRotation,
             },
@@ -1508,12 +1508,12 @@ namespace MovementPhysics
             AZ::Color m_color;
         };
         const SurfacePatch surfacePatches[] = {
-            {AZ::Vector3(42.0f, 26.0f, 0.035f), AZ::Vector3(40.0f, 22.0f, 0.035f), hearthwatchYardColor},
-            {AZ::Vector3(126.0f, 68.0f, 0.030f), AZ::Vector3(34.0f, 18.0f, 0.030f), mossColor},
-            {AZ::Vector3(196.0f, 114.0f, 0.030f), AZ::Vector3(28.0f, 16.0f, 0.030f), groundTileLight},
-            {AZ::Vector3(292.0f, 158.0f, 0.030f), AZ::Vector3(44.0f, 18.0f, 0.030f), rockyGroundColor},
-            {AZ::Vector3(402.0f, 238.0f, 0.030f), AZ::Vector3(38.0f, 22.0f, 0.030f), groundTileDark},
-            {AZ::Vector3(462.0f, 318.0f, 0.030f), AZ::Vector3(30.0f, 22.0f, 0.030f), mossColor},
+            {AZ::Vector3(232.0f, 130.0f, 0.035f), AZ::Vector3(42.0f, 25.0f, 0.035f), hearthwatchYardColor},
+            {AZ::Vector3(197.0f, 74.0f, 0.030f), AZ::Vector3(34.0f, 22.0f, 0.030f), groundTileLight},
+            {AZ::Vector3(313.0f, 81.0f, 0.030f), AZ::Vector3(36.0f, 18.0f, 0.030f), mossColor},
+            {AZ::Vector3(361.0f, 157.0f, 0.030f), AZ::Vector3(44.0f, 24.0f, 0.030f), rockyGroundColor},
+            {AZ::Vector3(380.0f, 231.0f, 0.030f), AZ::Vector3(38.0f, 22.0f, 0.030f), groundTileDark},
+            {AZ::Vector3(358.0f, 39.0f, 0.030f), AZ::Vector3(34.0f, 18.0f, 0.030f), mossColor},
         };
         for (const SurfacePatch& patch : surfacePatches)
         {
@@ -1525,8 +1525,8 @@ namespace MovementPhysics
 
         for (int cobbleIndex = 0; cobbleIndex < 30; ++cobbleIndex)
         {
-            const float centerX = 8.0f + (static_cast<float>(cobbleIndex % 10) * 7.2f);
-            const float centerY = 8.0f + (static_cast<float>(cobbleIndex / 10) * 13.0f);
+            const float centerX = 200.0f + (static_cast<float>(cobbleIndex % 10) * 7.2f);
+            const float centerY = 112.0f + (static_cast<float>(cobbleIndex / 10) * 10.0f);
             auxGeom->DrawAabb(
                 AZ::Aabb::CreateCenterHalfExtents(
                     AZ::Vector3(centerX, centerY, 0.090f),
@@ -1537,8 +1537,8 @@ namespace MovementPhysics
 
         for (int grassBreakIndex = 0; grassBreakIndex < 26; ++grassBreakIndex)
         {
-            const float centerX = 104.0f + (static_cast<float>((grassBreakIndex * 37) % 350));
-            const float centerY = 52.0f + (static_cast<float>((grassBreakIndex * 29) % 290));
+            const float centerX = 140.0f + (static_cast<float>((grassBreakIndex * 37) % 270));
+            const float centerY = 42.0f + (static_cast<float>((grassBreakIndex * 29) % 205));
             const AZ::Color breakColor = (grassBreakIndex % 3) == 0 ? mossColor : groundTileLight;
             auxGeom->DrawAabb(
                 AZ::Aabb::CreateCenterHalfExtents(
@@ -1549,10 +1549,10 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 streamCenters[] = {
-            AZ::Vector3(248.0f, 158.0f, 0.04f),
-            AZ::Vector3(296.0f, 184.0f, 0.04f),
-            AZ::Vector3(352.0f, 215.0f, 0.04f),
-            AZ::Vector3(420.0f, 248.0f, 0.04f),
+            AZ::Vector3(286.0f, 105.0f, 0.04f),
+            AZ::Vector3(313.0f, 81.0f, 0.04f),
+            AZ::Vector3(336.0f, 72.0f, 0.04f),
+            AZ::Vector3(366.0f, 64.0f, 0.04f),
         };
         const AZ::Vector3 streamExtents[] = {
             AZ::Vector3(30.0f, 2.8f, 0.04f),
@@ -1575,14 +1575,14 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 roadCenters[] = {
-            AZ::Vector3(22.0f, 14.0f, 0.10f),
-            AZ::Vector3(55.0f, 26.0f, 0.10f),
-            AZ::Vector3(96.0f, 44.0f, 0.10f),
-            AZ::Vector3(154.0f, 82.0f, 0.10f),
-            AZ::Vector3(232.0f, 122.0f, 0.10f),
-            AZ::Vector3(314.0f, 172.0f, 0.10f),
-            AZ::Vector3(382.0f, 214.0f, 0.10f),
-            AZ::Vector3(438.0f, 246.0f, 0.10f),
+            AZ::Vector3(232.0f, 130.0f, 0.10f),
+            AZ::Vector3(197.0f, 74.0f, 0.10f),
+            AZ::Vector3(260.0f, 70.0f, 0.10f),
+            AZ::Vector3(313.0f, 81.0f, 0.10f),
+            AZ::Vector3(375.0f, 77.0f, 0.10f),
+            AZ::Vector3(361.0f, 157.0f, 0.10f),
+            AZ::Vector3(330.0f, 197.0f, 0.10f),
+            AZ::Vector3(380.0f, 231.0f, 0.10f),
         };
         const AZ::Vector3 roadExtents[] = {
             AZ::Vector3(18.0f, 3.2f, 0.06f),
@@ -1631,11 +1631,11 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 fieldCenters[] = {
-            AZ::Vector3(142.0f, 72.0f, 0.02f),
-            AZ::Vector3(156.0f, 78.0f, 0.02f),
-            AZ::Vector3(170.0f, 84.0f, 0.02f),
-            AZ::Vector3(184.0f, 90.0f, 0.02f),
-            AZ::Vector3(164.0f, 104.0f, 0.02f),
+            AZ::Vector3(175.0f, 62.0f, 0.02f),
+            AZ::Vector3(188.0f, 68.0f, 0.02f),
+            AZ::Vector3(202.0f, 74.0f, 0.02f),
+            AZ::Vector3(216.0f, 80.0f, 0.02f),
+            AZ::Vector3(198.0f, 92.0f, 0.02f),
         };
         for (const AZ::Vector3& fieldCenter : fieldCenters)
         {
@@ -1732,16 +1732,16 @@ namespace MovementPhysics
         };
 
         const AZ::Vector3 buildingCenters[] = {
-            AZ::Vector3(7.0f, 7.0f, 1.0f),
-            AZ::Vector3(18.0f, 7.0f, 0.9f),
-            AZ::Vector3(8.0f, 29.0f, 0.85f),
-            AZ::Vector3(22.0f, 29.0f, 0.85f),
-            AZ::Vector3(42.0f, 22.0f, 0.65f),
-            AZ::Vector3(76.0f, 37.0f, 1.1f),
-            AZ::Vector3(232.0f, 118.0f, 1.2f),
-            AZ::Vector3(322.0f, 174.0f, 2.6f),
-            AZ::Vector3(420.0f, 224.0f, 1.0f),
-            AZ::Vector3(438.0f, 246.0f, 1.7f),
+            AZ::Vector3(218.0f, 120.0f, 1.0f),
+            AZ::Vector3(232.0f, 118.0f, 0.9f),
+            AZ::Vector3(220.0f, 142.0f, 0.85f),
+            AZ::Vector3(244.0f, 142.0f, 0.85f),
+            AZ::Vector3(270.0f, 143.0f, 0.65f),
+            AZ::Vector3(198.0f, 68.0f, 1.1f),
+            AZ::Vector3(320.0f, 76.0f, 1.2f),
+            AZ::Vector3(386.0f, 233.0f, 2.6f),
+            AZ::Vector3(358.0f, 39.0f, 1.0f),
+            AZ::Vector3(381.0f, 76.0f, 1.7f),
         };
         const AZ::Vector3 buildingExtents[] = {
             AZ::Vector3(2.8f, 2.0f, 1.0f),
@@ -1806,18 +1806,18 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 ridgeCenters[] = {
-            AZ::Vector3(5.0f, 6.0f, 1.2f),
-            AZ::Vector3(18.0f, 4.0f, 1.0f),
-            AZ::Vector3(42.0f, 5.0f, 1.3f),
-            AZ::Vector3(72.0f, 7.0f, 1.1f),
-            AZ::Vector3(104.0f, 18.0f, 1.2f),
-            AZ::Vector3(120.0f, 48.0f, 1.4f),
-            AZ::Vector3(190.0f, 92.0f, 1.1f),
-            AZ::Vector3(230.0f, 112.0f, 1.4f),
-            AZ::Vector3(268.0f, 142.0f, 1.2f),
-            AZ::Vector3(330.0f, 184.0f, 1.3f),
-            AZ::Vector3(402.0f, 232.0f, 1.1f),
-            AZ::Vector3(460.0f, 270.0f, 1.3f),
+            AZ::Vector3(120.0f, 48.0f, 1.2f),
+            AZ::Vector3(150.0f, 70.0f, 1.0f),
+            AZ::Vector3(176.0f, 54.0f, 1.3f),
+            AZ::Vector3(220.0f, 170.0f, 1.1f),
+            AZ::Vector3(250.0f, 188.0f, 1.2f),
+            AZ::Vector3(292.0f, 160.0f, 1.4f),
+            AZ::Vector3(338.0f, 150.0f, 1.1f),
+            AZ::Vector3(361.0f, 157.0f, 1.4f),
+            AZ::Vector3(388.0f, 166.0f, 1.2f),
+            AZ::Vector3(370.0f, 228.0f, 1.3f),
+            AZ::Vector3(405.0f, 235.0f, 1.1f),
+            AZ::Vector3(420.0f, 94.0f, 1.3f),
         };
         for (const AZ::Vector3& ridgeCenter : ridgeCenters)
         {
@@ -1830,14 +1830,14 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 treeCenters[] = {
-            AZ::Vector3(29.0f, 48.0f, 0.0f),
-            AZ::Vector3(41.0f, 50.0f, 0.0f),
-            AZ::Vector3(90.0f, 63.0f, 0.0f),
-            AZ::Vector3(112.0f, 83.0f, 0.0f),
-            AZ::Vector3(188.0f, 118.0f, 0.0f),
-            AZ::Vector3(210.0f, 136.0f, 0.0f),
-            AZ::Vector3(270.0f, 154.0f, 0.0f),
-            AZ::Vector3(350.0f, 162.0f, 0.0f),
+            AZ::Vector3(180.0f, 118.0f, 0.0f),
+            AZ::Vector3(198.0f, 112.0f, 0.0f),
+            AZ::Vector3(250.0f, 155.0f, 0.0f),
+            AZ::Vector3(286.0f, 134.0f, 0.0f),
+            AZ::Vector3(306.0f, 96.0f, 0.0f),
+            AZ::Vector3(332.0f, 112.0f, 0.0f),
+            AZ::Vector3(348.0f, 196.0f, 0.0f),
+            AZ::Vector3(365.0f, 162.0f, 0.0f),
             AZ::Vector3(396.0f, 244.0f, 0.0f),
         };
         for (const AZ::Vector3& treeBase : treeCenters)
@@ -1858,8 +1858,8 @@ namespace MovementPhysics
             const float angleRadians = (AZ::Constants::TwoPi / 18.0f) * static_cast<float>(segmentIndex);
             auxGeom->DrawSphere(
                 AZ::Vector3(
-                    58.0f + (AZStd::cos(angleRadians) * 9.0f),
-                    32.0f + (AZStd::sin(angleRadians) * 7.0f),
+                    268.0f + (AZStd::cos(angleRadians) * 9.0f),
+                    145.0f + (AZStd::sin(angleRadians) * 7.0f),
                     ValidationMarkerZ),
                 0.14f,
                 trainingRingColor);
@@ -1879,10 +1879,10 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 commandPostColumns[] = {
-            AZ::Vector3(10.0f, 10.0f, ValidationMarkerZ),
-            AZ::Vector3(14.0f, 10.0f, ValidationMarkerZ),
-            AZ::Vector3(10.0f, 14.0f, ValidationMarkerZ),
-            AZ::Vector3(14.0f, 14.0f, ValidationMarkerZ)};
+            AZ::Vector3(228.0f, 126.0f, ValidationMarkerZ),
+            AZ::Vector3(236.0f, 126.0f, ValidationMarkerZ),
+            AZ::Vector3(228.0f, 134.0f, ValidationMarkerZ),
+            AZ::Vector3(236.0f, 134.0f, ValidationMarkerZ)};
         for (const AZ::Vector3& columnBase : commandPostColumns)
         {
             for (int segmentIndex = 0; segmentIndex < 4; ++segmentIndex)
@@ -1895,14 +1895,14 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 trailMarkers[] = {
-            AZ::Vector3(22.0f, 14.0f, ValidationMarkerZ),
-            AZ::Vector3(52.0f, 26.0f, ValidationMarkerZ),
-            AZ::Vector3(84.0f, 36.0f, ValidationMarkerZ),
-            AZ::Vector3(134.0f, 64.0f, ValidationMarkerZ),
-            AZ::Vector3(184.0f, 96.0f, ValidationMarkerZ),
-            AZ::Vector3(232.0f, 118.0f, ValidationMarkerZ),
-            AZ::Vector3(322.0f, 174.0f, ValidationMarkerZ),
-            AZ::Vector3(438.0f, 246.0f, ValidationMarkerZ)};
+            AZ::Vector3(232.0f, 130.0f, ValidationMarkerZ),
+            AZ::Vector3(197.0f, 74.0f, ValidationMarkerZ),
+            AZ::Vector3(260.0f, 70.0f, ValidationMarkerZ),
+            AZ::Vector3(313.0f, 81.0f, ValidationMarkerZ),
+            AZ::Vector3(375.0f, 77.0f, ValidationMarkerZ),
+            AZ::Vector3(358.0f, 39.0f, ValidationMarkerZ),
+            AZ::Vector3(361.0f, 157.0f, ValidationMarkerZ),
+            AZ::Vector3(380.0f, 231.0f, ValidationMarkerZ)};
         for (const AZ::Vector3& marker : trailMarkers)
         {
             auxGeom->DrawSphere(marker + AZ::Vector3(0.0f, 0.0f, 0.08f), 0.26f, pathColor);
@@ -1921,12 +1921,12 @@ namespace MovementPhysics
             float m_height;
         };
         const LandmarkMarker landmarkMarkers[] = {
-            {AZ::Vector3(13.0f, 10.0f, 0.0f), commandColor, 2.0f},
-            {AZ::Vector3(58.0f, 32.0f, 0.0f), trainingRingColor, 1.8f},
-            {AZ::Vector3(164.0f, 96.0f, 0.0f), cropColor, 1.7f},
-            {AZ::Vector3(232.0f, 118.0f, 0.0f), runeColor, 2.2f},
-            {AZ::Vector3(322.0f, 174.0f, 0.0f), encounterColor, 2.1f},
-            {AZ::Vector3(438.0f, 246.0f, 0.0f), waterColor, 1.9f},
+            {AZ::Vector3(232.0f, 130.0f, 0.0f), commandColor, 2.0f},
+            {AZ::Vector3(197.0f, 74.0f, 0.0f), cropColor, 1.8f},
+            {AZ::Vector3(313.0f, 81.0f, 0.0f), runeColor, 2.0f},
+            {AZ::Vector3(361.0f, 157.0f, 0.0f), cutStoneColor, 2.2f},
+            {AZ::Vector3(380.0f, 231.0f, 0.0f), encounterColor, 2.1f},
+            {AZ::Vector3(375.0f, 77.0f, 0.0f), waterColor, 1.9f},
         };
         for (const LandmarkMarker& landmark : landmarkMarkers)
         {
@@ -1956,21 +1956,21 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 boulderCluster[] = {
-            AZ::Vector3(72.0f, 28.0f, 0.30f),
-            AZ::Vector3(76.0f, 36.0f, 0.55f),
-            AZ::Vector3(80.0f, 44.0f, 0.42f),
-            AZ::Vector3(74.0f, 46.0f, 0.38f)};
+            AZ::Vector3(355.0f, 152.0f, 0.30f),
+            AZ::Vector3(360.0f, 158.0f, 0.55f),
+            AZ::Vector3(367.0f, 164.0f, 0.42f),
+            AZ::Vector3(352.0f, 166.0f, 0.38f)};
         for (const AZ::Vector3& boulder : boulderCluster)
         {
             auxGeom->DrawSphere(boulder, 0.75f, obstacleColor);
         }
 
         const AZ::Vector3 standingStones[] = {
-            AZ::Vector3(228.0f, 114.0f, 1.0f),
-            AZ::Vector3(233.0f, 113.0f, 1.4f),
-            AZ::Vector3(237.0f, 117.0f, 1.0f),
-            AZ::Vector3(235.0f, 123.0f, 1.2f),
-            AZ::Vector3(229.0f, 122.0f, 0.9f),
+            AZ::Vector3(286.0f, 154.0f, 1.0f),
+            AZ::Vector3(291.0f, 153.0f, 1.4f),
+            AZ::Vector3(295.0f, 157.0f, 1.0f),
+            AZ::Vector3(293.0f, 163.0f, 1.2f),
+            AZ::Vector3(287.0f, 162.0f, 0.9f),
         };
         for (const AZ::Vector3& stone : standingStones)
         {
@@ -1982,10 +1982,10 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 quarryBlocks[] = {
-            AZ::Vector3(310.0f, 166.0f, 0.45f),
-            AZ::Vector3(318.0f, 170.0f, 0.55f),
-            AZ::Vector3(328.0f, 176.0f, 0.50f),
-            AZ::Vector3(336.0f, 181.0f, 0.38f),
+            AZ::Vector3(350.0f, 152.0f, 0.45f),
+            AZ::Vector3(358.0f, 157.0f, 0.55f),
+            AZ::Vector3(368.0f, 162.0f, 0.50f),
+            AZ::Vector3(376.0f, 167.0f, 0.38f),
         };
         for (const AZ::Vector3& block : quarryBlocks)
         {
@@ -1996,10 +1996,10 @@ namespace MovementPhysics
         }
 
         const AZ::Vector3 dockPlanks[] = {
-            AZ::Vector3(410.0f, 252.0f, 0.18f),
-            AZ::Vector3(418.0f, 253.0f, 0.18f),
-            AZ::Vector3(426.0f, 254.0f, 0.18f),
-            AZ::Vector3(434.0f, 255.0f, 0.18f),
+            AZ::Vector3(362.0f, 45.0f, 0.18f),
+            AZ::Vector3(370.0f, 46.0f, 0.18f),
+            AZ::Vector3(378.0f, 47.0f, 0.18f),
+            AZ::Vector3(386.0f, 48.0f, 0.18f),
         };
         for (const AZ::Vector3& plank : dockPlanks)
         {
@@ -2013,7 +2013,7 @@ namespace MovementPhysics
         {
             auxGeom->DrawAabb(
                 AZ::Aabb::CreateCenterHalfExtents(
-                    AZ::Vector3(452.0f, 258.0f, 0.45f + (tierIndex * 0.62f)),
+                    AZ::Vector3(380.0f, 231.0f, 0.45f + (tierIndex * 0.62f)),
                     AZ::Vector3(1.15f - (tierIndex * 0.10f), 1.15f - (tierIndex * 0.10f), 0.30f)),
                 cutStoneColor,
                 AZ::RPI::AuxGeomDraw::DrawStyle::Shaded);

@@ -74,7 +74,8 @@ namespace NetClient
             const AZStd::string& requestBody,
             AZStd::string& responseBody,
             AZ::u32& outStatusCode,
-            AZStd::string& outError)
+            AZStd::string& outError,
+            const AZStd::string& bearerToken = {})
         {
             ParsedEndpoint parsedEndpoint;
             if (!ParseEndpoint(endpoint, parsedEndpoint, outError))
@@ -119,12 +120,23 @@ namespace NetClient
                 return false;
             }
 
-            const wchar_t* headers = L"Content-Type: application/json\r\n";
-            const DWORD headerLength = requestBody.empty() ? 0 : static_cast<DWORD>(wcslen(headers));
+            AZStd::wstring headers;
+            if (!requestBody.empty())
+            {
+                headers += L"Content-Type: application/json\r\n";
+            }
+            if (!bearerToken.empty())
+            {
+                headers += L"Authorization: Bearer ";
+                headers += ToWideString(bearerToken);
+                headers += L"\r\n";
+            }
+
+            const DWORD headerLength = headers.empty() ? 0 : static_cast<DWORD>(headers.size());
             const DWORD bodyLength = static_cast<DWORD>(requestBody.size());
             if (!WinHttpSendRequest(
                     request,
-                    requestBody.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers,
+                    headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
                     headerLength,
                     requestBody.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(requestBody.data()),
                     bodyLength,
@@ -568,6 +580,7 @@ namespace NetClient
             ReadString(quest, "title", outQuest.m_title);
             ReadString(quest, "category", outQuest.m_category);
             ReadString(quest, "statusBucket", outQuest.m_statusBucket);
+            ReadString(quest, "levelBand", outQuest.m_levelBand);
             ReadString(quest, "objectiveType", outQuest.m_objectiveType);
             ReadString(quest, "objectiveText", outQuest.m_objectiveText);
             ReadString(quest, "state", outQuest.m_state);
@@ -603,6 +616,146 @@ namespace NetClient
                 ReadDouble(objectiveArea, "centerY", outQuest.m_objectiveY);
                 ReadDouble(objectiveArea, "radius", outQuest.m_objectiveRadius);
             }
+            if (quest.HasMember("objectiveGraph") && quest["objectiveGraph"].IsArray())
+            {
+                for (const rapidjson::Value& nodeValue : quest["objectiveGraph"].GetArray())
+                {
+                    if (!nodeValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    QuestState::ObjectiveNode node;
+                    ReadString(nodeValue, "nodeId", node.m_nodeId);
+                    ReadString(nodeValue, "kind", node.m_kind);
+                    ReadString(nodeValue, "targetNpcArchetype", node.m_targetNpcArchetype);
+                    ReadString(nodeValue, "targetEntityId", node.m_targetEntityId);
+                    ReadString(nodeValue, "targetItemId", node.m_targetItemId);
+                    ReadInt(nodeValue, "currentCount", node.m_currentCount);
+                    ReadInt(nodeValue, "targetCount", node.m_targetCount);
+                    ReadBool(nodeValue, "completed", node.m_completed);
+                    ReadBool(nodeValue, "active", node.m_active);
+                    ReadBool(nodeValue, "terminal", node.m_terminal);
+                    if (nodeValue.HasMember("dependsOn") && nodeValue["dependsOn"].IsArray())
+                    {
+                        for (const rapidjson::Value& dependencyValue : nodeValue["dependsOn"].GetArray())
+                        {
+                            if (dependencyValue.IsString())
+                            {
+                                node.m_dependsOn.push_back(dependencyValue.GetString());
+                            }
+                        }
+                    }
+                    outQuest.m_objectiveGraph.push_back(AZStd::move(node));
+                }
+            }
+            if (quest.HasMember("rewardItems") && quest["rewardItems"].IsArray())
+            {
+                for (const rapidjson::Value& rewardValue : quest["rewardItems"].GetArray())
+                {
+                    if (!rewardValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    QuestState::RewardItem reward;
+                    ReadString(rewardValue, "itemId", reward.m_itemId);
+                    ReadString(rewardValue, "displayName", reward.m_displayName);
+                    ReadInt(rewardValue, "stackCount", reward.m_stackCount);
+                    outQuest.m_rewardItems.push_back(AZStd::move(reward));
+                }
+            }
+        }
+
+        void ParseProfessionRecipe(const rapidjson::Value& recipeValue, ProfessionRecipeState& outRecipe)
+        {
+            ReadString(recipeValue, "recipeId", outRecipe.m_recipeId);
+            ReadString(recipeValue, "professionId", outRecipe.m_professionId);
+            ReadString(recipeValue, "displayName", outRecipe.m_displayName);
+            ReadInt(recipeValue, "requiredSkill", outRecipe.m_requiredSkill);
+            ReadString(recipeValue, "outputItemId", outRecipe.m_outputItemId);
+            ReadString(recipeValue, "outputDisplayName", outRecipe.m_outputDisplayName);
+            ReadInt(recipeValue, "outputQuantity", outRecipe.m_outputQuantity);
+            ReadBool(recipeValue, "learnedByDefault", outRecipe.m_learnedByDefault);
+            ReadBool(recipeValue, "trainerTaught", outRecipe.m_trainerTaught);
+            ReadInt64(recipeValue, "craftTimeMs", outRecipe.m_craftTimeMs);
+            ReadString(recipeValue, "category", outRecipe.m_category);
+            ReadBool(recipeValue, "implemented", outRecipe.m_implemented);
+
+            if (recipeValue.HasMember("requiredMaterials") && recipeValue["requiredMaterials"].IsArray())
+            {
+                for (const rapidjson::Value& materialValue : recipeValue["requiredMaterials"].GetArray())
+                {
+                    if (!materialValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    ProfessionRecipeMaterialState material;
+                    ReadString(materialValue, "itemId", material.m_itemId);
+                    ReadString(materialValue, "displayName", material.m_displayName);
+                    ReadInt(materialValue, "quantity", material.m_quantity);
+                    outRecipe.m_requiredMaterials.push_back(AZStd::move(material));
+                }
+            }
+        }
+
+        void ParseProfessionEntry(const rapidjson::Value& professionValue, ProfessionEntryState& outProfession)
+        {
+            ReadString(professionValue, "professionId", outProfession.m_professionId);
+            ReadString(professionValue, "displayName", outProfession.m_displayName);
+            ReadString(professionValue, "category", outProfession.m_category);
+            ReadString(professionValue, "rankId", outProfession.m_rankId);
+            ReadString(professionValue, "unavailableReason", outProfession.m_unavailableReason);
+            ReadInt(professionValue, "maxStarterSkill", outProfession.m_maxStarterSkill);
+            ReadInt(professionValue, "skillValue", outProfession.m_skillValue);
+            ReadBool(professionValue, "implemented", outProfession.m_implemented);
+            ReadInt64(professionValue, "learnedAt", outProfession.m_learnedAt);
+            ReadInt64(professionValue, "updatedAt", outProfession.m_updatedAt);
+
+            if (professionValue.HasMember("knownRecipeIds") && professionValue["knownRecipeIds"].IsArray())
+            {
+                for (const rapidjson::Value& recipeIdValue : professionValue["knownRecipeIds"].GetArray())
+                {
+                    if (recipeIdValue.IsString())
+                    {
+                        outProfession.m_knownRecipeIds.push_back(recipeIdValue.GetString());
+                    }
+                }
+            }
+            if (professionValue.HasMember("knownRecipes") && professionValue["knownRecipes"].IsArray())
+            {
+                for (const rapidjson::Value& recipeValue : professionValue["knownRecipes"].GetArray())
+                {
+                    if (!recipeValue.IsObject())
+                    {
+                        continue;
+                    }
+
+                    ProfessionRecipeState recipe;
+                    ParseProfessionRecipe(recipeValue, recipe);
+                    outProfession.m_knownRecipes.push_back(AZStd::move(recipe));
+                }
+            }
+        }
+
+        void ParseVendorOffer(const rapidjson::Value& offerValue, VendorOfferState& outOffer)
+        {
+            ReadString(offerValue, "itemId", outOffer.m_itemId);
+            ReadString(offerValue, "displayName", outOffer.m_displayName);
+            ReadString(offerValue, "type", outOffer.m_itemType);
+            ReadString(offerValue, "subtype", outOffer.m_itemSubtype);
+            ReadString(offerValue, "quality", outOffer.m_quality);
+            ReadBool(offerValue, "stackable", outOffer.m_stackable);
+            ReadInt(offerValue, "maxStack", outOffer.m_maxStack);
+            ReadInt(offerValue, "sellPriceCopper", outOffer.m_sellPriceCopper);
+            ReadInt(offerValue, "buyPriceCopper", outOffer.m_buyPriceCopper);
+            ReadString(offerValue, "requiredClass", outOffer.m_requiredClass);
+            ReadInt(offerValue, "requiredLevel", outOffer.m_requiredLevel);
+            ReadString(offerValue, "equipSlot", outOffer.m_equipSlot);
+            ReadInt(offerValue, "strength", outOffer.m_strength);
+            ReadInt(offerValue, "stamina", outOffer.m_stamina);
+            ReadInt(offerValue, "armor", outOffer.m_armor);
         }
 
         bool ParseWorldSessionJson(const AZStd::string& payload, WorldSessionResponse& outResponse, AZStd::string& outError)
@@ -660,6 +813,7 @@ namespace NetClient
             outResponse.m_resource = document["resource"].GetDouble();
             outResponse.m_maxResource = document["maxResource"].GetDouble();
             ReadString(document, "resourceName", outResponse.m_resourceName);
+            ReadString(document, "archetypeId", outResponse.m_archetypeId);
             ReadInt(document, "level", outResponse.m_level);
             ReadInt(document, "experience", outResponse.m_experience);
             ReadInt(document, "currencyCopper", outResponse.m_currency.m_totalCopper);
@@ -692,13 +846,54 @@ namespace NetClient
                         ReadString(slotValue, "itemSubtype", slot.m_itemSubtype);
                         ReadString(slotValue, "quality", slot.m_quality);
                         ReadString(slotValue, "iconKind", slot.m_iconKind);
+                        ReadString(slotValue, "description", slot.m_description);
+                        ReadString(slotValue, "equipSlot", slot.m_equipSlot);
+                        ReadString(slotValue, "requiredArchetype", slot.m_requiredArchetype);
                         ReadInt(slotValue, "stackCount", slot.m_stackCount);
+                        ReadInt(slotValue, "requiredLevel", slot.m_requiredLevel);
+                        ReadInt(slotValue, "sellPriceCopper", slot.m_sellPriceCopper);
+                        ReadInt(slotValue, "strength", slot.m_strength);
+                        ReadInt(slotValue, "stamina", slot.m_stamina);
+                        ReadInt(slotValue, "armor", slot.m_armor);
                         outResponse.m_inventory.m_slots.push_back(AZStd::move(slot));
                     }
                 }
                 if (outResponse.m_inventory.m_slotCount <= 0)
                 {
                     outResponse.m_inventory.m_slotCount = static_cast<int>(outResponse.m_inventory.m_slots.size());
+                }
+            }
+            outResponse.m_equipment.m_slots.clear();
+            if (document.HasMember("equipment") && document["equipment"].IsObject())
+            {
+                const rapidjson::Value& equipment = document["equipment"];
+                if (equipment.HasMember("slots") && equipment["slots"].IsArray())
+                {
+                    for (const rapidjson::Value& slotValue : equipment["slots"].GetArray())
+                    {
+                        if (!slotValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        EquipmentSlotState slot;
+                        ReadString(slotValue, "slot", slot.m_slot);
+                        ReadString(slotValue, "itemId", slot.m_itemId);
+                        ReadString(slotValue, "displayName", slot.m_displayName);
+                        ReadString(slotValue, "itemType", slot.m_itemType);
+                        ReadString(slotValue, "itemSubtype", slot.m_itemSubtype);
+                        ReadString(slotValue, "quality", slot.m_quality);
+                        ReadString(slotValue, "iconKind", slot.m_iconKind);
+                        ReadString(slotValue, "description", slot.m_description);
+                        ReadString(slotValue, "equipSlot", slot.m_equipSlot);
+                        ReadString(slotValue, "requiredArchetype", slot.m_requiredArchetype);
+                        ReadInt(slotValue, "requiredLevel", slot.m_requiredLevel);
+                        ReadInt(slotValue, "sellPriceCopper", slot.m_sellPriceCopper);
+                        ReadInt(slotValue, "strength", slot.m_strength);
+                        ReadInt(slotValue, "stamina", slot.m_stamina);
+                        ReadInt(slotValue, "armor", slot.m_armor);
+                        outResponse.m_equipment.m_slots.push_back(AZStd::move(slot));
+                    }
                 }
             }
             if (document.HasMember("stats") && document["stats"].IsObject())
@@ -779,6 +974,8 @@ namespace NetClient
                     ReadString(spellValue, "id", entry.m_id);
                     ReadString(spellValue, "displayName", entry.m_displayName);
                     ReadString(spellValue, "classId", entry.m_classId);
+                    ReadString(spellValue, "category", entry.m_category);
+                    ReadString(spellValue, "abilityType", entry.m_abilityType);
                     ReadString(spellValue, "description", entry.m_description);
                     ReadString(spellValue, "tooltipText", entry.m_tooltipText);
                     ReadString(spellValue, "requirementText", entry.m_requirementText);
@@ -792,6 +989,9 @@ namespace NetClient
                     ReadBool(spellValue, "requiresTarget", entry.m_requiresTarget);
                     ReadBool(spellValue, "triggersGCD", entry.m_triggersGlobalCooldown);
                     ReadBool(spellValue, "learned", entry.m_learned);
+                    ReadBool(spellValue, "passive", entry.m_passive);
+                    ReadBool(spellValue, "actionBarAssignable", entry.m_actionBarAssignable);
+                    ReadBool(spellValue, "trainable", entry.m_trainable);
                     outResponse.m_spellbookEntries.push_back(AZStd::move(entry));
                 }
             }
@@ -811,6 +1011,8 @@ namespace NetClient
                     ReadString(actionValue, "abilityId", slot.m_abilityId);
                     ReadString(actionValue, "displayName", slot.m_displayName);
                     ReadString(actionValue, "buttonLabel", slot.m_buttonLabel);
+                    ReadString(actionValue, "category", slot.m_category);
+                    ReadString(actionValue, "abilityType", slot.m_abilityType);
                     ReadString(actionValue, "resourceName", slot.m_resourceName);
                     ReadString(actionValue, "tooltipText", slot.m_tooltipText);
                     ReadString(actionValue, "iconKind", slot.m_iconKind);
@@ -823,6 +1025,8 @@ namespace NetClient
                     ReadBool(actionValue, "requiresTarget", slot.m_requiresTarget);
                     ReadBool(actionValue, "triggersGCD", slot.m_triggersGlobalCooldown);
                     ReadBool(actionValue, "learned", slot.m_learned);
+                    ReadBool(actionValue, "passive", slot.m_passive);
+                    ReadBool(actionValue, "actionBarAssignable", slot.m_actionBarAssignable);
                     outResponse.m_actionBarSlots.push_back(AZStd::move(slot));
                 }
             }
@@ -848,6 +1052,8 @@ namespace NetClient
                         TrainerOfferState offer;
                         ReadString(offerValue, "abilityId", offer.m_abilityId);
                         ReadString(offerValue, "displayName", offer.m_displayName);
+                        ReadString(offerValue, "category", offer.m_category);
+                        ReadString(offerValue, "abilityType", offer.m_abilityType);
                         ReadString(offerValue, "description", offer.m_description);
                         ReadString(offerValue, "tooltipText", offer.m_tooltipText);
                         ReadString(offerValue, "requirementText", offer.m_requirementText);
@@ -861,7 +1067,100 @@ namespace NetClient
                         ReadDouble(offerValue, "rangeMeters", offer.m_rangeMeters);
                         ReadBool(offerValue, "learned", offer.m_learned);
                         ReadBool(offerValue, "canLearn", offer.m_canLearn);
+                        ReadBool(offerValue, "passive", offer.m_passive);
+                        ReadBool(offerValue, "actionBarAssignable", offer.m_actionBarAssignable);
+                        ReadBool(offerValue, "trainable", offer.m_trainable);
                         outResponse.m_trainer.m_offers.push_back(AZStd::move(offer));
+                    }
+                }
+            }
+            outResponse.m_vendor = VendorState{};
+            if (document.HasMember("vendor") && document["vendor"].IsObject())
+            {
+                const rapidjson::Value& vendor = document["vendor"];
+                ReadString(vendor, "id", outResponse.m_vendor.m_id);
+                ReadString(vendor, "npcId", outResponse.m_vendor.m_npcId);
+                ReadString(vendor, "displayName", outResponse.m_vendor.m_displayName);
+                ReadBool(vendor, "inRange", outResponse.m_vendor.m_inRange);
+                if (vendor.HasMember("offers") && vendor["offers"].IsArray())
+                {
+                    for (const rapidjson::Value& offerValue : vendor["offers"].GetArray())
+                    {
+                        if (!offerValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        VendorOfferState offer;
+                        ParseVendorOffer(offerValue, offer);
+                        outResponse.m_vendor.m_offers.push_back(AZStd::move(offer));
+                    }
+                }
+            }
+            outResponse.m_professions = ProfessionSummaryState{};
+            if (document.HasMember("professions") && document["professions"].IsObject())
+            {
+                const rapidjson::Value& professions = document["professions"];
+                ReadInt(professions, "primaryLimit", outResponse.m_professions.m_primaryLimit);
+                if (professions.HasMember("learned") && professions["learned"].IsArray())
+                {
+                    for (const rapidjson::Value& professionValue : professions["learned"].GetArray())
+                    {
+                        if (!professionValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        ProfessionEntryState profession;
+                        ParseProfessionEntry(professionValue, profession);
+                        outResponse.m_professions.m_learned.push_back(AZStd::move(profession));
+                    }
+                }
+                if (professions.HasMember("catalog") && professions["catalog"].IsArray())
+                {
+                    for (const rapidjson::Value& professionValue : professions["catalog"].GetArray())
+                    {
+                        if (!professionValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        ProfessionEntryState profession;
+                        ParseProfessionEntry(professionValue, profession);
+                        outResponse.m_professions.m_catalog.push_back(AZStd::move(profession));
+                    }
+                }
+            }
+            outResponse.m_professionTrainer = ProfessionTrainerState{};
+            if (document.HasMember("professionTrainer") && document["professionTrainer"].IsObject())
+            {
+                const rapidjson::Value& trainer = document["professionTrainer"];
+                ReadString(trainer, "id", outResponse.m_professionTrainer.m_id);
+                ReadString(trainer, "npcId", outResponse.m_professionTrainer.m_npcId);
+                ReadString(trainer, "displayName", outResponse.m_professionTrainer.m_displayName);
+                ReadString(trainer, "interactionHint", outResponse.m_professionTrainer.m_interactionHint);
+                ReadBool(trainer, "inRange", outResponse.m_professionTrainer.m_inRange);
+                if (trainer.HasMember("offers") && trainer["offers"].IsArray())
+                {
+                    for (const rapidjson::Value& offerValue : trainer["offers"].GetArray())
+                    {
+                        if (!offerValue.IsObject())
+                        {
+                            continue;
+                        }
+
+                        ProfessionTrainerOfferState offer;
+                        ReadString(offerValue, "professionId", offer.m_professionId);
+                        ReadString(offerValue, "displayName", offer.m_displayName);
+                        ReadString(offerValue, "category", offer.m_category);
+                        ReadString(offerValue, "requirementText", offer.m_requirementText);
+                        ReadString(offerValue, "unavailableReason", offer.m_unavailableReason);
+                        ReadInt(offerValue, "maxStarterSkill", offer.m_maxStarterSkill);
+                        ReadInt(offerValue, "costCopper", offer.m_costCopper);
+                        ReadBool(offerValue, "learned", offer.m_learned);
+                        ReadBool(offerValue, "implemented", offer.m_implemented);
+                        ReadBool(offerValue, "canLearn", offer.m_canLearn);
+                        outResponse.m_professionTrainer.m_offers.push_back(AZStd::move(offer));
                     }
                 }
             }
@@ -1127,7 +1426,13 @@ namespace NetClient
                     {
                         entity.m_targetable = entityValue["targetable"].GetBool();
                     }
+                    ReadBool(entityValue, "isInCombat", entity.m_isInCombat);
                     ReadBool(entityValue, "duelOpponent", entity.m_duelOpponent);
+                    ReadString(entityValue, "currentTargetEntityId", entity.m_currentTargetEntityId);
+                    ReadString(entityValue, "lastDamagedByEntityId", entity.m_lastDamagedByEntityId);
+                    ReadInt64(entityValue, "respawnDelayMs", entity.m_respawnDelayMs);
+                    ReadInt64(entityValue, "deathTick", entity.m_deathTick);
+                    ReadInt64(entityValue, "respawnTick", entity.m_respawnTick);
                     ReadString(entityValue, "aiState", entity.m_aiState);
                     ReadString(entityValue, "pvpState", entity.m_pvpState);
                     if (entityValue.HasMember("auras"))
@@ -1543,7 +1848,334 @@ namespace NetClient
 
             return payload;
         }
+
+        bool ParseAuthSessionJson(
+            const AZStd::string& payload,
+            bool requireAccountId,
+            AuthSessionResponse& outResponse,
+            AZStd::string& outError)
+        {
+            outResponse = AuthSessionResponse{};
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Login response was not valid JSON.";
+                return false;
+            }
+
+            ReadString(document, "accessToken", outResponse.m_accessToken);
+            ReadString(document, "refreshToken", outResponse.m_refreshToken);
+            ReadString(document, "accountId", outResponse.m_accountId);
+            if (outResponse.m_accessToken.empty() ||
+                outResponse.m_refreshToken.empty() ||
+                (requireAccountId && outResponse.m_accountId.empty()))
+            {
+                outError = "Login response was missing required fields.";
+                return false;
+            }
+            return true;
+        }
+
+        void ParseRealmDescriptor(const rapidjson::Value& realmValue, RealmDescriptor& outRealm)
+        {
+            ReadString(realmValue, "id", outRealm.m_id);
+            ReadString(realmValue, "displayName", outRealm.m_displayName);
+            ReadString(realmValue, "region", outRealm.m_region);
+            ReadString(realmValue, "endpoint", outRealm.m_endpoint);
+            ReadString(realmValue, "supportedBuild", outRealm.m_supportedBuild);
+            ReadInt(realmValue, "onlinePlayers", outRealm.m_onlinePlayers);
+            ReadBool(realmValue, "online", outRealm.m_online);
+        }
+
+        bool ParseRealmListJson(const AZStd::string& payload, AZStd::vector<RealmDescriptor>& outRealms, AZStd::string& outError)
+        {
+            outRealms.clear();
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Realm list response was not valid JSON.";
+                return false;
+            }
+            if (!document.HasMember("realms") || !document["realms"].IsArray())
+            {
+                outError = "Realm list response was missing realms.";
+                return false;
+            }
+
+            for (const rapidjson::Value& realmValue : document["realms"].GetArray())
+            {
+                if (!realmValue.IsObject())
+                {
+                    continue;
+                }
+                RealmDescriptor realm;
+                ParseRealmDescriptor(realmValue, realm);
+                if (!realm.m_id.empty())
+                {
+                    outRealms.push_back(AZStd::move(realm));
+                }
+            }
+            return true;
+        }
+
+        void ParseCharacterSummary(const rapidjson::Value& characterValue, CharacterSummary& outCharacter)
+        {
+            ReadString(characterValue, "id", outCharacter.m_id);
+            ReadString(characterValue, "realmId", outCharacter.m_realmId);
+            ReadString(characterValue, "displayName", outCharacter.m_displayName);
+            ReadString(characterValue, "raceId", outCharacter.m_raceId);
+            ReadString(characterValue, "classId", outCharacter.m_classId);
+            ReadString(characterValue, "archetypeId", outCharacter.m_archetypeId);
+            ReadInt(characterValue, "level", outCharacter.m_level);
+            ReadString(characterValue, "zoneId", outCharacter.m_zoneId);
+        }
+
+        bool ParseCharacterListJson(const AZStd::string& payload, AZStd::vector<CharacterSummary>& outCharacters, AZStd::string& outError)
+        {
+            outCharacters.clear();
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Character list response was not valid JSON.";
+                return false;
+            }
+            if (!document.HasMember("characters") || !document["characters"].IsArray())
+            {
+                outError = "Character list response was missing characters.";
+                return false;
+            }
+
+            for (const rapidjson::Value& characterValue : document["characters"].GetArray())
+            {
+                if (!characterValue.IsObject())
+                {
+                    continue;
+                }
+                CharacterSummary character;
+                ParseCharacterSummary(characterValue, character);
+                if (!character.m_id.empty())
+                {
+                    outCharacters.push_back(AZStd::move(character));
+                }
+            }
+            return true;
+        }
+
+        bool ParseCharacterSummaryJson(const AZStd::string& payload, CharacterSummary& outCharacter, AZStd::string& outError)
+        {
+            outCharacter = CharacterSummary{};
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Character response was not valid JSON.";
+                return false;
+            }
+            ParseCharacterSummary(document, outCharacter);
+            if (outCharacter.m_id.empty())
+            {
+                outError = "Character response was missing required fields.";
+                return false;
+            }
+            return true;
+        }
+
+        bool ParseJoinTicketJson(const AZStd::string& payload, WorldJoinTicketResponse& outTicket, AZStd::string& outError)
+        {
+            outTicket = WorldJoinTicketResponse{};
+            rapidjson::Document document;
+            document.Parse(payload.c_str());
+            if (document.HasParseError() || !document.IsObject())
+            {
+                outError = "Join ticket response was not valid JSON.";
+                return false;
+            }
+
+            ReadString(document, "ticketId", outTicket.m_ticketId);
+            ReadString(document, "sessionId", outTicket.m_sessionId);
+            ReadString(document, "accountId", outTicket.m_accountId);
+            ReadString(document, "characterId", outTicket.m_characterId);
+            ReadString(document, "realmId", outTicket.m_realmId);
+            ReadString(document, "worldEndpoint", outTicket.m_worldEndpoint);
+            ReadInt64(document, "expiresAt", outTicket.m_expiresAt);
+            if (outTicket.m_ticketId.empty() || outTicket.m_worldEndpoint.empty())
+            {
+                outError = "Join ticket response was missing required fields.";
+                return false;
+            }
+            return true;
+        }
     } // namespace
+
+    bool LoginRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& username,
+        const AZStd::string& password,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"username\":\"%s\",\"password\":\"%s\"}",
+            JsonEscape(username).c_str(),
+            JsonEscape(password).c_str());
+        if (!PerformRequest(authEndpoint, L"POST", L"/v1/auth/login", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseAuthSessionJson(responseBody, true, outResponse, outError);
+    }
+
+    bool RefreshSessionRequest(
+        const AZStd::string& authEndpoint,
+        const AZStd::string& refreshToken,
+        AuthSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"refreshToken\":\"%s\"}",
+            JsonEscape(refreshToken).c_str());
+        if (!PerformRequest(authEndpoint, L"POST", L"/v1/auth/refresh", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseAuthSessionJson(responseBody, false, outResponse, outError);
+    }
+
+    bool ListRealmsRequest(
+        const AZStd::string& realmEndpoint,
+        AZStd::vector<RealmDescriptor>& outRealms,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        if (!PerformRequest(realmEndpoint, L"GET", L"/v1/realms", {}, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseRealmListJson(responseBody, outRealms, outError);
+    }
+
+    bool ListCharactersRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        AZStd::vector<CharacterSummary>& outCharacters,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string path = AZStd::string::format("/v1/characters?realmId=%s", JsonEscape(realmId).c_str());
+        if (!PerformRequest(
+                characterEndpoint,
+                L"GET",
+                ToWideString(path),
+                {},
+                responseBody,
+                statusCode,
+                outError,
+                accessToken))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseCharacterListJson(responseBody, outCharacters, outError);
+    }
+
+    bool CreateCharacterRequest(
+        const AZStd::string& characterEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& displayName,
+        const AZStd::string& archetypeId,
+        CharacterSummary& outCharacter,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"realmId\":\"%s\",\"displayName\":\"%s\",\"archetypeId\":\"%s\"}",
+            JsonEscape(realmId).c_str(),
+            JsonEscape(displayName).c_str(),
+            JsonEscape(archetypeId).c_str());
+        if (!PerformRequest(
+                characterEndpoint,
+                L"POST",
+                L"/v1/characters",
+                requestBody,
+                responseBody,
+                statusCode,
+                outError,
+                accessToken))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseCharacterSummaryJson(responseBody, outCharacter, outError);
+    }
+
+    bool CreateJoinTicketRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& accessToken,
+        const AZStd::string& realmId,
+        const AZStd::string& characterId,
+        WorldJoinTicketResponse& outTicket,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"realmId\":\"%s\",\"characterId\":\"%s\"}",
+            JsonEscape(realmId).c_str(),
+            JsonEscape(characterId).c_str());
+        if (!PerformRequest(
+                worldEndpoint,
+                L"POST",
+                L"/v1/world/join-ticket",
+                requestBody,
+                responseBody,
+                statusCode,
+                outError,
+                accessToken))
+        {
+            return false;
+        }
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+        return ParseJoinTicketJson(responseBody, outTicket, outError);
+    }
 
     bool ConnectRequest(
         const AZStd::string& worldEndpoint,
@@ -2013,6 +2645,33 @@ namespace NetClient
         return ParseWorldSessionJson(responseBody, outResponse, outError);
     }
 
+    bool CompleteQuestRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& questId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"questId\":\"%s\"}",
+            worldSessionToken.c_str(),
+            questId.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/quest/complete", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
     bool EnterDungeonRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -2258,6 +2917,35 @@ namespace NetClient
         return ParseWorldSessionJson(responseBody, outResponse, outError);
     }
 
+    bool LearnProfessionRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& trainerId,
+        const AZStd::string& professionId,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"trainerId\":\"%s\",\"professionId\":\"%s\"}",
+            worldSessionToken.c_str(),
+            trainerId.c_str(),
+            professionId.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/profession/learn", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
     bool AssignActionBarSlotRequest(
         const AZStd::string& worldEndpoint,
         const AZStd::string& worldSessionToken,
@@ -2385,6 +3073,122 @@ namespace NetClient
             fromSlotIndex,
             toSlotIndex);
         if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/inventory/move", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool EquipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        int slotIndex,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"slotIndex\":%d}",
+            worldSessionToken.c_str(),
+            slotIndex);
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/inventory/equip", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool UnequipInventorySlotRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& equipmentSlot,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"slot\":\"%s\"}",
+            worldSessionToken.c_str(),
+            equipmentSlot.c_str());
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/inventory/unequip", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool BuyVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        const AZStd::string& itemId,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"vendorId\":\"%s\",\"itemId\":\"%s\",\"stackCount\":%d}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(vendorId).c_str(),
+            JsonEscape(itemId).c_str(),
+            stackCount);
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/vendor/buy", requestBody, responseBody, statusCode, outError))
+        {
+            return false;
+        }
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            outError = ExtractErrorMessage(responseBody);
+            return false;
+        }
+
+        return ParseWorldSessionJson(responseBody, outResponse, outError);
+    }
+
+    bool SellVendorItemRequest(
+        const AZStd::string& worldEndpoint,
+        const AZStd::string& worldSessionToken,
+        const AZStd::string& vendorId,
+        int slotIndex,
+        int stackCount,
+        WorldSessionResponse& outResponse,
+        AZStd::string& outError)
+    {
+        AZStd::string responseBody;
+        AZ::u32 statusCode = 0;
+        const AZStd::string requestBody = AZStd::string::format(
+            "{\"worldSessionToken\":\"%s\",\"vendorId\":\"%s\",\"slotIndex\":%d,\"stackCount\":%d}",
+            JsonEscape(worldSessionToken).c_str(),
+            JsonEscape(vendorId).c_str(),
+            slotIndex,
+            stackCount);
+        if (!PerformRequest(worldEndpoint, L"POST", L"/v1/world/vendor/sell", requestBody, responseBody, statusCode, outError))
         {
             return false;
         }

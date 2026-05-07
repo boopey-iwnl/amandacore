@@ -2,11 +2,10 @@
 
 The launcher is a Windows-first C# WinForms application that can:
 
-- register a new player account
-- log in against the auth service
-- fetch the realm directory and patch manifest
-- list and create characters
-- request a world join ticket
-- optionally launch a configured game client executable with that ticket
+- fetch patch/build status from the realm service
+- resolve the preferred O3DE `GameLauncher`
+- launch the game client with safe endpoint and O3DE runtime arguments
 
-Settings are stored under `%LocalAppData%\amandacore\launcher-settings.json`.
+The launcher is not the player login surface. Account login, remembered-session restore, realm selection, character selection/creation, join-ticket request, and world entry happen inside the game client.
+
+Settings are stored under `%LocalAppData%\amandacore\launcher-settings.json`. The launcher does not persist player login sessions.

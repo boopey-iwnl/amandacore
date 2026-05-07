@@ -92,6 +92,7 @@ func RegisterRoutesWithAdmin(mux *http.ServeMux, fileStore *store.FileStore, adm
 	mux.HandleFunc("POST /v1/world/action-bar/clear", server.instrumentEndpointFunc("action_bar_clear", server.handleActionBarClear))
 	mux.HandleFunc("POST /v1/world/inventory/move", server.instrumentEndpointFunc("inventory_move", server.handleInventoryMove))
 	mux.HandleFunc("POST /v1/world/inventory/equip", server.instrumentEndpointFunc("inventory_equip", server.handleInventoryEquip))
+	mux.HandleFunc("POST /v1/world/inventory/unequip", server.instrumentEndpointFunc("inventory_unequip", server.handleInventoryUnequip))
 	mux.HandleFunc("POST /v1/world/loot/inspect", server.instrumentEndpointFunc("loot_inspect", server.handleLootInspect))
 	mux.HandleFunc("POST /v1/world/loot/claim", server.instrumentEndpointFunc("loot_claim", server.handleLootClaim))
 	mux.HandleFunc("GET /v1/world/housing/status", server.instrumentEndpointFunc("housing_status", server.handleHousingStatus))
@@ -264,6 +265,7 @@ func (s *worldServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				CharacterID: ticket.CharacterID,
 				DisplayName: character.DisplayName,
 				ClassID:     character.ClassID,
+				ArchetypeID: character.ArchetypeID,
 				RealmID:     ticket.RealmID,
 				ZoneID:      character.ZoneID,
 				X:           character.PositionX,
@@ -654,6 +656,29 @@ func (s *worldServer) handleInventoryEquip(w http.ResponseWriter, r *http.Reques
 		"inventory_equip_failed",
 		func(session *worldSessionState, state *worldloop.ShardState) error {
 			return s.equipInventorySlotLocked(session, request.SlotIndex)
+		})
+	if err != nil {
+		s.writeStonewakeCommandError(w, err)
+		return
+	}
+	httpapi.WriteJSON(w, response.Status, response.Body)
+}
+
+func (s *worldServer) handleInventoryUnequip(w http.ResponseWriter, r *http.Request) {
+	var request inventoryUnequipRequest
+	if err := httpapi.DecodeJSON(r, &request); err != nil {
+		httpapi.Error(w, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+
+	response, err := s.submitStonewakeSessionMutation(
+		r.Context(),
+		worldloop.CommandMoveInventoryItem,
+		request.WorldSessionToken,
+		map[string]any{"slot": request.Slot, "unequip": true},
+		"inventory_unequip_failed",
+		func(session *worldSessionState, state *worldloop.ShardState) error {
+			return s.unequipEquipmentSlotLocked(session, request.Slot)
 		})
 	if err != nil {
 		s.writeStonewakeCommandError(w, err)
@@ -1297,6 +1322,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 		"realmId":           session.RealmID,
 		"zoneId":            session.ZoneID,
 		"displayName":       session.DisplayName,
+		"archetypeId":       session.ArchetypeID,
 		"level":             session.Level,
 		"position": map[string]float64{
 			"x": session.X,
@@ -1318,7 +1344,7 @@ func (s *worldServer) buildResponse(session *worldSessionState) map[string]any {
 			Slots:     buildInventorySlotsResponse(session.Inventory),
 		},
 		"equipment": equipmentResponse{
-			Slots: platform.NormalizeEquipmentSlots(session.Equipment),
+			Slots: buildEquipmentSlotsResponse(session.Equipment),
 		},
 		"stats":                s.buildStatsResponse(session),
 		"talents":              s.buildTalentsResponse(session),

@@ -45,24 +45,25 @@ type ItemDefinition = itemDefinition
 type ItemCatalog = map[string]itemDefinition
 
 type itemDefinition struct {
-	ItemID          string
-	DisplayName     string
-	Description     string
-	Kind            string
-	Type            string
-	Subtype         string
-	Quality         string
-	Stackable       bool
-	MaxStack        int
-	Tags            []string
-	SellPriceCopper int
-	BuyPriceCopper  int
-	RequiredClass   string
-	RequiredLevel   int
-	EquipSlot       string
-	Strength        int
-	Stamina         int
-	Armor           int
+	ItemID            string
+	DisplayName       string
+	Description       string
+	Kind              string
+	Type              string
+	Subtype           string
+	Quality           string
+	Stackable         bool
+	MaxStack          int
+	Tags              []string
+	SellPriceCopper   int
+	BuyPriceCopper    int
+	RequiredArchetype string
+	RequiredClass     string
+	RequiredLevel     int
+	EquipSlot         string
+	Strength          int
+	Stamina           int
+	Armor             int
 }
 
 func itemIconKind(item itemDefinition) string {
@@ -311,66 +312,70 @@ var itemDefinitions = map[string]itemDefinition{
 		RequiredLevel:   1,
 	},
 	itemWornMilitiaBladeID: {
-		ItemID:          itemWornMilitiaBladeID,
-		DisplayName:     "Worn Militia Blade",
-		Type:            itemTypeWeapon,
-		Subtype:         "sword",
-		Quality:         itemQualityCommon,
-		Stackable:       false,
-		MaxStack:        1,
-		SellPriceCopper: 8,
-		BuyPriceCopper:  24,
-		RequiredClass:   platform.DefaultClassID,
-		RequiredLevel:   1,
-		EquipSlot:       platform.EquipmentSlotMainHand,
-		Strength:        1,
+		ItemID:            itemWornMilitiaBladeID,
+		DisplayName:       "Worn Militia Blade",
+		Type:              itemTypeWeapon,
+		Subtype:           "sword",
+		Quality:           itemQualityCommon,
+		Stackable:         false,
+		MaxStack:          1,
+		SellPriceCopper:   8,
+		BuyPriceCopper:    24,
+		RequiredArchetype: platform.LegacyWayfarerArchetypeID,
+		RequiredClass:     platform.DefaultClassID,
+		RequiredLevel:     1,
+		EquipSlot:         platform.EquipmentSlotMainHand,
+		Strength:          1,
 	},
 	itemPaddedYardVestID: {
-		ItemID:          itemPaddedYardVestID,
-		DisplayName:     "Padded Yard Vest",
-		Type:            itemTypeArmor,
-		Subtype:         "vest",
-		Quality:         itemQualityCommon,
-		Stackable:       false,
-		MaxStack:        1,
-		SellPriceCopper: 6,
-		BuyPriceCopper:  18,
-		RequiredClass:   platform.DefaultClassID,
-		RequiredLevel:   1,
-		EquipSlot:       platform.EquipmentSlotChest,
-		Stamina:         1,
-		Armor:           2,
+		ItemID:            itemPaddedYardVestID,
+		DisplayName:       "Padded Yard Vest",
+		Type:              itemTypeArmor,
+		Subtype:           "vest",
+		Quality:           itemQualityCommon,
+		Stackable:         false,
+		MaxStack:          1,
+		SellPriceCopper:   6,
+		BuyPriceCopper:    18,
+		RequiredArchetype: platform.LegacyWayfarerArchetypeID,
+		RequiredClass:     platform.DefaultClassID,
+		RequiredLevel:     1,
+		EquipSlot:         platform.EquipmentSlotChest,
+		Stamina:           1,
+		Armor:             2,
 	},
 	itemFieldBootsID: {
-		ItemID:          itemFieldBootsID,
-		DisplayName:     "Field Boots",
-		Type:            itemTypeArmor,
-		Subtype:         "boots",
-		Quality:         itemQualityCommon,
-		Stackable:       false,
-		MaxStack:        1,
-		SellPriceCopper: 4,
-		BuyPriceCopper:  12,
-		RequiredClass:   platform.DefaultClassID,
-		RequiredLevel:   1,
-		EquipSlot:       platform.EquipmentSlotFeet,
-		Armor:           1,
+		ItemID:            itemFieldBootsID,
+		DisplayName:       "Field Boots",
+		Type:              itemTypeArmor,
+		Subtype:           "boots",
+		Quality:           itemQualityCommon,
+		Stackable:         false,
+		MaxStack:          1,
+		SellPriceCopper:   4,
+		BuyPriceCopper:    12,
+		RequiredArchetype: platform.LegacyWayfarerArchetypeID,
+		RequiredClass:     platform.DefaultClassID,
+		RequiredLevel:     1,
+		EquipSlot:         platform.EquipmentSlotFeet,
+		Armor:             1,
 	},
 	itemTDSSluiceguardHandwrapsID: {
-		ItemID:          itemTDSSluiceguardHandwrapsID,
-		DisplayName:     "Sluiceguard Handwraps",
-		Type:            itemTypeArmor,
-		Subtype:         "handwraps",
-		Quality:         itemQualityCommon,
-		Stackable:       false,
-		MaxStack:        1,
-		SellPriceCopper: 14,
-		BuyPriceCopper:  0,
-		RequiredClass:   platform.DefaultClassID,
-		RequiredLevel:   8,
-		EquipSlot:       platform.EquipmentSlotHands,
-		Stamina:         2,
-		Armor:           3,
+		ItemID:            itemTDSSluiceguardHandwrapsID,
+		DisplayName:       "Sluiceguard Handwraps",
+		Type:              itemTypeArmor,
+		Subtype:           "handwraps",
+		Quality:           itemQualityCommon,
+		Stackable:         false,
+		MaxStack:          1,
+		SellPriceCopper:   14,
+		BuyPriceCopper:    0,
+		RequiredArchetype: platform.LegacyWayfarerArchetypeID,
+		RequiredClass:     platform.DefaultClassID,
+		RequiredLevel:     8,
+		EquipSlot:         platform.EquipmentSlotHands,
+		Stamina:           2,
+		Armor:             3,
 	},
 }
 

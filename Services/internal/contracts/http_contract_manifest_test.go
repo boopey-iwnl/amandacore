@@ -11,14 +11,20 @@ import (
 )
 
 type httpContractManifest struct {
-	ContractID string              `json:"contractId"`
-	Status     string              `json:"status"`
-	Routes     []httpContractRoute `json:"routes"`
+	ContractID     string                      `json:"contractId"`
+	Status         string                      `json:"status"`
+	Routes         []httpContractRoute         `json:"routes"`
+	ResponseShapes []httpContractResponseShape `json:"responseShapes"`
 }
 
 type httpContractRoute struct {
 	Method string `json:"method"`
 	Path   string `json:"path"`
+}
+
+type httpContractResponseShape struct {
+	Name   string   `json:"name"`
+	Fields []string `json:"fields"`
 }
 
 func TestHTTPContractManifestMatchesRegisteredRoutes(t *testing.T) {
@@ -46,6 +52,221 @@ func TestHTTPContractManifestIsSortedAndUnique(t *testing.T) {
 			t.Fatalf("manifest routes must be sorted by method then path: %s appears after %s", key, previous)
 		}
 		previous = key
+	}
+}
+
+func TestHTTPContractManifestDocumentsWorldPayloads(t *testing.T) {
+	repoRoot := findRepoRoot(t)
+	manifest := loadManifest(t, filepath.Join(repoRoot, "Docs", "Contracts", "http-api-v1.json"))
+
+	requiredShapes := map[string][]string{
+		"worldSession.inventory.slots[]": {
+			"slotIndex",
+			"itemId",
+			"displayName",
+			"stackCount",
+			"itemType",
+			"itemSubtype",
+			"quality",
+			"iconKind",
+			"description",
+			"equipSlot",
+			"requiredArchetype",
+			"requiredLevel",
+			"sellPriceCopper",
+			"strength",
+			"stamina",
+			"armor",
+		},
+		"worldSession.equipment.slots[]": {
+			"slot",
+			"itemId",
+			"displayName",
+			"itemType",
+			"itemSubtype",
+			"quality",
+			"iconKind",
+			"description",
+			"equipSlot",
+			"requiredArchetype",
+			"requiredLevel",
+			"sellPriceCopper",
+			"strength",
+			"stamina",
+			"armor",
+		},
+		"worldSession.spellbook[]": {
+			"id",
+			"displayName",
+			"classId",
+			"category",
+			"abilityType",
+			"description",
+			"tooltipText",
+			"requirementText",
+			"resourceName",
+			"iconKind",
+			"requiredLevel",
+			"resourceCost",
+			"resourceGeneration",
+			"cooldownMs",
+			"rangeMeters",
+			"requiresTarget",
+			"triggersGCD",
+			"learned",
+			"passive",
+			"actionBarAssignable",
+			"trainable",
+		},
+		"worldSession.actionBar[]": {
+			"slotIndex",
+			"hotkey",
+			"abilityId",
+			"displayName",
+			"buttonLabel",
+			"category",
+			"abilityType",
+			"resourceName",
+			"tooltipText",
+			"iconKind",
+			"resourceCost",
+			"resourceGeneration",
+			"cooldownMs",
+			"cooldownEndsAt",
+			"cooldownRemainingMs",
+			"rangeMeters",
+			"requiresTarget",
+			"triggersGCD",
+			"learned",
+			"passive",
+			"actionBarAssignable",
+		},
+		"worldSession.trainer.offers[]": {
+			"abilityId",
+			"displayName",
+			"description",
+			"tooltipText",
+			"category",
+			"abilityType",
+			"requiredLevel",
+			"costCopper",
+			"learned",
+			"canLearn",
+			"requirementText",
+			"iconKind",
+			"passive",
+			"actionBarAssignable",
+			"trainable",
+			"actionBarSlot",
+			"actionBarHotkey",
+			"actionBarLabel",
+			"requiresTarget",
+			"resourceName",
+			"resourceCost",
+			"resourceGeneration",
+			"cooldownMs",
+			"rangeMeters",
+		},
+		"worldSession.professions.catalog[]": {
+			"professionId",
+			"displayName",
+			"category",
+			"rankId",
+			"unavailableReason",
+			"maxStarterSkill",
+			"skillValue",
+			"implemented",
+			"knownRecipeIds",
+			"knownRecipes",
+		},
+		"worldSession.professions.learned[]": {
+			"professionId",
+			"displayName",
+			"category",
+			"rankId",
+			"unavailableReason",
+			"maxStarterSkill",
+			"skillValue",
+			"implemented",
+			"learnedAt",
+			"updatedAt",
+			"knownRecipeIds",
+			"knownRecipes",
+		},
+		"worldSession.professionTrainer.offers[]": {
+			"professionId",
+			"displayName",
+			"category",
+			"requirementText",
+			"unavailableReason",
+			"maxStarterSkill",
+			"costCopper",
+			"learned",
+			"implemented",
+			"canLearn",
+		},
+		"worldSession.vendor": {
+			"id",
+			"npcId",
+			"displayName",
+			"inRange",
+			"offers",
+		},
+		"worldSession.vendor.offers[]": {
+			"itemId",
+			"displayName",
+			"type",
+			"subtype",
+			"quality",
+			"stackable",
+			"maxStack",
+			"sellPriceCopper",
+			"buyPriceCopper",
+			"requiredClass",
+			"requiredLevel",
+			"equipSlot",
+			"strength",
+			"stamina",
+			"armor",
+		},
+		"worldSession.entities[]": {
+			"id",
+			"displayName",
+			"kind",
+			"health",
+			"maxHealth",
+			"alive",
+			"targetable",
+			"isInCombat",
+			"currentTargetEntityId",
+			"lastDamagedByEntityId",
+			"respawnDelayMs",
+			"deathTick",
+			"respawnTick",
+			"aiState",
+			"auras",
+		},
+	}
+
+	shapesByName := map[string]map[string]bool{}
+	for _, shape := range manifest.ResponseShapes {
+		fields := map[string]bool{}
+		for _, field := range shape.Fields {
+			fields[field] = true
+		}
+		shapesByName[shape.Name] = fields
+	}
+
+	for name, fields := range requiredShapes {
+		shapeFields, found := shapesByName[name]
+		if !found {
+			t.Fatalf("response shape %s is not documented", name)
+		}
+		for _, field := range fields {
+			if !shapeFields[field] {
+				t.Fatalf("response shape %s missing field %s", name, field)
+			}
+		}
 	}
 }
 

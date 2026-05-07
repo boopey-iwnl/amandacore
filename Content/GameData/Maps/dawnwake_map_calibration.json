@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "mapId": "dawnwake_isles",
+  "origin": "bottom_left",
+  "north": "up",
+  "worldCoordinateUnits": "AmandaCore world meters",
+  "notes": [
+    "Stonewake Vale is calibrated for the v1 playable area.",
+    "Other zone maps are repo-local display references until their runtime zones are authored."
+  ],
+  "worldMap": {
+    "mapArtId": "dawnwake_isles_world",
+    "imagePath": "Content/Art/UI/Maps/World/dawnwake_isles_world.png",
+    "imageWidth": 1448,
+    "imageHeight": 1086,
+    "calibrationAccuracy": "calibrated_v1",
+    "zoneInsets": {
+      "stonewake_vale": {
+        "pixelMinX": 65,
+        "pixelMinY": 205,
+        "pixelMaxX": 535,
+        "pixelMaxY": 505,
+        "worldBounds": {
+          "minX": 0,
+          "minY": 0,
+          "maxX": 460,
+          "maxY": 270
+        },
+        "calibrationAccuracy": "calibrated_v1"
+      }
+    }
+  },
+  "zones": [
+    {
+      "zoneId": "stonewake_vale",
+      "mapArtId": "stonewake_vale",
+      "displayName": "Stonewake Vale",
+      "imagePath": "Content/Art/UI/Maps/Zones/stonewake_vale.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "worldBounds": {
+        "minX": 0,
+        "minY": 0,
+        "maxX": 460,
+        "maxY": 270
+      },
+      "pixelBounds": {
+        "pixelMinX": 0,
+        "pixelMinY": 0,
+        "pixelMaxX": 1448,
+        "pixelMaxY": 1086
+      },
+      "calibrationAccuracy": "calibrated_v1",
+      "anchors": [
+        {
+          "id": "hearthwatch_yard",
+          "displayName": "Hearthwatch Yard",
+          "worldX": 232,
+          "worldY": 130,
+          "pixelX": 730,
+          "pixelY": 563
+        },
+        {
+          "id": "valefurrow_farms",
+          "displayName": "ValeFurrow Farms",
+          "worldX": 197,
+          "worldY": 74,
+          "pixelX": 620,
+          "pixelY": 788
+        },
+        {
+          "id": "brookside_crossing",
+          "displayName": "Brookside Crossing",
+          "worldX": 313,
+          "worldY": 81,
+          "pixelX": 985,
+          "pixelY": 760
+        },
+        {
+          "id": "stonehewn_quarry",
+          "displayName": "Stonehewn Quarry",
+          "worldX": 361,
+          "worldY": 157,
+          "pixelX": 1136,
+          "pixelY": 455
+        },
+        {
+          "id": "tiderown_ruins",
+          "displayName": "Tiderown Ruins",
+          "worldX": 358,
+          "worldY": 39,
+          "pixelX": 1126,
+          "pixelY": 930
+        },
+        {
+          "id": "lightkeepers_point",
+          "displayName": "Lightkeeper's Point",
+          "worldX": 380,
+          "worldY": 231,
+          "pixelX": 1195,
+          "pixelY": 156
+        },
+        {
+          "id": "whispering_cave",
+          "displayName": "Whispering Cave",
+          "worldX": 375,
+          "worldY": 77,
+          "pixelX": 1180,
+          "pixelY": 775
+        }
+      ],
+      "roadLoops": [
+        {
+          "id": "stonewake_main_road_loop",
+          "pointIds": [
+            "hearthwatch_yard",
+            "valefurrow_farms",
+            "brookside_crossing",
+            "whispering_cave",
+            "tiderown_ruins",
+            "brookside_crossing",
+            "stonehewn_quarry",
+            "lightkeepers_point",
+            "hearthwatch_yard"
+          ]
+        }
+      ]
+    },
+    {
+      "zoneId": "hearthmere_coast",
+      "mapArtId": "hearthmere_coast",
+      "displayName": "Hearthmere Coast",
+      "imagePath": "Content/Art/UI/Maps/Zones/hearthmere_coast.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "zoneId": "tempest_hollow",
+      "mapArtId": "tempest_hollow",
+      "displayName": "Tempest Hollow",
+      "imagePath": "Content/Art/UI/Maps/Zones/tempest_hollow.png",
+      "imageWidth": 1055,
+      "imageHeight": 1491,
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "zoneId": "ironroot_wilds",
+      "mapArtId": "ironroot_wilds",
+      "displayName": "Ironroot Wilds",
+      "imagePath": "Content/Art/UI/Maps/Zones/ironroot_wilds.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "zoneId": "ashenridge_highlands",
+      "mapArtId": "ashenridge_highlands",
+      "displayName": "Ashenridge Highlands",
+      "imagePath": "Content/Art/UI/Maps/Zones/ashenridge_highlands.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "zoneId": "goldmere_plains",
+      "mapArtId": "goldmere_plains",
+      "displayName": "Goldmere Plains",
+      "imagePath": "Content/Art/UI/Maps/Zones/goldmere_plains.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "zoneId": "kingsfall_reach",
+      "mapArtId": "kingsfall_reach",
+      "displayName": "Kingsfall Reach",
+      "imagePath": "Content/Art/UI/Maps/Zones/kingsfall_reach.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "calibrationAccuracy": "display_reference"
+    },
+    {
+      "zoneId": "kingsfall_harbor",
+      "mapArtId": "kingsfall_harbor",
+      "displayName": "Kingsfall Harbor",
+      "imagePath": "Content/Art/UI/Maps/Zones/kingsfall_harbor.png",
+      "imageWidth": 1448,
+      "imageHeight": 1086,
+      "calibrationAccuracy": "display_reference"
+    }
+  ]
+}
