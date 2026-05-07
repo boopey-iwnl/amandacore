@@ -72,7 +72,10 @@ namespace UiClient
         void EndChatInput(bool clearBuffer);
         void MarkGameplayPanelOpened(const char* panelId);
         bool IsGameplayPanelOpen(const char* panelId) const;
+        void RemoveGameplayPanelFromStack(const char* panelId);
+        void SyncGameplayPanelStack();
         bool CloseGameplayPanelById(const char* panelId, const char* reason);
+        void ClearPendingUiInteractionState();
         void ResetHudLayout();
         void ResetUiOptionsToDefaults();
         void DrawPreWorldFrontend(GameCore::IGameCoreRequests* gameCore, const ImVec2& displaySize);
@@ -89,10 +92,10 @@ namespace UiClient
         AZStd::string m_lastErrorMessage;
         AZStd::string m_activeInteractionEntityId;
         AZStd::string m_activeInteractionKind;
-        AZStd::string m_topGameplayPanel;
         AZStd::string m_selectedQuestId;
         AZStd::string m_questToast;
         AZStd::deque<AZStd::string> m_eventLog;
+        AZStd::deque<AZStd::string> m_gameplayPanelStack;
         struct NotificationToast
         {
             AZStd::string m_title;
@@ -146,6 +149,7 @@ namespace UiClient
         bool m_rightActionBarOneVisible = true;
         bool m_rightActionBarTwoVisible = false;
         bool m_shiftHeld = false;
+        bool m_lastUiEditMode = false;
         bool m_lastWorldConnected = false;
         bool m_lastNearCommandPoint = false;
         bool m_loggedActionBarVisible = false;

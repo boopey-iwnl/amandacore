@@ -332,6 +332,11 @@ namespace UiClient
             return outSlotIndex >= 0 && outSlotIndex < ActionBarSlotCount;
         }
 
+        bool IsValidActionSlotIndex(int slotIndex)
+        {
+            return slotIndex >= 0 && slotIndex < ActionBarSlotCount;
+        }
+
         AZStd::string DisplayKeyName(const AZStd::string& keyName)
         {
             if (keyName.empty())
@@ -3945,6 +3950,10 @@ namespace UiClient
                 }
 
                 const int slotIndex = firstSlot + localSlotIndex;
+                if (!IsValidActionSlotIndex(slotIndex))
+                {
+                    continue;
+                }
                 ImGui::PushID(slotIndex);
                 const NetClient::ActionBarSlotState* slotState = FindActionBarSlot(worldState.m_session, slotIndex);
                 const bool slotAssignable = slotState &&
@@ -4088,7 +4097,7 @@ namespace UiClient
                 {
                     if (!pendingActionAssignmentAbilityId.empty())
                     {
-                        if (gameCore->AssignActionBarSlot(slotIndex, pendingActionAssignmentAbilityId))
+                        if (gameCore && gameCore->AssignActionBarSlot(slotIndex, pendingActionAssignmentAbilityId))
                         {
                             AZ_Printf(
                                 "amandacore",
@@ -4098,9 +4107,10 @@ namespace UiClient
                             pendingActionAssignmentAbilityId.clear();
                         }
                     }
-                    else if (pendingActionMoveSlot >= 0)
+                    else if (IsValidActionSlotIndex(pendingActionMoveSlot))
                     {
-                        if (pendingActionMoveSlot != slotIndex && gameCore->MoveActionBarSlot(pendingActionMoveSlot, slotIndex))
+                        if (pendingActionMoveSlot != slotIndex && gameCore &&
+                            gameCore->MoveActionBarSlot(pendingActionMoveSlot, slotIndex))
                         {
                             AZ_Printf(
                                 "amandacore",
@@ -4132,7 +4142,9 @@ namespace UiClient
                 {
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(SpellbookAbilityPayloadType))
                     {
-                        const auto* drag = static_cast<const SpellbookAbilityDragPayload*>(payload->Data);
+                        const auto* drag = payload->DataSize == sizeof(SpellbookAbilityDragPayload)
+                            ? static_cast<const SpellbookAbilityDragPayload*>(payload->Data)
+                            : nullptr;
                         const NetClient::SpellbookEntryState* draggedEntry =
                             drag && drag->m_abilityId[0] != '\0'
                             ? FindSpellbookEntry(worldState.m_session, drag->m_abilityId)
@@ -4158,9 +4170,12 @@ namespace UiClient
                     }
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ActionBarSlotPayloadType))
                     {
-                        const auto* drag = static_cast<const ActionBarSlotDragPayload*>(payload->Data);
-                        if (drag && drag->m_sourceSlotIndex >= 0 && drag->m_sourceSlotIndex != slotIndex &&
-                            gameCore->MoveActionBarSlot(drag->m_sourceSlotIndex, slotIndex))
+                        const auto* drag = payload->DataSize == sizeof(ActionBarSlotDragPayload)
+                            ? static_cast<const ActionBarSlotDragPayload*>(payload->Data)
+                            : nullptr;
+                        if (drag && IsValidActionSlotIndex(drag->m_sourceSlotIndex) &&
+                            drag->m_sourceSlotIndex != slotIndex &&
+                            gameCore && gameCore->MoveActionBarSlot(drag->m_sourceSlotIndex, slotIndex))
                         {
                             AZ_Printf(
                                 "amandacore",
@@ -4176,7 +4191,7 @@ namespace UiClient
 
                 if (hasAbility && editMode && ImGui::IsItemClicked(ImGuiMouseButton_Right))
                 {
-                    if (gameCore->ClearActionBarSlot(slotIndex))
+                    if (gameCore && gameCore->ClearActionBarSlot(slotIndex))
                     {
                         AZ_Printf("amandacore", "client.action_bar_clear_requested slot=%d", slotIndex);
                     }
@@ -4280,9 +4295,9 @@ namespace UiClient
 
             ImGui::Spacing();
             const bool clearPressed = ImGui::Button("Clear Slot", ImVec2(112.0f, 26.0f));
-            if (clearPressed && pendingActionMoveSlot >= 0)
+            if (clearPressed && IsValidActionSlotIndex(pendingActionMoveSlot))
             {
-                if (gameCore->ClearActionBarSlot(pendingActionMoveSlot))
+                if (gameCore && gameCore->ClearActionBarSlot(pendingActionMoveSlot))
                 {
                     AZ_Printf("amandacore", "client.action_bar_clear_requested slot=%d source=clear_drop_target", pendingActionMoveSlot);
                 }
@@ -4293,8 +4308,11 @@ namespace UiClient
             {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ActionBarSlotPayloadType))
                 {
-                    const auto* drag = static_cast<const ActionBarSlotDragPayload*>(payload->Data);
-                    if (drag && drag->m_sourceSlotIndex >= 0 && gameCore->ClearActionBarSlot(drag->m_sourceSlotIndex))
+                    const auto* drag = payload->DataSize == sizeof(ActionBarSlotDragPayload)
+                        ? static_cast<const ActionBarSlotDragPayload*>(payload->Data)
+                        : nullptr;
+                    if (drag && IsValidActionSlotIndex(drag->m_sourceSlotIndex) &&
+                        gameCore && gameCore->ClearActionBarSlot(drag->m_sourceSlotIndex))
                     {
                         AZ_Printf(
                             "amandacore",
@@ -4886,6 +4904,10 @@ namespace UiClient
             const int slotCount = worldState.m_session.m_inventory.m_slotCount > 0
                 ? worldState.m_session.m_inventory.m_slotCount
                 : static_cast<int>(worldState.m_session.m_inventory.m_slots.size());
+            auto validInventorySlot = [slotCount](int slotIndex)
+            {
+                return slotIndex >= 0 && slotIndex < slotCount;
+            };
 
             ImGui::Text("Frontier Pack  |  %d / %d occupied", CountOccupiedSlots(worldState.m_session.m_inventory), slotCount);
             ImGui::Text("Currency  %s", FormatCurrency(worldState.m_session.m_currency).c_str());
@@ -4966,8 +4988,10 @@ namespace UiClient
                 {
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(InventorySlotPayloadType))
                     {
-                        const auto* drag = static_cast<const InventorySlotDragPayload*>(payload->Data);
-                        if (drag && drag->m_sourceSlotIndex >= 0 && drag->m_sourceSlotIndex != slotIndex &&
+                        const auto* drag = payload->DataSize == sizeof(InventorySlotDragPayload)
+                            ? static_cast<const InventorySlotDragPayload*>(payload->Data)
+                            : nullptr;
+                        if (drag && validInventorySlot(drag->m_sourceSlotIndex) && drag->m_sourceSlotIndex != slotIndex &&
                             gameCore && gameCore->MoveInventorySlot(drag->m_sourceSlotIndex, slotIndex))
                         {
                             AZ_Printf(
@@ -4980,8 +5004,10 @@ namespace UiClient
                     }
                     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(EquipmentSlotPayloadType))
                     {
-                        const auto* drag = static_cast<const EquipmentSlotDragPayload*>(payload->Data);
-                        if (drag && gameCore && gameCore->UnequipInventorySlot(drag->m_slot))
+                        const auto* drag = payload->DataSize == sizeof(EquipmentSlotDragPayload)
+                            ? static_cast<const EquipmentSlotDragPayload*>(payload->Data)
+                            : nullptr;
+                        if (drag && drag->m_slot[0] != '\0' && gameCore && gameCore->UnequipInventorySlot(drag->m_slot))
                         {
                             AZ_Printf(
                                 "amandacore",
@@ -4994,7 +5020,7 @@ namespace UiClient
                 }
                 if (pressed)
                 {
-                    if (pendingInventoryMoveSlot >= 0)
+                    if (validInventorySlot(pendingInventoryMoveSlot))
                     {
                         if (pendingInventoryMoveSlot != slotIndex &&
                             gameCore && gameCore->MoveInventorySlot(pendingInventoryMoveSlot, slotIndex))
@@ -5005,6 +5031,10 @@ namespace UiClient
                                 pendingInventoryMoveSlot,
                                 slotIndex);
                         }
+                        pendingInventoryMoveSlot = -1;
+                    }
+                    else if (pendingInventoryMoveSlot >= 0)
+                    {
                         pendingInventoryMoveSlot = -1;
                     }
                     else if (slotState && !slotState->m_itemId.empty() && slotState->m_stackCount > 0)
@@ -5584,8 +5614,10 @@ namespace UiClient
                     {
                         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(InventorySlotPayloadType))
                         {
-                            const auto* drag = static_cast<const InventorySlotDragPayload*>(payload->Data);
-                            if (drag && drag->m_sourceSlotIndex >= 0)
+                            const auto* drag = payload->DataSize == sizeof(InventorySlotDragPayload)
+                                ? static_cast<const InventorySlotDragPayload*>(payload->Data)
+                                : nullptr;
+                            if (drag && FindInventorySlot(worldState.m_session.m_inventory, drag->m_sourceSlotIndex))
                             {
                                 selectedSellSlot = drag->m_sourceSlotIndex;
                             }
@@ -6555,7 +6587,9 @@ namespace UiClient
             {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(InventorySlotPayloadType))
                 {
-                    const auto* drag = static_cast<const InventorySlotDragPayload*>(payload->Data);
+                    const auto* drag = payload->DataSize == sizeof(InventorySlotDragPayload)
+                        ? static_cast<const InventorySlotDragPayload*>(payload->Data)
+                        : nullptr;
                     const NetClient::InventorySlotState* source =
                         drag ? FindInventorySlot(worldState.m_session.m_inventory, drag->m_sourceSlotIndex) : nullptr;
                     if (!source || source->m_itemId.empty())
@@ -7858,6 +7892,7 @@ namespace UiClient
         m_lastErrorMessage.clear();
         m_activeInteractionEntityId.clear();
         m_activeInteractionKind.clear();
+        m_gameplayPanelStack.clear();
         m_questToastExpiresAt = 0;
         m_lastHandledInteractionSequence = 0;
         m_questGossipOpen = false;
@@ -7869,6 +7904,7 @@ namespace UiClient
         m_loggedActionBarVisible = false;
         m_eventLog.clear();
         m_shiftHeld = false;
+        m_lastUiEditMode = false;
         m_pendingActionAssignmentAbilityId.clear();
         m_pendingActionMoveSlot = -1;
         m_pendingInventoryMoveSlot = -1;
@@ -8392,16 +8428,60 @@ namespace UiClient
         m_auctionOpen = false;
         m_vendorOpen = false;
         m_professionsOpen = false;
+        RemoveGameplayPanelFromStack(PanelProfessions);
         m_activeInteractionEntityId.clear();
         m_activeInteractionKind.clear();
         return true;
+    }
+
+    void UiClientSystemComponent::ClearPendingUiInteractionState()
+    {
+        m_pendingActionAssignmentAbilityId.clear();
+        m_pendingActionMoveSlot = -1;
+        m_pendingInventoryMoveSlot = -1;
     }
 
     void UiClientSystemComponent::MarkGameplayPanelOpened(const char* panelId)
     {
         if (panelId && panelId[0] != '\0' && IsGameplayPanelOpen(panelId))
         {
-            m_topGameplayPanel = panelId;
+            RemoveGameplayPanelFromStack(panelId);
+            m_gameplayPanelStack.push_back(panelId);
+        }
+    }
+
+    void UiClientSystemComponent::RemoveGameplayPanelFromStack(const char* panelId)
+    {
+        if (!panelId || panelId[0] == '\0')
+        {
+            return;
+        }
+
+        for (auto it = m_gameplayPanelStack.begin(); it != m_gameplayPanelStack.end();)
+        {
+            if (*it == panelId)
+            {
+                it = m_gameplayPanelStack.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
+    void UiClientSystemComponent::SyncGameplayPanelStack()
+    {
+        for (auto it = m_gameplayPanelStack.begin(); it != m_gameplayPanelStack.end();)
+        {
+            if (!IsGameplayPanelOpen(it->c_str()))
+            {
+                it = m_gameplayPanelStack.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
         }
     }
 
@@ -8514,10 +8594,8 @@ namespace UiClient
         {
             m_helpOpen = false;
         }
-        if (!m_topGameplayPanel.empty() && strcmp(m_topGameplayPanel.c_str(), panelName) == 0)
-        {
-            m_topGameplayPanel.clear();
-        }
+        ClearPendingUiInteractionState();
+        RemoveGameplayPanelFromStack(panelName);
         AZ_Printf(
             "amandacore",
             "client.gameplay_panel_closed panel=%s reason=%s",
@@ -8528,6 +8606,7 @@ namespace UiClient
 
     void UiClientSystemComponent::ResetHudLayout()
     {
+        ClearPendingUiInteractionState();
         m_chatOffsetX = 0.0f;
         m_chatOffsetY = 0.0f;
         m_objectiveTrackerOffsetX = 0.0f;
@@ -8569,6 +8648,7 @@ namespace UiClient
         m_rightActionBarOneVisible = true;
         m_rightActionBarTwoVisible = false;
         m_pendingKeybindActionId.clear();
+        ClearPendingUiInteractionState();
         m_keybindNotice = "All local UI options reset to defaults.";
         LoadDefaultKeybindings();
         ResetHudLayout();
@@ -8608,10 +8688,17 @@ namespace UiClient
 
     bool UiClientSystemComponent::CloseOpenGameplayPanel(const char* reason)
     {
-        if (!m_topGameplayPanel.empty() && CloseGameplayPanelById(m_topGameplayPanel.c_str(), reason))
+        SyncGameplayPanelStack();
+        while (!m_gameplayPanelStack.empty())
         {
-            return true;
+            const AZStd::string panelId = m_gameplayPanelStack.back();
+            if (CloseGameplayPanelById(panelId.c_str(), reason))
+            {
+                return true;
+            }
+            RemoveGameplayPanelFromStack(panelId.c_str());
         }
+
         const char* fallbackOrder[] = {
             PanelGameMenu,
             PanelSettings,
@@ -9026,6 +9113,7 @@ namespace UiClient
 
     void UiClientSystemComponent::BeginChatInput()
     {
+        ClearPendingUiInteractionState();
         m_chatInputActive = true;
         m_chatFocusRequested = true;
         ImGui::ImGuiManagerBus::Broadcast(&ImGui::IImGuiManager::SetEnableDiscreteInputMode, true);
@@ -9671,6 +9759,22 @@ namespace UiClient
             return true;
         }
 
+        if (channelId == AzFramework::InputDeviceKeyboard::Key::Escape)
+        {
+            if (CloseNpcInteraction("esc"))
+            {
+                return true;
+            }
+            if (CloseOpenGameplayPanel("esc"))
+            {
+                return true;
+            }
+            m_gameMenuOpen = true;
+            MarkGameplayPanelOpened(PanelGameMenu);
+            AZ_Printf("amandacore", "client.game_menu_visible open=true reason=esc");
+            return true;
+        }
+
         if (channelId == AzFramework::InputDeviceKeyboard::Key::EditEnter)
         {
             if (!m_chatInputActive && !ImGui::GetIO().WantTextInput)
@@ -9719,6 +9823,11 @@ namespace UiClient
         ImGuiIO& io = ImGui::GetIO();
         io.FontGlobalScale = AZ::GetClamp(m_uiScale * m_readabilityScale, 0.75f, 1.40f);
         g_tooltipsVisible = m_tooltipsVisible;
+        if (m_lastUiEditMode && !m_uiEditMode)
+        {
+            ClearPendingUiInteractionState();
+        }
+        m_lastUiEditMode = m_uiEditMode;
         const ImVec2 displaySize = io.DisplaySize;
         if (displaySize.x <= 1.0f || displaySize.y <= 1.0f)
         {
@@ -9733,6 +9842,8 @@ namespace UiClient
         }
         if (preWorldActive)
         {
+            ClearPendingUiInteractionState();
+            m_gameplayPanelStack.clear();
             CloseNpcInteraction("pre_world");
             m_talentsOpen = false;
             m_professionsOpen = false;
@@ -9761,6 +9872,8 @@ namespace UiClient
 
         if (!worldState.m_worldConnected)
         {
+            ClearPendingUiInteractionState();
+            m_gameplayPanelStack.clear();
             CloseNpcInteraction("disconnect");
             m_talentsOpen = false;
             m_professionsOpen = false;
@@ -10512,9 +10625,9 @@ namespace UiClient
                 {
                     MarkGameplayPanelOpened(PanelHelp);
                 }
-                else if (!m_gameMenuOpen && m_topGameplayPanel == PanelGameMenu)
+                else if (!m_gameMenuOpen)
                 {
-                    m_topGameplayPanel.clear();
+                    RemoveGameplayPanelFromStack(PanelGameMenu);
                 }
             }
         }
