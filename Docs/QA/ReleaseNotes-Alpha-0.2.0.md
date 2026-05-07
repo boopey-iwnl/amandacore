@@ -10,7 +10,7 @@ Package manifest: `release-package-manifest.json`
 
 Alpha 0.2.0 promotes the consolidated UI overhaul to the prerelease line. It keeps the .NET launcher as the patcher, updater, local-ops, and bootstrap shell while moving the playable flow toward an O3DE-rendered in-client login, realm, character, and world-entry experience.
 
-This release is clean-room AmandaCore work. It does not add addon APIs, Lua addon loading, an AddOns folder, plugin runtimes, user-installed UI modules, arbitrary UI script execution, or dependencies on machine-local texture folders.
+This release is clean-room AmandaCore work. It does not add addon APIs, Lua addon loading, an AddOns folder, plugin runtimes, user-installed UI modules, arbitrary UI script execution, or dependencies on local texture download folders.
 
 ## UI M1-M10 Summary
 
@@ -63,6 +63,6 @@ This release is clean-room AmandaCore work. It does not add addon APIs, Lua addo
 ## Clean-Room And Packaging Notes
 
 - No Blizzard, WoW, private-server, addon, or third-party UI assets are intentionally included.
-- No runtime/package reference to `C:\Users\forwo\Downloads\textures` or `Downloads\textures` is allowed.
+- No runtime/package reference to local texture download folders is allowed.
 - No AddOns folder, addon API, Lua addon loading, plugin runtime, user-installed UI module, or arbitrary UI script execution is included.
 - Package validation must confirm the archive excludes secrets, local DBs, logs, diagnostics, screenshots, nested zips, temp/cache/build junk, runtime tickets, and machine-local paths.
