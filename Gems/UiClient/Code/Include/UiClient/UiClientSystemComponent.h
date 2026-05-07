@@ -45,8 +45,14 @@ namespace UiClient
             int rewardSilver,
             int rewardCopper);
         void AddHudEvent(const AZStd::string& message);
+        void AddNotification(const AZStd::string& title, const AZStd::string& message);
         void AddCombatFeedbackPulse(const AZStd::string& message, AZ::s64 nowMs);
         void DrawCombatFeedbackPulses(AZ::s64 nowMs, const ImVec2& displaySize);
+        void DrawNotifications(AZ::s64 nowMs, const ImVec2& displaySize);
+        void DrawTutorialHints(const GameCore::ClientWorldState& worldState, const ImVec2& displaySize);
+        void ResetTutorialState();
+        void MarkTutorialDismissed(int tutorialIndex);
+        void OpenHelpPanel(const char* source);
         void LoadUiSettings();
         void SaveUiSettings() const;
         void LoadDefaultKeybindings();
@@ -87,6 +93,13 @@ namespace UiClient
         AZStd::string m_selectedQuestId;
         AZStd::string m_questToast;
         AZStd::deque<AZStd::string> m_eventLog;
+        struct NotificationToast
+        {
+            AZStd::string m_title;
+            AZStd::string m_message;
+            AZ::s64 m_expiresAt = 0;
+        };
+        AZStd::deque<NotificationToast> m_notifications;
         AZStd::deque<AZStd::string> m_combatPulseTexts;
         AZStd::deque<AZ::s64> m_combatPulseExpiresAt;
         AZ::u64 m_lastHandledInteractionSequence = 0;
@@ -100,6 +113,7 @@ namespace UiClient
         bool m_bagOpen = false;
         bool m_gameMenuOpen = false;
         bool m_settingsOpen = false;
+        bool m_helpOpen = false;
         bool m_socialOpen = false;
         bool m_auctionOpen = false;
         bool m_vendorOpen = false;
@@ -121,6 +135,10 @@ namespace UiClient
         bool m_actionBarsVisible = true;
         bool m_combatTextVisible = true;
         bool m_nameplatesVisible = true;
+        bool m_tutorialsEnabled = true;
+        bool m_keybindHintsVisible = true;
+        bool m_tooltipsVisible = true;
+        bool m_notificationsVisible = true;
         bool m_tooltipComparisonEnabled = true;
         bool m_reduceUiMotion = false;
         AZStd::string m_layoutProfileName = "Default";
@@ -162,11 +180,13 @@ namespace UiClient
         char m_guildMotdBuffer[161]{};
         char m_auctionSearchBuffer[65]{};
         char m_auctionBuyoutBuffer[33]{};
+        char m_helpFilterBuffer[65]{};
         int m_auctionTab = 0;
         int m_pendingAuctionSellSlot = -1;
         int m_pendingAuctionBuyoutIndex = -1;
         int m_auctionStackCount = 1;
         int m_selectedMailIndex = -1;
+        int m_helpCategoryIndex = 0;
         int m_pendingVendorSellSlot = -1;
         int m_vendorStackCount = 1;
         int m_createLineageIndex = 0;
@@ -179,8 +199,10 @@ namespace UiClient
         int m_pendingActionMoveSlot = -1;
         int m_pendingInventoryMoveSlot = -1;
         AZStd::string m_characterPanelNotice;
+        AZStd::array<bool, 10> m_tutorialDismissed{};
         float m_previewYaw = 0.0f;
         float m_previewZoom = 1.0f;
+        float m_notificationDurationSeconds = 4.5f;
         float m_chatOffsetX = 0.0f;
         float m_chatOffsetY = 0.0f;
         float m_objectiveTrackerOffsetX = 0.0f;
