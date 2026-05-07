@@ -396,6 +396,7 @@ foreach ($script in @(
     @{ Name = "migration check"; Path = Join-Path $PSScriptRoot "Check-Migrations.ps1" },
     @{ Name = "legacy state import"; Path = Join-Path $PSScriptRoot "Import-LegacyState.ps1" },
     @{ Name = "release package assert"; Path = Join-Path $PSScriptRoot "Assert-ReleasePackage.ps1" },
+    @{ Name = "UI smoke checklist"; Path = Join-Path $PSScriptRoot "Validate-UiSmokeChecklist.ps1" },
     @{ Name = "scale soak"; Path = Join-Path $PSScriptRoot "Run-ScaleSoak.ps1" },
     @{ Name = "release candidate validation"; Path = Join-Path $PSScriptRoot "Validate-ReleaseCandidate.ps1" }
 )) {
